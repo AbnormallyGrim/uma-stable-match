@@ -106,6 +106,10 @@ Club data refreshes automatically every 30 minutes by default. The page shows wh
 
 ## Understanding your results
 
+![All results table listing every analysed club with its tier, rank, last month's rank, open spots, join style, median daily gain, your place, balance score, passengers, top-3 share and fit score, with search, a hide-closed-clubs filter and sortable columns](docs/images/demo-results-table.png)
+
+<sub>The All results table, shown with sample data. Search by name, hide closed clubs, or select a column to sort.</sub>
+
 | Field | Meaning |
 |---|---|
 | **Fit** | How well the club suits you. **Lower is better.** |
