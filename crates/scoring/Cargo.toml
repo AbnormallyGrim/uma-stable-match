@@ -1,0 +1,15 @@
+[package]
+name = "uma-stable-match-scoring"
+description = "Scores Umamusume: Pretty Derby clubs by how well they fit a trainer's fan pace and how evenly their members contribute."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "uma_stable_match_scoring"
+
+[dependencies]
+
+[lints]
+workspace = true
