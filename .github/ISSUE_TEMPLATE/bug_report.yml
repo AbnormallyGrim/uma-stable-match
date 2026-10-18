@@ -1,0 +1,60 @@
+name: Bug report
+description: Something isn't working as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please **don't include personal information** such as your trainer ID, API key or email address. For security issues, use the [Security tab](https://github.com/AbnormallyGrim/uma-stable-match/security) instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. See error ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Web interface
+        - API / server
+        - Scoring results
+        - Installation / Docker
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: e.g. v0.1.0 or a commit hash
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, browser, and how you're running it (Docker or locally).
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove any API keys, trainer IDs or other personal details first.
+      render: text
