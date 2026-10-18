@@ -279,11 +279,11 @@ let ranked = score_clubs(&trainer, &clubs, &options);
 
 ## Contributing
 
-Bug reports and suggestions are welcome. Please [open an issue](https://github.com/AbnormallyGrim/uma-stable-match/issues) before starting on larger changes.
+Bug reports, ideas and pull requests are welcome. See the [Contributing guide](CONTRIBUTING.md) for the workflow, branch naming and checks, and ask questions in [Discussions](https://github.com/AbnormallyGrim/uma-stable-match/discussions).
 
-Before submitting code, run `cargo fmt`, `cargo clippy` and `cargo test`, plus `npm run check` and `npm test` in `web/`.
+To report a security issue, follow the [Security Policy](SECURITY.md) rather than opening a public issue.
 
-To report a security issue, use [private vulnerability reporting](https://github.com/AbnormallyGrim/uma-stable-match/security/advisories/new) rather than a public issue.
+This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
