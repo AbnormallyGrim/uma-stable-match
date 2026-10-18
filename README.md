@@ -2,6 +2,10 @@
 
 **Find your stable.** Uma Stable Match recommends Umamusume: Pretty Derby clubs that suit you: clubs where your fan pace fits, the club is climbing, and members pull their weight.
 
+![Stable Match results page: a summary of your pace and the clubs analysed, followed by ranked club recommendations showing each club's tier, rank trend, open spots, balance score and your expected place](docs/images/demo.png)
+
+<sub>Example results page, shown with sample data.</sub>
+
 > [!IMPORTANT]
 > Unofficial, non-commercial fan tool. Not affiliated with uma.moe or Cygames, Inc. See [Disclaimer](#disclaimer).
 
