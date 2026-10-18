@@ -22,3 +22,66 @@ rustc-ice-*.txt
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# ---------------------------------------------------------------------------
+# Secrets — never commit API keys or local config
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Web frontend (Node / Vite / Svelte / TypeScript)
+# ---------------------------------------------------------------------------
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+*.tsbuildinfo
+coverage/
+
+# Playwright test output
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Package manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------------------------------------------------------------------------
+# Local runtime data (Docker volumes, Redis dumps, logs)
+# ---------------------------------------------------------------------------
+/data/
+dump.rdb
+*.log
+
+# ---------------------------------------------------------------------------
+# Generated reports from local test runs
+# ---------------------------------------------------------------------------
+club_report*.html
+club_candidates*.csv
+
+# ---------------------------------------------------------------------------
+# macOS
+# ---------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ---------------------------------------------------------------------------
+# Editors (keep shared VS Code recommendations, ignore personal settings)
+# ---------------------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*~
