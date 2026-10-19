@@ -1,3 +1,5 @@
+//! Works out a trainer's pace from their trainer ID.
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -5,14 +7,19 @@ use std::time::{Duration, Instant};
 use uma_stable_match_scoring::daily_pace;
 use uma_stable_match_umamoe_client::{CircleRequest, CircleResponse, Client, Error, StatusCode};
 
+/// How long a looked-up pace is reused.
 pub const DEFAULT_PACE_TTL: Duration = Duration::from_secs(10 * 60);
 
+/// Why a trainer's pace couldn't be found. Messages never include the trainer ID.
 #[derive(Debug, thiserror::Error)]
 pub enum PaceError {
+    /// uma.moe doesn't know the trainer, or they aren't in the club it returned.
     #[error("trainer not found")]
     NotFound,
+    /// Fewer than 3 days of data, or no gain this month.
     #[error("not enough fan data this month to work out a pace")]
     NotEnoughData,
+    /// The uma.moe request failed.
     #[error("could not reach uma.moe")]
     Upstream(#[source] Error),
 }
@@ -34,6 +41,7 @@ impl Outcome {
     }
 }
 
+/// Looks up trainers' paces, reusing results for a while. Clones share the cache.
 #[derive(Debug, Clone)]
 pub struct PaceLookup {
     client: Client,
@@ -42,6 +50,7 @@ pub struct PaceLookup {
 }
 
 impl PaceLookup {
+    /// Reuses each result for `ttl`.
     pub fn new(client: Client, ttl: Duration) -> Self {
         Self {
             client,
@@ -50,6 +59,9 @@ impl PaceLookup {
         }
     }
 
+    /// The trainer's daily fan gain this month.
+    ///
+    /// Found and not-found results are cached; uma.moe failures aren't.
     pub async fn pace(&self, viewer_id: u64) -> Result<f64, PaceError> {
         if let Some(outcome) = self.cached(viewer_id) {
             return outcome.into_result();

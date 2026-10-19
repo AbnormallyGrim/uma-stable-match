@@ -1,3 +1,5 @@
+//! Trainer pace lookup tests against a mock server. All data is made up.
+
 use std::time::Duration;
 
 use axum::body::Body;

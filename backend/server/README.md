@@ -1,6 +1,6 @@
 # uma-stable-match-server
 
-The API server for Uma Stable Match. It scans uma.moe for candidate clubs on a schedule, keeps the results in memory, and recommends clubs for a trainer's daily fan pace.
+The API server for Uma Stable Match. It scans uma.moe for candidate clubs on a schedule, keeps the results in memory, and recommends clubs for a daily fan pace or a trainer ID.
 
 ## Run
 
@@ -18,7 +18,7 @@ Run these from the repository root. The server reads the first `.env` it finds i
 | `UMAMOE_API_KEY` | none (required) | uma.moe API key. Create one in your uma.moe settings |
 | `UMAMOE_BASE_URL` | `https://uma.moe` | API base URL override, for testing against a mock |
 | `BIND_ADDR` | `127.0.0.1:3000` | Address and port to listen on. Use `0.0.0.0:3000` in a container |
-| `RUST_LOG` | `info` | Log filter, such as `debug` or `uma_stable_match_server=debug` |
+| `RUST_LOG` | `info` | Log filter, such as `debug` or `uma_stable_match_server=debug`. At `debug`, the HTTP libraries can log request URLs, which include trainer IDs |
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to scan |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to scan |
 | `SCAN_MAX_DETAILS` | `80` | Most clubs to fetch member data for in each scan |
@@ -53,7 +53,7 @@ Scan results live in memory only, so nothing is written to disk. When the server
 |---|---|---|
 | `GET` | `/health` | `200 {"status":"ok"}` |
 | `GET` | `/api/status` | `200` with the scan state, below |
-| `GET` | `/api/recommendations` | Ranked clubs for a pace, below |
+| `GET` | `/api/recommendations` | Ranked clubs for a pace or trainer, below |
 
 `/api/status` looks like this:
 
@@ -73,9 +73,18 @@ Scan results live in memory only, so nothing is written to disk. When the server
 
 | Parameter | Required | Meaning |
 |---|---|---|
-| `pace` | Yes | Your daily fan gain, such as `7600000` |
+| `pace` | One of these two | Your daily fan gain, such as `7600000` |
+| `viewer_id` | One of these two | Your trainer ID. The server works out your pace from your own fan data this month |
 | `balance_weight` | No | Turns on balance scoring with this weight, from 0 to 1 |
 | `include_closed` | No | `true` to include clubs that aren't accepting members. Defaults to `false` |
+
+#### Looking up a trainer
+
+With `viewer_id`, the server fetches that trainer's club from uma.moe and finds their snapshot (the latest month if there's more than one). It then calculates their pace with `daily_pace`, which needs at least 3 days of data and a gain above zero. The response's `pace` is the calculated value; the trainer ID isn't echoed back.
+
+- **Cached for 10 minutes.** A found pace, and a "not found" or "not enough data" answer, is reused for that long, so repeat requests don't call uma.moe again. Failed uma.moe requests aren't cached.
+- **IDs stay out of logs.** Trainer IDs never appear in log messages or error responses. Failed lookups log only the HTTP status.
+- **No lookup without results.** Before the first scan finishes, the endpoint returns `503` without contacting uma.moe.
 
 Clubs with fewer than 8 rankable members aren't returned, and with balance scoring on, neither are clubs whose balance can't be measured.
 
@@ -129,7 +138,10 @@ Errors come back as `{"error": "..."}`:
 
 | Status | When |
 |---|---|
-| `400` | `pace` is missing, not a number, or zero or below; `balance_weight` isn't a number from 0 to 1; or `include_closed` isn't `true` or `false` |
+| `400` | Neither or both of `pace` and `viewer_id` are given; `pace` is not a number, or zero or below; `viewer_id` isn't a trainer ID; `balance_weight` isn't a number from 0 to 1; or `include_closed` isn't `true` or `false` |
+| `404` | uma.moe doesn't know the trainer, or they aren't in their club's data |
+| `422` | The trainer has too little fan data this month to work out a pace |
+| `502` | uma.moe couldn't be reached for the trainer lookup |
 | `503` | No scan has finished yet. Try again shortly |
 
 ## Shutdown

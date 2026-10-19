@@ -1,4 +1,4 @@
-//! `GET /api/recommendations`: scores the cached clubs for a pace.
+//! `GET /api/recommendations`: scores the cached clubs for a pace or a trainer.
 
 use axum::extract::{Query, State};
 use axum::http::StatusCode;

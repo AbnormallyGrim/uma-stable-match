@@ -11,13 +11,16 @@ use crate::cache::Cache;
 use crate::pace::PaceLookup;
 use crate::recommendations::recommendations;
 
+/// Shared state for request handlers.
 #[derive(Debug, Clone)]
 pub struct AppState {
+    /// Scan results.
     pub cache: Cache,
+    /// Trainer pace lookups.
     pub paces: PaceLookup,
 }
 
-/// The server's routes, reading scan results from `cache`.
+/// The server's routes.
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
