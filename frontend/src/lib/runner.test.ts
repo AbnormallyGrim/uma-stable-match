@@ -1,3 +1,5 @@
+// SearchRunner tests. All data is made up.
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError, type RecommendationQuery, type Recommendations } from './api';

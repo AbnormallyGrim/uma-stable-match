@@ -1,3 +1,5 @@
+// Search message tests. All data is made up.
+
 import { describe, expect, it } from 'vitest';
 
 import { ApiError } from './api';

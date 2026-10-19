@@ -1,9 +1,14 @@
+/** Search state machine: loading, retries, countdowns and errors. Framework-free, so it's easy to test. */
+
 import { ApiError, type RecommendationQuery, type Recommendations } from './api';
 import { SCAN_STILL_LOADING, describeError, type ErrorMessage } from './states';
 
+/** Seconds to wait before each retry while the first scan runs (about 2 minutes in total). */
 export const RETRY_DELAYS = [5, 10, 20, 30, 30, 30];
+/** Seconds to wait after a 429 without a `Retry-After` header. */
 export const DEFAULT_RATE_LIMIT_WAIT = 10;
 
+/** Where a search is up to. `retryIn` counts down in seconds. */
 export type SearchPhase =
   | { phase: 'idle' }
   | { phase: 'loading' }
@@ -12,16 +17,19 @@ export type SearchPhase =
   | { phase: 'rate-limited'; retryIn: number }
   | { phase: 'error'; message: ErrorMessage };
 
+/** The current phase, plus the last successful result, which is kept while a new search loads. */
 export interface SearchState {
   status: SearchPhase;
   result: Recommendations | null;
 }
 
+/** Timer functions, replaceable in tests. */
 export interface Timers {
   setTimeout: (fn: () => void, ms: number) => unknown;
   clearTimeout: (id: unknown) => void;
 }
 
+/** How the runner fetches and reports. `delays` overrides `RETRY_DELAYS`. */
 export interface RunnerOptions {
   fetch: (query: RecommendationQuery, signal: AbortSignal) => Promise<Recommendations>;
   onchange: (state: SearchState) => void;
@@ -29,6 +37,12 @@ export interface RunnerOptions {
   timers?: Timers;
 }
 
+/**
+ * Runs searches and handles waiting: retries automatically while the first scan runs (503),
+ * counts down after a rate limit (429) and describes other errors.
+ *
+ * Starting a new search cancels any earlier request and pending retry.
+ */
 export class SearchRunner {
   private state: SearchState = { status: { phase: 'idle' }, result: null };
   private query: RecommendationQuery | null = null;
@@ -50,12 +64,14 @@ export class SearchRunner {
     };
   }
 
+  /** Starts a new search. */
   run(query: RecommendationQuery) {
     this.query = query;
     this.attempt = 0;
     void this.send();
   }
 
+  /** Retries the last search now, unless it's loading or a rate limit is still counting down. */
   retryNow() {
     const { status } = this.state;
     if (this.query === null) return;
@@ -64,6 +80,7 @@ export class SearchRunner {
     void this.send();
   }
 
+  /** Stops timers and cancels the request in flight. */
   dispose() {
     this.stopTimer();
     this.controller?.abort();

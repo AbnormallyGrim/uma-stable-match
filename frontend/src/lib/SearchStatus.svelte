@@ -1,3 +1,9 @@
+<!--
+  @component
+  Shows the search's phase: loading, waiting for the first scan, rate limited or an error.
+  `onretry` runs when the visitor chooses to retry.
+-->
+
 <script lang="ts">
   import type { SearchPhase } from './runner';
 

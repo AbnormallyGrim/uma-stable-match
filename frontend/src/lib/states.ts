@@ -1,17 +1,22 @@
+/** User-facing messages for search errors and empty results. */
+
 import { ApiError, type Recommendations } from './api';
 
+/** A friendly error: a short title, what to do, and whether retrying can help. */
 export interface ErrorMessage {
   title: string;
   detail: string;
   canRetry: boolean;
 }
 
+/** Shown when the first scan is still running after every retry. */
 export const SCAN_STILL_LOADING: ErrorMessage = {
   title: "Club data still isn't ready",
   detail: 'The first scan is taking longer than usual. Try again in a minute.',
   canRetry: true,
 };
 
+/** A friendly message for a failed search. */
 export function describeError(error: unknown): ErrorMessage {
   if (!(error instanceof ApiError)) {
     return { title: 'Something went wrong', detail: 'Try again in a moment.', canRetry: true };
@@ -69,6 +74,7 @@ function describeStatus(error: ApiError): ErrorMessage {
   }
 }
 
+/** Suggestions for widening a search that found nothing. */
 export function emptyHints(options: Recommendations['options']): string[] {
   const hints: string[] = [];
   if (!options.include_closed) {
