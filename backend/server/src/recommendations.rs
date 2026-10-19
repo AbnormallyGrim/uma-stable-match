@@ -1,5 +1,6 @@
 //! `GET /api/v1/recommendations`: scores the cached clubs for a pace or a trainer.
 
+use axum::extract::rejection::QueryRejection;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Extension;
@@ -85,8 +86,9 @@ struct BalanceView {
 pub(crate) async fn recommendations(
     State(state): State<AppState>,
     Extension(visitor): Extension<Visitor>,
-    Query(params): Query<Params>,
+    params: Result<Query<Params>, QueryRejection>,
 ) -> Result<Json<Recommendations>, ApiError> {
+    let Query(params) = params.map_err(|_| ApiError::bad_request("invalid query string"))?;
     let pace = blank_to_none(&params.pace);
     let trainer_id = blank_to_none(&params.trainer_id);
     let source = match (pace, trainer_id) {

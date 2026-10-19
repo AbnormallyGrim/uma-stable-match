@@ -212,6 +212,7 @@ async fn rejects_invalid_input() {
             "?pace=5000000&limit=many",
             "limit must be a positive whole number",
         ),
+        ("?pace=1&pace=2", "invalid query string"),
     ];
     let scanned = scanned_cache().await;
     for (query, message) in cases {
