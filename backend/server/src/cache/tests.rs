@@ -1,0 +1,99 @@
+use super::*;
+use std::time::Duration;
+use uma_stable_match_umamoe_client::Error;
+
+fn scan(ids: &[u64]) -> Scan {
+    Scan {
+        clubs: ids
+            .iter()
+            .map(|id| Club {
+                circle_id: *id,
+                ..Default::default()
+            })
+            .collect(),
+        candidates: ids.len() + 1,
+        failed: 1,
+    }
+}
+
+fn failure() -> ScanError {
+    ScanError::List(Error::InvalidRequest("made-up failure".into()))
+}
+
+fn at(seconds: u64) -> SystemTime {
+    SystemTime::UNIX_EPOCH + Duration::from_secs(seconds)
+}
+
+#[test]
+fn starts_empty() {
+    let cache = Cache::new();
+    assert_eq!(cache.snapshot(), None);
+    assert_eq!(
+        cache.status(),
+        CacheStatus {
+            scanning: false,
+            snapshot: None,
+            last_error: None
+        }
+    );
+}
+
+#[test]
+fn only_one_scan_at_a_time() {
+    let cache = Cache::new();
+    assert!(cache.begin_scan());
+    assert!(!cache.begin_scan());
+    assert!(cache.status().scanning);
+    cache.finish_scan(Ok(scan(&[1])), at(10));
+    assert!(!cache.status().scanning);
+    assert!(cache.begin_scan());
+}
+
+#[test]
+fn success_replaces_snapshot_and_clears_error() {
+    let cache = Cache::new();
+    cache.begin_scan();
+    cache.finish_scan(Err(failure()), at(10));
+    cache.begin_scan();
+    cache.finish_scan(Ok(scan(&[1, 2])), at(20));
+
+    let snapshot = cache.snapshot().unwrap();
+    assert_eq!(snapshot.clubs.len(), 2);
+    assert_eq!(snapshot.candidates, 3);
+    assert_eq!(snapshot.failed, 1);
+    assert_eq!(snapshot.scanned_at, at(20));
+    assert_eq!(cache.status().last_error, None);
+}
+
+#[test]
+fn failure_keeps_last_snapshot() {
+    let cache = Cache::new();
+    cache.begin_scan();
+    cache.finish_scan(Ok(scan(&[1])), at(10));
+    cache.begin_scan();
+    cache.finish_scan(Err(failure()), at(20));
+
+    let status = cache.status();
+    assert!(!status.scanning);
+    assert_eq!(status.snapshot.unwrap().scanned_at, at(10));
+    let error = status.last_error.unwrap();
+    assert_eq!(error.at, at(20));
+    assert!(error.message.contains("made-up failure"));
+}
+
+#[test]
+fn cancel_ends_the_scan_without_changes() {
+    let cache = Cache::new();
+    cache.begin_scan();
+    cache.cancel_scan();
+    assert_eq!(cache.status(), Cache::new().status());
+}
+
+#[test]
+fn clones_share_state() {
+    let cache = Cache::new();
+    let clone = cache.clone();
+    clone.begin_scan();
+    clone.finish_scan(Ok(scan(&[7])), at(5));
+    assert_eq!(cache.snapshot().unwrap().clubs[0].circle_id, 7);
+}
