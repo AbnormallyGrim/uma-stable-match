@@ -1,3 +1,5 @@
+//! Retry rules and backoff delays.
+
 use std::time::Duration;
 
 use reqwest::header::{HeaderMap, RETRY_AFTER};
@@ -5,14 +7,17 @@ use reqwest::StatusCode;
 
 use crate::config::RetryConfig;
 
+/// Whether a response status is worth retrying.
 pub(crate) fn is_retryable_status(status: StatusCode) -> bool {
     matches!(status.as_u16(), 429 | 500 | 502 | 503 | 504)
 }
 
+/// Whether a transport error is worth retrying.
 pub(crate) fn is_retryable_error(error: &reqwest::Error) -> bool {
     error.is_timeout() || error.is_connect()
 }
 
+/// `Retry-After` in seconds, if present. HTTP dates are ignored.
 pub(crate) fn retry_after(headers: &HeaderMap) -> Option<Duration> {
     let seconds = headers
         .get(RETRY_AFTER)?
@@ -24,6 +29,7 @@ pub(crate) fn retry_after(headers: &HeaderMap) -> Option<Duration> {
     Some(Duration::from_secs(seconds))
 }
 
+/// Delay before retry number `retry` (0-based), with `jitter` in `[0, 1)`.
 pub(crate) fn delay(
     config: &RetryConfig,
     retry: u32,
@@ -31,6 +37,7 @@ pub(crate) fn delay(
     jitter: f64,
 ) -> Duration {
     let delay = retry_after.unwrap_or_else(|| {
+        // Half fixed, half random, so clients don't retry in lockstep.
         let exp = config
             .base_delay
             .saturating_mul(2u32.saturating_pow(retry))
