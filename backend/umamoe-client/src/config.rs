@@ -28,6 +28,23 @@ impl fmt::Debug for ApiKey {
 }
 
 /// Settings for [`Client`](crate::Client).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetryConfig {
+    pub max_retries: u32,
+    pub base_delay: Duration,
+    pub max_delay: Duration,
+}
+
+impl Default for RetryConfig {
+    fn default() -> Self {
+        Self {
+            max_retries: 3,
+            base_delay: Duration::from_millis(500),
+            max_delay: Duration::from_secs(30),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
     /// API base URL, without a trailing path.
@@ -38,6 +55,7 @@ pub struct ClientConfig {
     pub timeout: Duration,
     /// Minimum gap between requests.
     pub min_interval: Duration,
+    pub retry: RetryConfig,
     /// `User-Agent` header value.
     pub user_agent: String,
 }
@@ -50,6 +68,7 @@ impl ClientConfig {
             api_key,
             timeout: Duration::from_secs(15),
             min_interval: Duration::from_millis(500),
+            retry: RetryConfig::default(),
             user_agent: concat!(
                 "uma-stable-match/",
                 env!("CARGO_PKG_VERSION"),
