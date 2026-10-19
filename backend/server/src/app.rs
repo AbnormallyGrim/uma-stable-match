@@ -8,23 +8,33 @@ use axum::{Json, Router};
 use serde_json::{json, Value};
 
 use crate::cache::Cache;
+use crate::pace::PaceLookup;
 use crate::recommendations::recommendations;
 
-/// The server's routes, reading scan results from `cache`.
-pub fn router(cache: Cache) -> Router {
+/// Shared state for request handlers.
+#[derive(Debug, Clone)]
+pub struct AppState {
+    /// Scan results.
+    pub cache: Cache,
+    /// Trainer pace lookups.
+    pub paces: PaceLookup,
+}
+
+/// The server's routes.
+pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/api/status", get(status))
         .route("/api/recommendations", get(recommendations))
-        .with_state(cache)
+        .with_state(state)
 }
 
 async fn health() -> Json<Value> {
     Json(json!({ "status": "ok" }))
 }
 
-async fn status(State(cache): State<Cache>) -> Json<Value> {
-    let status = cache.status();
+async fn status(State(state): State<AppState>) -> Json<Value> {
+    let status = state.cache.status();
     Json(json!({
         "scanning": status.scanning,
         "last_scan": status.snapshot.map(|s| json!({

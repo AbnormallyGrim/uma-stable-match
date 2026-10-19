@@ -9,7 +9,9 @@ use serde_json::{json, Value};
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tower::ServiceExt;
-use uma_stable_match_server::{router, run_scheduler, Cache, CacheStatus, ScanConfig};
+use uma_stable_match_server::{
+    router, run_scheduler, AppState, Cache, CacheStatus, PaceLookup, ScanConfig, DEFAULT_PACE_TTL,
+};
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
 use wiremock::matchers::path;
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -25,6 +27,18 @@ fn client(server: &MockServer) -> Client {
         ..ClientConfig::new(ApiKey::new("test-key"))
     })
     .unwrap()
+}
+
+fn app(cache: Cache) -> AppState {
+    let client = Client::new(ClientConfig {
+        base_url: "http://127.0.0.1:9".into(),
+        ..ClientConfig::new(ApiKey::new("test-key"))
+    })
+    .unwrap();
+    AppState {
+        cache,
+        paces: PaceLookup::new(client, DEFAULT_PACE_TTL),
+    }
 }
 
 fn list() -> ResponseTemplate {
@@ -89,7 +103,7 @@ async fn stop(running: Running) {
 }
 
 async fn status_json(cache: &Cache) -> Value {
-    let response = router(cache.clone())
+    let response = router(app(cache.clone()))
         .oneshot(Request::get("/api/status").body(Body::empty()).unwrap())
         .await
         .unwrap();
