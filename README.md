@@ -70,7 +70,7 @@ cd uma-stable-match
 cp .env.example .env
 ```
 
-Open `.env` in a text editor and paste your key:
+Open `.env` in a text editor and paste your key. Its name starts with a dot, so it's hidden: use `ls -a` to see it in a terminal, or press **Cmd+Shift+.** in Finder.
 
 ```env
 UMAMOE_API_KEY=your-key-here
@@ -82,7 +82,7 @@ UMAMOE_API_KEY=your-key-here
 docker compose up -d
 ```
 
-The first start builds the image, which takes a few minutes. Club data appears about a minute after the server starts, once the first scan finishes.
+Compose builds the image on your computer every time it starts; it never downloads one. The first build takes a few minutes, and later ones reuse what hasn't changed. Club data appears about a minute after the server starts, once the first scan finishes.
 
 Open **<http://localhost:8080>** in your browser.
 
@@ -96,7 +96,7 @@ To update to the latest version:
 
 ```bash
 git pull
-docker compose up -d --build
+docker compose up -d
 ```
 
 ### Docker details
