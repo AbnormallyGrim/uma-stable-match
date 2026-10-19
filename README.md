@@ -240,21 +240,21 @@ These rules can change, so check in-game if something doesn't match.
 ### Project layout
 
 ```
-crates/
+backend/
   scoring/         Club scoring (no network or storage dependencies)
   umamoe-client/   uma.moe API client
   server/          API server, scheduled club scanner and cache
-web/               Web interface (Svelte + TypeScript)
+frontend/          Web interface (Svelte + TypeScript)
 ```
 
 ### Run locally
 
 ```bash
 # Backend
-cargo run -p server
+cargo run -p uma-stable-match-server
 
 # Frontend (separate terminal)
-cd web
+cd frontend
 npm install
 npm run dev
 ```
@@ -263,12 +263,12 @@ npm run dev
 
 ```bash
 cargo test
-cd web && npm test
+cd frontend && npm test
 ```
 
 ### Using the scoring crate on its own
 
-The `scoring` crate has no network or storage dependencies. If you already have club and member data, you can score it directly. See the [scoring crate documentation](crates/scoring/README.md) for usage, input data and the scoring rules.
+The `scoring` crate has no network or storage dependencies. If you already have club and member data, you can score it directly. See the [scoring crate documentation](backend/scoring/README.md) for usage, input data and the scoring rules.
 
 To browse the API documentation locally:
 
