@@ -17,7 +17,9 @@ function recommendations(total: number, pace = 7_600_000): Recommendations {
 }
 
 function stubFetch(response: () => Response) {
-  const fetch = vi.fn<typeof globalThis.fetch>(() => Promise.resolve(response()));
+  const fetch = vi.fn<typeof globalThis.fetch>(
+    () => new Promise((resolve) => setTimeout(() => resolve(response()), 10)),
+  );
   vi.stubGlobal('fetch', fetch);
   return fetch;
 }
@@ -88,10 +90,12 @@ describe('App', () => {
     await fireEvent.input(trainerInput(), { target: { value: '123456789' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
     expect(localStorage.length).toBe(0);
+    await screen.findByRole('button', { name: 'Find clubs' });
 
     await fireEvent.click(screen.getByLabelText('Remember my trainer ID on this device'));
     await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
     expect(localStorage.getItem('uma-stable-match:trainer-id')).toBe('123456789');
+    await screen.findByRole('button', { name: 'Find clubs' });
     unmount();
 
     setUrl('');
