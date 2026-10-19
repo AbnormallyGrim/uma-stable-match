@@ -29,7 +29,7 @@ API_TARGET=http://127.0.0.1:3000 npm run dev
 | Command | What it does |
 |---|---|
 | `npm run dev` | Development server with hot reload and the `/api` proxy |
-| `npm run build` | Production build into `dist/` |
+| `npm run build` | Production build into `dist/`, which the server serves when `FRONTEND_DIR` points at it |
 | `npm run preview` | Serves the `dist/` build locally |
 | `npm run check` | Type checks TypeScript and Svelte files with `svelte-check`; warnings fail the check |
 | `npm run lint` | Runs ESLint, then checks formatting with Prettier |
@@ -42,6 +42,7 @@ CI runs `check`, `lint`, `test` and `build` on Node 22 for every push and pull r
 
 ```
 index.html                    Page shell
+public/theme-init.js          Applies the saved theme before the page renders
 src/main.ts                   Mounts the app
 src/App.svelte                Root component: runs searches and keeps them in the URL
 src/lib/runner.ts             Search state machine: loading, retries and countdowns
@@ -147,7 +148,7 @@ Colours are CSS custom properties in `src/app.css`, and components only use thes
 
 The **System / Light / Dark** switch in the header (`ThemeToggle.svelte`) sets the attribute. It saves Light or Dark in local storage under `uma-stable-match:theme`, and choosing System deletes it. It's a group of radio buttons labelled "Theme", so arrow keys and screen readers work, and keyboard focus shows a ring.
 
-A small inline script in `index.html` applies a saved theme before the page renders, so it never flashes the wrong theme while the app loads. When the server adds a content security policy (#40), it must allow this script, by hash or by moving it to its own file.
+`public/theme-init.js` applies a saved theme before the page renders, so it never flashes the wrong theme while the app loads. `index.html` loads it from its own file because the server's content security policy blocks inline scripts. Vite copies it into `dist/` unchanged, so it isn't hashed and browsers revalidate it on each visit.
 
 ### Shared styles
 

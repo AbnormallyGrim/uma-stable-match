@@ -232,3 +232,38 @@ fn invalid_rate_limit_settings_fail() {
         }
     );
 }
+
+#[test]
+fn reads_a_valid_frontend_dir() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("index.html"), "<!doctype html>").unwrap();
+    let path = dir.path().to_str().unwrap().to_owned();
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("FRONTEND_DIR", &path),
+    ]))
+    .unwrap();
+    assert_eq!(config.frontend_dir.as_deref(), Some(dir.path()));
+}
+
+#[test]
+fn frontend_dir_is_optional() {
+    let config = Config::from_lookup(lookup(&[("UMAMOE_API_KEY", "test-key")])).unwrap();
+    assert_eq!(config.frontend_dir, None);
+}
+
+#[test]
+fn rejects_a_frontend_dir_without_index_html() {
+    let empty = tempfile::tempdir().unwrap();
+    for value in [
+        empty.path().to_str().unwrap().to_owned(),
+        empty.path().join("missing").to_str().unwrap().to_owned(),
+    ] {
+        let error = Config::from_lookup(lookup(&[
+            ("UMAMOE_API_KEY", "test-key"),
+            ("FRONTEND_DIR", &value),
+        ]))
+        .unwrap_err();
+        assert_eq!(error, ConfigError::InvalidFrontendDir(value));
+    }
+}
