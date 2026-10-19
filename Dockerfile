@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
 
+# Builds the web page.
 FROM node:22-bookworm-slim AS frontend
 WORKDIR /build/frontend
 COPY frontend/package.json frontend/package-lock.json ./
@@ -7,6 +8,7 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
+# Builds the server. aws-lc-sys, used by rustls, compiles C code and needs cmake.
 FROM rust:1-bookworm AS server
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential cmake \
@@ -19,6 +21,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release --locked -p uma-stable-match-server \
     && cp target/release/uma-stable-match-server /usr/local/bin/
 
+# Runs both: no shell or package manager, CA certificates included, non-root.
 FROM gcr.io/distroless/cc-debian12:nonroot
 COPY --from=server /usr/local/bin/uma-stable-match-server /app/uma-stable-match-server
 COPY --from=frontend /build/frontend/dist /app/frontend

@@ -2,11 +2,13 @@ services:
   server:
     build: .
     image: uma-stable-match
+    # Settings and the API key come from .env at start-up, never from the image.
     env_file: .env
     environment:
       HOST: 0.0.0.0
       PORT: "8080"
       FRONTEND_DIR: /app/frontend
+    # Reachable only from this computer. PORT in .env picks the port.
     ports:
       - "127.0.0.1:${PORT:-8080}:8080"
     restart: unless-stopped
