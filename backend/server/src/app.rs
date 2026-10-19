@@ -1,3 +1,5 @@
+//! HTTP routes.
+
 use std::time::SystemTime;
 
 use axum::extract::State;
@@ -7,6 +9,7 @@ use serde_json::{json, Value};
 
 use crate::cache::Cache;
 
+/// The server's routes, reading scan results from `cache`.
 pub fn router(cache: Cache) -> Router {
     Router::new()
         .route("/health", get(health))

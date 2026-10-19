@@ -1,3 +1,5 @@
+//! In-memory cache of scan results.
+
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::SystemTime;
 
@@ -5,24 +7,36 @@ use uma_stable_match_scoring::Club;
 
 use crate::scanner::{Scan, ScanError};
 
+/// Results of the last successful scan.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Snapshot {
+    /// Clubs with member data, climbers first.
     pub clubs: Vec<Club>,
+    /// Clubs that matched the rank window and had open spots.
     pub candidates: usize,
+    /// Clubs whose details failed to load.
     pub failed: usize,
+    /// When the scan finished.
     pub scanned_at: SystemTime,
 }
 
+/// The most recent failed scan.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScanFailure {
+    /// When the scan failed.
     pub at: SystemTime,
+    /// Why it failed.
     pub message: String,
 }
 
+/// What the cache holds right now.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CacheStatus {
+    /// Whether a scan is running.
     pub scanning: bool,
+    /// Last successful scan, if any.
     pub snapshot: Option<Arc<Snapshot>>,
+    /// Failure since the last successful scan, if any.
     pub last_error: Option<ScanFailure>,
 }
 
@@ -33,20 +47,24 @@ struct State {
     last_error: Option<ScanFailure>,
 }
 
+/// Shared in-memory scan results. Clones share the same state.
 #[derive(Debug, Clone, Default)]
 pub struct Cache {
     state: Arc<RwLock<State>>,
 }
 
 impl Cache {
+    /// An empty cache.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Last successful scan, if any.
     pub fn snapshot(&self) -> Option<Arc<Snapshot>> {
         self.read().snapshot.clone()
     }
 
+    /// Scan state, last results and last failure.
     pub fn status(&self) -> CacheStatus {
         let state = self.read();
         CacheStatus {

@@ -1,3 +1,5 @@
+//! Runs scans on a schedule.
+
 use std::time::{Duration, SystemTime};
 
 use tokio::sync::watch;
@@ -6,6 +8,9 @@ use uma_stable_match_umamoe_client::Client;
 use crate::cache::Cache;
 use crate::scanner::{scan, ScanConfig};
 
+/// Scans now, then every `interval`, until `shutdown` turns true.
+///
+/// A scan in progress at shutdown is cancelled.
 pub async fn run_scheduler(
     client: Client,
     config: ScanConfig,

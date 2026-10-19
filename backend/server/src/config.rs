@@ -10,6 +10,7 @@ use crate::scanner::ScanConfig;
 /// Address the server listens on when `BIND_ADDR` isn't set.
 pub const DEFAULT_BIND_ADDR: &str = "127.0.0.1:3000";
 
+/// Minutes between scans when `SCAN_INTERVAL_MINUTES` isn't set.
 pub const DEFAULT_SCAN_INTERVAL_MINUTES: u32 = 180;
 
 /// Server settings. `Debug` output redacts the API key.
@@ -23,6 +24,7 @@ pub struct Config {
     pub bind_addr: SocketAddr,
     /// Scan settings, from `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `SCAN_MAX_DETAILS`.
     pub scan: ScanConfig,
+    /// Time between scans, from `SCAN_INTERVAL_MINUTES`.
     pub scan_interval: Duration,
 }
 
