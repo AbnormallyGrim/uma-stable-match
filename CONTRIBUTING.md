@@ -56,8 +56,8 @@ Example: `feat: add balance weight option (#12)`
 
 ```bash
 cargo fmt --all
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features
 ```
 
 ### Web frontend
