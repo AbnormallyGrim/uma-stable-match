@@ -116,3 +116,18 @@ When the response has a `Retry-After` header in seconds, that value is used inst
 | `Status` | Non-success status, with the parsed `{error, status, details}` body when the API sent one |
 | `Transport` | The request couldn't be sent or timed out, or the response couldn't be read |
 | `Decode` | The response body didn't match the expected shape |
+
+## Parity tests
+
+`tests/parity.rs` checks that the scoring crate gives the same results as the original prototype, the Python script this project grew from. It loads `tests/fixtures/parity/clubs.json` through `CircleResponse`, converts it to `Club` and compares the results with `expected.json`:
+
+- Which clubs are scored and in what order
+- Fit, score and median within 1e-9 (relative)
+- Place, club size and ranked members exactly
+- Balance score, Gini, passengers, bottom quarter and top-three share
+
+It covers two paces, each without balance scoring and with weights 0.5 and 1. Closed clubs are included, because the prototype scores them.
+
+The clubs, trainers and fan counts are made up. They cover departed members, fans from a previous club, new joiners, older months, too few members, a closed club, passengers, a full club, an unknown member count, a falling fan total and an even number of members.
+
+`expected.json` was recorded by running the prototype's own scoring functions on these clubs. The prototype isn't in this repository, so the expected values can't be regenerated from here. If a scoring rule changes on purpose, update `expected.json` in the same change and say why.

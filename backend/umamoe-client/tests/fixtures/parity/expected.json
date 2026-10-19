@@ -1,0 +1,920 @@
+{
+  "scenarios": [
+    {
+      "pace": 7600000.0,
+      "balance_weight": null,
+      "results": [
+        {
+          "circle_id": 900110,
+          "fit": 0.04041207330827064,
+          "score": 0.04041207330827064,
+          "median_per_day": 6160037.0,
+          "your_place": 6,
+          "club_size": 14,
+          "ranked_members": 13,
+          "balance": null
+        },
+        {
+          "circle_id": 900106,
+          "fit": 0.10716207082043341,
+          "score": 0.10716207082043341,
+          "median_per_day": 7308105.794117647,
+          "your_place": 9,
+          "club_size": 19,
+          "ranked_members": 18,
+          "balance": null
+        },
+        {
+          "circle_id": 900103,
+          "fit": 0.11825298181114552,
+          "score": 0.11825298181114552,
+          "median_per_day": 6773389.264705882,
+          "your_place": 5,
+          "club_size": 17,
+          "ranked_members": 12,
+          "balance": null
+        },
+        {
+          "circle_id": 900102,
+          "fit": 0.12993874466804267,
+          "score": 0.12993874466804267,
+          "median_per_day": 6264514.764705882,
+          "your_place": 5,
+          "club_size": 18,
+          "ranked_members": 17,
+          "balance": null
+        },
+        {
+          "circle_id": 900107,
+          "fit": 0.2976434218266253,
+          "score": 0.2976434218266253,
+          "median_per_day": 786366.6470588236,
+          "your_place": 9,
+          "club_size": 19,
+          "ranked_members": 18,
+          "balance": null
+        },
+        {
+          "circle_id": 900111,
+          "fit": 0.3139886349946157,
+          "score": 0.3139886349946157,
+          "median_per_day": 6436056.029411765,
+          "your_place": 2,
+          "club_size": 23,
+          "ranked_members": 16,
+          "balance": null
+        },
+        {
+          "circle_id": 900101,
+          "fit": 0.39294968022998666,
+          "score": 0.39294968022998666,
+          "median_per_day": 8452820.470588235,
+          "your_place": 15,
+          "club_size": 21,
+          "ranked_members": 20,
+          "balance": null
+        },
+        {
+          "circle_id": 900104,
+          "fit": 0.4302502089783281,
+          "score": 0.4302502089783281,
+          "median_per_day": 8493005.294117646,
+          "your_place": 9,
+          "club_size": 12,
+          "ranked_members": 11,
+          "balance": null
+        },
+        {
+          "circle_id": 900109,
+          "fit": 0.49828599152124964,
+          "score": 0.49828599152124964,
+          "median_per_day": 1667057.911764706,
+          "your_place": 1,
+          "club_size": 11,
+          "ranked_members": 10,
+          "balance": null
+        },
+        {
+          "circle_id": 900108,
+          "fit": 0.8156885595975232,
+          "score": 0.8156885595975232,
+          "median_per_day": 11924110.176470589,
+          "your_place": 30,
+          "club_size": 30,
+          "ranked_members": 29,
+          "balance": null
+        }
+      ]
+    },
+    {
+      "pace": 7600000.0,
+      "balance_weight": 0.5,
+      "results": [
+        {
+          "circle_id": 900110,
+          "fit": 0.04041207330827064,
+          "score": 0.11541207330827065,
+          "median_per_day": 6160037.0,
+          "your_place": 6,
+          "club_size": 14,
+          "ranked_members": 13,
+          "balance": {
+            "score": 85,
+            "gini": 0.21509771392651358,
+            "passengers": 1,
+            "counted": 13,
+            "bottom_quarter_per_day": 4126438.470588235,
+            "top3_share": 0.32875447860004886
+          }
+        },
+        {
+          "circle_id": 900106,
+          "fit": 0.10716207082043341,
+          "score": 0.13716207082043344,
+          "median_per_day": 7308105.794117647,
+          "your_place": 9,
+          "club_size": 19,
+          "ranked_members": 18,
+          "balance": {
+            "score": 94,
+            "gini": 0.11825412507802859,
+            "passengers": 0,
+            "counted": 18,
+            "bottom_quarter_per_day": 5154590.7352941185,
+            "top3_share": 0.22111267650071187
+          }
+        },
+        {
+          "circle_id": 900102,
+          "fit": 0.12993874466804267,
+          "score": 0.16493874466804265,
+          "median_per_day": 6264514.764705882,
+          "your_place": 5,
+          "club_size": 18,
+          "ranked_members": 17,
+          "balance": {
+            "score": 93,
+            "gini": 0.13495640550934762,
+            "passengers": 0,
+            "counted": 17,
+            "bottom_quarter_per_day": 5015107.94117647,
+            "top3_share": 0.2497000970623258
+          }
+        },
+        {
+          "circle_id": 900103,
+          "fit": 0.11825298181114552,
+          "score": 0.1682529818111455,
+          "median_per_day": 6773389.264705882,
+          "your_place": 5,
+          "club_size": 17,
+          "ranked_members": 12,
+          "balance": {
+            "score": 90,
+            "gini": 0.19430474416283725,
+            "passengers": 0,
+            "counted": 12,
+            "bottom_quarter_per_day": 3250007.882352941,
+            "top3_share": 0.3391271829704855
+          }
+        },
+        {
+          "circle_id": 900111,
+          "fit": 0.3139886349946157,
+          "score": 0.3289886349946157,
+          "median_per_day": 6436056.029411765,
+          "your_place": 2,
+          "club_size": 23,
+          "ranked_members": 16,
+          "balance": {
+            "score": 97,
+            "gini": 0.05384940386436782,
+            "passengers": 0,
+            "counted": 16,
+            "bottom_quarter_per_day": 5830430.5,
+            "top3_share": 0.21574605783478026
+          }
+        },
+        {
+          "circle_id": 900101,
+          "fit": 0.39294968022998666,
+          "score": 0.42794968022998664,
+          "median_per_day": 8452820.470588235,
+          "your_place": 15,
+          "club_size": 21,
+          "ranked_members": 20,
+          "balance": {
+            "score": 93,
+            "gini": 0.13114261581588346,
+            "passengers": 0,
+            "counted": 20,
+            "bottom_quarter_per_day": 5775457.294117647,
+            "top3_share": 0.19546304956146826
+          }
+        },
+        {
+          "circle_id": 900104,
+          "fit": 0.4302502089783281,
+          "score": 0.4502502089783281,
+          "median_per_day": 8493005.294117646,
+          "your_place": 9,
+          "club_size": 12,
+          "ranked_members": 11,
+          "balance": {
+            "score": 96,
+            "gini": 0.08990952348507458,
+            "passengers": 0,
+            "counted": 11,
+            "bottom_quarter_per_day": 6704671.764705882,
+            "top3_share": 0.32516907499282993
+          }
+        },
+        {
+          "circle_id": 900109,
+          "fit": 0.49828599152124964,
+          "score": 0.5532859915212496,
+          "median_per_day": 1667057.911764706,
+          "your_place": 1,
+          "club_size": 11,
+          "ranked_members": 10,
+          "balance": {
+            "score": 89,
+            "gini": 0.2114464716006093,
+            "passengers": 0,
+            "counted": 10,
+            "bottom_quarter_per_day": 1031942.205882353,
+            "top3_share": 0.44784122596800685
+          }
+        },
+        {
+          "circle_id": 900107,
+          "fit": 0.2976434218266253,
+          "score": 0.5776434218266253,
+          "median_per_day": 786366.6470588236,
+          "your_place": 9,
+          "club_size": 19,
+          "ranked_members": 18,
+          "balance": {
+            "score": 44,
+            "gini": 0.5547660095652314,
+            "passengers": 10,
+            "counted": 18,
+            "bottom_quarter_per_day": 172359.17647058825,
+            "top3_share": 0.4266678354273994
+          }
+        },
+        {
+          "circle_id": 900108,
+          "fit": 0.8156885595975232,
+          "score": 0.8356885595975232,
+          "median_per_day": 11924110.176470589,
+          "your_place": 30,
+          "club_size": 30,
+          "ranked_members": 29,
+          "balance": {
+            "score": 96,
+            "gini": 0.08407425478785614,
+            "passengers": 0,
+            "counted": 29,
+            "bottom_quarter_per_day": 9906132.588235294,
+            "top3_share": 0.13152422634833438
+          }
+        }
+      ]
+    },
+    {
+      "pace": 7600000.0,
+      "balance_weight": 1.0,
+      "results": [
+        {
+          "circle_id": 900106,
+          "fit": 0.10716207082043341,
+          "score": 0.16716207082043347,
+          "median_per_day": 7308105.794117647,
+          "your_place": 9,
+          "club_size": 19,
+          "ranked_members": 18,
+          "balance": {
+            "score": 94,
+            "gini": 0.11825412507802859,
+            "passengers": 0,
+            "counted": 18,
+            "bottom_quarter_per_day": 5154590.7352941185,
+            "top3_share": 0.22111267650071187
+          }
+        },
+        {
+          "circle_id": 900110,
+          "fit": 0.04041207330827064,
+          "score": 0.19041207330827065,
+          "median_per_day": 6160037.0,
+          "your_place": 6,
+          "club_size": 14,
+          "ranked_members": 13,
+          "balance": {
+            "score": 85,
+            "gini": 0.21509771392651358,
+            "passengers": 1,
+            "counted": 13,
+            "bottom_quarter_per_day": 4126438.470588235,
+            "top3_share": 0.32875447860004886
+          }
+        },
+        {
+          "circle_id": 900102,
+          "fit": 0.12993874466804267,
+          "score": 0.19993874466804262,
+          "median_per_day": 6264514.764705882,
+          "your_place": 5,
+          "club_size": 18,
+          "ranked_members": 17,
+          "balance": {
+            "score": 93,
+            "gini": 0.13495640550934762,
+            "passengers": 0,
+            "counted": 17,
+            "bottom_quarter_per_day": 5015107.94117647,
+            "top3_share": 0.2497000970623258
+          }
+        },
+        {
+          "circle_id": 900103,
+          "fit": 0.11825298181114552,
+          "score": 0.2182529818111455,
+          "median_per_day": 6773389.264705882,
+          "your_place": 5,
+          "club_size": 17,
+          "ranked_members": 12,
+          "balance": {
+            "score": 90,
+            "gini": 0.19430474416283725,
+            "passengers": 0,
+            "counted": 12,
+            "bottom_quarter_per_day": 3250007.882352941,
+            "top3_share": 0.3391271829704855
+          }
+        },
+        {
+          "circle_id": 900111,
+          "fit": 0.3139886349946157,
+          "score": 0.34398863499461574,
+          "median_per_day": 6436056.029411765,
+          "your_place": 2,
+          "club_size": 23,
+          "ranked_members": 16,
+          "balance": {
+            "score": 97,
+            "gini": 0.05384940386436782,
+            "passengers": 0,
+            "counted": 16,
+            "bottom_quarter_per_day": 5830430.5,
+            "top3_share": 0.21574605783478026
+          }
+        },
+        {
+          "circle_id": 900101,
+          "fit": 0.39294968022998666,
+          "score": 0.4629496802299866,
+          "median_per_day": 8452820.470588235,
+          "your_place": 15,
+          "club_size": 21,
+          "ranked_members": 20,
+          "balance": {
+            "score": 93,
+            "gini": 0.13114261581588346,
+            "passengers": 0,
+            "counted": 20,
+            "bottom_quarter_per_day": 5775457.294117647,
+            "top3_share": 0.19546304956146826
+          }
+        },
+        {
+          "circle_id": 900104,
+          "fit": 0.4302502089783281,
+          "score": 0.47025020897832814,
+          "median_per_day": 8493005.294117646,
+          "your_place": 9,
+          "club_size": 12,
+          "ranked_members": 11,
+          "balance": {
+            "score": 96,
+            "gini": 0.08990952348507458,
+            "passengers": 0,
+            "counted": 11,
+            "bottom_quarter_per_day": 6704671.764705882,
+            "top3_share": 0.32516907499282993
+          }
+        },
+        {
+          "circle_id": 900109,
+          "fit": 0.49828599152124964,
+          "score": 0.6082859915212496,
+          "median_per_day": 1667057.911764706,
+          "your_place": 1,
+          "club_size": 11,
+          "ranked_members": 10,
+          "balance": {
+            "score": 89,
+            "gini": 0.2114464716006093,
+            "passengers": 0,
+            "counted": 10,
+            "bottom_quarter_per_day": 1031942.205882353,
+            "top3_share": 0.44784122596800685
+          }
+        },
+        {
+          "circle_id": 900108,
+          "fit": 0.8156885595975232,
+          "score": 0.8556885595975232,
+          "median_per_day": 11924110.176470589,
+          "your_place": 30,
+          "club_size": 30,
+          "ranked_members": 29,
+          "balance": {
+            "score": 96,
+            "gini": 0.08407425478785614,
+            "passengers": 0,
+            "counted": 29,
+            "bottom_quarter_per_day": 9906132.588235294,
+            "top3_share": 0.13152422634833438
+          }
+        },
+        {
+          "circle_id": 900107,
+          "fit": 0.2976434218266253,
+          "score": 0.8576434218266253,
+          "median_per_day": 786366.6470588236,
+          "your_place": 9,
+          "club_size": 19,
+          "ranked_members": 18,
+          "balance": {
+            "score": 44,
+            "gini": 0.5547660095652314,
+            "passengers": 10,
+            "counted": 18,
+            "bottom_quarter_per_day": 172359.17647058825,
+            "top3_share": 0.4266678354273994
+          }
+        }
+      ]
+    },
+    {
+      "pace": 3200000.0,
+      "balance_weight": null,
+      "results": [
+        {
+          "circle_id": 900107,
+          "fit": 0.254962337364551,
+          "score": 0.254962337364551,
+          "median_per_day": 786366.6470588236,
+          "your_place": 9,
+          "club_size": 19,
+          "ranked_members": 18,
+          "balance": null
+        },
+        {
+          "circle_id": 900109,
+          "fit": 0.4078042298629679,
+          "score": 0.4078042298629679,
+          "median_per_day": 1667057.911764706,
+          "your_place": 1,
+          "club_size": 11,
+          "ranked_members": 10,
+          "balance": null
+        },
+        {
+          "circle_id": 900103,
+          "fit": 0.685887596507353,
+          "score": 0.685887596507353,
+          "median_per_day": 6773389.264705882,
+          "your_place": 12,
+          "club_size": 17,
+          "ranked_members": 12,
+          "balance": null
+        },
+        {
+          "circle_id": 900111,
+          "fit": 0.6875106875399615,
+          "score": 0.6875106875399615,
+          "median_per_day": 6436056.029411765,
+          "your_place": 17,
+          "club_size": 23,
+          "ranked_members": 16,
+          "balance": null
+        },
+        {
+          "circle_id": 900110,
+          "fit": 0.8510748973214286,
+          "score": 0.8510748973214286,
+          "median_per_day": 6160037.0,
+          "your_place": 13,
+          "club_size": 14,
+          "ranked_members": 13,
+          "balance": null
+        },
+        {
+          "circle_id": 900102,
+          "fit": 0.9322982591911766,
+          "score": 0.9322982591911766,
+          "median_per_day": 6264514.764705882,
+          "your_place": 18,
+          "club_size": 18,
+          "ranked_members": 17,
+          "balance": null
+        },
+        {
+          "circle_id": 900106,
+          "fit": 1.0301349181985293,
+          "score": 1.0301349181985293,
+          "median_per_day": 7308105.794117647,
+          "your_place": 19,
+          "club_size": 19,
+          "ranked_members": 18,
+          "balance": null
+        },
+        {
+          "circle_id": 900101,
+          "fit": 1.1374519191176469,
+          "score": 1.1374519191176469,
+          "median_per_day": 8452820.470588235,
+          "your_place": 21,
+          "club_size": 21,
+          "ranked_members": 20,
+          "balance": null
+        },
+        {
+          "circle_id": 900104,
+          "fit": 1.1412192463235293,
+          "score": 1.1412192463235293,
+          "median_per_day": 8493005.294117646,
+          "your_place": 12,
+          "club_size": 12,
+          "ranked_members": 11,
+          "balance": null
+        },
+        {
+          "circle_id": 900108,
+          "fit": 1.4628853290441177,
+          "score": 1.4628853290441177,
+          "median_per_day": 11924110.176470589,
+          "your_place": 30,
+          "club_size": 30,
+          "ranked_members": 29,
+          "balance": null
+        }
+      ]
+    },
+    {
+      "pace": 3200000.0,
+      "balance_weight": 0.5,
+      "results": [
+        {
+          "circle_id": 900109,
+          "fit": 0.4078042298629679,
+          "score": 0.4628042298629679,
+          "median_per_day": 1667057.911764706,
+          "your_place": 1,
+          "club_size": 11,
+          "ranked_members": 10,
+          "balance": {
+            "score": 89,
+            "gini": 0.2114464716006093,
+            "passengers": 0,
+            "counted": 10,
+            "bottom_quarter_per_day": 1031942.205882353,
+            "top3_share": 0.44784122596800685
+          }
+        },
+        {
+          "circle_id": 900107,
+          "fit": 0.254962337364551,
+          "score": 0.534962337364551,
+          "median_per_day": 786366.6470588236,
+          "your_place": 9,
+          "club_size": 19,
+          "ranked_members": 18,
+          "balance": {
+            "score": 44,
+            "gini": 0.5547660095652314,
+            "passengers": 10,
+            "counted": 18,
+            "bottom_quarter_per_day": 172359.17647058825,
+            "top3_share": 0.4266678354273994
+          }
+        },
+        {
+          "circle_id": 900111,
+          "fit": 0.6875106875399615,
+          "score": 0.7025106875399615,
+          "median_per_day": 6436056.029411765,
+          "your_place": 17,
+          "club_size": 23,
+          "ranked_members": 16,
+          "balance": {
+            "score": 97,
+            "gini": 0.05384940386436782,
+            "passengers": 0,
+            "counted": 16,
+            "bottom_quarter_per_day": 5830430.5,
+            "top3_share": 0.21574605783478026
+          }
+        },
+        {
+          "circle_id": 900103,
+          "fit": 0.685887596507353,
+          "score": 0.735887596507353,
+          "median_per_day": 6773389.264705882,
+          "your_place": 12,
+          "club_size": 17,
+          "ranked_members": 12,
+          "balance": {
+            "score": 90,
+            "gini": 0.19430474416283725,
+            "passengers": 0,
+            "counted": 12,
+            "bottom_quarter_per_day": 3250007.882352941,
+            "top3_share": 0.3391271829704855
+          }
+        },
+        {
+          "circle_id": 900110,
+          "fit": 0.8510748973214286,
+          "score": 0.9260748973214286,
+          "median_per_day": 6160037.0,
+          "your_place": 13,
+          "club_size": 14,
+          "ranked_members": 13,
+          "balance": {
+            "score": 85,
+            "gini": 0.21509771392651358,
+            "passengers": 1,
+            "counted": 13,
+            "bottom_quarter_per_day": 4126438.470588235,
+            "top3_share": 0.32875447860004886
+          }
+        },
+        {
+          "circle_id": 900102,
+          "fit": 0.9322982591911766,
+          "score": 0.9672982591911765,
+          "median_per_day": 6264514.764705882,
+          "your_place": 18,
+          "club_size": 18,
+          "ranked_members": 17,
+          "balance": {
+            "score": 93,
+            "gini": 0.13495640550934762,
+            "passengers": 0,
+            "counted": 17,
+            "bottom_quarter_per_day": 5015107.94117647,
+            "top3_share": 0.2497000970623258
+          }
+        },
+        {
+          "circle_id": 900106,
+          "fit": 1.0301349181985293,
+          "score": 1.0601349181985293,
+          "median_per_day": 7308105.794117647,
+          "your_place": 19,
+          "club_size": 19,
+          "ranked_members": 18,
+          "balance": {
+            "score": 94,
+            "gini": 0.11825412507802859,
+            "passengers": 0,
+            "counted": 18,
+            "bottom_quarter_per_day": 5154590.7352941185,
+            "top3_share": 0.22111267650071187
+          }
+        },
+        {
+          "circle_id": 900104,
+          "fit": 1.1412192463235293,
+          "score": 1.1612192463235294,
+          "median_per_day": 8493005.294117646,
+          "your_place": 12,
+          "club_size": 12,
+          "ranked_members": 11,
+          "balance": {
+            "score": 96,
+            "gini": 0.08990952348507458,
+            "passengers": 0,
+            "counted": 11,
+            "bottom_quarter_per_day": 6704671.764705882,
+            "top3_share": 0.32516907499282993
+          }
+        },
+        {
+          "circle_id": 900101,
+          "fit": 1.1374519191176469,
+          "score": 1.1724519191176468,
+          "median_per_day": 8452820.470588235,
+          "your_place": 21,
+          "club_size": 21,
+          "ranked_members": 20,
+          "balance": {
+            "score": 93,
+            "gini": 0.13114261581588346,
+            "passengers": 0,
+            "counted": 20,
+            "bottom_quarter_per_day": 5775457.294117647,
+            "top3_share": 0.19546304956146826
+          }
+        },
+        {
+          "circle_id": 900108,
+          "fit": 1.4628853290441177,
+          "score": 1.4828853290441177,
+          "median_per_day": 11924110.176470589,
+          "your_place": 30,
+          "club_size": 30,
+          "ranked_members": 29,
+          "balance": {
+            "score": 96,
+            "gini": 0.08407425478785614,
+            "passengers": 0,
+            "counted": 29,
+            "bottom_quarter_per_day": 9906132.588235294,
+            "top3_share": 0.13152422634833438
+          }
+        }
+      ]
+    },
+    {
+      "pace": 3200000.0,
+      "balance_weight": 1.0,
+      "results": [
+        {
+          "circle_id": 900109,
+          "fit": 0.4078042298629679,
+          "score": 0.5178042298629679,
+          "median_per_day": 1667057.911764706,
+          "your_place": 1,
+          "club_size": 11,
+          "ranked_members": 10,
+          "balance": {
+            "score": 89,
+            "gini": 0.2114464716006093,
+            "passengers": 0,
+            "counted": 10,
+            "bottom_quarter_per_day": 1031942.205882353,
+            "top3_share": 0.44784122596800685
+          }
+        },
+        {
+          "circle_id": 900111,
+          "fit": 0.6875106875399615,
+          "score": 0.7175106875399615,
+          "median_per_day": 6436056.029411765,
+          "your_place": 17,
+          "club_size": 23,
+          "ranked_members": 16,
+          "balance": {
+            "score": 97,
+            "gini": 0.05384940386436782,
+            "passengers": 0,
+            "counted": 16,
+            "bottom_quarter_per_day": 5830430.5,
+            "top3_share": 0.21574605783478026
+          }
+        },
+        {
+          "circle_id": 900103,
+          "fit": 0.685887596507353,
+          "score": 0.785887596507353,
+          "median_per_day": 6773389.264705882,
+          "your_place": 12,
+          "club_size": 17,
+          "ranked_members": 12,
+          "balance": {
+            "score": 90,
+            "gini": 0.19430474416283725,
+            "passengers": 0,
+            "counted": 12,
+            "bottom_quarter_per_day": 3250007.882352941,
+            "top3_share": 0.3391271829704855
+          }
+        },
+        {
+          "circle_id": 900107,
+          "fit": 0.254962337364551,
+          "score": 0.814962337364551,
+          "median_per_day": 786366.6470588236,
+          "your_place": 9,
+          "club_size": 19,
+          "ranked_members": 18,
+          "balance": {
+            "score": 44,
+            "gini": 0.5547660095652314,
+            "passengers": 10,
+            "counted": 18,
+            "bottom_quarter_per_day": 172359.17647058825,
+            "top3_share": 0.4266678354273994
+          }
+        },
+        {
+          "circle_id": 900110,
+          "fit": 0.8510748973214286,
+          "score": 1.0010748973214287,
+          "median_per_day": 6160037.0,
+          "your_place": 13,
+          "club_size": 14,
+          "ranked_members": 13,
+          "balance": {
+            "score": 85,
+            "gini": 0.21509771392651358,
+            "passengers": 1,
+            "counted": 13,
+            "bottom_quarter_per_day": 4126438.470588235,
+            "top3_share": 0.32875447860004886
+          }
+        },
+        {
+          "circle_id": 900102,
+          "fit": 0.9322982591911766,
+          "score": 1.0022982591911767,
+          "median_per_day": 6264514.764705882,
+          "your_place": 18,
+          "club_size": 18,
+          "ranked_members": 17,
+          "balance": {
+            "score": 93,
+            "gini": 0.13495640550934762,
+            "passengers": 0,
+            "counted": 17,
+            "bottom_quarter_per_day": 5015107.94117647,
+            "top3_share": 0.2497000970623258
+          }
+        },
+        {
+          "circle_id": 900106,
+          "fit": 1.0301349181985293,
+          "score": 1.0901349181985294,
+          "median_per_day": 7308105.794117647,
+          "your_place": 19,
+          "club_size": 19,
+          "ranked_members": 18,
+          "balance": {
+            "score": 94,
+            "gini": 0.11825412507802859,
+            "passengers": 0,
+            "counted": 18,
+            "bottom_quarter_per_day": 5154590.7352941185,
+            "top3_share": 0.22111267650071187
+          }
+        },
+        {
+          "circle_id": 900104,
+          "fit": 1.1412192463235293,
+          "score": 1.1812192463235294,
+          "median_per_day": 8493005.294117646,
+          "your_place": 12,
+          "club_size": 12,
+          "ranked_members": 11,
+          "balance": {
+            "score": 96,
+            "gini": 0.08990952348507458,
+            "passengers": 0,
+            "counted": 11,
+            "bottom_quarter_per_day": 6704671.764705882,
+            "top3_share": 0.32516907499282993
+          }
+        },
+        {
+          "circle_id": 900101,
+          "fit": 1.1374519191176469,
+          "score": 1.2074519191176467,
+          "median_per_day": 8452820.470588235,
+          "your_place": 21,
+          "club_size": 21,
+          "ranked_members": 20,
+          "balance": {
+            "score": 93,
+            "gini": 0.13114261581588346,
+            "passengers": 0,
+            "counted": 20,
+            "bottom_quarter_per_day": 5775457.294117647,
+            "top3_share": 0.19546304956146826
+          }
+        },
+        {
+          "circle_id": 900108,
+          "fit": 1.4628853290441177,
+          "score": 1.5028853290441178,
+          "median_per_day": 11924110.176470589,
+          "your_place": 30,
+          "club_size": 30,
+          "ranked_members": 29,
+          "balance": {
+            "score": 96,
+            "gini": 0.08407425478785614,
+            "passengers": 0,
+            "counted": 29,
+            "bottom_quarter_per_day": 9906132.588235294,
+            "top3_share": 0.13152422634833438
+          }
+        }
+      ]
+    }
+  ]
+}
