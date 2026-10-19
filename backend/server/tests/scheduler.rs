@@ -104,7 +104,7 @@ async fn stop(running: Running) {
 
 async fn status_json(cache: &Cache) -> Value {
     let response = router(app(cache.clone()))
-        .oneshot(Request::get("/api/status").body(Body::empty()).unwrap())
+        .oneshot(Request::get("/api/v1/status").body(Body::empty()).unwrap())
         .await
         .unwrap();
     let body = response.into_body().collect().await.unwrap().to_bytes();

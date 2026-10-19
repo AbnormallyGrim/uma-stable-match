@@ -137,7 +137,7 @@ async fn scanned_cache() -> Cache {
 async fn get(cache: &Cache, query: &str) -> (StatusCode, Value) {
     let response = router(app(cache.clone()))
         .oneshot(
-            Request::get(format!("/api/recommendations{query}"))
+            Request::get(format!("/api/v1/recommendations{query}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -157,7 +157,7 @@ fn assert_close(actual: &Value, expected: f64) {
 }
 
 fn ids(body: &Value) -> Vec<u64> {
-    body["results"]
+    body["clubs"]
         .as_array()
         .unwrap()
         .iter()
@@ -176,8 +176,8 @@ async fn unavailable_before_first_scan() {
 async fn rejects_invalid_input() {
     let cache = Cache::new();
     let cases = [
-        ("", "pace or viewer_id is required"),
-        ("?pace=", "pace or viewer_id is required"),
+        ("", "pace or trainer_id is required"),
+        ("?pace=", "pace or trainer_id is required"),
         ("?pace=fast", "pace must be a number"),
         ("?pace=inf", "pace must be a number"),
         ("?pace=0", "pace must be greater than zero, got 0"),
@@ -193,6 +193,23 @@ async fn rejects_invalid_input() {
         (
             "?pace=5000000&include_closed=yes",
             "include_closed must be true or false",
+        ),
+        ("?pace=5000000&balance=yes", "balance must be true or false"),
+        (
+            "?pace=5000000&balance=false&balance_weight=0.5",
+            "balance_weight can't be used with balance=false",
+        ),
+        (
+            "?pace=5000000&limit=0",
+            "limit must be a positive whole number",
+        ),
+        (
+            "?pace=5000000&limit=-1",
+            "limit must be a positive whole number",
+        ),
+        (
+            "?pace=5000000&limit=many",
+            "limit must be a positive whole number",
         ),
     ];
     let scanned = scanned_cache().await;
@@ -224,7 +241,7 @@ async fn ranks_clubs_like_the_scoring_crate() {
     assert!(!expected_ids.contains(&3), "closed club excluded");
     assert!(!expected_ids.contains(&4), "too few members");
 
-    for (result, want) in body["results"].as_array().unwrap().iter().zip(&expected) {
+    for (result, want) in body["clubs"].as_array().unwrap().iter().zip(&expected) {
         assert_close(&result["fit"], want.fit);
         assert_close(&result["score"], want.score);
         assert_eq!(result["your_place"], want.your_place);
@@ -233,17 +250,20 @@ async fn ranks_clubs_like_the_scoring_crate() {
         assert_eq!(result["balance"], Value::Null);
     }
 
-    assert_close(&body["pace"], pace);
-    assert_eq!(body["balance_weight"], Value::Null);
-    assert_eq!(body["include_closed"], false);
-    assert!(body["scanned_at"].as_str().unwrap().ends_with('Z'));
+    assert_close(&body["trainer"]["pace_per_day"], pace);
+    assert_eq!(body["trainer"]["trainer_id"], Value::Null);
+    assert_eq!(body["options"]["balance_weight"], Value::Null);
+    assert_eq!(body["options"]["include_closed"], false);
+    assert_eq!(body["options"]["limit"], 50);
+    assert_eq!(body["total"], expected.len());
+    assert!(body["updated_at"].as_str().unwrap().ends_with('Z'));
 }
 
 #[tokio::test]
 async fn returns_club_details() {
     let cache = scanned_cache().await;
     let (_, body) = get(&cache, "?pace=7600000").await;
-    let club = body["results"]
+    let club = body["clubs"]
         .as_array()
         .unwrap()
         .iter()
@@ -267,7 +287,7 @@ async fn includes_closed_clubs_on_request() {
     let cache = scanned_cache().await;
     let (_, body) = get(&cache, "?pace=7600000&include_closed=true").await;
     assert!(ids(&body).contains(&3));
-    assert_eq!(body["include_closed"], true);
+    assert_eq!(body["options"]["include_closed"], true);
 }
 
 #[tokio::test]
@@ -289,7 +309,7 @@ async fn adds_balance_when_weighted() {
             .map(|s| s.club.circle_id)
             .collect::<Vec<_>>()
     );
-    for (result, want) in body["results"].as_array().unwrap().iter().zip(&expected) {
+    for (result, want) in body["clubs"].as_array().unwrap().iter().zip(&expected) {
         let balance = want.balance.unwrap();
         assert_close(&result["score"], want.score);
         assert_eq!(result["balance"]["score"], balance.score);
@@ -297,5 +317,36 @@ async fn adds_balance_when_weighted() {
         assert_eq!(result["balance"]["counted"], balance.counted);
         assert_close(&result["balance"]["gini"], balance.gini);
     }
-    assert_eq!(body["balance_weight"].as_f64().unwrap(), 0.5);
+    assert_eq!(body["options"]["balance_weight"].as_f64().unwrap(), 0.5);
+}
+
+#[tokio::test]
+async fn balance_true_uses_the_default_weight() {
+    let cache = scanned_cache().await;
+    let (status, body) = get(&cache, "?pace=7600000&balance=true").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["options"]["balance_weight"].as_f64().unwrap(), 0.5);
+    assert!(body["clubs"][0]["balance"].is_object());
+
+    let (_, explicit) = get(&cache, "?pace=7600000&balance=true&balance_weight=1").await;
+    assert_eq!(explicit["options"]["balance_weight"].as_f64().unwrap(), 1.0);
+
+    let (_, off) = get(&cache, "?pace=7600000&balance=false").await;
+    assert_eq!(off["options"]["balance_weight"], Value::Null);
+    assert_eq!(off["clubs"][0]["balance"], Value::Null);
+}
+
+#[tokio::test]
+async fn limit_caps_clubs_but_not_total() {
+    let cache = scanned_cache().await;
+    let (_, all) = get(&cache, "?pace=7600000&include_closed=true").await;
+    let total = all["total"].as_u64().unwrap();
+    assert!(total >= 2);
+
+    let (status, body) = get(&cache, "?pace=7600000&include_closed=true&limit=1").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["clubs"].as_array().unwrap().len(), 1);
+    assert_eq!(body["total"].as_u64().unwrap(), total);
+    assert_eq!(body["options"]["limit"], 1);
+    assert_eq!(body["clubs"][0], all["clubs"][0]);
 }

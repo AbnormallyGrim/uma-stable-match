@@ -23,9 +23,9 @@ pub struct AppState {
 /// The server's routes.
 pub fn router(state: AppState) -> Router {
     Router::new()
-        .route("/health", get(health))
-        .route("/api/status", get(status))
-        .route("/api/recommendations", get(recommendations))
+        .route("/api/v1/health", get(health))
+        .route("/api/v1/status", get(status))
+        .route("/api/v1/recommendations", get(recommendations))
         .with_state(state)
 }
 
