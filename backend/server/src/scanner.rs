@@ -54,6 +54,7 @@ pub enum ScanError {
 }
 
 impl ScanError {
+    /// A short message that's safe to show visitors: no URLs or upstream error text.
     pub(crate) fn public_message(&self) -> String {
         match self {
             Self::List(error) => format!("listing clubs failed: {}", upstream_summary(error)),

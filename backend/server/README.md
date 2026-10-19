@@ -74,6 +74,15 @@ All endpoints are under `/api/v1`.
 
 `last_scan` is `null` until the first scan succeeds. `last_error` holds `{ "at", "message" }` for a failure since the last success. Times are RFC 3339 in UTC.
 
+`message` is short and safe to show publicly. It never includes request URLs or text from uma.moe's error responses. The full error goes to the server log.
+
+| Message | Cause |
+|---|---|
+| `listing clubs failed: uma.moe returned 503 Service Unavailable` | uma.moe answered with an error status (the status varies) |
+| `listing clubs failed: could not reach uma.moe` | Timeout or connection error |
+| `listing clubs failed: unexpected response from uma.moe` | The response wasn't the expected JSON |
+| `listing clubs failed: internal error` | A problem in the server itself |
+
 ### Recommendations
 
 `GET /api/v1/recommendations` scores the clubs from the last scan with [`uma-stable-match-scoring`](../scoring/README.md) and returns them best first.
@@ -162,7 +171,7 @@ Errors come back as `{"error": "..."}`:
 
 | Status | When |
 |---|---|
-| `400` | Any of these:<br>• neither or both of `trainer_id` and `pace` are given<br>• `trainer_id` isn't a trainer ID<br>• `pace` isn't a number above zero<br>• `balance_weight` isn't a number from 0 to 1<br>• `balance=false` is given with `balance_weight`<br>• `balance` or `include_closed` isn't `true` or `false`<br>• `limit` isn't a positive whole number |
+| `400` | Any of these:<br>• the query string can't be read, for example because a parameter is repeated<br>• neither or both of `trainer_id` and `pace` are given<br>• `trainer_id` isn't a trainer ID<br>• `pace` isn't a number above zero<br>• `balance_weight` isn't a number from 0 to 1<br>• `balance=false` is given with `balance_weight`<br>• `balance` or `include_closed` isn't `true` or `false`<br>• `limit` isn't a positive whole number |
 | `404` | uma.moe doesn't know the trainer, or they aren't in their club's data |
 | `422` | The trainer has too little fan data this month to work out a pace |
 | `502` | uma.moe couldn't be reached for the trainer lookup |
