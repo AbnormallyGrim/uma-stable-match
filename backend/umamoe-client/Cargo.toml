@@ -10,6 +10,11 @@ repository.workspace = true
 name = "uma_stable_match_umamoe_client"
 
 [dependencies]
+serde = { version = "1", features = ["derive"] }
+uma-stable-match-scoring = { version = "0.1.0", path = "../scoring" }
+
+[dev-dependencies]
+serde_json = "1"
 
 [lints]
 workspace = true
