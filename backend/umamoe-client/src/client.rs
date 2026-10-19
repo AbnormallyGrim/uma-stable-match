@@ -8,10 +8,11 @@ use reqwest::Url;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::config::ClientConfig;
+use crate::config::{ClientConfig, RetryConfig};
 use crate::error::{ApiErrorBody, Error};
 use crate::rate_limit::RateLimiter;
 use crate::requests::{CircleRequest, ListCirclesRequest};
+use crate::retry;
 use crate::types::{CircleListResponse, CircleResponse};
 
 const API_KEY_HEADER: &str = "X-API-Key";
@@ -22,6 +23,7 @@ pub struct Client {
     http: reqwest::Client,
     base_url: String,
     api_key: HeaderValue,
+    retry: RetryConfig,
     limiter: Arc<RateLimiter>,
 }
 
@@ -53,6 +55,7 @@ impl Client {
             http,
             base_url,
             api_key,
+            retry: config.retry,
             limiter: Arc::new(RateLimiter::new(config.min_interval)),
         })
     }
@@ -82,23 +85,48 @@ impl Client {
         T: DeserializeOwned,
         Q: Serialize + ?Sized,
     {
-        self.limiter.acquire().await;
-        let response = self
-            .http
-            .get(format!("{}{path}", self.base_url))
-            .query(query)
-            .header(API_KEY_HEADER, self.api_key.clone())
-            .header(ACCEPT, "application/json")
-            .send()
-            .await
-            .map_err(Error::Transport)?;
+        let url = format!("{}{path}", self.base_url);
+        let mut retries = 0;
+        loop {
+            self.limiter.acquire().await;
+            let result = self
+                .http
+                .get(&url)
+                .query(query)
+                .header(API_KEY_HEADER, self.api_key.clone())
+                .header(ACCEPT, "application/json")
+                .send()
+                .await;
 
-        let status = response.status();
-        let body = response.bytes().await.map_err(Error::Transport)?;
-        if !status.is_success() {
-            let body = serde_json::from_slice::<ApiErrorBody>(&body).ok();
-            return Err(Error::Status { status, body });
+            let (error, retry_after) = match result {
+                Ok(response) if response.status().is_success() => {
+                    let body = response.bytes().await.map_err(Error::Transport)?;
+                    return serde_json::from_slice(&body).map_err(Error::Decode);
+                }
+                Ok(response) => {
+                    let status = response.status();
+                    let retry_after = retry::retry_after(response.headers());
+                    let body = response
+                        .bytes()
+                        .await
+                        .ok()
+                        .and_then(|b| serde_json::from_slice::<ApiErrorBody>(&b).ok());
+                    let error = Error::Status { status, body };
+                    if !retry::is_retryable_status(status) {
+                        return Err(error);
+                    }
+                    (error, retry_after)
+                }
+                Err(e) if retry::is_retryable_error(&e) => (Error::Transport(e), None),
+                Err(e) => return Err(Error::Transport(e)),
+            };
+
+            if retries >= self.retry.max_retries {
+                return Err(error);
+            }
+            let delay = retry::delay(&self.retry, retries, retry_after, fastrand::f64());
+            tokio::time::sleep(delay).await;
+            retries += 1;
         }
-        serde_json::from_slice(&body).map_err(Error::Decode)
     }
 }
