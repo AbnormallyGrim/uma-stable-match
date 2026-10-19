@@ -1,0 +1,15 @@
+services:
+  server:
+    build: .
+    image: uma-stable-match
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+      FRONTEND_DIR: /app/frontend
+    ports:
+      - "127.0.0.1:${PORT:-8080}:8080"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
