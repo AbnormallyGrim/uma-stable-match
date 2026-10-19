@@ -8,16 +8,29 @@ This is an unofficial client. It isn't affiliated with uma.moe or Cygames.
 
 ```rust,no_run
 use uma_stable_match_scoring::Club;
-use uma_stable_match_umamoe_client::{ApiKey, CircleRequest, Client, ClientConfig};
+use uma_stable_match_umamoe_client::{
+    ApiKey, CircleRequest, CircleSort, Client, ClientConfig, ListCirclesRequest, SortDir,
+};
 
 # async fn run() -> Result<(), uma_stable_match_umamoe_client::Error> {
 // Read the key from your environment or config; never hard-code it.
 let key = std::env::var("UMAMOE_API_KEY").expect("UMAMOE_API_KEY is set");
 let client = Client::new(ClientConfig::new(ApiKey::new(key)))?;
 
-let response = client.circle(&CircleRequest::by_circle_id(1)).await?;
-let club = Club::from(response);
-println!("{} has {} member snapshots", club.name, club.members.len());
+// One page of clubs, best monthly rank first.
+let request = ListCirclesRequest {
+    sort_by: Some(CircleSort::MonthlyRank),
+    sort_dir: Some(SortDir::Asc),
+    ..Default::default()
+};
+let page = client.list_circles(&request).await?;
+
+// Full details and member fan data for one club, ready for scoring.
+if let Some(circle) = page.circles.first() {
+    let response = client.circle(&CircleRequest::by_circle_id(circle.circle_id)).await?;
+    let club = Club::from(response);
+    println!("{} has {} member snapshots", club.name, club.members.len());
+}
 # Ok(())
 # }
 ```
@@ -27,8 +40,11 @@ println!("{} has {} member snapshots", club.name, club.members.len());
 | Method | Endpoint | Returns |
 |---|---|---|
 | `Client::circle` | `GET /api/v4/circles` | `CircleResponse`: a club, its members' daily fans and its tier |
+| `Client::list_circles` | `GET /api/v4/circles/list` | `CircleListResponse`: one page of clubs, without members or tier |
 
 `CircleRequest` looks a club up by `circle_id` or by a member's `viewer_id`. Without `for_month`, the API returns the current game month, which starts on the 2nd (JST). A month outside 1 to 12 is rejected before any request is sent.
+
+`ListCirclesRequest` filters by name, minimum members and worst monthly rank, and sorts by name, member count, monthly rank or monthly points. Fields left as `None` aren't sent, so the API's defaults apply. Pages start at 0: use `has_next_page` on the response and `ListCirclesRequest::page` to walk them.
 
 ## Response types
 
@@ -38,8 +54,6 @@ println!("{} has {} member snapshots", club.name, club.members.len());
 | `CircleListResponse` | `GET /api/v4/circles/list`: one page of clubs, without members or tier |
 
 The types follow the uma.moe OpenAPI schema but are lenient. Missing fields take their default, `null` becomes `None`, and unknown fields are ignored. Timestamps are kept as ISO 8601 strings.
-
-`CircleListResponse` pages from 0. `has_next_page` reports whether a later page exists.
 
 ## Converting to scoring types
 

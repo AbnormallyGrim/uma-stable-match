@@ -65,6 +65,7 @@ impl Client {
         self.get("/api/v4/circles", &request.query()).await
     }
 
+    /// Fetches one page of clubs (`GET /api/v4/circles/list`).
     pub async fn list_circles(
         &self,
         request: &ListCirclesRequest,
