@@ -83,9 +83,27 @@ To keep your email address out of commits, turn on **Keep my email addresses pri
 ## Code guidelines
 
 - Keep the `scoring` crate free of network and storage code. Data goes in, scores come out.
-- Document public items. Missing documentation is flagged by the linter.
 - `unsafe` code isn't allowed.
 - Prefer small, focused pull requests.
+
+### Documentation
+
+- Give every public item a short comment in the code. Missing documentation is flagged by the linter.
+- Keep code comments brief. Add an inline comment only where the code isn't obvious.
+- Put longer explanations, such as how something works, formulas and examples, in the crate's or app's `README.md`. A crate's README is also its `cargo doc` front page, and its code examples run as tests.
+
+### Tests
+
+- **Unit tests** go in a `tests.rs` file next to the module they test, declared at the bottom of the module:
+
+  ```rust
+  #[cfg(test)]
+  mod tests;
+  ```
+
+  For example, tests for `src/scoring.rs` live in `src/scoring/tests.rs` and can test private functions.
+- **Tests of the public API** go in the crate's `tests/` folder.
+- Use made-up data in tests, never real player or club data.
 
 ## License
 

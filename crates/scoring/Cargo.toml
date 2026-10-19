@@ -9,7 +9,11 @@ repository.workspace = true
 [lib]
 name = "uma_stable_match_scoring"
 
+[features]
+serde = ["dep:serde"]
+
 [dependencies]
+serde = { version = "1", features = ["derive"], optional = true }
 
 [lints]
 workspace = true
