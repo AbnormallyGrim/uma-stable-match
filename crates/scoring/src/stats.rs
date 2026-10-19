@@ -1,7 +1,6 @@
-//! Small statistics helpers.
+//! Statistics helpers.
 
-/// Median of a slice. Returns `None` for an empty slice. For an even number of
-/// values, returns the mean of the two middle values.
+// Even-length slices use the mean of the two middle values.
 pub(crate) fn median(values: &[f64]) -> Option<f64> {
     if values.is_empty() {
         return None;
@@ -16,8 +15,7 @@ pub(crate) fn median(values: &[f64]) -> Option<f64> {
     })
 }
 
-/// Gini coefficient of non-negative values: 0 when everyone contributes
-/// equally, approaching 1 when one value accounts for everything.
+// Gini coefficient of non-negative values (0 = equal, towards 1 = one value dominates).
 pub(crate) fn gini(values: &[f64]) -> f64 {
     let mut sorted: Vec<f64> = values.iter().copied().filter(|v| *v >= 0.0).collect();
     sorted.sort_by(f64::total_cmp);
@@ -35,8 +33,7 @@ pub(crate) fn gini(values: &[f64]) -> f64 {
     weighted / (n_f * total)
 }
 
-/// Rounds to the nearest integer, sending exact halves to the nearest even
-/// integer (banker's rounding).
+// Rounds halves to the nearest even integer, matching the prototype's rounding.
 pub(crate) fn round_half_even(x: f64) -> f64 {
     let rounded = x.round();
     if (x - x.trunc()).abs() == 0.5 && rounded % 2.0 != 0.0 {

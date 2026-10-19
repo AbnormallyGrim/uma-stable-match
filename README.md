@@ -268,24 +268,13 @@ cd web && npm test
 
 ### Using the scoring crate on its own
 
-The `scoring` crate has no network or storage dependencies. If you already have club and member data, you can score it directly:
+The `scoring` crate has no network or storage dependencies. If you already have club and member data, you can score it directly. See the [scoring crate documentation](crates/scoring/README.md) for usage, input data and the scoring rules.
 
-```rust
-use uma_stable_match_scoring::{daily_pace, score_clubs, Club, ScoringOptions};
+To browse the API documentation locally:
 
-// Your cumulative fan count for each day of the month
-let pace = daily_pace(&my_daily_fans).expect("at least three days of data");
-
-let options = ScoringOptions { balance_weight: Some(0.5), ..Default::default() };
-for scored in score_clubs(pace, &clubs, &options)? {
-    println!(
-        "{}: place {} of {}, score {:.3}",
-        scored.club.name, scored.your_place, scored.club_size, scored.score
-    );
-}
+```bash
+cargo doc -p uma-stable-match-scoring --all-features --open
 ```
-
-Enable the `serde` feature to deserialise `Club` and `MemberSnapshot` directly from JSON.
 
 ## Contributing
 

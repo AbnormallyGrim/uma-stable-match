@@ -1,24 +1,13 @@
-//! Member-level rules: daily pace and who counts as a current member.
+//! Member rules: daily pace and current members.
 
 use crate::model::MemberSnapshot;
 
-/// Minimum number of days with data needed to calculate a pace.
+/// Days of data needed to calculate a pace.
 pub const MIN_DAYS_FOR_PACE: usize = 3;
 
-/// Average daily fan gain from a cumulative fan series.
-///
-/// Days with no data (`0`) are skipped, and fan counts recorded in a previous
-/// club (negative values) are counted as normal. Returns `None` when fewer than
-/// [`MIN_DAYS_FOR_PACE`] days have data.
-///
-/// ```
-/// use uma_stable_match_scoring::daily_pace;
-///
-/// // 10M on day 1, 16M on day 3, 22M on day 5: 12M over 2 gaps = 6M/day
-/// assert_eq!(daily_pace(&[10_000_000, 0, 16_000_000, 0, 22_000_000]), Some(6_000_000.0));
-/// assert_eq!(daily_pace(&[10_000_000, 12_000_000]), None);
-/// ```
+/// Average daily fan gain from a cumulative series, or `None` with too few days of data.
 pub fn daily_pace(daily_fans: &[i64]) -> Option<f64> {
+    // Skip days without data; previous-club values (negative) still count.
     let values: Vec<i64> = daily_fans
         .iter()
         .filter(|v| **v != 0)
@@ -32,23 +21,17 @@ pub fn daily_pace(daily_fans: &[i64]) -> Option<f64> {
     Some((last - first) / (values.len() - 1) as f64)
 }
 
-/// Index of the last day with data, or `None` if the series is empty.
 pub(crate) fn last_day(daily_fans: &[i64]) -> Option<usize> {
     daily_fans.iter().rposition(|v| *v != 0)
 }
 
-/// Number of days with data.
 pub(crate) fn days_with_data(daily_fans: &[i64]) -> usize {
     daily_fans.iter().filter(|v| **v != 0).count()
 }
 
-/// Members who are still in the club.
-///
-/// 1. Only snapshots from the latest month present are considered.
-/// 2. The club's latest data day is the last day on which any member has data.
-/// 3. A member is current if their value on that day is positive. Zero means
-///    they have left; a negative value means fans recorded in a previous club.
+/// Members still in the club: those with a positive value on the club's latest data day.
 pub fn current_members(members: &[MemberSnapshot]) -> Vec<&MemberSnapshot> {
+    // Only the latest month counts.
     let latest_period = members
         .iter()
         .filter_map(|m| Some((m.year?, m.month?)))

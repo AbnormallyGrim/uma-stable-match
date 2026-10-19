@@ -1,27 +1,22 @@
-//! Input data: clubs, their members, and club metadata.
+//! Input data: clubs and member snapshots.
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// Maximum number of members a club can have.
+/// Maximum members per club.
 pub const CLUB_CAP: u32 = 30;
 
-/// One member's fan history for a single month.
-///
-/// `daily_fans` holds the member's **cumulative** fan count for each day of the
-/// month, indexed from day 1. A value of `0` means no data for that day (for
-/// example, before the member joined or after they left). A **negative** value
-/// is a fan count recorded while the member was in a previous club.
+/// One member's cumulative fan count for each day of a month.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MemberSnapshot {
-    /// The member's trainer ID.
+    /// Trainer ID.
     pub viewer_id: u64,
-    /// Year of the snapshot, if known.
+    /// Snapshot year.
     pub year: Option<i32>,
-    /// Month of the snapshot (1–12), if known.
+    /// Snapshot month (1–12).
     pub month: Option<u32>,
-    /// Cumulative fan count per day of the month.
+    /// Cumulative fans per day: 0 = no data, negative = previous club.
     pub daily_fans: Vec<i64>,
 }
 
@@ -30,17 +25,16 @@ pub struct MemberSnapshot {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum JoinStyle {
-    /// Anyone can join immediately.
+    /// Anyone can join.
     Open,
-    /// The leader or an officer must approve applications.
+    /// Applications need approval.
     Approval,
-    /// Not accepting new members.
+    /// Not accepting members.
     Closed,
 }
 
 impl JoinStyle {
-    /// Converts the numeric join style used by the game data (1 = open,
-    /// 2 = approval, 3 = closed).
+    /// Converts the game's join style code (1 = open, 2 = approval, 3 = closed).
     pub fn from_code(code: u8) -> Option<Self> {
         match code {
             1 => Some(Self::Open),
@@ -51,16 +45,15 @@ impl JoinStyle {
     }
 }
 
-/// A club and its members for the month being scored.
+/// A club and its member snapshots for one month.
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Club {
-    /// The club's ID.
+    /// Club ID.
     pub circle_id: u64,
-    /// The club's name.
+    /// Club name.
     pub name: String,
-    /// Official member count, if known. Used to work out the club's size after
-    /// you join.
+    /// Official member count.
     pub member_count: Option<u32>,
     /// This month's rank.
     pub monthly_rank: Option<u32>,
@@ -68,23 +61,23 @@ pub struct Club {
     pub last_month_rank: Option<u32>,
     /// How the club accepts members.
     pub join_style: Option<JoinStyle>,
-    /// Playstyle code, as used by the game data.
+    /// Playstyle code.
     pub policy: Option<u32>,
-    /// Club tier code, from 1 (D) to 11 (SS). See [`tier_label`].
+    /// Tier code, 1 (D) to 11 (SS).
     pub club_rank: Option<u8>,
-    /// The club's description.
+    /// Club description.
     pub comment: Option<String>,
-    /// Member snapshots for the month.
+    /// Member snapshots.
     pub members: Vec<MemberSnapshot>,
 }
 
 impl Club {
-    /// Number of open spots, if the member count is known.
+    /// Open spots, if the member count is known.
     pub fn open_spots(&self) -> Option<u32> {
         self.member_count.map(|n| CLUB_CAP.saturating_sub(n))
     }
 
-    /// The club's tier label, such as `"A+"`, if known.
+    /// Tier label such as `"A+"`, if known.
     pub fn tier(&self) -> Option<&'static str> {
         self.club_rank.and_then(tier_label)
     }
@@ -92,14 +85,7 @@ impl Club {
 
 const TIER_LABELS: [&str; 11] = ["D", "D+", "C", "C+", "B", "B+", "A", "A+", "S", "S+", "SS"];
 
-/// Converts a club tier code (1–11) to its label, from `"D"` to `"SS"`.
-///
-/// ```
-/// use uma_stable_match_scoring::tier_label;
-///
-/// assert_eq!(tier_label(8), Some("A+"));
-/// assert_eq!(tier_label(12), None);
-/// ```
+/// Converts a tier code (1–11) to its label, `"D"` to `"SS"`.
 pub fn tier_label(code: u8) -> Option<&'static str> {
     (1..=11)
         .contains(&code)

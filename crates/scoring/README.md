@@ -1,0 +1,122 @@
+# uma-stable-match-scoring
+
+Ranks Umamusume: Pretty Derby clubs by how well they suit a trainer. Club and member data goes in, scores come out. The crate has no network or storage code.
+
+## Usage
+
+```rust
+use uma_stable_match_scoring::{daily_pace, score_clubs, Club, ScoringOptions};
+
+// Your cumulative fan count for each day of the month.
+let my_fans = [150_000_000, 157_500_000, 165_000_000];
+let pace = daily_pace(&my_fans).expect("at least three days of data");
+
+// Load clubs and their member snapshots from your data source.
+let clubs: Vec<Club> = Vec::new();
+
+let options = ScoringOptions { balance_weight: Some(0.5), ..Default::default() };
+for scored in score_clubs(pace, &clubs, &options).expect("valid pace and options") {
+    println!("{}: place {} of {}, score {:.3}",
+        scored.club.name, scored.your_place, scored.club_size, scored.score);
+}
+```
+
+Enable the `serde` feature to deserialise `Club` and `MemberSnapshot` directly from JSON:
+
+```toml
+uma-stable-match-scoring = { version = "0.1", features = ["serde"] }
+```
+
+## Input data
+
+A `MemberSnapshot` holds one member's **cumulative** fan count for each day of the month, starting at day 1:
+
+| Value | Meaning |
+|---|---|
+| Positive | Fan count while in this club |
+| `0` | No data for that day (before joining, or after leaving) |
+| Negative | Fan count recorded while in a previous club |
+
+A `Club` holds the club's details and its member snapshots for the month.
+
+## How scoring works
+
+### Pace
+
+`daily_pace` skips days without data and counts fans from a previous club:
+
+```text
+pace = (latest value − first value) ÷ (days with data − 1)
+```
+
+At least 3 days of data are needed.
+
+### Current members
+
+`current_members` decides who is still in a club:
+
+1. Only snapshots from the latest month present are used.
+2. The club's latest data day is the last day on which any member has data.
+3. A member is current if their value on that day is positive.
+
+### Place and fit
+
+```text
+club size  = min(official member count, 29) + 1        (you included, never above 30)
+your place = 1 + current members with a higher pace
+fit        = |your place ÷ club size − 0.4| + 0.3 × |club median ÷ your pace − 0.85|
+```
+
+Lower fit is better. It's lowest when you'd sit about 40% of the way down the club and the club median is a little below your pace.
+
+Members with fewer than 3 days of data are counted in the club size but can't be ranked, so they're placed below you. A club needs at least 8 rankable members to be scored.
+
+### Balance
+
+`club_balance` measures how evenly current members contribute. Members with fewer than 3 days of data are left out.
+
+| Measure | Definition |
+|---|---|
+| Passenger | Gaining under 1M fans/day, or under 25% of the club median, whichever is higher |
+| Gini | 0 = everyone contributes equally, 1 = one member does everything |
+| Bottom quarter | Median daily gain of the lowest-contributing quarter |
+| Top-3 share | Share of the club's daily gain from its three biggest contributors |
+
+```text
+balance = 100 × (0.5 × (1 − gini) + 0.5 × (1 − passenger share))     rounded, halves to even
+```
+
+### Final score
+
+With `ScoringOptions::balance_weight` set to `w`:
+
+```text
+score = fit + w × (1 − balance ÷ 100)
+```
+
+Without it, the score is the fit. `score_clubs` returns clubs sorted by score, lowest (best) first.
+
+### Clubs that are left out
+
+- Fewer than 8 rankable current members
+- Closed clubs, unless `ScoringOptions::include_closed` is set
+- Clubs without a balance score, when balance scoring is on
+
+## Errors
+
+`score_clubs` and `score_club` return a `ScoringError` when:
+
+- the pace isn't a finite number above zero
+- the balance weight is outside 0 to 1
+
+## Tiers
+
+`tier_label` converts a club's tier code to its label:
+
+```rust
+use uma_stable_match_scoring::tier_label;
+
+assert_eq!(tier_label(1), Some("D"));
+assert_eq!(tier_label(8), Some("A+"));
+assert_eq!(tier_label(11), Some("SS"));
+```

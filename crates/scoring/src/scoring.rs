@@ -1,4 +1,4 @@
-//! Club scoring: your place, fit, balance and the final ranking.
+//! Club scoring: place, fit, balance and ranking.
 
 use std::fmt;
 
@@ -9,42 +9,39 @@ use crate::members::{current_members, daily_pace, days_with_data, MIN_DAYS_FOR_P
 use crate::model::{Club, JoinStyle, MemberSnapshot, CLUB_CAP};
 use crate::stats::{gini, median, round_half_even};
 
-/// Minimum number of rankable current members a club needs to be scored.
+/// Minimum rankable current members a club needs to be scored.
 pub const MIN_RANKED_MEMBERS: usize = 8;
 
-/// A member gaining less than this many fans per day is a passenger.
+/// Members below this daily gain are passengers.
 pub const PASSENGER_FLOOR: f64 = 1_000_000.0;
 
-/// A member gaining less than this share of the club median is a passenger.
+/// Members below this share of the club median are passengers.
 pub const PASSENGER_SHARE_OF_MEDIAN: f64 = 0.25;
 
-/// Default strength of balance scoring.
+/// Default balance weight.
 pub const DEFAULT_BALANCE_WEIGHT: f64 = 0.5;
 
-/// Where in the club you should ideally sit, as a fraction from the top.
+// Fit targets: about 40% of the way down the club, with a median at 85% of your pace.
 const IDEAL_POSITION: f64 = 0.4;
-/// Ideal club median as a fraction of your pace.
 const IDEAL_MEDIAN_RATIO: f64 = 0.85;
-/// How much the median term counts towards fit.
 const MEDIAN_WEIGHT: f64 = 0.3;
 
-/// Options for [`score_clubs`].
+/// Options for [`score_clubs`] and [`score_club`].
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ScoringOptions {
-    /// Turns on balance scoring with this weight, from 0 to 1. Clubs without
-    /// enough data for a balance score are left out when this is set.
+    /// Turns on balance scoring with this weight (0 to 1).
     pub balance_weight: Option<f64>,
     /// Include clubs that aren't accepting members.
     pub include_closed: bool,
 }
 
-/// Errors returned by [`score_clubs`] and [`score_club`].
+/// Invalid input to [`score_clubs`] or [`score_club`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ScoringError {
-    /// The trainer's pace must be a finite number greater than zero.
+    /// Pace must be finite and above zero.
     InvalidPace(f64),
-    /// The balance weight must be between 0 and 1.
+    /// Balance weight must be between 0 and 1.
     InvalidBalanceWeight(f64),
 }
 
@@ -65,49 +62,44 @@ impl std::error::Error for ScoringError {}
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Balance {
-    /// 0 to 100. Higher means members contribute more evenly.
+    /// 0 to 100; higher is more even.
     pub score: u8,
-    /// Gini coefficient of daily gains: 0 is perfectly even, 1 is one member
-    /// doing everything.
+    /// Gini coefficient of daily gains (0 = even, 1 = one member does everything).
     pub gini: f64,
-    /// Number of passengers among the counted members.
+    /// Number of passengers.
     pub passengers: usize,
-    /// Number of current members counted (those with enough data).
+    /// Number of members counted.
     pub counted: usize,
     /// Median daily gain of the lowest-contributing quarter.
     pub bottom_quarter_per_day: f64,
-    /// Share of the club's daily gain from its top three members, from 0 to 1.
+    /// Share of daily gain from the top three members (0 to 1).
     pub top3_share: f64,
 }
 
-/// A club with its scores for one trainer.
+/// A club's scores for one trainer.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScoredClub<'a> {
     /// The club that was scored.
     pub club: &'a Club,
-    /// Median daily gain of the club's current members.
+    /// Median daily gain of current members.
     pub median_per_day: f64,
-    /// Where you would rank among current members, starting at 1.
+    /// Your rank among current members, starting at 1.
     pub your_place: u32,
-    /// Club size after you join, including you. At most [`CLUB_CAP`].
+    /// Club size after you join, at most [`CLUB_CAP`].
     pub club_size: u32,
-    /// Number of current members with enough data to rank.
+    /// Current members with enough data to rank.
     pub ranked_members: usize,
-    /// Fit score. Lower is better.
+    /// Fit score; lower is better.
     pub fit: f64,
     /// Balance, when balance scoring is on.
     pub balance: Option<Balance>,
-    /// Final score used for ranking. Lower is better. Equal to `fit` when
-    /// balance scoring is off.
+    /// Final score used for ranking; lower is better.
     pub score: f64,
 }
 
-/// Balance of a club's current members.
-///
-/// Members with fewer than three days of data are left out, so new recruits
-/// aren't counted as passengers. Returns `None` when fewer than
-/// [`MIN_RANKED_MEMBERS`] members can be counted.
+/// Balance of a club's current members, or `None` if too few can be counted.
 pub fn club_balance(members: &[MemberSnapshot]) -> Option<Balance> {
+    // New members without enough data are left out so they aren't counted as passengers.
     let mut rates: Vec<f64> = current_members(members)
         .into_iter()
         .filter(|m| days_with_data(&m.daily_fans) >= MIN_DAYS_FOR_PACE)
@@ -143,12 +135,7 @@ pub fn club_balance(members: &[MemberSnapshot]) -> Option<Balance> {
     })
 }
 
-/// Scores one club for a trainer with the given daily pace.
-///
-/// Returns `Ok(None)` when the club is left out: it has fewer than
-/// [`MIN_RANKED_MEMBERS`] rankable members, it is closed (unless
-/// `include_closed` is set), or balance scoring is on and the club has no
-/// balance score.
+/// Scores one club, or returns `Ok(None)` if the club is left out.
 pub fn score_club<'a>(
     pace: f64,
     club: &'a Club,
@@ -158,26 +145,7 @@ pub fn score_club<'a>(
     Ok(score_valid(pace, club, options))
 }
 
-/// Scores and ranks clubs for a trainer with the given daily pace, best first.
-///
-/// ```
-/// use uma_stable_match_scoring::{score_clubs, Club, MemberSnapshot, ScoringOptions};
-///
-/// let members = (1..=10)
-///     .map(|i| MemberSnapshot {
-///         viewer_id: i,
-///         daily_fans: vec![100_000_000, 100_000_000 + i as i64 * 1_000_000, 100_000_000 + i as i64 * 2_000_000],
-///         ..Default::default()
-///     })
-///     .collect();
-/// let clubs = vec![Club { name: "Example Club".into(), member_count: Some(10), members, ..Default::default() }];
-///
-/// let options = ScoringOptions { balance_weight: Some(0.5), ..Default::default() };
-/// let ranked = score_clubs(7_000_000.0, &clubs, &options).unwrap();
-///
-/// assert_eq!(ranked[0].club.name, "Example Club");
-/// assert_eq!(ranked[0].club_size, 11);
-/// ```
+/// Scores and ranks clubs, best first.
 pub fn score_clubs<'a>(
     pace: f64,
     clubs: &'a [Club],
@@ -220,8 +188,7 @@ fn score_valid<'a>(pace: f64, club: &'a Club, options: &ScoringOptions) -> Optio
     }
     let club_median = median(&rates)?;
 
-    // Club size after you join: current members plus you, never above the cap.
-    // Brand-new members without enough data are counted but placed below you.
+    // Unrankable new members count towards the size but are placed below you.
     let known_members = club
         .member_count
         .filter(|n| *n > 0)
