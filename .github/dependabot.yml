@@ -11,6 +11,17 @@ updates:
       cargo-minor-and-patch:
         update-types: ["minor", "patch"]
 
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "web"]
+    commit-message:
+      prefix: build
+    groups:
+      npm-minor-and-patch:
+        update-types: ["minor", "patch"]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
