@@ -1,6 +1,6 @@
 # uma-stable-match-server
 
-The API server for Uma Stable Match. It scans uma.moe for candidate clubs on a schedule, keeps the results in memory, and recommends clubs for a daily fan pace or a trainer ID.
+The API server for Uma Stable Match. It scans uma.moe for candidate clubs on a schedule, keeps the results in memory, and recommends clubs for a trainer ID or a daily fan pace.
 
 ## Run
 
@@ -49,13 +49,15 @@ Scan results live in memory only, so nothing is written to disk. When the server
 
 ## Endpoints
 
+All endpoints are under `/api/v1`.
+
 | Method | Path | Response |
 |---|---|---|
-| `GET` | `/health` | `200 {"status":"ok"}` |
-| `GET` | `/api/status` | `200` with the scan state, below |
-| `GET` | `/api/recommendations` | Ranked clubs for a pace or trainer, below |
+| `GET` | `/api/v1/health` | `200 {"status":"ok"}` |
+| `GET` | `/api/v1/status` | `200` with the scan state, below |
+| `GET` | `/api/v1/recommendations` | Ranked clubs for a trainer or a pace, below |
 
-`/api/status` looks like this:
+`/api/v1/status` looks like this:
 
 ```json
 {
@@ -69,32 +71,38 @@ Scan results live in memory only, so nothing is written to disk. When the server
 
 ### Recommendations
 
-`GET /api/recommendations` scores the clubs from the last scan with [`uma-stable-match-scoring`](../scoring/README.md) and returns them best first.
+`GET /api/v1/recommendations` scores the clubs from the last scan with [`uma-stable-match-scoring`](../scoring/README.md) and returns them best first.
 
-| Parameter | Required | Meaning |
-|---|---|---|
-| `pace` | One of these two | Your daily fan gain, such as `7600000` |
-| `viewer_id` | One of these two | Your trainer ID. The server works out your pace from your own fan data this month |
-| `balance_weight` | No | Turns on balance scoring with this weight, from 0 to 1 |
-| `include_closed` | No | `true` to include clubs that aren't accepting members. Defaults to `false` |
+| Parameter | Required | Default | Meaning |
+|---|---|---|---|
+| `trainer_id` | One of these two | | Your trainer ID. The server works out your pace from your own fan data this month |
+| `pace` | One of these two | | Your daily fan gain, such as `7600000` |
+| `balance` | No | `false` | `true` turns on balance scoring at weight 0.5 |
+| `balance_weight` | No | | Balance strength, from 0 to 1. Setting it turns balance scoring on |
+| `include_closed` | No | `false` | `true` to include clubs that aren't accepting members |
+| `limit` | No | `50` | Most clubs to return |
+
+`balance=false` together with `balance_weight` is rejected, because the request contradicts itself.
 
 #### Looking up a trainer
 
-With `viewer_id`, the server fetches that trainer's club from uma.moe and finds their snapshot (the latest month if there's more than one). It then calculates their pace with `daily_pace`, which needs at least 3 days of data and a gain above zero. The response's `pace` is the calculated value; the trainer ID isn't echoed back.
+With `trainer_id`, the server fetches that trainer's club from uma.moe and finds their snapshot (the latest month if there's more than one). It then calculates their pace with `daily_pace`, which needs at least 3 days of data and a gain above zero.
 
 - **Cached for 10 minutes.** A found pace, and a "not found" or "not enough data" answer, is reused for that long, so repeat requests don't call uma.moe again. Failed uma.moe requests aren't cached.
-- **IDs stay out of logs.** Trainer IDs never appear in log messages or error responses. Failed lookups log only the HTTP status.
+- **IDs stay out of logs.** Trainer IDs never appear in log messages or error responses, only in the response to the trainer's own request. Failed lookups log only the HTTP status.
 - **No lookup without results.** Before the first scan finishes, the endpoint returns `503` without contacting uma.moe.
+
+#### Response
 
 Clubs with fewer than 8 rankable members aren't returned, and with balance scoring on, neither are clubs whose balance can't be measured.
 
 ```json
 {
-  "scanned_at": "2026-03-18T09:00:00Z",
-  "pace": 7600000.0,
-  "balance_weight": 0.5,
-  "include_closed": false,
-  "results": [
+  "trainer": { "trainer_id": 123456789012, "pace_per_day": 7600000.0 },
+  "options": { "balance_weight": 0.5, "include_closed": false, "limit": 50 },
+  "updated_at": "2026-03-18T09:00:00Z",
+  "total": 62,
+  "clubs": [
     {
       "circle_id": 1,
       "name": "Example Club",
@@ -126,19 +134,30 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
 }
 ```
 
+| Field | Meaning |
+|---|---|
+| `trainer.trainer_id` | The trainer ID you asked about, or `null` when you gave a `pace` |
+| `trainer.pace_per_day` | The pace used: yours from uma.moe, or the `pace` you gave |
+| `options` | The settings used, after defaults: `balance_weight` is `null` when balance scoring is off |
+| `updated_at` | When the clubs were scanned |
+| `total` | How many clubs were scored, before `limit` |
+| `clubs` | Up to `limit` clubs, best first |
+
 - `join_style` is `open`, `approval`, `closed` or `null`.
 - `tier` runs from `D` to `SS`, or is `null` when unknown.
 - `policy` is uma.moe's playstyle code.
-- `balance` is `null` unless `balance_weight` is set.
+- `balance` is `null` unless balance scoring is on.
 - Lower `fit` and `score` are better.
 
 The [scoring README](../scoring/README.md) explains every value.
+
+#### Errors
 
 Errors come back as `{"error": "..."}`:
 
 | Status | When |
 |---|---|
-| `400` | Neither or both of `pace` and `viewer_id` are given; `pace` is not a number, or zero or below; `viewer_id` isn't a trainer ID; `balance_weight` isn't a number from 0 to 1; or `include_closed` isn't `true` or `false` |
+| `400` | Any of these:<br>• neither or both of `trainer_id` and `pace` are given<br>• `trainer_id` isn't a trainer ID<br>• `pace` isn't a number above zero<br>• `balance_weight` isn't a number from 0 to 1<br>• `balance=false` is given with `balance_weight`<br>• `balance` or `include_closed` isn't `true` or `false`<br>• `limit` isn't a positive whole number |
 | `404` | uma.moe doesn't know the trainer, or they aren't in their club's data |
 | `422` | The trainer has too little fan data this month to work out a pace |
 | `502` | uma.moe couldn't be reached for the trainer lookup |
