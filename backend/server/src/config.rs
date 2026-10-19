@@ -14,6 +14,10 @@ pub const DEFAULT_HOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 /// Port the server listens on when `PORT` isn't set.
 pub const DEFAULT_PORT: u16 = 8080;
 
+pub const DEFAULT_RATE_LIMIT_PER_MINUTE: u32 = 30;
+
+pub const DEFAULT_TRAINER_LOOKUPS_PER_MINUTE: u32 = 10;
+
 // TODO(#51): adjust the default once uma.moe agrees how often we may scan.
 /// Minutes between scans when `SCAN_INTERVAL_MINUTES` isn't set.
 pub const DEFAULT_SCAN_INTERVAL_MINUTES: u32 = 180;
@@ -33,6 +37,9 @@ pub struct Config {
     pub scan_interval: Duration,
     /// How long a trainer's pace is reused, from `TRAINER_CACHE_MINUTES`.
     pub trainer_cache: Duration,
+    pub rate_limit_per_minute: u32,
+    pub trainer_lookups_per_minute: u32,
+    pub trust_forwarded_for: bool,
 }
 
 /// Invalid or missing settings.
@@ -47,6 +54,8 @@ pub enum ConfigError {
     /// `PORT` isn't a port number from 1 to 65535.
     #[error("PORT must be a port number from 1 to 65535, got {0:?}")]
     InvalidPort(String),
+    #[error("{name} must be true or false, got {value:?}")]
+    InvalidBool { name: &'static str, value: String },
     /// A numeric setting isn't a positive whole number.
     #[error("{name} must be a positive whole number, got {value:?}")]
     InvalidNumber {
@@ -123,6 +132,21 @@ impl Config {
                 (DEFAULT_PACE_TTL.as_secs() / 60) as u32,
             )?) * 60,
         );
+        let rate_limit_per_minute = number("RATE_LIMIT_PER_MINUTE", DEFAULT_RATE_LIMIT_PER_MINUTE)?;
+        let trainer_lookups_per_minute = number(
+            "TRAINER_LOOKUPS_PER_MINUTE",
+            DEFAULT_TRAINER_LOOKUPS_PER_MINUTE,
+        )?;
+        let trust_forwarded_for = match get("TRUST_FORWARDED_FOR").as_deref() {
+            None | Some("false") => false,
+            Some("true") => true,
+            Some(value) => {
+                return Err(ConfigError::InvalidBool {
+                    name: "TRUST_FORWARDED_FOR",
+                    value: value.to_owned(),
+                })
+            }
+        };
         if scan.rank_from > scan.rank_to {
             return Err(ConfigError::InvalidRankWindow {
                 from: scan.rank_from,
@@ -137,6 +161,9 @@ impl Config {
             scan,
             scan_interval,
             trainer_cache,
+            rate_limit_per_minute,
+            trainer_lookups_per_minute,
+            trust_forwarded_for,
         })
     }
 }
