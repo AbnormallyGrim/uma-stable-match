@@ -27,6 +27,27 @@ impl fmt::Debug for ApiKey {
     }
 }
 
+/// Retry settings for failed requests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetryConfig {
+    /// Retries after the first attempt.
+    pub max_retries: u32,
+    /// Delay before the first retry; doubles on each retry.
+    pub base_delay: Duration,
+    /// Longest delay between attempts, including `Retry-After`.
+    pub max_delay: Duration,
+}
+
+impl Default for RetryConfig {
+    fn default() -> Self {
+        Self {
+            max_retries: 3,
+            base_delay: Duration::from_millis(500),
+            max_delay: Duration::from_secs(30),
+        }
+    }
+}
+
 /// Settings for [`Client`](crate::Client).
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
@@ -34,10 +55,12 @@ pub struct ClientConfig {
     pub base_url: String,
     /// API key sent as `X-API-Key`.
     pub api_key: ApiKey,
-    /// Timeout for each request.
+    /// Timeout for each attempt.
     pub timeout: Duration,
-    /// Minimum gap between requests.
+    /// Minimum gap between requests, including retries.
     pub min_interval: Duration,
+    /// Retry settings.
+    pub retry: RetryConfig,
     /// `User-Agent` header value.
     pub user_agent: String,
 }
@@ -50,6 +73,7 @@ impl ClientConfig {
             api_key,
             timeout: Duration::from_secs(15),
             min_interval: Duration::from_millis(500),
+            retry: RetryConfig::default(),
             user_agent: concat!(
                 "uma-stable-match/",
                 env!("CARGO_PKG_VERSION"),

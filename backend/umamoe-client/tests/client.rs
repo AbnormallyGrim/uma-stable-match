@@ -4,8 +4,8 @@ use std::time::{Duration, Instant};
 
 use uma_stable_match_scoring::{Club, JoinStyle};
 use uma_stable_match_umamoe_client::{
-    ApiKey, CircleRequest, CircleSort, Client, ClientConfig, Error, ListCirclesRequest, SortDir,
-    StatusCode,
+    ApiKey, CircleRequest, CircleSort, Client, ClientConfig, Error, ListCirclesRequest,
+    RetryConfig, SortDir, StatusCode,
 };
 use wiremock::matchers::{header, method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -19,6 +19,11 @@ fn config(server: &MockServer) -> ClientConfig {
         base_url: server.uri(),
         timeout: Duration::from_secs(5),
         min_interval: Duration::ZERO,
+        retry: RetryConfig {
+            max_retries: 2,
+            base_delay: Duration::from_millis(1),
+            max_delay: Duration::from_millis(10),
+        },
         ..ClientConfig::new(ApiKey::new(KEY))
     }
 }
@@ -175,7 +180,7 @@ async fn returns_api_error_body() {
 async fn error_body_is_optional() {
     let server = MockServer::start().await;
     Mock::given(path("/api/v4/circles"))
-        .respond_with(ResponseTemplate::new(503).set_body_string("unavailable"))
+        .respond_with(ResponseTemplate::new(404).set_body_string("not found"))
         .expect(1)
         .mount(&server)
         .await;
@@ -187,10 +192,69 @@ async fn error_body_is_optional() {
     assert!(matches!(
         error,
         Error::Status {
-            status: StatusCode::SERVICE_UNAVAILABLE,
+            status: StatusCode::NOT_FOUND,
             body: None
         }
     ));
+}
+
+#[tokio::test]
+async fn retries_server_errors_then_succeeds() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(ResponseTemplate::new(503))
+        .up_to_n_times(2)
+        .expect(2)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(json(CIRCLE))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let response = client(&server)
+        .circle(&CircleRequest::by_circle_id(900001))
+        .await
+        .unwrap();
+    assert_eq!(response.circle.circle_id, 900001);
+}
+
+#[tokio::test]
+async fn retries_rate_limited_requests() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "0"))
+        .up_to_n_times(1)
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(json(CIRCLE_LIST))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    client(&server)
+        .list_circles(&ListCirclesRequest::default())
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn gives_up_after_max_retries() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(ResponseTemplate::new(500))
+        .expect(3)
+        .mount(&server)
+        .await;
+
+    let error = client(&server)
+        .circle(&CircleRequest::by_circle_id(1))
+        .await
+        .unwrap_err();
+    assert_eq!(error.status(), Some(StatusCode::INTERNAL_SERVER_ERROR));
 }
 
 #[tokio::test]
@@ -198,6 +262,7 @@ async fn invalid_json_is_a_decode_error() {
     let server = MockServer::start().await;
     Mock::given(path("/api/v4/circles"))
         .respond_with(json(r#"{"circle": "#))
+        .expect(1)
         .mount(&server)
         .await;
 
@@ -209,15 +274,17 @@ async fn invalid_json_is_a_decode_error() {
 }
 
 #[tokio::test]
-async fn timeout_is_a_transport_error() {
+async fn retries_timeouts() {
     let server = MockServer::start().await;
     Mock::given(path("/api/v4/circles"))
         .respond_with(json(CIRCLE).set_delay(Duration::from_secs(2)))
+        .expect(2)
         .mount(&server)
         .await;
 
     let mut config = config(&server);
     config.timeout = Duration::from_millis(100);
+    config.retry.max_retries = 1;
     let error = Client::new(config)
         .unwrap()
         .circle(&CircleRequest::by_circle_id(1))
