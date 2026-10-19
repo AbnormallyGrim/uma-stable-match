@@ -3,11 +3,13 @@
 use std::time::SystemTime;
 
 use axum::extract::State;
+use axum::middleware::from_fn_with_state;
 use axum::routing::get;
 use axum::{Json, Router};
 use serde_json::{json, Value};
 
 use crate::cache::Cache;
+use crate::limits::{limit_requests, RateLimits};
 use crate::pace::PaceLookup;
 use crate::recommendations::recommendations;
 
@@ -18,6 +20,8 @@ pub struct AppState {
     pub cache: Cache,
     /// Trainer pace lookups.
     pub paces: PaceLookup,
+    /// Per-visitor rate limits.
+    pub limits: RateLimits,
 }
 
 /// The server's routes.
@@ -25,7 +29,10 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/api/v1/health", get(health))
         .route("/api/v1/status", get(status))
-        .route("/api/v1/recommendations", get(recommendations))
+        .route(
+            "/api/v1/recommendations",
+            get(recommendations).route_layer(from_fn_with_state(state.clone(), limit_requests)),
+        )
         .with_state(state)
 }
 

@@ -2,16 +2,17 @@
 
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
+use axum::Extension;
 use axum::Json;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use uma_stable_match_scoring::{
     score_clubs, Balance, JoinStyle, ScoredClub, ScoringOptions, DEFAULT_BALANCE_WEIGHT,
 };
 
+use crate::api_error::ApiError;
 use crate::app::timestamp;
 use crate::app::AppState;
+use crate::limits::Visitor;
 use crate::pace::PaceError;
 
 const CLUB_URL: &str = "https://uma.moe/circles/";
@@ -81,28 +82,9 @@ struct BalanceView {
     top3_share: f64,
 }
 
-pub(crate) struct ApiError {
-    status: StatusCode,
-    message: String,
-}
-
-impl ApiError {
-    fn bad_request(message: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::BAD_REQUEST,
-            message: message.into(),
-        }
-    }
-}
-
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        (self.status, Json(json!({ "error": self.message }))).into_response()
-    }
-}
-
 pub(crate) async fn recommendations(
     State(state): State<AppState>,
+    Extension(visitor): Extension<Visitor>,
     Query(params): Query<Params>,
 ) -> Result<Json<Recommendations>, ApiError> {
     let pace = blank_to_none(&params.pace);
@@ -149,13 +131,18 @@ pub(crate) async fn recommendations(
         balance_weight,
         include_closed,
     };
-    let snapshot = state.cache.snapshot().ok_or(ApiError {
-        status: StatusCode::SERVICE_UNAVAILABLE,
-        message: "no scan results yet; try again shortly".into(),
-    })?;
+    let snapshot = state.cache.snapshot().ok_or(ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "no scan results yet; try again shortly",
+    ))?;
     let (pace, trainer_id) = match source {
         PaceSource::Given(pace) => (pace, None),
-        PaceSource::Trainer(id) => (state.paces.pace(id).await.map_err(pace_error)?, Some(id)),
+        PaceSource::Trainer(id) => {
+            if !state.paces.is_cached(id) {
+                state.limits.check_lookup(visitor)?;
+            }
+            (state.paces.pace(id).await.map_err(pace_error)?, Some(id))
+        }
     };
     let scored = score_clubs(pace, &snapshot.clubs, &options)
         .map_err(|e| ApiError::bad_request(e.to_string()))?;
@@ -206,10 +193,7 @@ fn pace_error(error: PaceError) -> ApiError {
         PaceError::NotEnoughData => StatusCode::UNPROCESSABLE_ENTITY,
         PaceError::Upstream(_) => StatusCode::BAD_GATEWAY,
     };
-    ApiError {
-        status,
-        message: error.to_string(),
-    }
+    ApiError::new(status, error.to_string())
 }
 
 fn parse_number(name: &str, value: &str) -> Result<f64, ApiError> {

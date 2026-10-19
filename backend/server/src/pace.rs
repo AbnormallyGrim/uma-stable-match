@@ -83,6 +83,11 @@ impl PaceLookup {
         outcome.into_result()
     }
 
+    /// Whether a fresh result for this trainer is cached.
+    pub fn is_cached(&self, viewer_id: u64) -> bool {
+        self.cached(viewer_id).is_some()
+    }
+
     fn cached(&self, viewer_id: u64) -> Option<Outcome> {
         let entries = self.entries.lock().unwrap_or_else(|e| e.into_inner());
         entries

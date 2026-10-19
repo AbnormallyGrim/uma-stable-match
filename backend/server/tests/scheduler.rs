@@ -10,7 +10,8 @@ use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    router, run_scheduler, AppState, Cache, CacheStatus, PaceLookup, ScanConfig, DEFAULT_PACE_TTL,
+    router, run_scheduler, AppState, Cache, CacheStatus, PaceLookup, RateLimits, ScanConfig,
+    DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
 use wiremock::matchers::path;
@@ -38,6 +39,7 @@ fn app(cache: Cache) -> AppState {
     AppState {
         cache,
         paces: PaceLookup::new(client, DEFAULT_PACE_TTL),
+        limits: RateLimits::new(10_000, 10_000, false),
     }
 }
 
