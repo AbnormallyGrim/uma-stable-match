@@ -1,3 +1,5 @@
+// SiteFooter component tests.
+
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 

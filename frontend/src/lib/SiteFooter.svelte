@@ -1,3 +1,9 @@
+<!--
+  @component
+  The page footer: tips for switching clubs, the privacy note, the disclaimer and attributions,
+  and project links. Keep the wording in step with the root README's Disclaimer section.
+-->
+
 <script lang="ts">
   const REPO = 'https://github.com/AbnormallyGrim/uma-stable-match';
 </script>
