@@ -1,11 +1,14 @@
 //! Starts the Uma Stable Match server.
 
+use std::net::SocketAddr;
 use std::process::ExitCode;
 
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 use tracing_subscriber::EnvFilter;
-use uma_stable_match_server::{router, run_scheduler, AppState, Cache, Config, PaceLookup};
+use uma_stable_match_server::{
+    router, run_scheduler, AppState, Cache, Config, PaceLookup, RateLimits,
+};
 use uma_stable_match_umamoe_client::{Client, ClientConfig};
 
 #[tokio::main]
@@ -49,6 +52,11 @@ async fn main() -> ExitCode {
     let cache = Cache::new();
     let (stop, stopped) = watch::channel(false);
     let paces = PaceLookup::new(client.clone(), config.trainer_cache);
+    let limits = RateLimits::new(
+        config.rate_limit_per_minute,
+        config.trainer_lookups_per_minute,
+        config.trust_forwarded_for,
+    );
     let scheduler = tokio::spawn(run_scheduler(
         client,
         config.scan,
@@ -57,12 +65,20 @@ async fn main() -> ExitCode {
         stopped,
     ));
 
-    let served = axum::serve(listener, router(AppState { cache, paces }))
-        .with_graceful_shutdown(async move {
-            shutdown_signal().await;
-            stop.send(true).ok();
-        })
-        .await;
+    let app = router(AppState {
+        cache,
+        paces,
+        limits,
+    });
+    let served = axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(async move {
+        shutdown_signal().await;
+        stop.send(true).ok();
+    })
+    .await;
     scheduler.await.ok();
 
     if let Err(error) = served {

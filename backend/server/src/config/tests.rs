@@ -19,6 +19,9 @@ fn defaults() {
     assert_eq!(config.scan, ScanConfig::default());
     assert_eq!(config.scan_interval, Duration::from_secs(180 * 60));
     assert_eq!(config.trainer_cache, Duration::from_secs(10 * 60));
+    assert_eq!(config.rate_limit_per_minute, 30);
+    assert_eq!(config.trainer_lookups_per_minute, 10);
+    assert!(!config.trust_forwarded_for);
 }
 
 #[test]
@@ -185,4 +188,47 @@ fn reads_scan_interval() {
             ..
         }
     ));
+}
+
+#[test]
+fn reads_rate_limit_settings() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("RATE_LIMIT_PER_MINUTE", "60"),
+        ("TRAINER_LOOKUPS_PER_MINUTE", "5"),
+        ("TRUST_FORWARDED_FOR", "true"),
+    ]))
+    .unwrap();
+    assert_eq!(config.rate_limit_per_minute, 60);
+    assert_eq!(config.trainer_lookups_per_minute, 5);
+    assert!(config.trust_forwarded_for);
+}
+
+#[test]
+fn invalid_rate_limit_settings_fail() {
+    let error = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("RATE_LIMIT_PER_MINUTE", "0"),
+    ]))
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        ConfigError::InvalidNumber {
+            name: "RATE_LIMIT_PER_MINUTE",
+            ..
+        }
+    ));
+
+    let error = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("TRUST_FORWARDED_FOR", "yes"),
+    ]))
+    .unwrap_err();
+    assert_eq!(
+        error,
+        ConfigError::InvalidBool {
+            name: "TRUST_FORWARDED_FOR",
+            value: "yes".into()
+        }
+    );
 }
