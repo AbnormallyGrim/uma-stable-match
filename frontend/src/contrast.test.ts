@@ -1,4 +1,6 @@
 // @vitest-environment node
+// Checks every colour pair the UI uses against WCAG AA, in both themes, straight from the
+// tokens in app.css. Node environment so the stylesheet can be read from disk.
 
 import { readFileSync } from 'node:fs';
 
@@ -43,10 +45,12 @@ function ratio(a: Rgba, b: Rgba): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+// WCAG AA minimums: normal text, large text (pick numbers), and UI parts such as borders.
 const TEXT = 4.5;
 const LARGE = 3;
 const UI = 3;
 
+// [foreground token, background, minimum]. `tag` and `policy-tag` are the tinted tag backgrounds.
 const pairs: [string, string, number][] = [
   ['text', 'bg', TEXT],
   ['text', 'card', TEXT],

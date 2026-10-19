@@ -1,3 +1,5 @@
+// axe-core accessibility checks for the main views and states. All data is made up.
+
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import axe from 'axe-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +14,8 @@ import { DEFAULT_SEARCH } from './lib/search';
 import { club, recommendations } from './lib/test-data';
 import ThemeToggle from './lib/ThemeToggle.svelte';
 
+// axe's colour-contrast rule needs real rendering, so contrast.test.ts covers it instead.
+// The landmark (region) rule only applies to whole-page checks.
 async function violations(node: Element, wholePage = false) {
   const result = await axe.run(node, {
     rules: {
