@@ -81,7 +81,7 @@ describe('App', () => {
     render(App);
     await fireEvent.input(trainerInput(), { target: { value: '123456789' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('trainer not found');
+    expect(await screen.findByRole('alert')).toHaveTextContent("We couldn't find that trainer");
   });
 
   it('remembers the trainer ID only when asked', async () => {
@@ -111,5 +111,46 @@ describe('App', () => {
     await fireEvent.click(screen.getByLabelText('Remember my trainer ID on this device'));
     await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
     expect(localStorage.getItem('uma-stable-match:trainer-id')).toBeNull();
+  });
+});
+
+describe('App states', () => {
+  it('waits for the first scan and retries', async () => {
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        calls += 1;
+        return Promise.resolve(
+          calls === 1
+            ? json({ error: 'no scan results yet; try again shortly' }, 503)
+            : json(recommendations(2)),
+        );
+      }),
+    );
+    setUrl('?pace=5000000');
+    render(App);
+    expect(await screen.findByText('Club data is still loading')).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: 'Try now' }));
+    expect(await screen.findByText('Found 2 clubs.')).toBeInTheDocument();
+    expect(calls).toBe(2);
+  });
+
+  it('shows a rate limit countdown', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ error: 'too many requests; try again in 7 seconds' }), {
+            status: 429,
+            headers: { 'Content-Type': 'application/json', 'Retry-After': '7' },
+          }),
+        ),
+      ),
+    );
+    setUrl('?pace=5000000');
+    render(App);
+    expect(await screen.findByText('Too many searches')).toBeInTheDocument();
+    expect(screen.getByText('Please wait 7 seconds before searching again.')).toBeInTheDocument();
   });
 });

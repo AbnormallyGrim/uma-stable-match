@@ -44,6 +44,9 @@ CI runs `check`, `lint`, `test` and `build` on Node 22 for every push and pull r
 index.html                    Page shell
 src/main.ts                   Mounts the app
 src/App.svelte                Root component: runs searches and keeps them in the URL
+src/lib/runner.ts             Search state machine: loading, retries and countdowns
+src/lib/states.ts             Error messages and empty-result hints
+src/lib/SearchStatus.svelte   Loading, waiting and error messages
 src/lib/api.ts                Typed API client
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
@@ -125,6 +128,26 @@ Below the cards, every scored club is listed in a table. The app asks the API fo
 ### Themes
 
 Colours are CSS custom properties in `src/app.css`, and components only use these tokens. A dark set applies automatically when the system uses dark mode. A manual theme toggle and a full contrast check are still to come.
+
+### Search states
+
+`src/lib/runner.ts` runs each search and tracks where it's up to. `SearchStatus.svelte` shows that state under the form.
+
+| Situation | What the visitor sees | Retry |
+|---|---|---|
+| Loading | "Finding clubs…". Previous results stay, dimmed and marked `aria-busy` | – |
+| First scan still running (503) | "Club data is still loading", with a countdown | Automatic after 5, 10, 20, 30, 30 and 30 seconds (about 2 minutes), or **Try now** |
+| Still loading after every retry | "Club data still isn't ready" | **Try again** |
+| Rate limited (429) | "Too many searches", counting down from `Retry-After` (10 seconds without it) | **Try again**, enabled when the countdown ends. Never automatic |
+| Trainer not found (404) | Where to find the trainer ID in-game | None; the search needs changing |
+| Not enough data (422) | Wait a few days, or search by pace | None |
+| uma.moe unreachable (502), network error, timeout, other | A short explanation | **Try again** |
+| Invalid search (400) | The server's message | None |
+| No matches | "No clubs matched your search", with hints to include closed clubs or lower the balance strength, when those apply | – |
+
+Starting a new search cancels any pending retry and any earlier request, so an old answer never replaces a newer one. Loading and waiting messages use `role="status"`, and errors use `role="alert"`. The dimming transition is turned off when the visitor prefers reduced motion.
+
+The runner takes the fetch function, a change callback, the retry delays and the timer functions as options. Its tests replace them, so they can check retries and countdowns to the second with fake timers.
 
 ## Display formatting
 

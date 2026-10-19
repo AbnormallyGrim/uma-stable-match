@@ -1,14 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import {
-    ApiError,
-    fetchRecommendations,
-    type RecommendationQuery,
-    type Recommendations,
-  } from './lib/api';
+  import { fetchRecommendations, type RecommendationQuery } from './lib/api';
   import Results from './lib/Results.svelte';
+  import { SearchRunner, type SearchState as RunnerState } from './lib/runner';
   import SearchForm from './lib/SearchForm.svelte';
+  import SearchStatus from './lib/SearchStatus.svelte';
   import {
     DEFAULT_SEARCH,
     fromUrlParams,
@@ -28,51 +25,36 @@
   // Above a scan's default 80 clubs, so the table can list them all.
   const RESULT_LIMIT = 100;
 
-  let busy = $state(false);
-  let result = $state<Recommendations | null>(null);
-  let error = $state<string | null>(null);
-  let controller: AbortController | null = null;
+  let search = $state<RunnerState>({ status: { phase: 'idle' }, result: null });
 
-  async function search(query: RecommendationQuery) {
-    controller?.abort();
-    const current = new AbortController();
-    controller = current;
-    busy = true;
-    error = null;
-    try {
-      result = await fetchRecommendations(
-        { ...query, limit: RESULT_LIMIT },
-        { signal: current.signal },
-      );
-    } catch (caught) {
-      if (current.signal.aborted) {
-        return;
-      }
-      result = null;
-      error = caught instanceof ApiError ? caught.message : 'Something went wrong.';
-    } finally {
-      if (controller === current) {
-        busy = false;
-      }
-    }
-  }
+  const runner = new SearchRunner({
+    fetch: (query, signal) => fetchRecommendations({ ...query, limit: RESULT_LIMIT }, { signal }),
+    onchange: (state) => {
+      search = state;
+    },
+  });
+
+  const busy = $derived(search.status.phase === 'loading');
+  const showResults = $derived(
+    search.result !== null && (search.status.phase === 'done' || search.status.phase === 'loading'),
+  );
 
   function onsearch(query: RecommendationQuery, state: SearchState, remember: boolean) {
     if (state.mode === 'trainer') {
       saveRememberedTrainerId(storage, remember ? state.trainerId : null);
     }
     window.history.replaceState(null, '', `${window.location.pathname}?${toUrlParams(query)}`);
-    void search(query);
+    runner.run(query);
   }
 
   onMount(() => {
     if (fromUrl) {
       const validation = validate(fromUrl);
       if (validation.ok) {
-        void search(validation.query);
+        runner.run(validation.query);
       }
     }
-    return () => controller?.abort();
+    return () => runner.dispose();
   });
 </script>
 
@@ -80,18 +62,16 @@
   <h1>Uma Stable Match</h1>
   <SearchForm {initial} remember={remembered !== null} {busy} {onsearch} />
 
-  <div aria-live="polite">
-    {#if error}
-      <p class="error" role="alert">{error}</p>
-    {:else if result}
-      <p class="visually-hidden">
-        Found {result.total}
-        {result.total === 1 ? 'club' : 'clubs'}.
-      </p>
+  <SearchStatus status={search.status} onretry={() => runner.retryNow()} />
+
+  <div aria-live="polite" class="visually-hidden">
+    {#if search.status.phase === 'done' && search.result}
+      Found {search.result.total}
+      {search.result.total === 1 ? 'club' : 'clubs'}.
     {/if}
   </div>
 
-  {#if result && !error}
-    <Results {result} />
+  {#if showResults && search.result}
+    <Results result={search.result} stale={busy} />
   {/if}
 </main>
