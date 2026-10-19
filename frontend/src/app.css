@@ -1,0 +1,86 @@
+/* Global styles and colour tokens. Components use the tokens, so themes only change :root. */
+
+:root {
+  color-scheme: light;
+  --bg: #f3f5f8;
+  --card: #ffffff;
+  --surface: #f2f5f9;
+  --text: #111827;
+  --text-2: #374151;
+  --muted: #4b5563;
+  --border: rgb(17 24 39 / 12%);
+  --border-strong: rgb(17 24 39 / 20%);
+  --accent: #2563eb;
+  --up: #15803d;
+  --down: #b91c1c;
+  --open: #0f766e;
+  --approval: #b45309;
+  --closed: #b91c1c;
+  --policy: #6d28d9;
+  --gold: #946100;
+  --silver: #53616b;
+  --bronze: #9b521b;
+  --radius-sm: 4px;
+  --radius: 8px;
+  --font: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Dark theme, following the system setting. A manual toggle comes later. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0a0a0a;
+    --card: #161616;
+    --surface: rgb(255 255 255 / 8%);
+    --text: #ffffff;
+    --text-2: rgb(255 255 255 / 70%);
+    --muted: rgb(255 255 255 / 55%);
+    --border: rgb(255 255 255 / 12%);
+    --border-strong: rgb(255 255 255 / 20%);
+    --accent: #64b5f6;
+    --up: #81c784;
+    --down: #e57373;
+    --open: #81c784;
+    --approval: #ffb74d;
+    --closed: #e57373;
+    --policy: #ce93d8;
+    --gold: #ffd700;
+    --silver: #c0c0c0;
+    --bronze: #cd7f32;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  line-height: 1.5;
+}
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+a {
+  color: var(--accent);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
