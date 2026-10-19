@@ -1,3 +1,8 @@
+<!--
+  @component
+  The search at a glance: pace used, clubs analysed, data age and balance setting.
+-->
+
 <script lang="ts">
   import type { Recommendations } from './api';
   import { formatPerDay, formatUpdated } from './format';

@@ -1,3 +1,9 @@
+<!--
+  @component
+  A club's tier as its in-game icon (Cygames artwork, see `assets/tiers/README.md`).
+  Unknown tiers show a dashed "?" with screen-reader text.
+-->
+
 <script lang="ts">
   const icons = import.meta.glob<string>('../assets/tiers/tier-*.webp', {
     eager: true,

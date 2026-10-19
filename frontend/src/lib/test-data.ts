@@ -1,3 +1,5 @@
+// Made-up clubs and responses for component tests.
+
 import type { Club, Recommendations } from './api';
 
 export function club(overrides: Partial<Club> = {}): Club {

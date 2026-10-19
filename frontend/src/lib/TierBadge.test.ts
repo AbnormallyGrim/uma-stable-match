@@ -1,3 +1,5 @@
+// TierBadge component tests. All data is made up.
+
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 

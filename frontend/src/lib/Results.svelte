@@ -1,3 +1,8 @@
+<!--
+  @component
+  The results view: summary, then the top ten picks as cards.
+-->
+
 <script lang="ts">
   import type { Recommendations } from './api';
   import ClubCard from './ClubCard.svelte';

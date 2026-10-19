@@ -1,3 +1,5 @@
+/* Global styles and colour tokens. Components use the tokens, so themes only change :root. */
+
 :root {
   color-scheme: light;
   --bg: #f3f5f8;
@@ -23,6 +25,7 @@
   --font: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* Dark theme, following the system setting. A manual toggle comes later. */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;

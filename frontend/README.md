@@ -2,7 +2,7 @@
 
 The Uma Stable Match web interface, built with [Svelte 5](https://svelte.dev) and TypeScript on [Vite](https://vite.dev). It's a single-page app; the Rust server will serve the built files (#40).
 
-For now it has the search form and shows how many clubs were found. The results view comes in a later issue.
+It has the search form, a summary of each search and the top ten picks as cards. The full results table comes in a later issue.
 
 ## Requirements
 
@@ -47,6 +47,13 @@ src/App.svelte                Root component: runs searches and keeps them in th
 src/lib/api.ts                Typed API client
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
+src/lib/Results.svelte        Results view: summary and top picks
+src/lib/ResultsSummary.svelte Pace, clubs analysed, data age and balance setting
+src/lib/ClubCard.svelte       One top pick
+src/lib/TierBadge.svelte      Tier icon, with a fallback for unknown tiers
+src/lib/test-data.ts          Made-up data for component tests
+src/app.css                   Global styles and light and dark colour tokens
+src/assets/tiers/             Club tier icons (Cygames artwork, not MIT licensed)
 src/lib/SearchForm.svelte     The search form
 src/**/*.test.ts              Unit and component tests
 src/setup-tests.ts            Adds jest-dom matchers to Vitest
@@ -73,6 +80,27 @@ Each search replaces the page URL's query with the same parameters the API uses,
 ### Remembering the trainer ID
 
 "Remember my trainer ID on this device" is off by default. When it's ticked at search time, the trainer ID is saved in the browser's local storage under `uma-stable-match:trainer-id`. Unticking it and searching again deletes it. Nothing else is stored. Without a search in the URL, a remembered ID fills the form, but doesn't start a search on its own. Browsers that block storage simply don't remember.
+
+## Results view
+
+After a search, the page shows a summary and the top ten picks.
+
+- **Summary:** your pace, how many clubs were analysed (the API's `total`), how long ago the data was updated (with the exact time on hover), and the balance setting used.
+- **Each card:**
+  - **Header:** the pick number (gold, silver and bronze for the top three), the tier icon, and the club name linking to uma.moe in a new tab
+  - **Details:** the monthly rank and trend, open spots, join style and playstyle tags, and the description
+  - **How you'd compare:** your place, the club's median per day, and the fit (or the score, with balance on)
+  - **With balance on:** the balance score as a bar, passengers and top-three share
+- **Layout:** on narrow screens, the numbers move below the club details.
+- **Screen readers:** after a search, only a short "Found N clubs" message is announced, not the whole list. Rank trends have spoken descriptions, such as "Up 16 places since last month".
+
+### Tier icons
+
+Tiers are shown with the game's own icons, D to SS, from [`src/assets/tiers/`](src/assets/tiers/README.md). They're © Cygames, Inc. and excluded from the MIT licence; that folder's README has the details. Each icon is under Vite's 4 kB inline limit, so it's bundled into the JavaScript as a data URL. A content security policy for the page must allow `img-src data:`.
+
+### Themes
+
+Colours are CSS custom properties in `src/app.css`, and components only use these tokens. A dark set applies automatically when the system uses dark mode. A manual theme toggle and a full contrast check are still to come.
 
 ## Display formatting
 

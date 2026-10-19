@@ -1,3 +1,9 @@
+<!--
+  @component
+  One recommended club: tier, link to uma.moe, rank trend, tags, how you'd compare,
+  and balance details when balance scoring is on. The top three get medal colours.
+-->
+
 <script lang="ts">
   import type { Club } from './api';
   import {
