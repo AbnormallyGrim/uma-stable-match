@@ -96,5 +96,10 @@
     gap: 8px 16px;
     align-items: center;
     justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    margin: 8px 0 0;
   }
 </style>

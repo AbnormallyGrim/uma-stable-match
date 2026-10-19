@@ -69,6 +69,8 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 
 ## Search form
 
+The form sits in a card. The "Search by" switch is at the top, then the field on the left and the options on the right, with **Find clubs** at the bottom right. Below 720 pixels it becomes a single column, and the inputs and button use the full width.
+
 The form searches by **trainer ID** or by **daily pace**, with an optional **balance scoring** toggle and strength slider (0 to 1, in steps of 0.05) and an **include closed clubs** checkbox.
 
 | Field | Accepted | Sent to the API as |
@@ -143,6 +145,20 @@ Colours are CSS custom properties in `src/app.css`, and components only use thes
 The **System / Light / Dark** switch in the header (`ThemeToggle.svelte`) sets the attribute. It saves Light or Dark in local storage under `uma-stable-match:theme`, and choosing System deletes it. It's a group of radio buttons labelled "Theme", so arrow keys and screen readers work, and keyboard focus shows a ring.
 
 A small inline script in `index.html` applies a saved theme before the page renders, so it never flashes the wrong theme while the app loads. When the server adds a content security policy (#40), it must allow this script, by hash or by moving it to its own file.
+
+### Shared styles
+
+`src/app.css` also styles the controls used across the page, so components don't repeat them:
+
+| Style | Use |
+|---|---|
+| `button` | Every button: a card-coloured background, a border and a hover state. Disabled buttons are dimmed |
+| `button.primary` | The main action, such as **Find clubs**: accent background with `--on-accent` text |
+| Text and search inputs | Padding, border and theme colours. `aria-invalid="true"` turns the border red |
+| `accent-color` | Checkboxes, radio buttons and the slider follow the theme's accent |
+| `.check` | A checkbox and its label, aligned on one line |
+| `.segmented`, `.segmented.small` | A pill-shaped group of radio buttons, used for "Search by" and the theme switch. The selected option is styled with `:has(input:checked)` |
+| `:focus-visible` | A 2px accent ring around whatever has keyboard focus |
 
 A full contrast check comes with the accessibility audit.
 

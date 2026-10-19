@@ -96,7 +96,7 @@
 
 <style>
   .data-status {
-    margin: -4px 0 16px;
+    margin: 0 0 16px;
     color: var(--muted);
     font-size: 0.8125rem;
   }
