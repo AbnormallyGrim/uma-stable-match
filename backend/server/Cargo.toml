@@ -1,0 +1,17 @@
+[package]
+name = "uma-stable-match-server"
+description = "API server for Uma Stable Match, with a scheduled club scanner and a cache."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "uma-stable-match-server"
+path = "src/main.rs"
+
+[dependencies]
+
+[lints]
+workspace = true

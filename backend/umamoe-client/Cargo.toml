@@ -1,0 +1,15 @@
+[package]
+name = "uma-stable-match-umamoe-client"
+description = "Client for the uma.moe API, used to fetch Umamusume: Pretty Derby club and member data."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "uma_stable_match_umamoe_client"
+
+[dependencies]
+
+[lints]
+workspace = true
