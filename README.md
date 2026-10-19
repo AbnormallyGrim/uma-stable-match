@@ -37,7 +37,7 @@ Enter your trainer ID and you'll get a ranked list of clubs, each with its tier,
 ## Features
 
 - **Personal recommendations** based on your fan pace this month
-- **Open clubs only:** closed clubs are never recommended
+- **Open clubs first:** clubs that aren't recruiting are left out unless you ask for them
 - **Current members only:** members who have left a club don't skew its numbers
 - **Balance scoring:** optionally ranks clubs lower when many members barely contribute
 - **Club details at a glance:** tier, rank and trend, open spots, join style, playstyle and description
@@ -102,7 +102,7 @@ docker compose down
 4. Browse **Top picks**, or use **All results** to search and sort every club.
 5. Select a club's name to open its uma.moe page in a new tab, then contact the leader.
 
-Club data refreshes automatically every 30 minutes by default. The page shows when it was last updated.
+Club data refreshes automatically every 3 hours by default. The page shows when it was last updated.
 
 ## Understanding your results
 
@@ -153,11 +153,13 @@ Only **current members** count. A member counts as current if they have data on 
 | Variable | Default | Description |
 |---|---|---|
 | `UMAMOE_API_KEY` | *(required)* | Your uma.moe API key |
+| `HOST` | `127.0.0.1` | IP address the web page and API listen on. The Docker setup uses `0.0.0.0` |
 | `PORT` | `8080` | Port the web page and API run on |
-| `SCAN_INTERVAL_MINUTES` | `30` | How often club data refreshes |
-| `RANK_MIN` | `80` | Highest-ranked club to include |
-| `RANK_MAX` | `900` | Lowest-ranked club to include |
-| `TRAINER_CACHE_MINUTES` | `15` | How long a trainer's pace is reused before refreshing |
+| `SCAN_INTERVAL_MINUTES` | `180` | How often club data refreshes, in minutes |
+| `SCAN_RANK_FROM` | `80` | Best monthly rank to include |
+| `SCAN_RANK_TO` | `900` | Worst monthly rank to include |
+| `SCAN_MAX_DETAILS` | `80` | Most clubs to analyse in each refresh |
+| `TRAINER_CACHE_MINUTES` | `10` | How long a trainer's pace is reused before refreshing |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests allowed per visitor per minute |
 | `REDIS_URL` | *(none)* | Optional. Share one cache between several servers |
 

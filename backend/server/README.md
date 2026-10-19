@@ -17,14 +17,16 @@ Run these from the repository root. The server reads the first `.env` it finds i
 |---|---|---|
 | `UMAMOE_API_KEY` | none (required) | uma.moe API key. Create one in your uma.moe settings |
 | `UMAMOE_BASE_URL` | `https://uma.moe` | API base URL override, for testing against a mock |
-| `BIND_ADDR` | `127.0.0.1:3000` | Address and port to listen on. Use `0.0.0.0:3000` in a container |
+| `HOST` | `127.0.0.1` | IP address to listen on. Use `0.0.0.0` in a container, or `::` for all IPv6 and IPv4 interfaces |
+| `PORT` | `8080` | Port to listen on |
 | `RUST_LOG` | `info` | Log filter, such as `debug` or `uma_stable_match_server=debug`. At `debug`, the HTTP libraries can log request URLs, which include trainer IDs |
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to scan |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to scan |
 | `SCAN_MAX_DETAILS` | `80` | Most clubs to fetch member data for in each scan |
-| `SCAN_INTERVAL_MINUTES` | `180` | Minutes between scans |
+| `SCAN_INTERVAL_MINUTES` | `180` | Minutes between scans. The default may change once uma.moe agrees how often scans can run |
+| `TRAINER_CACHE_MINUTES` | `10` | Minutes a trainer's looked-up pace is reused |
 
-Blank values count as unset. A missing key, an invalid address, a scan setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO` stops the server at startup, with an error message and exit code 1. The key is never logged, never included in errors and is redacted in `Debug` output. `.env` is git-ignored; never commit it.
+Blank values count as unset. A missing key, a `HOST` that isn't an IP address (hostnames such as `localhost` aren't accepted), a `PORT` outside 1 to 65535, a scan or cache setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO` stops the server at startup, with an error message and exit code 1. The key is never logged, never included in errors and is redacted in `Debug` output. `.env` is git-ignored; never commit it.
 
 ## Scanner
 
@@ -88,7 +90,7 @@ All endpoints are under `/api/v1`.
 
 With `trainer_id`, the server fetches that trainer's club from uma.moe and finds their snapshot (the latest month if there's more than one). It then calculates their pace with `daily_pace`, which needs at least 3 days of data and a gain above zero.
 
-- **Cached for 10 minutes.** A found pace, and a "not found" or "not enough data" answer, is reused for that long, so repeat requests don't call uma.moe again. Failed uma.moe requests aren't cached.
+- **Cached for `TRAINER_CACHE_MINUTES`** (10 by default). A found pace, and a "not found" or "not enough data" answer, is reused for that long, so repeat requests don't call uma.moe again. Failed uma.moe requests aren't cached.
 - **IDs stay out of logs.** Trainer IDs never appear in log messages or error responses, only in the response to the trainer's own request. Failed lookups log only the HTTP status.
 - **No lookup without results.** Before the first scan finishes, the endpoint returns `503` without contacting uma.moe.
 
