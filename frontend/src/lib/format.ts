@@ -1,5 +1,8 @@
+/** Formatting and labels for showing results. */
+
 import type { JoinStyle } from './api';
 
+/** Fans in millions: one decimal from 1M (`6.4M`), two below (`0.85M`), `<0.01M` for tiny values. */
 export function formatMillions(fans: number): string {
   const millions = fans / 1_000_000;
   if (millions === 0) {
@@ -12,24 +15,30 @@ export function formatMillions(fans: number): string {
   return `${millions.toFixed(digits)}M`;
 }
 
+/** A daily gain, such as `6.4M/day`. */
 export function formatPerDay(fans: number): string {
   return `${formatMillions(fans)}/day`;
 }
 
+/** A place in a club, such as `8 of 30`. */
 export function formatPlace(place: number, size: number): string {
   return `${place} of ${size}`;
 }
 
+/** A share from 0 to 1 as a whole percentage, such as `34%`. */
 export function formatPercent(share: number): string {
   return `${Math.round(share * 100)}%`;
 }
 
+/** A fit or score to three decimals. */
 export function formatScore(score: number): string {
   return score.toFixed(3);
 }
 
+/** Direction of a club's rank since last month. */
 export type TrendKind = 'up' | 'down' | 'same' | 'new' | 'unknown';
 
+/** A rank change: a short `label` to show and a `description` for screen readers. */
 export interface RankTrend {
   kind: TrendKind;
   change: number;
@@ -37,6 +46,7 @@ export interface RankTrend {
   description: string;
 }
 
+/** How a club's monthly rank changed since last month. A lower rank number is better. */
 export function rankTrend(rank: number | null, lastMonthRank: number | null): RankTrend {
   if (rank === null) {
     return { kind: 'unknown', change: 0, label: '', description: 'Rank unknown' };
@@ -70,10 +80,12 @@ const JOIN_STYLE_LABELS: Record<JoinStyle, string> = {
   closed: 'Closed',
 };
 
+/** Display name for a join style. */
 export function joinStyleLabel(style: JoinStyle | null): string | null {
   return style === null ? null : JOIN_STYLE_LABELS[style];
 }
 
+// uma.moe's names for club policy codes.
 const PLAYSTYLE_LABELS: Record<number, string> = {
   1: 'You Do You',
   2: 'Laid-back',
@@ -94,6 +106,7 @@ const PLAYSTYLE_LABELS: Record<number, string> = {
   17: 'Active at Night',
 };
 
+/** uma.moe's name for a club's playstyle code, or `null` if unknown. */
 export function playstyleLabel(policy: number | null): string | null {
   return policy === null ? null : (PLAYSTYLE_LABELS[policy] ?? null);
 }
@@ -104,6 +117,7 @@ const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ['minute', 60],
 ];
 
+/** How long ago a time was, such as `3 hours ago` or `yesterday`. Future times count as `just now`. */
 export function formatUpdated(iso: string, now: Date = new Date()): string {
   const then = new Date(iso);
   if (Number.isNaN(then.getTime())) {
