@@ -9,8 +9,8 @@ use serde::Serialize;
 
 use crate::config::ClientConfig;
 use crate::error::{ApiErrorBody, Error};
-use crate::requests::CircleRequest;
-use crate::types::CircleResponse;
+use crate::requests::{CircleRequest, ListCirclesRequest};
+use crate::types::{CircleListResponse, CircleResponse};
 
 const API_KEY_HEADER: &str = "X-API-Key";
 
@@ -63,6 +63,13 @@ impl Client {
             }
         }
         self.get("/api/v4/circles", &request.query()).await
+    }
+
+    pub async fn list_circles(
+        &self,
+        request: &ListCirclesRequest,
+    ) -> Result<CircleListResponse, Error> {
+        self.get("/api/v4/circles/list", request).await
     }
 
     async fn get<T, Q>(&self, path: &str, query: &Q) -> Result<T, Error>
