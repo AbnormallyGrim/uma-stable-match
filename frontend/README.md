@@ -48,6 +48,8 @@ src/lib/runner.ts             Search state machine: loading, retries and countdo
 src/lib/states.ts             Error messages and empty-result hints
 src/lib/SearchStatus.svelte   Loading, waiting and error messages
 src/lib/DataStatus.svelte     How fresh the club data is, from /api/v1/status
+src/lib/ThemeToggle.svelte    System / Light / Dark switch
+src/lib/theme.ts              Saving and applying the theme choice
 src/lib/api.ts                Typed API client
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
@@ -128,7 +130,21 @@ Below the cards, every scored club is listed in a table. The app asks the API fo
 
 ### Themes
 
-Colours are CSS custom properties in `src/app.css`, and components only use these tokens. A dark set applies automatically when the system uses dark mode. A manual theme toggle and a full contrast check are still to come.
+Colours are CSS custom properties in `src/app.css`, and components only use these tokens. Each token holds both values, as `light-dark(light, dark)`, and the root's `color-scheme` decides which one applies:
+
+| `<html>` | `color-scheme` | Result |
+|---|---|---|
+| No `data-theme` | `light dark` | Follows the system setting |
+| `data-theme="light"` | `light` | Always light |
+| `data-theme="dark"` | `dark` | Always dark |
+
+`light-dark()` needs Chrome or Edge 123, Firefox 120 or Safari 17.5, or newer.
+
+The **System / Light / Dark** switch in the header (`ThemeToggle.svelte`) sets the attribute. It saves Light or Dark in local storage under `uma-stable-match:theme`, and choosing System deletes it. It's a group of radio buttons labelled "Theme", so arrow keys and screen readers work, and keyboard focus shows a ring.
+
+A small inline script in `index.html` applies a saved theme before the page renders, so it never flashes the wrong theme while the app loads. When the server adds a content security policy (#40), it must allow this script, by hash or by moving it to its own file.
+
+A full contrast check comes with the accessibility audit.
 
 ### Search states
 

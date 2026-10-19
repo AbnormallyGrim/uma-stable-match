@@ -7,6 +7,7 @@
   import { SearchRunner, type SearchState as RunnerState } from './lib/runner';
   import SearchForm from './lib/SearchForm.svelte';
   import SearchStatus from './lib/SearchStatus.svelte';
+  import ThemeToggle from './lib/ThemeToggle.svelte';
   import {
     DEFAULT_SEARCH,
     fromUrlParams,
@@ -67,7 +68,10 @@
 </script>
 
 <main>
-  <h1>Uma Stable Match</h1>
+  <header>
+    <h1>Uma Stable Match</h1>
+    <ThemeToggle />
+  </header>
   <DataStatus {onscanready} />
   <SearchForm {initial} remember={remembered !== null} {busy} {onsearch} />
 
@@ -84,3 +88,13 @@
     <Results result={search.result} stale={busy} />
   {/if}
 </main>
+
+<style>
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    align-items: center;
+    justify-content: space-between;
+  }
+</style>
