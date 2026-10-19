@@ -1,3 +1,5 @@
+// App tests with a stubbed fetch. All data is made up.
+
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

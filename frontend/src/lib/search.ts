@@ -1,7 +1,11 @@
+/** Search form state: validation, page URL parameters and the remembered trainer ID. */
+
 import type { RecommendationQuery } from './api';
 
+/** Whether the visitor searches by trainer ID or by entering their pace. */
 export type SearchMode = 'trainer' | 'pace';
 
+/** The form's fields, as typed. `paceMillions` is in millions of fans per day. */
 export interface SearchState {
   mode: SearchMode;
   trainerId: string;
@@ -11,16 +15,20 @@ export interface SearchState {
   includeClosed: boolean;
 }
 
+/** Validation messages by field. */
 export interface SearchErrors {
   trainerId?: string;
   pace?: string;
 }
 
+/** A query ready to send, or the fields to fix. */
 export type Validation =
   { ok: true; query: RecommendationQuery } | { ok: false; errors: SearchErrors };
 
+/** Slider position when balance scoring is first turned on; matches the server's default. */
 export const DEFAULT_BALANCE_WEIGHT = 0.5;
 
+/** An empty trainer ID search with balance scoring off. */
 export const DEFAULT_SEARCH: SearchState = {
   mode: 'trainer',
   trainerId: '',
@@ -30,19 +38,24 @@ export const DEFAULT_SEARCH: SearchState = {
   includeClosed: false,
 };
 
+/** Shown when the trainer ID isn't 9 to 12 digits. */
 export const TRAINER_ID_ERROR = 'Enter your trainer ID: 9 to 12 digits.';
+/** Shown when the pace isn't a positive number. */
 export const PACE_ERROR = 'Enter your daily fan gain in millions, such as 7.6.';
 
 const REMEMBER_KEY = 'uma-stable-match:trainer-id';
 
+/** Removes spaces and dashes, so `1234 5678 9012` becomes `123456789012`. */
 export function normaliseTrainerId(value: string): string {
   return value.replace(/[\s-]/g, '');
 }
 
+/** Whether the value is 9 to 12 digits once spaces and dashes are removed. */
 export function isTrainerId(value: string): boolean {
   return /^\d{9,12}$/.test(normaliseTrainerId(value));
 }
 
+/** Converts a pace in millions, such as `7.6` or `7,6`, to fans per day. `null` if it isn't a positive number. */
 export function parsePaceMillions(value: string): number | null {
   const text = value.trim().replace(',', '.');
   if (!/^\d+(\.\d+)?$/.test(text)) {
@@ -52,6 +65,7 @@ export function parsePaceMillions(value: string): number | null {
   return millions > 0 ? Math.round(millions * 1_000_000) : null;
 }
 
+/** Checks the field for the current mode and builds the API query. */
 export function validate(state: SearchState): Validation {
   const options = {
     balanceWeight: state.balance ? clampWeight(state.balanceWeight) : null,
@@ -73,6 +87,7 @@ export function validate(state: SearchState): Validation {
   return { ok: true, query: { source: { pace }, ...options } };
 }
 
+/** Page URL parameters for a search, named like the API's. */
 export function toUrlParams(query: RecommendationQuery): URLSearchParams {
   const params = new URLSearchParams();
   if ('trainerId' in query.source) {
@@ -89,6 +104,7 @@ export function toUrlParams(query: RecommendationQuery): URLSearchParams {
   return params;
 }
 
+/** Restores a search from page URL parameters. `null` if there's no valid search. */
 export function fromUrlParams(params: URLSearchParams): SearchState | null {
   const trainerId = params.get('trainer_id');
   const pace = params.get('pace');
@@ -120,6 +136,7 @@ export function fromUrlParams(params: URLSearchParams): SearchState | null {
   return null;
 }
 
+/** The trainer ID saved with "remember me", if any. Storage errors count as none. */
 export function loadRememberedTrainerId(storage: Storage | undefined): string | null {
   try {
     const value = storage?.getItem(REMEMBER_KEY) ?? null;
@@ -129,6 +146,7 @@ export function loadRememberedTrainerId(storage: Storage | undefined): string | 
   }
 }
 
+/** Saves the trainer ID, or forgets it when `trainerId` is `null`. Storage errors are ignored. */
 export function saveRememberedTrainerId(storage: Storage | undefined, trainerId: string | null) {
   try {
     if (trainerId === null) {

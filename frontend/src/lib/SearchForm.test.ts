@@ -1,3 +1,5 @@
+// Search form tests. All data is made up.
+
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 

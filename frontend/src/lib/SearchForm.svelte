@@ -4,6 +4,8 @@
   import type { RecommendationQuery } from './api';
   import { validate, type SearchErrors, type SearchState } from './search';
 
+  // The search form. It owns its fields after the first render, so later
+  // `initial` changes are ignored. `onsearch` only receives valid searches.
   interface Props {
     initial: SearchState;
     remember: boolean;

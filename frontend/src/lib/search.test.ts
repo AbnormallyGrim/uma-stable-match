@@ -1,3 +1,5 @@
+// Search helper tests. All data is made up.
+
 import { describe, expect, it } from 'vitest';
 
 import {
