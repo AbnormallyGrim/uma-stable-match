@@ -78,7 +78,7 @@ fn failure_keeps_last_snapshot() {
     assert_eq!(status.snapshot.unwrap().scanned_at, at(10));
     let error = status.last_error.unwrap();
     assert_eq!(error.at, at(20));
-    assert!(error.message.contains("made-up failure"));
+    assert_eq!(error.message, "listing clubs failed: internal error");
 }
 
 #[test]

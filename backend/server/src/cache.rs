@@ -99,7 +99,7 @@ impl Cache {
             Err(error) => {
                 state.last_error = Some(ScanFailure {
                     at,
-                    message: error.to_string(),
+                    message: error.public_message(),
                 });
             }
         }
