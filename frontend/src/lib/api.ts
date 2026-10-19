@@ -1,5 +1,9 @@
+/** Typed client for the Uma Stable Match API. */
+
+/** How a club accepts new members. */
 export type JoinStyle = 'open' | 'approval' | 'closed';
 
+/** How evenly a club's members contribute. See the scoring README. */
 export interface Balance {
   score: number;
   gini: number;
@@ -9,6 +13,7 @@ export interface Balance {
   top3_share: number;
 }
 
+/** One recommended club. Lower `fit` and `score` are better. */
 export interface Club {
   circle_id: number;
   name: string;
@@ -30,6 +35,7 @@ export interface Club {
   balance: Balance | null;
 }
 
+/** Response from `GET /api/v1/recommendations`. */
 export interface Recommendations {
   trainer: { trainer_id: number | null; pace_per_day: number };
   options: { balance_weight: number | null; include_closed: boolean; limit: number };
@@ -38,14 +44,17 @@ export interface Recommendations {
   clubs: Club[];
 }
 
+/** Response from `GET /api/v1/status`. */
 export interface Status {
   scanning: boolean;
   last_scan: { finished_at: string; clubs: number; candidates: number; failed: number } | null;
   last_error: { at: string; message: string } | null;
 }
 
+/** Look up a trainer's pace, or give it directly in fans per day. */
 export type PaceSource = { trainerId: string } | { pace: number };
 
+/** What to ask `/api/v1/recommendations` for. Unset options use the server's defaults. */
 export interface RecommendationQuery {
   source: PaceSource;
   balanceWeight?: number | null;
@@ -53,8 +62,10 @@ export interface RecommendationQuery {
   limit?: number;
 }
 
+/** Why a request failed. */
 export type ApiErrorKind = 'http' | 'network' | 'timeout' | 'invalid-response';
 
+/** A failed API request. `status` and `retryAfter` (seconds) are set for `http` errors. */
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status: number | null;
@@ -74,14 +85,17 @@ export class ApiError extends Error {
   }
 }
 
+/** Per-request options. `fetch` can be replaced in tests. */
 export interface RequestOptions {
   signal?: AbortSignal;
   timeoutMs?: number;
   fetch?: typeof fetch;
 }
 
+/** How long a request may take before it fails with a `timeout` error. */
 export const DEFAULT_TIMEOUT_MS = 15_000;
 
+/** Query parameters for a recommendations request. */
 export function recommendationParams(query: RecommendationQuery): URLSearchParams {
   const params = new URLSearchParams();
   if ('trainerId' in query.source) {
@@ -101,10 +115,16 @@ export function recommendationParams(query: RecommendationQuery): URLSearchParam
   return params;
 }
 
+/** Fetches the scan status. */
 export function fetchStatus(options: RequestOptions = {}): Promise<Status> {
   return getJson<Status>('/api/v1/status', options);
 }
 
+/**
+ * Fetches ranked clubs.
+ *
+ * Throws `ApiError`, or the caller's abort error when `signal` is aborted.
+ */
 export function fetchRecommendations(
   query: RecommendationQuery,
   options: RequestOptions = {},

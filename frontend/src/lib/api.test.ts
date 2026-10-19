@@ -1,3 +1,5 @@
+// Client tests with a stubbed fetch. All data is made up.
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
