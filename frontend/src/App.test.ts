@@ -1,36 +1,109 @@
-import { render, screen } from '@testing-library/svelte';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/svelte';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App.svelte';
+import type { Recommendations } from './lib/api';
 
-function stubFetch(result: Promise<Response>) {
-  const fetch = vi.fn(() => result);
+function recommendations(total: number, pace = 7_600_000): Recommendations {
+  return {
+    trainer: { trainer_id: null, pace_per_day: pace },
+    options: { balance_weight: null, include_closed: false, limit: 50 },
+    updated_at: '2026-03-18T09:00:00Z',
+    total,
+    clubs: [],
+  };
+}
+
+function stubFetch(response: () => Response) {
+  const fetch = vi.fn<typeof globalThis.fetch>(() => Promise.resolve(response()));
   vi.stubGlobal('fetch', fetch);
   return fetch;
 }
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+function setUrl(search: string) {
+  window.history.replaceState(null, '', `/${search}`);
+}
+
+const trainerInput = () => screen.getByLabelText('Trainer ID', { selector: 'input#trainer-id' });
+
+beforeEach(() => {
+  setUrl('');
+  localStorage.clear();
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe('App', () => {
-  it('checks the API health endpoint', async () => {
-    const fetch = stubFetch(Promise.resolve(new Response('{"status":"ok"}')));
+  it('searches and puts the search in the URL', async () => {
+    const fetch = stubFetch(() => json(recommendations(3)));
     render(App);
-    expect(screen.getByTestId('health')).toHaveTextContent('checking');
-    expect(await screen.findByText('online')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith('/api/v1/health');
+    await fireEvent.input(trainerInput(), { target: { value: '123456789012' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
+
+    expect(await screen.findByTestId('result-summary')).toHaveTextContent(
+      'Found 3 clubs for 7.60M fans a day.',
+    );
+    expect(fetch.mock.calls[0]?.[0]).toBe('/api/v1/recommendations?trainer_id=123456789012');
+    expect(window.location.search).toBe('?trainer_id=123456789012');
   });
 
-  it('shows unreachable for an error status', async () => {
-    stubFetch(Promise.resolve(new Response('', { status: 503 })));
+  it('runs a search from the URL on load', async () => {
+    setUrl('?pace=5000000&include_closed=true');
+    const fetch = stubFetch(() => json(recommendations(1, 5_000_000)));
     render(App);
-    expect(await screen.findByText('unreachable')).toBeInTheDocument();
+    expect(await screen.findByTestId('result-summary')).toHaveTextContent(
+      'Found 1 club for 5.00M fans a day.',
+    );
+    expect(fetch.mock.calls[0]?.[0]).toBe(
+      '/api/v1/recommendations?pace=5000000&include_closed=true',
+    );
+    expect(screen.getByLabelText('Daily fan gain (millions)')).toHaveValue('5');
   });
 
-  it('shows unreachable when the request fails', async () => {
-    stubFetch(Promise.reject(new TypeError('network error')));
+  it('does not search on load without a valid search in the URL', () => {
+    setUrl('?trainer_id=abc');
+    const fetch = stubFetch(() => json(recommendations(0)));
     render(App);
-    expect(await screen.findByText('unreachable')).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('shows the server error message', async () => {
+    stubFetch(() => json({ error: 'trainer not found' }, 404));
+    render(App);
+    await fireEvent.input(trainerInput(), { target: { value: '123456789' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('trainer not found');
+  });
+
+  it('remembers the trainer ID only when asked', async () => {
+    stubFetch(() => json(recommendations(0)));
+    const { unmount } = render(App);
+    await fireEvent.input(trainerInput(), { target: { value: '123456789' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
+    expect(localStorage.length).toBe(0);
+
+    await fireEvent.click(screen.getByLabelText('Remember my trainer ID on this device'));
+    await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
+    expect(localStorage.getItem('uma-stable-match:trainer-id')).toBe('123456789');
+    unmount();
+
+    setUrl('');
+    render(App);
+    expect(trainerInput()).toHaveValue('123456789');
+    expect(screen.getByLabelText('Remember my trainer ID on this device')).toBeChecked();
+  });
+
+  it('forgets the trainer ID when unticked', async () => {
+    localStorage.setItem('uma-stable-match:trainer-id', '123456789');
+    stubFetch(() => json(recommendations(0)));
+    render(App);
+    await fireEvent.click(screen.getByLabelText('Remember my trainer ID on this device'));
+    await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
+    expect(localStorage.getItem('uma-stable-match:trainer-id')).toBeNull();
   });
 });
