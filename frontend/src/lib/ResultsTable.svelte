@@ -252,7 +252,7 @@
     min-width: 200px;
     padding: 6px 10px;
     background: var(--card);
-    border: 1px solid var(--border);
+    border: 1px solid var(--control-border);
     border-radius: var(--radius-sm);
     color: var(--text);
     font: inherit;

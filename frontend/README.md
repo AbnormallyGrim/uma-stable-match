@@ -63,6 +63,8 @@ src/app.css                   Global styles and light and dark colour tokens
 src/assets/tiers/             Club tier icons (Cygames artwork, not MIT licensed)
 src/lib/SearchForm.svelte     The search form
 src/**/*.test.ts              Unit and component tests
+src/a11y.test.ts              axe-core checks for the main views and states
+src/contrast.test.ts          WCAG AA contrast for every colour token pair
 src/setup-tests.ts            Adds jest-dom matchers to Vitest
 vite.config.ts                Vite, the /api proxy and Vitest settings
 ```
@@ -160,7 +162,33 @@ A small inline script in `index.html` applies a saved theme before the page rend
 | `.segmented`, `.segmented.small` | A pill-shaped group of radio buttons, used for "Search by" and the theme switch. The selected option is styled with `:has(input:checked)` |
 | `:focus-visible` | A 2px accent ring around whatever has keyboard focus |
 
-A full contrast check comes with the accessibility audit.
+### Accessibility
+
+The page aims for WCAG 2.2 AA. Two test files check it, and they run with the rest of the tests in CI.
+
+**`contrast.test.ts`** reads the colour tokens straight from `app.css` and checks every pair the UI uses, in both themes. Tinted tag backgrounds and semi-transparent colours are blended over the card colour first.
+
+| Kind | Minimum | Examples |
+|---|---|---|
+| Text | 4.5:1 | Body, secondary and muted text on the page, cards and surfaces; links; button text; trend, error and warning text; tag text on its tint |
+| Large text | 3:1 | Gold, silver and bronze pick numbers |
+| UI parts | 3:1 | Form field borders (`--control-border`), and the focus ring on surfaces |
+
+When you add or change a colour token, add its pairs to the test. A failing pair names the tokens involved.
+
+**`a11y.test.ts`** runs [axe-core](https://github.com/dequelabs/axe-core) over:
+- the whole page: empty, with results and the table, and after a failed search
+- the form, with a validation error and with balance on
+- the sorted table
+- every search status
+- the theme switch, and the data status after a failed refresh
+
+Two axe rules are adjusted. The colour-contrast rule is off, because jsdom doesn't render, and the contrast test covers it instead. The landmark (region) rule only applies to the whole-page checks.
+
+**Keyboard:** everything works without a mouse.
+- Tab moves through the theme switch, "Search by", the form, the cards, the table search, the scrollable table and its column headers.
+- The arrow keys change radio groups, Enter submits a search, and Enter or Space sorts a column.
+- `:focus-visible` shows a ring on whatever has focus.
 
 ### Search states
 
