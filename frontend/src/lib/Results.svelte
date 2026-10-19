@@ -7,6 +7,7 @@
   import type { Recommendations } from './api';
   import ClubCard from './ClubCard.svelte';
   import ResultsSummary from './ResultsSummary.svelte';
+  import ResultsTable from './ResultsTable.svelte';
 
   const TOP_PICKS = 10;
 
@@ -34,6 +35,9 @@
         <li><ClubCard {club} position={i + 1} {balanceOn} /></li>
       {/each}
     </ol>
+
+    <h3>All results</h3>
+    <ResultsTable clubs={result.clubs} {balanceOn} includeClosed={result.options.include_closed} />
   {/if}
 </section>
 

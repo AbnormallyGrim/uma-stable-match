@@ -25,6 +25,8 @@
   const initial: SearchState =
     fromUrl ?? (remembered ? { ...DEFAULT_SEARCH, trainerId: remembered } : DEFAULT_SEARCH);
 
+  const RESULT_LIMIT = 100;
+
   let busy = $state(false);
   let result = $state<Recommendations | null>(null);
   let error = $state<string | null>(null);
@@ -37,7 +39,10 @@
     busy = true;
     error = null;
     try {
-      result = await fetchRecommendations(query, { signal: current.signal });
+      result = await fetchRecommendations(
+        { ...query, limit: RESULT_LIMIT },
+        { signal: current.signal },
+      );
     } catch (caught) {
       if (current.signal.aborted) {
         return;
