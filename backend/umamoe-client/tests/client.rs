@@ -1,6 +1,6 @@
 //! Public API tests against a mock server. All data is made up.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use uma_stable_match_scoring::{Club, JoinStyle};
 use uma_stable_match_umamoe_client::{
@@ -18,6 +18,7 @@ fn config(server: &MockServer) -> ClientConfig {
     ClientConfig {
         base_url: server.uri(),
         timeout: Duration::from_secs(5),
+        min_interval: Duration::ZERO,
         ..ClientConfig::new(ApiKey::new(KEY))
     }
 }
@@ -248,4 +249,47 @@ fn rejects_invalid_config() {
     let error = Client::new(bad_key).unwrap_err();
     assert!(matches!(error, Error::Config(_)));
     assert!(!error.to_string().contains("line"));
+}
+
+#[tokio::test]
+async fn requests_are_rate_limited() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(json(CIRCLE_LIST))
+        .expect(3)
+        .mount(&server)
+        .await;
+
+    let mut config = config(&server);
+    config.min_interval = Duration::from_millis(100);
+    let client = Client::new(config).unwrap();
+    let start = Instant::now();
+    for _ in 0..3 {
+        client
+            .list_circles(&ListCirclesRequest::default())
+            .await
+            .unwrap();
+    }
+    assert!(start.elapsed() >= Duration::from_millis(200));
+}
+
+#[tokio::test]
+async fn clones_share_the_rate_limit() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(json(CIRCLE_LIST))
+        .expect(2)
+        .mount(&server)
+        .await;
+
+    let mut config = config(&server);
+    config.min_interval = Duration::from_millis(200);
+    let client = Client::new(config).unwrap();
+    let clone = client.clone();
+    let request = ListCirclesRequest::default();
+    let start = Instant::now();
+    let (a, b) = tokio::join!(client.list_circles(&request), clone.list_circles(&request));
+    a.unwrap();
+    b.unwrap();
+    assert!(start.elapsed() >= Duration::from_millis(200));
 }
