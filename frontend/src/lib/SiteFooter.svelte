@@ -83,9 +83,9 @@
   .site-footer {
     display: grid;
     gap: 12px;
-    max-width: 1100px;
+    max-width: var(--page-max);
     margin: 0 auto;
-    padding: 24px 16px 48px;
+    padding: 24px var(--gutter) 48px;
     border-top: 1px solid var(--border);
     color: var(--muted);
     font-size: 0.8125rem;
