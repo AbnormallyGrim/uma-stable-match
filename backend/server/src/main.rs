@@ -1,3 +1,5 @@
+//! Starts the Uma Stable Match server.
+
 use std::process::ExitCode;
 
 use tokio::net::TcpListener;

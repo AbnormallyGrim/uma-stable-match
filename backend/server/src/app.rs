@@ -1,7 +1,10 @@
+//! HTTP routes.
+
 use axum::routing::get;
 use axum::{Json, Router};
 use serde_json::{json, Value};
 
+/// The server's routes.
 pub fn router() -> Router {
     Router::new().route("/health", get(health))
 }
