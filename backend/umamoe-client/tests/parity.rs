@@ -1,3 +1,5 @@
+//! Parity with the original prototype. All data is made up.
+
 use serde::Deserialize;
 use uma_stable_match_scoring::{score_clubs, Club, ScoringOptions};
 use uma_stable_match_umamoe_client::CircleResponse;
