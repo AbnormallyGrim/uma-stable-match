@@ -4,13 +4,15 @@ use std::time::Duration;
 
 use uma_stable_match_scoring::{Club, JoinStyle};
 use uma_stable_match_umamoe_client::{
-    ApiKey, CircleRequest, Client, ClientConfig, Error, StatusCode,
+    ApiKey, CircleRequest, CircleSort, Client, ClientConfig, Error, ListCirclesRequest, SortDir,
+    StatusCode,
 };
 use wiremock::matchers::{header, method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 const KEY: &str = "test-key";
 const CIRCLE: &str = include_str!("fixtures/circle.json");
+const CIRCLE_LIST: &str = include_str!("fixtures/circle_list.json");
 
 fn config(server: &MockServer) -> ClientConfig {
     ClientConfig {
@@ -85,6 +87,59 @@ async fn rejects_invalid_month_without_a_request() {
     let request = CircleRequest::by_circle_id(1).for_month(2026, 13);
     let error = client(&server).circle(&request).await.unwrap_err();
     assert!(matches!(error, Error::InvalidRequest(_)));
+}
+
+#[tokio::test]
+async fn lists_circles_with_filters() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/v4/circles/list"))
+        .and(query_param("page", "1"))
+        .and(query_param("limit", "2"))
+        .and(query_param("min_members", "20"))
+        .and(query_param("sort_by", "monthly_rank"))
+        .and(query_param("sort_dir", "asc"))
+        .and(query_param_is_missing("name"))
+        .and(header("x-api-key", KEY))
+        .respond_with(json(CIRCLE_LIST))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let request = ListCirclesRequest {
+        limit: Some(2),
+        min_members: Some(20),
+        sort_by: Some(CircleSort::MonthlyRank),
+        sort_dir: Some(SortDir::Asc),
+        ..Default::default()
+    }
+    .page(1);
+    let page = client(&server).list_circles(&request).await.unwrap();
+    assert_eq!(page.circles.len(), 2);
+    assert_eq!(page.total, 5);
+    assert!(page.has_next_page());
+    assert_eq!(
+        Club::from(page.circles[1].clone()).join_style,
+        Some(JoinStyle::Closed)
+    );
+}
+
+#[tokio::test]
+async fn default_list_request_sends_no_filters() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles/list"))
+        .and(query_param_is_missing("page"))
+        .and(query_param_is_missing("limit"))
+        .and(query_param_is_missing("sort_by"))
+        .respond_with(json(CIRCLE_LIST))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    client(&server)
+        .list_circles(&ListCirclesRequest::default())
+        .await
+        .unwrap();
 }
 
 #[tokio::test]

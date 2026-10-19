@@ -1,0 +1,22 @@
+{
+  "circles": [
+    {
+      "circle_id": 900001,
+      "name": "Example Club",
+      "member_count": 3,
+      "join_style": 1,
+      "monthly_rank": 250
+    },
+    {
+      "circle_id": 900002,
+      "name": "Another Club",
+      "member_count": 30,
+      "join_style": 3,
+      "monthly_rank": 251
+    }
+  ],
+  "total": 5,
+  "page": 0,
+  "limit": 2,
+  "total_pages": 3
+}
