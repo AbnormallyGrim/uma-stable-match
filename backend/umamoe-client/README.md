@@ -1,5 +1,101 @@
 # uma-stable-match-umamoe-client
 
-A client for the [uma.moe](https://uma.moe) API v4. It fetches club and member data for Uma Stable Match.
+An async client for the [uma.moe](https://uma.moe) API v4. It fetches Umamusume: Pretty Derby club and member fan data and converts it into the types used by [`uma-stable-match-scoring`](../scoring/README.md).
 
-This crate is a placeholder. The client is not implemented yet.
+This is an unofficial client. It isn't affiliated with uma.moe or Cygames.
+
+## Usage
+
+```rust,no_run
+use uma_stable_match_scoring::Club;
+use uma_stable_match_umamoe_client::{
+    ApiKey, CircleRequest, CircleSort, Client, ClientConfig, ListCirclesRequest, SortDir,
+};
+
+# async fn run() -> Result<(), uma_stable_match_umamoe_client::Error> {
+// Read the key from your environment or config; never hard-code it.
+let key = std::env::var("UMAMOE_API_KEY").expect("UMAMOE_API_KEY is set");
+let client = Client::new(ClientConfig::new(ApiKey::new(key)))?;
+
+// One page of clubs, best monthly rank first.
+let request = ListCirclesRequest {
+    sort_by: Some(CircleSort::MonthlyRank),
+    sort_dir: Some(SortDir::Asc),
+    ..Default::default()
+};
+let page = client.list_circles(&request).await?;
+
+// Full details and member fan data for one club, ready for scoring.
+if let Some(circle) = page.circles.first() {
+    let response = client.circle(&CircleRequest::by_circle_id(circle.circle_id)).await?;
+    let club = Club::from(response);
+    println!("{} has {} member snapshots", club.name, club.members.len());
+}
+# Ok(())
+# }
+```
+
+## Endpoints
+
+| Method | Endpoint | Returns |
+|---|---|---|
+| `Client::circle` | `GET /api/v4/circles` | `CircleResponse`: a club, its members' daily fans and its tier |
+| `Client::list_circles` | `GET /api/v4/circles/list` | `CircleListResponse`: one page of clubs, without members or tier |
+
+`CircleRequest` looks a club up by `circle_id` or by a member's `viewer_id`. Without `for_month`, the API returns the current game month, which starts on the 2nd (JST).
+
+`ListCirclesRequest` pages from 0. Use `has_next_page` on the response and `ListCirclesRequest::page` to walk the pages.
+
+## Converting to scoring types
+
+| From | To | Notes |
+|---|---|---|
+| `CircleResponse` | `Club` | Includes members and tier (`club_rank`) |
+| `Circle` | `Club` | No members or tier, because the list endpoint doesn't return them |
+| `CircleMember` | `MemberSnapshot` | `daily_fans` is passed through unchanged |
+
+A code that is out of range or unknown becomes `None`. This covers negative counts, join styles other than 1 to 3, and tiers above 255.
+
+Response types follow the uma.moe OpenAPI schema but are lenient. Missing fields take their default, `null` becomes `None`, and unknown fields are ignored. Timestamps are kept as ISO 8601 strings.
+
+## Authentication
+
+The key is sent as the `X-API-Key` header and marked sensitive. `ApiKey`, `ClientConfig` and `Client` all redact it in `Debug` output, and it never appears in error messages. Keep it in `.env` or your deployment's secret store.
+
+## Rate limiting
+
+Requests are spaced at least `min_interval` apart (500 ms by default). Retries count too. All clones of a `Client` share one limiter, so a scanner running many tasks still sends requests one slot at a time. Idle time isn't saved up for bursts.
+
+## Retries
+
+These are retried:
+
+- Status 429, 500, 502, 503 and 504
+- Timeouts and connection errors
+
+Other errors are returned straight away. That includes 4xx responses, invalid JSON and other transport errors.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `max_retries` | 3 | Retries after the first attempt |
+| `base_delay` | 500 ms | First retry delay, doubled each time |
+| `max_delay` | 30 s | Longest wait between attempts |
+
+The wait before retry *n* (from 0) is:
+
+```text
+exp  = min(base_delay × 2ⁿ, max_delay)
+wait = exp ÷ 2 + random(0, exp ÷ 2)
+```
+
+When the response has a `Retry-After` header in seconds, that value is used instead, capped at `max_delay`. HTTP-date values are ignored.
+
+## Errors
+
+| Variant | When |
+|---|---|
+| `Config` | Invalid base URL or API key |
+| `InvalidRequest` | Invalid parameters, such as a month outside 1 to 12 |
+| `Status` | Non-success status, with the parsed `{error, status, details}` body when the API sent one |
+| `Transport` | The request couldn't be sent, or the response couldn't be read |
+| `Decode` | The response body didn't match the expected shape |
