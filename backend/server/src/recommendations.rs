@@ -1,3 +1,5 @@
+//! `GET /api/recommendations`: scores the cached clubs for a pace.
+
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
