@@ -4,6 +4,8 @@ use std::net::SocketAddr;
 
 use uma_stable_match_umamoe_client::ApiKey;
 
+use crate::scanner::ScanConfig;
+
 /// Address the server listens on when `BIND_ADDR` isn't set.
 pub const DEFAULT_BIND_ADDR: &str = "127.0.0.1:3000";
 
@@ -16,6 +18,7 @@ pub struct Config {
     pub base_url: Option<String>,
     /// Listen address, from `BIND_ADDR`.
     pub bind_addr: SocketAddr,
+    pub scan: ScanConfig,
 }
 
 /// Invalid or missing settings.
@@ -27,6 +30,10 @@ pub enum ConfigError {
     /// `BIND_ADDR` isn't a socket address.
     #[error("BIND_ADDR is not a valid address: {0}")]
     InvalidBindAddr(String),
+    #[error("{name} must be a positive whole number, got {value:?}")]
+    InvalidNumber { name: &'static str, value: String },
+    #[error("SCAN_RANK_FROM ({from}) must not be above SCAN_RANK_TO ({to})")]
+    InvalidRankWindow { from: u32, to: u32 },
 }
 
 impl Config {
@@ -51,10 +58,33 @@ impl Config {
             .parse()
             .map_err(|_| ConfigError::InvalidBindAddr(bind_addr))?;
 
+        let number = |name: &'static str, default: u32| match get(name) {
+            None => Ok(default),
+            Some(value) => value
+                .parse::<u32>()
+                .ok()
+                .filter(|n| *n > 0)
+                .ok_or(ConfigError::InvalidNumber { name, value }),
+        };
+        let defaults = ScanConfig::default();
+        let scan = ScanConfig {
+            rank_from: number("SCAN_RANK_FROM", defaults.rank_from)?,
+            rank_to: number("SCAN_RANK_TO", defaults.rank_to)?,
+            max_details: number("SCAN_MAX_DETAILS", defaults.max_details)?,
+            ..defaults
+        };
+        if scan.rank_from > scan.rank_to {
+            return Err(ConfigError::InvalidRankWindow {
+                from: scan.rank_from,
+                to: scan.rank_to,
+            });
+        }
+
         Ok(Self {
             api_key,
             base_url: get("UMAMOE_BASE_URL"),
             bind_addr,
+            scan,
         })
     }
 }
