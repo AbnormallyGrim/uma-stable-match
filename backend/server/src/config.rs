@@ -8,8 +8,10 @@ use uma_stable_match_umamoe_client::ApiKey;
 use crate::pace::DEFAULT_PACE_TTL;
 use crate::scanner::ScanConfig;
 
+/// Address the server listens on when `HOST` isn't set.
 pub const DEFAULT_HOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
+/// Port the server listens on when `PORT` isn't set.
 pub const DEFAULT_PORT: u16 = 8080;
 
 // TODO(#51): adjust the default once uma.moe agrees how often we may scan.
@@ -23,12 +25,13 @@ pub struct Config {
     pub api_key: ApiKey,
     /// uma.moe base URL override, from `UMAMOE_BASE_URL`.
     pub base_url: Option<String>,
-    /// Listen address, from `BIND_ADDR`.
+    /// Listen address, from `HOST` and `PORT`.
     pub bind_addr: SocketAddr,
     /// Scan settings, from `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `SCAN_MAX_DETAILS`.
     pub scan: ScanConfig,
     /// Time between scans, from `SCAN_INTERVAL_MINUTES`.
     pub scan_interval: Duration,
+    /// How long a trainer's pace is reused, from `TRAINER_CACHE_MINUTES`.
     pub trainer_cache: Duration,
 }
 
@@ -38,8 +41,10 @@ pub enum ConfigError {
     /// `UMAMOE_API_KEY` is missing or blank.
     #[error("UMAMOE_API_KEY is not set")]
     MissingApiKey,
+    /// `HOST` isn't an IP address.
     #[error("HOST must be an IP address, got {0:?}")]
     InvalidHost(String),
+    /// `PORT` isn't a port number from 1 to 65535.
     #[error("PORT must be a port number from 1 to 65535, got {0:?}")]
     InvalidPort(String),
     /// A numeric setting isn't a positive whole number.
