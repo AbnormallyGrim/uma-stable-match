@@ -1,3 +1,5 @@
+//! The API client.
+
 use std::fmt;
 
 use reqwest::header::{HeaderValue, ACCEPT};
@@ -12,6 +14,7 @@ use crate::types::CircleResponse;
 
 const API_KEY_HEADER: &str = "X-API-Key";
 
+/// uma.moe API client. Clones share one connection pool.
 #[derive(Clone)]
 pub struct Client {
     http: reqwest::Client,
@@ -28,6 +31,7 @@ impl fmt::Debug for Client {
 }
 
 impl Client {
+    /// Builds a client from settings.
     pub fn new(config: ClientConfig) -> Result<Self, Error> {
         let base_url = config.base_url.trim_end_matches('/').to_owned();
         Url::parse(&base_url).map_err(|e| Error::Config(format!("base URL: {e}")))?;
@@ -49,6 +53,7 @@ impl Client {
         })
     }
 
+    /// Fetches a club and its members' fan data (`GET /api/v4/circles`).
     pub async fn circle(&self, request: &CircleRequest) -> Result<CircleResponse, Error> {
         if let Some((_, month)) = request.period {
             if !(1..=12).contains(&month) {

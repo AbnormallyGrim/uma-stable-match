@@ -1,3 +1,5 @@
+//! Public API tests against a mock server. All data is made up.
+
 use std::time::Duration;
 
 use uma_stable_match_scoring::{Club, JoinStyle};
