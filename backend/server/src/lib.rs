@@ -3,6 +3,7 @@
 mod app;
 mod cache;
 mod config;
+mod recommendations;
 mod scanner;
 mod scheduler;
 
