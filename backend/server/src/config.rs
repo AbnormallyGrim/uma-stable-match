@@ -1,6 +1,7 @@
 //! Server settings.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use uma_stable_match_umamoe_client::ApiKey;
@@ -45,6 +46,7 @@ pub struct Config {
     pub trainer_lookups_per_minute: u32,
     /// Whether to identify visitors by `X-Forwarded-For`, from `TRUST_FORWARDED_FOR`.
     pub trust_forwarded_for: bool,
+    pub frontend_dir: Option<PathBuf>,
 }
 
 /// Invalid or missing settings.
@@ -59,6 +61,8 @@ pub enum ConfigError {
     /// `PORT` isn't a port number from 1 to 65535.
     #[error("PORT must be a port number from 1 to 65535, got {0:?}")]
     InvalidPort(String),
+    #[error("FRONTEND_DIR must be a directory containing index.html, got {0:?}")]
+    InvalidFrontendDir(String),
     /// A true-or-false setting is something else.
     #[error("{name} must be true or false, got {value:?}")]
     InvalidBool {
@@ -158,6 +162,16 @@ impl Config {
                 })
             }
         };
+        let frontend_dir = match get("FRONTEND_DIR") {
+            None => None,
+            Some(value) => {
+                let dir = PathBuf::from(&value);
+                if !dir.join("index.html").is_file() {
+                    return Err(ConfigError::InvalidFrontendDir(value));
+                }
+                Some(dir)
+            }
+        };
         if scan.rank_from > scan.rank_to {
             return Err(ConfigError::InvalidRankWindow {
                 from: scan.rank_from,
@@ -175,6 +189,7 @@ impl Config {
             rate_limit_per_minute,
             trainer_lookups_per_minute,
             trust_forwarded_for,
+            frontend_dir,
         })
     }
 }
