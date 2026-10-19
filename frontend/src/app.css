@@ -72,11 +72,13 @@ a {
   white-space: nowrap;
 }
 
+/* One focus ring for every control, shown for keyboard focus only. */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
+/* Shared controls. Components can override these with scoped styles. */
 button {
   padding: 6px 14px;
   background: var(--card);
@@ -135,6 +137,8 @@ input[type='range']:disabled {
   cursor: pointer;
 }
 
+/* A pill-shaped group of radio buttons. The selected one is styled with :has(), so it needs
+   no component state. */
 .segmented {
   display: inline-flex;
   gap: 2px;

@@ -117,6 +117,7 @@
 </form>
 
 <style>
+  /* Two columns (field, options) on wide screens; one column below 720px. */
   .search {
     display: grid;
     gap: 16px;
