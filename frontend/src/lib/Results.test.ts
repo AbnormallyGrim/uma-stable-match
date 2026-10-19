@@ -50,3 +50,27 @@ describe('Results', () => {
     expect(screen.getByText('No clubs matched your search.')).toBeInTheDocument();
   });
 });
+
+describe('Results states', () => {
+  it('suggests how to widen an empty search', () => {
+    render(Results, {
+      result: recommendations({
+        options: { balance_weight: 0.5, include_closed: false, limit: 100 },
+      }),
+      now,
+    });
+    expect(screen.getByText('No clubs matched your search.')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('dims stale results while a new search loads', () => {
+    const { container } = render(Results, {
+      result: recommendations({ total: 1, clubs: [club()] }),
+      now,
+      stale: true,
+    });
+    const section = container.querySelector('section');
+    expect(section).toHaveClass('stale');
+    expect(section).toHaveAttribute('aria-busy', 'true');
+  });
+});
