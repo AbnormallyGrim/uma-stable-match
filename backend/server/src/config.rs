@@ -1,6 +1,7 @@
 //! Server settings.
 
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use uma_stable_match_umamoe_client::ApiKey;
 
@@ -8,6 +9,8 @@ use crate::scanner::ScanConfig;
 
 /// Address the server listens on when `BIND_ADDR` isn't set.
 pub const DEFAULT_BIND_ADDR: &str = "127.0.0.1:3000";
+
+pub const DEFAULT_SCAN_INTERVAL_MINUTES: u32 = 180;
 
 /// Server settings. `Debug` output redacts the API key.
 #[derive(Debug, Clone)]
@@ -20,6 +23,7 @@ pub struct Config {
     pub bind_addr: SocketAddr,
     /// Scan settings, from `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `SCAN_MAX_DETAILS`.
     pub scan: ScanConfig,
+    pub scan_interval: Duration,
 }
 
 /// Invalid or missing settings.
@@ -86,6 +90,12 @@ impl Config {
             max_details: number("SCAN_MAX_DETAILS", defaults.max_details)?,
             ..defaults
         };
+        let scan_interval = Duration::from_secs(
+            u64::from(number(
+                "SCAN_INTERVAL_MINUTES",
+                DEFAULT_SCAN_INTERVAL_MINUTES,
+            )?) * 60,
+        );
         if scan.rank_from > scan.rank_to {
             return Err(ConfigError::InvalidRankWindow {
                 from: scan.rank_from,
@@ -98,6 +108,7 @@ impl Config {
             base_url: get("UMAMOE_BASE_URL"),
             bind_addr,
             scan,
+            scan_interval,
         })
     }
 }

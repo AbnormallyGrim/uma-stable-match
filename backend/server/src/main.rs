@@ -3,8 +3,10 @@
 use std::process::ExitCode;
 
 use tokio::net::TcpListener;
+use tokio::sync::watch;
 use tracing_subscriber::EnvFilter;
-use uma_stable_match_server::{router, Config};
+use uma_stable_match_server::{router, run_scheduler, Cache, Config};
+use uma_stable_match_umamoe_client::{Client, ClientConfig};
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -23,6 +25,18 @@ async fn main() -> ExitCode {
         }
     };
 
+    let mut client_config = ClientConfig::new(config.api_key.clone());
+    if let Some(base_url) = &config.base_url {
+        client_config.base_url = base_url.clone();
+    }
+    let client = match Client::new(client_config) {
+        Ok(client) => client,
+        Err(error) => {
+            tracing::error!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
+
     let listener = match TcpListener::bind(config.bind_addr).await {
         Ok(listener) => listener,
         Err(error) => {
@@ -32,10 +46,25 @@ async fn main() -> ExitCode {
     };
     tracing::info!("listening on {}", config.bind_addr);
 
-    if let Err(error) = axum::serve(listener, router())
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-    {
+    let cache = Cache::new();
+    let (stop, stopped) = watch::channel(false);
+    let scheduler = tokio::spawn(run_scheduler(
+        client,
+        config.scan,
+        config.scan_interval,
+        cache.clone(),
+        stopped,
+    ));
+
+    let served = axum::serve(listener, router(cache))
+        .with_graceful_shutdown(async move {
+            shutdown_signal().await;
+            stop.send(true).ok();
+        })
+        .await;
+    scheduler.await.ok();
+
+    if let Err(error) = served {
         tracing::error!("server error: {error}");
         return ExitCode::FAILURE;
     }
