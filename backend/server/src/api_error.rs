@@ -1,3 +1,5 @@
+//! JSON error responses.
+
 use std::time::Duration;
 
 use axum::http::header::RETRY_AFTER;

@@ -20,6 +20,7 @@ pub struct AppState {
     pub cache: Cache,
     /// Trainer pace lookups.
     pub paces: PaceLookup,
+    /// Per-visitor rate limits.
     pub limits: RateLimits,
 }
 

@@ -1,3 +1,5 @@
+//! Rate limit tests. Addresses are from documentation ranges and all data is made up.
+
 use std::net::SocketAddr;
 use std::time::Duration;
 

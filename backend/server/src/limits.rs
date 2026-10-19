@@ -1,3 +1,5 @@
+//! Per-visitor rate limits.
+
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::num::NonZeroU32;
@@ -13,11 +15,13 @@ use governor::{DefaultKeyedRateLimiter, Quota};
 use crate::api_error::ApiError;
 use crate::app::AppState;
 
+// Forget idle visitors once this many are tracked.
 const PRUNE_ABOVE: usize = 10_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Visitor(IpAddr);
 
+/// Per-visitor request limits. Clones share the same counters.
 #[derive(Clone)]
 pub struct RateLimits {
     requests: Arc<DefaultKeyedRateLimiter<IpAddr>>,
@@ -34,6 +38,9 @@ impl fmt::Debug for RateLimits {
 }
 
 impl RateLimits {
+    /// Limits per minute for all recommendation requests and for uncached trainer lookups.
+    ///
+    /// With `trust_forwarded_for`, visitors are identified by the right-most `X-Forwarded-For` address.
     pub fn new(
         requests_per_minute: u32,
         lookups_per_minute: u32,
@@ -105,6 +112,7 @@ fn forwarded_for(headers: &HeaderMap) -> Option<IpAddr> {
         .ok()
 }
 
+// IPv6 visitors are grouped by /64, the usual size of one home network.
 fn group(ip: IpAddr) -> IpAddr {
     match ip {
         IpAddr::V4(_) => ip,
