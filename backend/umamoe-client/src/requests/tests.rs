@@ -19,3 +19,42 @@ fn circle_query_by_viewer_with_month() {
         ]
     );
 }
+
+#[test]
+fn list_query_skips_unset_fields() {
+    let value = serde_json::to_value(ListCirclesRequest::default()).unwrap();
+    assert_eq!(value, serde_json::json!({}));
+}
+
+#[test]
+fn list_query_uses_api_names() {
+    let request = ListCirclesRequest {
+        min_members: Some(20),
+        sort_by: Some(CircleSort::MonthlyRank),
+        sort_dir: Some(SortDir::Asc),
+        ..Default::default()
+    }
+    .page(3);
+    let value = serde_json::to_value(request).unwrap();
+    assert_eq!(
+        value,
+        serde_json::json!({
+            "page": 3,
+            "min_members": 20,
+            "sort_by": "monthly_rank",
+            "sort_dir": "asc",
+        })
+    );
+}
+
+#[test]
+fn page_keeps_other_fields() {
+    let request = ListCirclesRequest {
+        name: Some("Example".into()),
+        page: Some(1),
+        ..Default::default()
+    };
+    let next = request.page(2);
+    assert_eq!(next.page, Some(2));
+    assert_eq!(next.name.as_deref(), Some("Example"));
+}
