@@ -150,6 +150,15 @@ The **System / Light / Dark** switch in the header (`ThemeToggle.svelte`) sets t
 
 `public/theme-init.js` applies a saved theme before the page renders, so it never flashes the wrong theme while the app loads. `index.html` loads it from its own file because the server's content security policy blocks inline scripts. Vite copies it into `dist/` unchanged, so it isn't hashed and browsers revalidate it on each visit.
 
+### Page width
+
+`<main>` and the footer share two tokens from `app.css`, so their edges always line up:
+
+- `--page-max` is `1760px`. The page fills the screen up to that width, then stays centred.
+- `--gutter` is the side padding: `16px` up to 720 pixels wide, `24px` above that, and `32px` from 1600 pixels.
+
+Card descriptions are capped at `80ch` so they stay easy to read on wide screens.
+
 ### Shared styles
 
 `src/app.css` also styles the controls used across the page, so components don't repeat them:

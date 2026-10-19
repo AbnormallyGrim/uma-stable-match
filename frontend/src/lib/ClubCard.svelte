@@ -247,6 +247,7 @@
   }
 
   .comment {
+    max-width: 80ch;
     margin: 8px 0 0;
     color: var(--muted);
     font-size: 0.8125rem;
