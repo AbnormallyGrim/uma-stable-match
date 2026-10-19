@@ -9,12 +9,26 @@ use serde_json::{json, Value};
 use tokio::sync::watch;
 use tower::ServiceExt;
 use uma_stable_match_scoring::{score_clubs, Club, ScoringOptions};
-use uma_stable_match_server::{router, run_scheduler, Cache, ScanConfig};
+use uma_stable_match_server::{
+    router, run_scheduler, AppState, Cache, PaceLookup, ScanConfig, DEFAULT_PACE_TTL,
+};
 use uma_stable_match_umamoe_client::{ApiKey, CircleResponse, Client, ClientConfig, RetryConfig};
 use wiremock::matchers::{path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 const M: f64 = 1_000_000.0;
+
+fn app(cache: Cache) -> AppState {
+    let client = Client::new(ClientConfig {
+        base_url: "http://127.0.0.1:9".into(),
+        ..ClientConfig::new(ApiKey::new("test-key"))
+    })
+    .unwrap();
+    AppState {
+        cache,
+        paces: PaceLookup::new(client, DEFAULT_PACE_TTL),
+    }
+}
 
 fn series(pace: f64) -> Vec<i64> {
     let mut fans = vec![0i64; 31];
@@ -121,7 +135,7 @@ async fn scanned_cache() -> Cache {
 }
 
 async fn get(cache: &Cache, query: &str) -> (StatusCode, Value) {
-    let response = router(cache.clone())
+    let response = router(app(cache.clone()))
         .oneshot(
             Request::get(format!("/api/recommendations{query}"))
                 .body(Body::empty())
@@ -162,8 +176,8 @@ async fn unavailable_before_first_scan() {
 async fn rejects_invalid_input() {
     let cache = Cache::new();
     let cases = [
-        ("", "pace is required"),
-        ("?pace=", "pace is required"),
+        ("", "pace or viewer_id is required"),
+        ("?pace=", "pace or viewer_id is required"),
         ("?pace=fast", "pace must be a number"),
         ("?pace=inf", "pace must be a number"),
         ("?pace=0", "pace must be greater than zero, got 0"),

@@ -1,0 +1,105 @@
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+use uma_stable_match_scoring::daily_pace;
+use uma_stable_match_umamoe_client::{CircleRequest, CircleResponse, Client, Error, StatusCode};
+
+pub const DEFAULT_PACE_TTL: Duration = Duration::from_secs(10 * 60);
+
+#[derive(Debug, thiserror::Error)]
+pub enum PaceError {
+    #[error("trainer not found")]
+    NotFound,
+    #[error("not enough fan data this month to work out a pace")]
+    NotEnoughData,
+    #[error("could not reach uma.moe")]
+    Upstream(#[source] Error),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Outcome {
+    Pace(f64),
+    NotFound,
+    NotEnoughData,
+}
+
+impl Outcome {
+    fn into_result(self) -> Result<f64, PaceError> {
+        match self {
+            Self::Pace(pace) => Ok(pace),
+            Self::NotFound => Err(PaceError::NotFound),
+            Self::NotEnoughData => Err(PaceError::NotEnoughData),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PaceLookup {
+    client: Client,
+    ttl: Duration,
+    entries: Arc<Mutex<HashMap<u64, (Instant, Outcome)>>>,
+}
+
+impl PaceLookup {
+    pub fn new(client: Client, ttl: Duration) -> Self {
+        Self {
+            client,
+            ttl,
+            entries: Arc::default(),
+        }
+    }
+
+    pub async fn pace(&self, viewer_id: u64) -> Result<f64, PaceError> {
+        if let Some(outcome) = self.cached(viewer_id) {
+            return outcome.into_result();
+        }
+
+        let outcome = match self
+            .client
+            .circle(&CircleRequest::by_viewer_id(viewer_id))
+            .await
+        {
+            Ok(response) => pace_from_response(&response, viewer_id),
+            Err(error) if error.status() == Some(StatusCode::NOT_FOUND) => Outcome::NotFound,
+            Err(error) => {
+                tracing::warn!(status = ?error.status(), "trainer pace lookup failed");
+                return Err(PaceError::Upstream(error));
+            }
+        };
+        self.store(viewer_id, outcome);
+        outcome.into_result()
+    }
+
+    fn cached(&self, viewer_id: u64) -> Option<Outcome> {
+        let entries = self.entries.lock().unwrap_or_else(|e| e.into_inner());
+        entries
+            .get(&viewer_id)
+            .filter(|(at, _)| at.elapsed() < self.ttl)
+            .map(|(_, outcome)| *outcome)
+    }
+
+    fn store(&self, viewer_id: u64, outcome: Outcome) {
+        let mut entries = self.entries.lock().unwrap_or_else(|e| e.into_inner());
+        entries.retain(|_, (at, _)| at.elapsed() < self.ttl);
+        entries.insert(viewer_id, (Instant::now(), outcome));
+    }
+}
+
+fn pace_from_response(response: &CircleResponse, viewer_id: u64) -> Outcome {
+    let snapshot = response
+        .members
+        .iter()
+        .filter(|m| m.viewer_id == viewer_id)
+        .max_by_key(|m| (m.year, m.month));
+    match snapshot {
+        None => Outcome::NotFound,
+        Some(member) => match daily_pace(&member.daily_fans) {
+            Some(pace) if pace > 0.0 => Outcome::Pace(pace),
+            _ => Outcome::NotEnoughData,
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests;

@@ -9,13 +9,15 @@ use serde_json::json;
 use uma_stable_match_scoring::{score_clubs, Balance, JoinStyle, ScoredClub, ScoringOptions};
 
 use crate::app::timestamp;
-use crate::cache::Cache;
+use crate::app::AppState;
+use crate::pace::PaceError;
 
 const CLUB_URL: &str = "https://uma.moe/circles/";
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Params {
     pace: Option<String>,
+    viewer_id: Option<String>,
     balance_weight: Option<String>,
     include_closed: Option<String>,
 }
@@ -82,12 +84,24 @@ impl IntoResponse for ApiError {
 }
 
 pub(crate) async fn recommendations(
-    State(cache): State<Cache>,
+    State(state): State<AppState>,
     Query(params): Query<Params>,
 ) -> Result<Json<Recommendations>, ApiError> {
-    let pace = match params.pace.as_deref().map(str::trim) {
-        None | Some("") => return Err(ApiError::bad_request("pace is required")),
-        Some(value) => parse_number("pace", value)?,
+    let pace = blank_to_none(&params.pace);
+    let viewer_id = blank_to_none(&params.viewer_id);
+    let source = match (pace, viewer_id) {
+        (Some(_), Some(_)) => {
+            return Err(ApiError::bad_request(
+                "use either pace or viewer_id, not both",
+            ))
+        }
+        (None, None) => return Err(ApiError::bad_request("pace or viewer_id is required")),
+        (Some(value), None) => PaceSource::Given(parse_number("pace", value)?),
+        (None, Some(value)) => PaceSource::Trainer(
+            value
+                .parse::<u64>()
+                .map_err(|_| ApiError::bad_request("viewer_id must be a trainer ID"))?,
+        ),
     };
     let balance_weight = match params.balance_weight.as_deref().map(str::trim) {
         None | Some("") => None,
@@ -107,10 +121,14 @@ pub(crate) async fn recommendations(
         balance_weight,
         include_closed,
     };
-    let snapshot = cache.snapshot().ok_or(ApiError {
+    let snapshot = state.cache.snapshot().ok_or(ApiError {
         status: StatusCode::SERVICE_UNAVAILABLE,
         message: "no scan results yet; try again shortly".into(),
     })?;
+    let pace = match source {
+        PaceSource::Given(pace) => pace,
+        PaceSource::Trainer(viewer_id) => state.paces.pace(viewer_id).await.map_err(pace_error)?,
+    };
     let scored = score_clubs(pace, &snapshot.clubs, &options)
         .map_err(|e| ApiError::bad_request(e.to_string()))?;
 
@@ -121,6 +139,27 @@ pub(crate) async fn recommendations(
         include_closed,
         results: scored.iter().map(recommendation).collect(),
     }))
+}
+
+enum PaceSource {
+    Given(f64),
+    Trainer(u64),
+}
+
+fn blank_to_none(value: &Option<String>) -> Option<&str> {
+    value.as_deref().map(str::trim).filter(|v| !v.is_empty())
+}
+
+fn pace_error(error: PaceError) -> ApiError {
+    let status = match error {
+        PaceError::NotFound => StatusCode::NOT_FOUND,
+        PaceError::NotEnoughData => StatusCode::UNPROCESSABLE_ENTITY,
+        PaceError::Upstream(_) => StatusCode::BAD_GATEWAY,
+    };
+    ApiError {
+        status,
+        message: error.to_string(),
+    }
 }
 
 fn parse_number(name: &str, value: &str) -> Result<f64, ApiError> {
