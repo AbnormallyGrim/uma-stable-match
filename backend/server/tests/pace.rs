@@ -112,7 +112,7 @@ fn app(server: &MockServer, cache: Cache, ttl: Duration) -> AppState {
 async fn get(state: &AppState, query: &str) -> (StatusCode, Value) {
     let response = router(state.clone())
         .oneshot(
-            Request::get(format!("/api/recommendations{query}"))
+            Request::get(format!("/api/v1/recommendations{query}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -124,7 +124,7 @@ async fn get(state: &AppState, query: &str) -> (StatusCode, Value) {
 }
 
 fn by_trainer() -> String {
-    format!("?viewer_id={TRAINER}")
+    format!("?trainer_id={TRAINER}")
 }
 
 #[tokio::test]
@@ -136,9 +136,12 @@ async fn works_out_pace_from_trainer_id() {
 
     let (status, body) = get(&state, &by_trainer()).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["pace"].as_f64().unwrap(), 6_000_000.0);
-    assert_eq!(body["results"].as_array().unwrap().len(), 1);
-    assert!(body.get("viewer_id").is_none());
+    assert_eq!(
+        body["trainer"]["pace_per_day"].as_f64().unwrap(),
+        6_000_000.0
+    );
+    assert_eq!(body["trainer"]["trainer_id"], TRAINER);
+    assert_eq!(body["clubs"].as_array().unwrap().len(), 1);
 }
 
 #[tokio::test]
@@ -245,15 +248,18 @@ async fn rejects_invalid_trainer_queries() {
     let state = app(&server, Cache::new(), DEFAULT_PACE_TTL);
     let cases = [
         (
-            format!("?pace=5000000&viewer_id={TRAINER}"),
-            "use either pace or viewer_id, not both",
+            format!("?pace=5000000&trainer_id={TRAINER}"),
+            "use either pace or trainer_id, not both",
         ),
         (
-            "?viewer_id=abc".to_owned(),
-            "viewer_id must be a trainer ID",
+            "?trainer_id=abc".to_owned(),
+            "trainer_id must be a trainer ID",
         ),
-        ("?viewer_id=-1".to_owned(), "viewer_id must be a trainer ID"),
-        ("?viewer_id=".to_owned(), "pace or viewer_id is required"),
+        (
+            "?trainer_id=-1".to_owned(),
+            "trainer_id must be a trainer ID",
+        ),
+        ("?trainer_id=".to_owned(), "pace or trainer_id is required"),
     ];
     for (query, message) in cases {
         let (status, body) = get(&state, &query).await;

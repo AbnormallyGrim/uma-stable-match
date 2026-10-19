@@ -6,29 +6,47 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use uma_stable_match_scoring::{score_clubs, Balance, JoinStyle, ScoredClub, ScoringOptions};
+use uma_stable_match_scoring::{
+    score_clubs, Balance, JoinStyle, ScoredClub, ScoringOptions, DEFAULT_BALANCE_WEIGHT,
+};
 
 use crate::app::timestamp;
 use crate::app::AppState;
 use crate::pace::PaceError;
 
 const CLUB_URL: &str = "https://uma.moe/circles/";
+const DEFAULT_LIMIT: u32 = 50;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Params {
     pace: Option<String>,
-    viewer_id: Option<String>,
+    trainer_id: Option<String>,
+    balance: Option<String>,
     balance_weight: Option<String>,
     include_closed: Option<String>,
+    limit: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 pub(crate) struct Recommendations {
-    scanned_at: String,
-    pace: f64,
+    trainer: TrainerView,
+    options: OptionsView,
+    updated_at: String,
+    total: usize,
+    clubs: Vec<Recommendation>,
+}
+
+#[derive(Debug, Serialize)]
+struct TrainerView {
+    trainer_id: Option<u64>,
+    pace_per_day: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct OptionsView {
     balance_weight: Option<f64>,
     include_closed: bool,
-    results: Vec<Recommendation>,
+    limit: u32,
 }
 
 #[derive(Debug, Serialize)]
@@ -88,33 +106,43 @@ pub(crate) async fn recommendations(
     Query(params): Query<Params>,
 ) -> Result<Json<Recommendations>, ApiError> {
     let pace = blank_to_none(&params.pace);
-    let viewer_id = blank_to_none(&params.viewer_id);
-    let source = match (pace, viewer_id) {
+    let trainer_id = blank_to_none(&params.trainer_id);
+    let source = match (pace, trainer_id) {
         (Some(_), Some(_)) => {
             return Err(ApiError::bad_request(
-                "use either pace or viewer_id, not both",
+                "use either pace or trainer_id, not both",
             ))
         }
-        (None, None) => return Err(ApiError::bad_request("pace or viewer_id is required")),
+        (None, None) => return Err(ApiError::bad_request("pace or trainer_id is required")),
         (Some(value), None) => PaceSource::Given(parse_number("pace", value)?),
         (None, Some(value)) => PaceSource::Trainer(
             value
                 .parse::<u64>()
-                .map_err(|_| ApiError::bad_request("viewer_id must be a trainer ID"))?,
+                .map_err(|_| ApiError::bad_request("trainer_id must be a trainer ID"))?,
         ),
     };
-    let balance_weight = match params.balance_weight.as_deref().map(str::trim) {
-        None | Some("") => None,
-        Some(value) => Some(parse_number("balance_weight", value)?),
-    };
-    let include_closed = match params.include_closed.as_deref().map(str::trim) {
-        None | Some("") | Some("false") => false,
-        Some("true") => true,
-        Some(_) => {
+    let balance = parse_bool("balance", &params.balance)?;
+    let weight = blank_to_none(&params.balance_weight)
+        .map(|value| parse_number("balance_weight", value))
+        .transpose()?;
+    let balance_weight = match (balance, weight) {
+        (Some(false), Some(_)) => {
             return Err(ApiError::bad_request(
-                "include_closed must be true or false",
+                "balance_weight can't be used with balance=false",
             ))
         }
+        (_, Some(weight)) => Some(weight),
+        (Some(true), None) => Some(DEFAULT_BALANCE_WEIGHT),
+        _ => None,
+    };
+    let include_closed = parse_bool("include_closed", &params.include_closed)?.unwrap_or(false);
+    let limit = match blank_to_none(&params.limit) {
+        None => DEFAULT_LIMIT,
+        Some(value) => value
+            .parse::<u32>()
+            .ok()
+            .filter(|n| *n > 0)
+            .ok_or_else(|| ApiError::bad_request("limit must be a positive whole number"))?,
     };
 
     let options = ScoringOptions {
@@ -125,25 +153,47 @@ pub(crate) async fn recommendations(
         status: StatusCode::SERVICE_UNAVAILABLE,
         message: "no scan results yet; try again shortly".into(),
     })?;
-    let pace = match source {
-        PaceSource::Given(pace) => pace,
-        PaceSource::Trainer(viewer_id) => state.paces.pace(viewer_id).await.map_err(pace_error)?,
+    let (pace, trainer_id) = match source {
+        PaceSource::Given(pace) => (pace, None),
+        PaceSource::Trainer(id) => (state.paces.pace(id).await.map_err(pace_error)?, Some(id)),
     };
     let scored = score_clubs(pace, &snapshot.clubs, &options)
         .map_err(|e| ApiError::bad_request(e.to_string()))?;
 
     Ok(Json(Recommendations {
-        scanned_at: timestamp(snapshot.scanned_at),
-        pace,
-        balance_weight,
-        include_closed,
-        results: scored.iter().map(recommendation).collect(),
+        trainer: TrainerView {
+            trainer_id,
+            pace_per_day: pace,
+        },
+        options: OptionsView {
+            balance_weight,
+            include_closed,
+            limit,
+        },
+        updated_at: timestamp(snapshot.scanned_at),
+        total: scored.len(),
+        clubs: scored
+            .iter()
+            .take(limit as usize)
+            .map(recommendation)
+            .collect(),
     }))
 }
 
 enum PaceSource {
     Given(f64),
     Trainer(u64),
+}
+
+fn parse_bool(name: &str, value: &Option<String>) -> Result<Option<bool>, ApiError> {
+    match blank_to_none(value) {
+        None => Ok(None),
+        Some("true") => Ok(Some(true)),
+        Some("false") => Ok(Some(false)),
+        Some(_) => Err(ApiError::bad_request(format!(
+            "{name} must be true or false"
+        ))),
+    }
 }
 
 fn blank_to_none(value: &Option<String>) -> Option<&str> {
