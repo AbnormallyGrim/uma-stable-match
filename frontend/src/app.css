@@ -10,13 +10,15 @@
   --text-2: light-dark(#374151, rgb(255 255 255 / 70%));
   --muted: light-dark(#4b5563, rgb(255 255 255 / 55%));
   --border: light-dark(rgb(17 24 39 / 12%), rgb(255 255 255 / 12%));
+  /* Form field edges: at least 3:1 against cards and the page (WCAG 1.4.11). */
+  --control-border: light-dark(#848e9a, rgb(255 255 255 / 42%));
   --border-strong: light-dark(rgb(17 24 39 / 20%), rgb(255 255 255 / 20%));
   --accent: light-dark(#2563eb, #64b5f6);
   --on-accent: light-dark(#ffffff, #0a0a0a);
   --up: light-dark(#15803d, #81c784);
   --down: light-dark(#b91c1c, #e57373);
-  --open: light-dark(#0f766e, #81c784);
-  --approval: light-dark(#b45309, #ffb74d);
+  --open: light-dark(#0b6a62, #81c784);
+  --approval: light-dark(#9c4706, #ffb74d);
   --closed: light-dark(#b91c1c, #e57373);
   --policy: light-dark(#6d28d9, #ce93d8);
   --gold: light-dark(#946100, #ffd700);
@@ -116,7 +118,7 @@ input[type='text'],
 input[type='search'] {
   padding: 7px 10px;
   background: var(--card);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius-sm);
   color: var(--text);
   font: inherit;
