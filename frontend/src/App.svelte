@@ -7,6 +7,7 @@
     type RecommendationQuery,
     type Recommendations,
   } from './lib/api';
+  import Results from './lib/Results.svelte';
   import SearchForm from './lib/SearchForm.svelte';
   import {
     DEFAULT_SEARCH,
@@ -77,11 +78,14 @@
     {#if error}
       <p class="error" role="alert">{error}</p>
     {:else if result}
-      <p data-testid="result-summary">
+      <p class="visually-hidden">
         Found {result.total}
-        {result.total === 1 ? 'club' : 'clubs'}
-        for {(result.trainer.pace_per_day / 1_000_000).toFixed(2)}M fans a day.
+        {result.total === 1 ? 'club' : 'clubs'}.
       </p>
     {/if}
   </div>
+
+  {#if result && !error}
+    <Results {result} />
+  {/if}
 </main>
