@@ -16,12 +16,29 @@ function recommendations(total: number, pace = 7_600_000): Recommendations {
   };
 }
 
-function stubFetch(response: () => Response) {
-  const fetch = vi.fn<typeof globalThis.fetch>(
-    () => new Promise((resolve) => setTimeout(() => resolve(response()), 10)),
-  );
+const READY_STATUS = {
+  scanning: false,
+  last_scan: { finished_at: '2026-03-18T09:00:00Z', clubs: 3, candidates: 5, failed: 0 },
+  last_error: null,
+};
+
+function stubApi(
+  recommendations: () => Response,
+  status: () => Response = () => json(READY_STATUS),
+  delays = { recommendations: 10, status: 10 },
+) {
+  const fetch = vi.fn<typeof globalThis.fetch>((input) => {
+    const isStatus = String(input).startsWith('/api/v1/status');
+    const respond = isStatus ? status : recommendations;
+    const delay = isStatus ? delays.status : delays.recommendations;
+    return new Promise((resolve) => setTimeout(() => resolve(respond()), delay));
+  });
   vi.stubGlobal('fetch', fetch);
-  return fetch;
+  const recommendationCalls = () =>
+    fetch.mock.calls
+      .map(([input]) => String(input))
+      .filter((url) => url.startsWith('/api/v1/recommendations'));
+  return { fetch, recommendationCalls };
 }
 
 const json = (body: unknown, status = 200) =>
@@ -44,40 +61,40 @@ afterEach(() => {
 
 describe('App', () => {
   it('searches and puts the search in the URL', async () => {
-    const fetch = stubFetch(() => json(recommendations(3)));
+    const { recommendationCalls } = stubApi(() => json(recommendations(3)));
     render(App);
     await fireEvent.input(trainerInput(), { target: { value: '123456789012' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
 
     expect(await screen.findByTestId('result-summary')).toHaveTextContent('7.6M/day');
     expect(screen.getByText('Found 3 clubs.')).toBeInTheDocument();
-    expect(fetch.mock.calls[0]?.[0]).toBe(
+    expect(recommendationCalls()).toEqual([
       '/api/v1/recommendations?trainer_id=123456789012&limit=100',
-    );
+    ]);
     expect(window.location.search).toBe('?trainer_id=123456789012');
   });
 
   it('runs a search from the URL on load', async () => {
     setUrl('?pace=5000000&include_closed=true');
-    const fetch = stubFetch(() => json(recommendations(1, 5_000_000)));
+    const { recommendationCalls } = stubApi(() => json(recommendations(1, 5_000_000)));
     render(App);
     expect(await screen.findByTestId('result-summary')).toHaveTextContent('5.0M/day');
     expect(screen.getByText('Found 1 club.')).toBeInTheDocument();
-    expect(fetch.mock.calls[0]?.[0]).toBe(
+    expect(recommendationCalls()).toEqual([
       '/api/v1/recommendations?pace=5000000&include_closed=true&limit=100',
-    );
+    ]);
     expect(screen.getByLabelText('Daily fan gain (millions)')).toHaveValue('5');
   });
 
   it('does not search on load without a valid search in the URL', () => {
     setUrl('?trainer_id=abc');
-    const fetch = stubFetch(() => json(recommendations(0)));
+    const { recommendationCalls } = stubApi(() => json(recommendations(0)));
     render(App);
-    expect(fetch).not.toHaveBeenCalled();
+    expect(recommendationCalls()).toEqual([]);
   });
 
   it('shows the server error message', async () => {
-    stubFetch(() => json({ error: 'trainer not found' }, 404));
+    stubApi(() => json({ error: 'trainer not found' }, 404));
     render(App);
     await fireEvent.input(trainerInput(), { target: { value: '123456789' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
@@ -85,7 +102,7 @@ describe('App', () => {
   });
 
   it('remembers the trainer ID only when asked', async () => {
-    stubFetch(() => json(recommendations(0)));
+    stubApi(() => json(recommendations(0)));
     const { unmount } = render(App);
     await fireEvent.input(trainerInput(), { target: { value: '123456789' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
@@ -106,7 +123,7 @@ describe('App', () => {
 
   it('forgets the trainer ID when unticked', async () => {
     localStorage.setItem('uma-stable-match:trainer-id', '123456789');
-    stubFetch(() => json(recommendations(0)));
+    stubApi(() => json(recommendations(0)));
     render(App);
     await fireEvent.click(screen.getByLabelText('Remember my trainer ID on this device'));
     await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
@@ -117,16 +134,15 @@ describe('App', () => {
 describe('App states', () => {
   it('waits for the first scan and retries', async () => {
     let calls = 0;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => {
+    const loading = { scanning: true, last_scan: null, last_error: null };
+    stubApi(
+      () => {
         calls += 1;
-        return Promise.resolve(
-          calls === 1
-            ? json({ error: 'no scan results yet; try again shortly' }, 503)
-            : json(recommendations(2)),
-        );
-      }),
+        return calls === 1
+          ? json({ error: 'no scan results yet; try again shortly' }, 503)
+          : json(recommendations(2));
+      },
+      () => json(loading),
     );
     setUrl('?pace=5000000');
     render(App);
@@ -136,17 +152,37 @@ describe('App states', () => {
     expect(calls).toBe(2);
   });
 
+  it('retries a waiting search as soon as the scan finishes', async () => {
+    let calls = 0;
+    stubApi(
+      () => {
+        calls += 1;
+        return calls === 1
+          ? json({ error: 'no scan results yet; try again shortly' }, 503)
+          : json(recommendations(4));
+      },
+      () => json(READY_STATUS),
+      { recommendations: 5, status: 40 },
+    );
+    setUrl('?pace=5000000');
+    render(App);
+    expect(await screen.findByText('Found 4 clubs.')).toBeInTheDocument();
+    expect(calls).toBe(2);
+  });
+
+  it('shows when the club data was updated', async () => {
+    stubApi(() => json(recommendations(0)));
+    render(App);
+    expect(await screen.findByTestId('data-status')).toHaveTextContent('Club data updated');
+  });
+
   it('shows a rate limit countdown', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ error: 'too many requests; try again in 7 seconds' }), {
-            status: 429,
-            headers: { 'Content-Type': 'application/json', 'Retry-After': '7' },
-          }),
-        ),
-      ),
+    stubApi(
+      () =>
+        new Response(JSON.stringify({ error: 'too many requests; try again in 7 seconds' }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json', 'Retry-After': '7' },
+        }),
     );
     setUrl('?pace=5000000');
     render(App);

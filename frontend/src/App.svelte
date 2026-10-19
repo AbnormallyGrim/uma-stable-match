@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
 
   import { fetchRecommendations, type RecommendationQuery } from './lib/api';
+  import DataStatus from './lib/DataStatus.svelte';
   import Results from './lib/Results.svelte';
   import { SearchRunner, type SearchState as RunnerState } from './lib/runner';
   import SearchForm from './lib/SearchForm.svelte';
@@ -39,6 +40,13 @@
     search.result !== null && (search.status.phase === 'done' || search.status.phase === 'loading'),
   );
 
+  // A finished scan means a search waiting on a 503 can retry now.
+  function onscanready() {
+    if (search.status.phase === 'waiting-for-scan') {
+      runner.retryNow();
+    }
+  }
+
   function onsearch(query: RecommendationQuery, state: SearchState, remember: boolean) {
     if (state.mode === 'trainer') {
       saveRememberedTrainerId(storage, remember ? state.trainerId : null);
@@ -60,6 +68,7 @@
 
 <main>
   <h1>Uma Stable Match</h1>
+  <DataStatus {onscanready} />
   <SearchForm {initial} remember={remembered !== null} {busy} {onsearch} />
 
   <SearchStatus status={search.status} onretry={() => runner.retryNow()} />
