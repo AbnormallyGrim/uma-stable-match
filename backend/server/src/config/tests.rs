@@ -15,6 +15,7 @@ fn defaults() {
     assert_eq!(config.api_key, ApiKey::new("test-key"));
     assert_eq!(config.bind_addr, DEFAULT_BIND_ADDR.parse().unwrap());
     assert_eq!(config.base_url, None);
+    assert_eq!(config.scan, ScanConfig::default());
 }
 
 #[test]
@@ -75,4 +76,48 @@ fn debug_and_errors_hide_the_key() {
     ]))
     .unwrap_err();
     assert!(!error.to_string().contains("test-key"));
+}
+
+#[test]
+fn reads_scan_settings() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("SCAN_RANK_FROM", "10"),
+        ("SCAN_RANK_TO", "500"),
+        ("SCAN_MAX_DETAILS", "25"),
+    ]))
+    .unwrap();
+    assert_eq!(config.scan.rank_from, 10);
+    assert_eq!(config.scan.rank_to, 500);
+    assert_eq!(config.scan.max_details, 25);
+    assert_eq!(config.scan.page_size, ScanConfig::default().page_size);
+}
+
+#[test]
+fn invalid_scan_numbers_fail() {
+    for value in ["0", "-5", "abc", "1.5"] {
+        let error = Config::from_lookup(lookup(&[
+            ("UMAMOE_API_KEY", "test-key"),
+            ("SCAN_MAX_DETAILS", value),
+        ]))
+        .unwrap_err();
+        assert_eq!(
+            error,
+            ConfigError::InvalidNumber {
+                name: "SCAN_MAX_DETAILS",
+                value: value.into()
+            }
+        );
+    }
+}
+
+#[test]
+fn inverted_rank_window_fails() {
+    let error = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("SCAN_RANK_FROM", "600"),
+        ("SCAN_RANK_TO", "500"),
+    ]))
+    .unwrap_err();
+    assert_eq!(error, ConfigError::InvalidRankWindow { from: 600, to: 500 });
 }
