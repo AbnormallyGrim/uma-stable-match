@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug! Please **don't include personal information** such as your trainer ID, API key or email address. For security issues, use the [Security tab](https://github.com/AbnormallyGrim/uma-stable-match/security) instead.
+        Thanks for reporting a bug! Please **don't include personal information** such as your trainer ID, API key or email address. For security issues, follow the [Security Policy](https://github.com/AbnormallyGrim/uma-stable-match/security/policy) instead.
   - type: textarea
     id: what-happened
     attributes:
@@ -37,6 +37,7 @@ body:
         - Web interface
         - API / server
         - Scoring results
+        - Club data from uma.moe
         - Installation / Docker
         - Documentation
         - Other
@@ -58,3 +59,12 @@ body:
       label: Logs or screenshots
       description: Remove any API keys, trainer IDs or other personal details first.
       render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I've searched existing issues and this hasn't been reported yet.
+          required: true
+        - label: I've removed personal information such as trainer IDs, API keys and email addresses.
+          required: true
