@@ -268,13 +268,12 @@ cd web && npm test
 
 ### Using the scoring crate on its own
 
-The `scoring` crate has no network or storage dependencies. If you already have club and member data, you can score it directly:
+The `scoring` crate has no network or storage dependencies. If you already have club and member data, you can score it directly. See the [scoring crate documentation](crates/scoring/README.md) for usage, input data and the scoring rules.
 
-```rust
-use uma_stable_match_scoring::{score_clubs, ScoringOptions};
+To browse the API documentation locally:
 
-let options = ScoringOptions { balance_weight: Some(0.5), ..Default::default() };
-let ranked = score_clubs(&trainer, &clubs, &options);
+```bash
+cargo doc -p uma-stable-match-scoring --all-features --open
 ```
 
 ## Contributing
