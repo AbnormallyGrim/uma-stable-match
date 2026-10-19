@@ -49,9 +49,8 @@ describe('App', () => {
     await fireEvent.input(trainerInput(), { target: { value: '123456789012' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
 
-    expect(await screen.findByTestId('result-summary')).toHaveTextContent(
-      'Found 3 clubs for 7.60M fans a day.',
-    );
+    expect(await screen.findByTestId('result-summary')).toHaveTextContent('7.6M/day');
+    expect(screen.getByText('Found 3 clubs.')).toBeInTheDocument();
     expect(fetch.mock.calls[0]?.[0]).toBe('/api/v1/recommendations?trainer_id=123456789012');
     expect(window.location.search).toBe('?trainer_id=123456789012');
   });
@@ -60,9 +59,8 @@ describe('App', () => {
     setUrl('?pace=5000000&include_closed=true');
     const fetch = stubFetch(() => json(recommendations(1, 5_000_000)));
     render(App);
-    expect(await screen.findByTestId('result-summary')).toHaveTextContent(
-      'Found 1 club for 5.00M fans a day.',
-    );
+    expect(await screen.findByTestId('result-summary')).toHaveTextContent('5.0M/day');
+    expect(screen.getByText('Found 1 club.')).toBeInTheDocument();
     expect(fetch.mock.calls[0]?.[0]).toBe(
       '/api/v1/recommendations?pace=5000000&include_closed=true',
     );

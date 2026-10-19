@@ -309,7 +309,7 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 
 [MIT](LICENSE) © 2026 AbnormallyGrim
 
-The license covers this project's source code only, not Cygames' artwork or trademarks.
+The license covers this project's source code only, not Cygames' artwork or trademarks. The club tier icons in [`frontend/src/assets/tiers/`](frontend/src/assets/tiers/README.md) are © Cygames, Inc. and are excluded from the MIT license.
 
 ## Disclaimer
 
