@@ -81,11 +81,33 @@ The key is sent as the `X-API-Key` header and marked sensitive. `ApiKey`, `Clien
 
 ## Rate limiting
 
-Requests are spaced at least `min_interval` apart (500 ms by default) and go out in the order they were made. All clones of a `Client` share one limiter, so a scanner running many tasks still sends one request per slot. Idle time isn't saved up for bursts. Set `min_interval` to zero to turn the limit off.
+Requests are spaced at least `min_interval` apart (500 ms by default). Retries count too. Requests go out in the order they were made. All clones of a `Client` share one limiter, so a scanner running many tasks still sends one request per slot. Idle time isn't saved up for bursts. Set `min_interval` to zero to turn the limit off.
+
+## Retries
+
+These are retried:
+
+- Status 429, 500, 502, 503 and 504
+- Timeouts and connection errors
+
+Other errors are returned straight away. That includes other 4xx responses, invalid JSON and other transport errors. When retries run out, the last error is returned.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `max_retries` | 3 | Retries after the first attempt |
+| `base_delay` | 500 ms | First retry delay, doubled each time |
+| `max_delay` | 30 s | Longest wait between attempts |
+
+The wait before retry *n* (from 0) is:
+
+```text
+exp  = min(base_delay × 2ⁿ, max_delay)
+wait = exp ÷ 2 + random(0, exp ÷ 2)
+```
+
+When the response has a `Retry-After` header in seconds, that value is used instead, capped at `max_delay`. HTTP-date values are ignored. `timeout` applies to each attempt, not to the whole call.
 
 ## Errors
-
-Errors are returned straight away; requests aren't retried.
 
 | Variant | When |
 |---|---|
