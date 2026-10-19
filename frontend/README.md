@@ -2,7 +2,7 @@
 
 The Uma Stable Match web interface, built with [Svelte 5](https://svelte.dev) and TypeScript on [Vite](https://vite.dev). It's a single-page app; the Rust server will serve the built files (#40).
 
-It has the search form, a summary of each search and the top ten picks as cards. The full results table comes in a later issue.
+It has the search form, a summary of each search, the top ten picks as cards, and every scored club in a sortable table.
 
 ## Requirements
 
@@ -47,7 +47,8 @@ src/App.svelte                Root component: runs searches and keeps them in th
 src/lib/api.ts                Typed API client
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
-src/lib/Results.svelte        Results view: summary and top picks
+src/lib/Results.svelte        Results view: summary, top picks and all results
+src/lib/ResultsTable.svelte   Sortable, searchable table of every scored club
 src/lib/ResultsSummary.svelte Pace, clubs analysed, data age and balance setting
 src/lib/ClubCard.svelte       One top pick
 src/lib/TierBadge.svelte      Tier icon, with a fallback for unknown tiers
@@ -97,6 +98,29 @@ After a search, the page shows a summary and the top ten picks.
 ### Tier icons
 
 Tiers are shown with the game's own icons, D to SS, from [`src/assets/tiers/`](src/assets/tiers/README.md). They're © Cygames, Inc. and excluded from the MIT licence; that folder's README has the details. Each icon is under Vite's 4 kB inline limit, so it's bundled into the JavaScript as a data URL. A content security policy for the page must allow `img-src data:`.
+
+### All results table
+
+Below the cards, every scored club is listed in a table. The app asks the API for up to 100 clubs (a scan loads at most 80 by default), so nothing is cut off.
+
+| Column | Sorts first by |
+|---|---|
+| `#` (pick order) | Best pick first |
+| Tier | Highest tier first |
+| Club | A to Z |
+| Rank, Last month | Best (lowest) rank first |
+| Open spots | Most first |
+| Join style | A to Z |
+| Median/day | Highest first |
+| You'd be | Nearest the top of the club first |
+| Balance *(balance on)* | Most even first |
+| Passengers, Top 3 share *(balance on)* | Fewest or lowest first |
+| Fit, or Score *(balance on)* | Best (lowest) first |
+
+- **Sorting:** select a column header to sort by it. Select it again to reverse the order. Missing values always sort last, and ties keep pick order. Each header is a button with `aria-sort`, so sorting works by keyboard and screen readers announce it.
+- **Search:** filters by club name as you type. "Showing X of Y clubs" updates as you go.
+- **Hide closed clubs:** only appears when the search included closed clubs, and is on by default.
+- **Narrow screens:** the table scrolls sideways inside its own region. The region can be focused, so it also scrolls with the keyboard. That needs a `svelte-ignore` for Svelte's `a11y_no_noninteractive_tabindex` rule, because axe requires scrollable regions to be focusable. On a desktop the table fits without scrolling, even with balance columns.
 
 ### Themes
 

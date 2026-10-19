@@ -5,11 +5,12 @@
 -->
 
 <script lang="ts">
+  import { tierIndex } from './format';
+
   const icons = import.meta.glob<string>('../assets/tiers/tier-*.webp', {
     eager: true,
     import: 'default',
   });
-  const TIERS = ['D', 'D+', 'C', 'C+', 'B', 'B+', 'A', 'A+', 'S', 'S+', 'SS'];
 
   interface Props {
     tier: string | null;
@@ -18,7 +19,7 @@
 
   let { tier, size = 'large' }: Props = $props();
 
-  const index = $derived(tier === null ? -1 : TIERS.indexOf(tier));
+  const index = $derived(tierIndex(tier));
   const src = $derived(index >= 0 ? icons[`../assets/tiers/tier-${index + 1}.webp`] : undefined);
   const pixels = $derived(size === 'large' ? 48 : 26);
 </script>

@@ -36,11 +36,13 @@ describe('Results', () => {
       club({ circle_id: i + 1, name: `Club ${i + 1}`, url: `https://uma.moe/circles/${i + 1}` }),
     );
     render(Results, { result: recommendations({ total: 12, clubs }), now });
-    const items = screen.getAllByRole('listitem');
+    const picks = screen.getByRole('list');
+    const items = within(picks).getAllByRole('listitem');
     expect(items).toHaveLength(10);
     expect(within(items[0]!).getByRole('link')).toHaveTextContent('Club 1');
     expect(within(items[9]!).getByRole('link')).toHaveTextContent('Club 10');
-    expect(screen.queryByText('Club 11')).not.toBeInTheDocument();
+    expect(within(picks).queryByText('Club 11')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getAllByRole('link')).toHaveLength(12);
   });
 
   it('says when nothing matched', () => {
