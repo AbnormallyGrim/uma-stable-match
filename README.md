@@ -253,7 +253,7 @@ These rules can change, so check in-game if something doesn't match.
 ### Prerequisites
 
 - [Rust](https://rustup.rs) (latest stable)
-- [Node.js](https://nodejs.org) 22.12 or newer
+- [Node.js](https://nodejs.org) 22.22.2 or newer (or 24.15 or newer)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (optional, for Redis and full-stack runs)
 
 ### Project layout
@@ -277,6 +277,8 @@ cd frontend
 npm install
 npm run dev
 ```
+
+Open <http://localhost:5173>. The frontend dev server forwards `/api` requests to the backend. See the [frontend README](frontend/README.md).
 
 ### Test
 

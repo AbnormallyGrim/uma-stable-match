@@ -62,13 +62,14 @@ cargo test --workspace --all-features
 
 ### Web frontend
 
-Once the `frontend/` app exists:
-
 ```bash
 cd frontend
 npm run check
+npm run lint
 npm test
 ```
+
+Run `npm run format` to fix formatting. See the [frontend README](frontend/README.md) for every script.
 
 ## Keep personal information out
 
