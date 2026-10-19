@@ -1,3 +1,5 @@
+// DataStatus component tests with fake timers. All data is made up.
+
 import { render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

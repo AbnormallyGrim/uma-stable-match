@@ -47,6 +47,7 @@ src/App.svelte                Root component: runs searches and keeps them in th
 src/lib/runner.ts             Search state machine: loading, retries and countdowns
 src/lib/states.ts             Error messages and empty-result hints
 src/lib/SearchStatus.svelte   Loading, waiting and error messages
+src/lib/DataStatus.svelte     How fresh the club data is, from /api/v1/status
 src/lib/api.ts                Typed API client
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
@@ -148,6 +149,22 @@ Colours are CSS custom properties in `src/app.css`, and components only use thes
 Starting a new search cancels any pending retry and any earlier request, so an old answer never replaces a newer one. Loading and waiting messages use `role="status"`, and errors use `role="alert"`. The dimming transition is turned off when the visitor prefers reduced motion.
 
 The runner takes the fetch function, a change callback, the retry delays and the timer functions as options. Its tests replace them, so they can check retries and countdowns to the second with fake timers.
+
+### Data status
+
+Under the heading, `DataStatus.svelte` shows how fresh the club data is, using `/api/v1/status`.
+
+| Server state | Line shown |
+|---|---|
+| Data ready | "Club data updated 3 hours ago." The exact time shows on hover |
+| Refreshing | "Club data updated 3 hours ago; refreshing now…" |
+| First scan running | "Loading club data for the first time…" |
+| Last refresh failed | The line, then "The last refresh didn't finish (…)" with the server's public-safe message, in the warning colour |
+| Status request failed | Nothing |
+
+It checks when the page loads, then every 60 seconds (`POLL_MS`). While a scan runs, or before any data exists, it checks every 5 seconds (`FAST_POLL_MS`). It doesn't check while the tab is hidden, and checks straight away when the tab becomes visible again.
+
+When it sees a newly finished scan, it calls `onscanready`. If a search is waiting for the first scan, the app retries it straight away instead of waiting out the countdown.
 
 ## Display formatting
 

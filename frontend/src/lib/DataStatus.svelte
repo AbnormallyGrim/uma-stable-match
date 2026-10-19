@@ -1,5 +1,14 @@
+<!--
+  @component
+  A one-line summary of the club data from `/api/v1/status`: how old it is, whether a refresh
+  is running, and whether the last one failed. Polls while the tab is visible.
+  `onscanready` runs whenever a newly finished scan is seen.
+-->
+
 <script lang="ts" module>
+  /** How often to check `/api/v1/status` once club data is ready. */
   export const POLL_MS = 60_000;
+  /** How often to check while a scan runs or before any data exists. */
   export const FAST_POLL_MS = 5_000;
 </script>
 

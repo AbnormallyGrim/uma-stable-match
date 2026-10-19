@@ -40,6 +40,7 @@
     search.result !== null && (search.status.phase === 'done' || search.status.phase === 'loading'),
   );
 
+  // A finished scan means a search waiting on a 503 can retry now.
   function onscanready() {
     if (search.status.phase === 'waiting-for-scan') {
       runner.retryNow();
