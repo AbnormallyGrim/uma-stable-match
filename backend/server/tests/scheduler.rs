@@ -198,10 +198,10 @@ async fn failed_scan_keeps_last_results() {
 
     let status = status_json(&running.cache).await;
     assert_eq!(status["last_scan"]["clubs"], 1);
-    assert!(status["last_error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("503"));
+    assert_eq!(
+        status["last_error"]["message"],
+        "listing clubs failed: uma.moe returned 503 Service Unavailable"
+    );
     stop(running).await;
 }
 
@@ -221,4 +221,36 @@ async fn shutdown_cancels_a_running_scan() {
     let status = cache.status();
     assert!(!status.scanning);
     assert_eq!(status.snapshot, None);
+}
+
+#[tokio::test]
+async fn unreachable_api_error_hides_the_url() {
+    let cache = Cache::new();
+    let (stop, stopped) = watch::channel(false);
+    let unreachable = Client::new(ClientConfig {
+        base_url: "http://127.0.0.1:9".into(),
+        min_interval: Duration::ZERO,
+        retry: RetryConfig {
+            max_retries: 0,
+            ..Default::default()
+        },
+        ..ClientConfig::new(ApiKey::new("test-key"))
+    })
+    .unwrap();
+    let handle = tokio::spawn(run_scheduler(
+        unreachable,
+        ScanConfig::default(),
+        Duration::from_secs(3600),
+        cache.clone(),
+        stopped,
+    ));
+    wait_until(&cache, |s| s.last_error.is_some()).await;
+    stop.send(true).unwrap();
+    handle.await.unwrap();
+
+    let status = status_json(&cache).await;
+    let message = status["last_error"]["message"].as_str().unwrap();
+    assert_eq!(message, "listing clubs failed: could not reach uma.moe");
+    assert!(!message.contains("http"));
+    assert!(!message.contains("127.0.0.1"));
 }
