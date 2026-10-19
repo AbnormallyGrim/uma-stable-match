@@ -18,6 +18,7 @@ pub struct Config {
     pub base_url: Option<String>,
     /// Listen address, from `BIND_ADDR`.
     pub bind_addr: SocketAddr,
+    /// Scan settings, from `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `SCAN_MAX_DETAILS`.
     pub scan: ScanConfig,
 }
 
@@ -30,10 +31,22 @@ pub enum ConfigError {
     /// `BIND_ADDR` isn't a socket address.
     #[error("BIND_ADDR is not a valid address: {0}")]
     InvalidBindAddr(String),
+    /// A numeric setting isn't a positive whole number.
     #[error("{name} must be a positive whole number, got {value:?}")]
-    InvalidNumber { name: &'static str, value: String },
+    InvalidNumber {
+        /// Variable name.
+        name: &'static str,
+        /// Value that was set.
+        value: String,
+    },
+    /// The rank window is inverted.
     #[error("SCAN_RANK_FROM ({from}) must not be above SCAN_RANK_TO ({to})")]
-    InvalidRankWindow { from: u32, to: u32 },
+    InvalidRankWindow {
+        /// `SCAN_RANK_FROM`.
+        from: u32,
+        /// `SCAN_RANK_TO`.
+        to: u32,
+    },
 }
 
 impl Config {

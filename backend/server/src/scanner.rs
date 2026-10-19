@@ -1,3 +1,5 @@
+//! Finds candidate clubs and fetches their member data.
+
 use std::cmp::Reverse;
 
 use uma_stable_match_scoring::{Club, CLUB_CAP};
@@ -5,13 +7,19 @@ use uma_stable_match_umamoe_client::{
     Circle, CircleRequest, CircleSort, Client, Error, ListCirclesRequest, SortDir,
 };
 
+// Safety stop in case the API never returns a short page.
 const MAX_PAGES: u32 = 100;
 
+/// Which clubs a scan looks at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScanConfig {
+    /// Best monthly rank to include.
     pub rank_from: u32,
+    /// Worst monthly rank to include.
     pub rank_to: u32,
+    /// Most clubs to fetch details for.
     pub max_details: u32,
+    /// Clubs per list page.
     pub page_size: u32,
 }
 
@@ -26,19 +34,26 @@ impl Default for ScanConfig {
     }
 }
 
+/// Result of one scan.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scan {
+    /// Clubs with member data, climbers first.
     pub clubs: Vec<Club>,
+    /// Clubs that matched the rank window and had open spots.
     pub candidates: usize,
+    /// Clubs whose details failed to load.
     pub failed: usize,
 }
 
+/// Why a scan failed.
 #[derive(Debug, thiserror::Error)]
 pub enum ScanError {
+    /// A list request failed.
     #[error("listing clubs failed: {0}")]
     List(#[source] Error),
 }
 
+/// Lists candidate clubs and fetches their member data.
 pub async fn scan(client: &Client, config: &ScanConfig) -> Result<Scan, ScanError> {
     let mut candidates = list_candidates(client, config).await?;
     let total = candidates.len();
