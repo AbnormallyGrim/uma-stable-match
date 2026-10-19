@@ -1,6 +1,6 @@
 <!--
   @component
-  The results view: summary, then the top ten picks as cards.
+  The results view: summary, the top ten picks as cards, then every club in a table.
 -->
 
 <script lang="ts">

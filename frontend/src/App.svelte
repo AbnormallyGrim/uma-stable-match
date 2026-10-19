@@ -25,6 +25,7 @@
   const initial: SearchState =
     fromUrl ?? (remembered ? { ...DEFAULT_SEARCH, trainerId: remembered } : DEFAULT_SEARCH);
 
+  // Above a scan's default 80 clubs, so the table can list them all.
   const RESULT_LIMIT = 100;
 
   let busy = $state(false);

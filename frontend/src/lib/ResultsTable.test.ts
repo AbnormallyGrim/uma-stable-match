@@ -1,3 +1,5 @@
+// ResultsTable component tests. All data is made up.
+
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 

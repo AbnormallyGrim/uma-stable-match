@@ -1,3 +1,9 @@
+<!--
+  @component
+  Every scored club in a sortable table, with search by name and, when closed clubs
+  were requested, a hide-closed toggle. Balance columns only show with balance on.
+-->
+
 <script lang="ts">
   import type { Club } from './api';
   import {
@@ -26,6 +32,7 @@
     | 'score';
   type Direction = 'ascending' | 'descending';
 
+  // `first` is the direction a column sorts in when first selected.
   interface Column {
     key: SortKey;
     label: string;
@@ -136,6 +143,7 @@
     return [...filtered].sort((a, b) => {
       const x = column.value(a);
       const y = column.value(b);
+      // Ties keep pick order, and missing values always go last.
       if (x === y) return a.pick - b.pick;
       if (x === null) return 1;
       if (y === null) return -1;

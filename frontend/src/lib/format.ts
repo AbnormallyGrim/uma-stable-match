@@ -74,8 +74,10 @@ export function rankTrend(rank: number | null, lastMonthRank: number | null): Ra
   return { kind: 'same', change: 0, label: '–', description: 'Same rank as last month' };
 }
 
+/** Club tiers from lowest to highest. */
 export const TIER_LABELS = ['D', 'D+', 'C', 'C+', 'B', 'B+', 'A', 'A+', 'S', 'S+', 'SS'];
 
+/** A tier's position from 0 (D) to 10 (SS), or -1 if unknown. */
 export function tierIndex(tier: string | null): number {
   return tier === null ? -1 : TIER_LABELS.indexOf(tier);
 }
