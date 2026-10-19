@@ -62,10 +62,10 @@ cargo test --workspace
 
 ### Web frontend
 
-Once the `web/` directory exists:
+Once the `frontend/` app exists:
 
 ```bash
-cd web
+cd frontend
 npm run check
 npm test
 ```
