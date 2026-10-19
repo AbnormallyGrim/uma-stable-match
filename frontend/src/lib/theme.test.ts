@@ -1,3 +1,5 @@
+// theme tests.
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { THEME_KEY, applyTheme, isThemeChoice, loadTheme, saveTheme } from './theme';

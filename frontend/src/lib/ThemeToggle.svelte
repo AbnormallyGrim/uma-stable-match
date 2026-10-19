@@ -1,3 +1,8 @@
+<!--
+  @component
+  System / Light / Dark switch. Applies the choice to the page and remembers it.
+-->
+
 <script lang="ts">
   import { untrack } from 'svelte';
 

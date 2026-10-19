@@ -1,4 +1,5 @@
-/* Global styles and colour tokens. Components use the tokens, so themes only change :root. */
+/* Global styles and colour tokens. Components use the tokens, so themes only change :root.
+   Each token is light-dark(light value, dark value); color-scheme picks which applies. */
 
 :root {
   color-scheme: light dark;
@@ -25,6 +26,7 @@
   --font: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* A theme chosen with the toggle overrides the system setting. */
 :root[data-theme='light'] {
   color-scheme: light;
 }
