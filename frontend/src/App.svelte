@@ -1,21 +1,87 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  type Health = 'checking' | 'online' | 'unreachable';
+  import {
+    ApiError,
+    fetchRecommendations,
+    type RecommendationQuery,
+    type Recommendations,
+  } from './lib/api';
+  import SearchForm from './lib/SearchForm.svelte';
+  import {
+    DEFAULT_SEARCH,
+    fromUrlParams,
+    loadRememberedTrainerId,
+    saveRememberedTrainerId,
+    toUrlParams,
+    validate,
+    type SearchState,
+  } from './lib/search';
 
-  let health = $state<Health>('checking');
+  const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
+  const fromUrl = fromUrlParams(new URLSearchParams(window.location.search));
+  const remembered = loadRememberedTrainerId(storage);
+  const initial: SearchState =
+    fromUrl ?? (remembered ? { ...DEFAULT_SEARCH, trainerId: remembered } : DEFAULT_SEARCH);
 
-  onMount(async () => {
+  let busy = $state(false);
+  let result = $state<Recommendations | null>(null);
+  let error = $state<string | null>(null);
+  let controller: AbortController | null = null;
+
+  async function search(query: RecommendationQuery) {
+    controller?.abort();
+    const current = new AbortController();
+    controller = current;
+    busy = true;
+    error = null;
     try {
-      const response = await fetch('/api/v1/health');
-      health = response.ok ? 'online' : 'unreachable';
-    } catch {
-      health = 'unreachable';
+      result = await fetchRecommendations(query, { signal: current.signal });
+    } catch (caught) {
+      if (current.signal.aborted) {
+        return;
+      }
+      result = null;
+      error = caught instanceof ApiError ? caught.message : 'Something went wrong.';
+    } finally {
+      if (controller === current) {
+        busy = false;
+      }
     }
+  }
+
+  function onsearch(query: RecommendationQuery, state: SearchState, remember: boolean) {
+    if (state.mode === 'trainer') {
+      saveRememberedTrainerId(storage, remember ? state.trainerId : null);
+    }
+    window.history.replaceState(null, '', `${window.location.pathname}?${toUrlParams(query)}`);
+    void search(query);
+  }
+
+  onMount(() => {
+    if (fromUrl) {
+      const validation = validate(fromUrl);
+      if (validation.ok) {
+        void search(validation.query);
+      }
+    }
+    return () => controller?.abort();
   });
 </script>
 
 <main>
   <h1>Uma Stable Match</h1>
-  <p>Server: <span data-testid="health">{health}</span></p>
+  <SearchForm {initial} remember={remembered !== null} {busy} {onsearch} />
+
+  <div aria-live="polite">
+    {#if error}
+      <p class="error" role="alert">{error}</p>
+    {:else if result}
+      <p data-testid="result-summary">
+        Found {result.total}
+        {result.total === 1 ? 'club' : 'clubs'}
+        for {(result.trainer.pace_per_day / 1_000_000).toFixed(2)}M fans a day.
+      </p>
+    {/if}
+  </div>
 </main>

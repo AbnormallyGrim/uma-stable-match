@@ -2,7 +2,7 @@
 
 The Uma Stable Match web interface, built with [Svelte 5](https://svelte.dev) and TypeScript on [Vite](https://vite.dev). It's a single-page app; the Rust server will serve the built files (#40).
 
-For now it's a placeholder page that checks whether the API server is reachable. The search form and results come in later issues.
+For now it has the search form and shows how many clubs were found. The results view comes in a later issue.
 
 ## Requirements
 
@@ -41,14 +41,37 @@ CI runs `check`, `lint`, `test` and `build` on Node 22 for every push and pull r
 ## Layout
 
 ```
-index.html          Page shell
-src/main.ts         Mounts the app
-src/App.svelte      Root component
-src/lib/api.ts      Typed API client
-src/*.test.ts       Component tests
-src/setup-tests.ts  Adds jest-dom matchers to Vitest
-vite.config.ts      Vite, the /api proxy and Vitest settings
+index.html                    Page shell
+src/main.ts                   Mounts the app
+src/App.svelte                Root component: runs searches and keeps them in the URL
+src/lib/api.ts                Typed API client
+src/lib/search.ts             Search validation, URL parameters and "remember me"
+src/lib/SearchForm.svelte     The search form
+src/**/*.test.ts              Unit and component tests
+src/setup-tests.ts            Adds jest-dom matchers to Vitest
+vite.config.ts                Vite, the /api proxy and Vitest settings
 ```
+
+## Search form
+
+The form searches by **trainer ID** or by **daily pace**, with an optional **balance scoring** toggle and strength slider (0 to 1, in steps of 0.05) and an **include closed clubs** checkbox.
+
+| Field | Accepted | Sent to the API as |
+|---|---|---|
+| Trainer ID | 9 to 12 digits; spaces and dashes are ignored | `trainer_id` |
+| Daily pace | A positive number of millions, such as `7.6` (a comma works as the decimal point) | `pace`, in fans per day |
+| Balance scoring | Off, or a strength from 0 to 1 | `balance_weight`, only when on |
+| Include closed clubs | On or off | `include_closed=true`, only when on |
+
+Only the field for the chosen mode is checked. An invalid field gets a message linked to it with `aria-describedby`, and nothing is sent.
+
+### Search in the URL
+
+Each search replaces the page URL's query with the same parameters the API uses, such as `?trainer_id=123456789012&balance_weight=0.5`. When the page loads with a valid search in the URL, it fills in the form and runs the search, so searches can be bookmarked and shared. Invalid or missing parameters are ignored. If a search is still running when a new one starts, the older one is cancelled.
+
+### Remembering the trainer ID
+
+"Remember my trainer ID on this device" is off by default. When it's ticked at search time, the trainer ID is saved in the browser's local storage under `uma-stable-match:trainer-id`. Unticking it and searching again deletes it. Nothing else is stored. Without a search in the URL, a remembered ID fills the form, but doesn't start a search on its own. Browsers that block storage simply don't remember.
 
 ## API client
 
