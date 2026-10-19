@@ -8,12 +8,14 @@ use axum::{Json, Router};
 use serde_json::{json, Value};
 
 use crate::cache::Cache;
+use crate::recommendations::recommendations;
 
 /// The server's routes, reading scan results from `cache`.
 pub fn router(cache: Cache) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/api/status", get(status))
+        .route("/api/recommendations", get(recommendations))
         .with_state(cache)
 }
 
@@ -38,6 +40,6 @@ async fn status(State(cache): State<Cache>) -> Json<Value> {
     }))
 }
 
-fn timestamp(time: SystemTime) -> String {
+pub(crate) fn timestamp(time: SystemTime) -> String {
     humantime::format_rfc3339_seconds(time).to_string()
 }

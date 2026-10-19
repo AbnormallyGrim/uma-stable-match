@@ -1,6 +1,6 @@
 # uma-stable-match-server
 
-The API server for Uma Stable Match. It scans uma.moe for candidate clubs on a schedule, keeps the results in memory and reports scan status. The recommendations API comes later.
+The API server for Uma Stable Match. It scans uma.moe for candidate clubs on a schedule, keeps the results in memory, and recommends clubs for a trainer's daily fan pace.
 
 ## Run
 
@@ -53,6 +53,7 @@ Scan results live in memory only, so nothing is written to disk. When the server
 |---|---|---|
 | `GET` | `/health` | `200 {"status":"ok"}` |
 | `GET` | `/api/status` | `200` with the scan state, below |
+| `GET` | `/api/recommendations` | Ranked clubs for a pace, below |
 
 `/api/status` looks like this:
 
@@ -65,6 +66,71 @@ Scan results live in memory only, so nothing is written to disk. When the server
 ```
 
 `last_scan` is `null` until the first scan succeeds. `last_error` holds `{ "at", "message" }` for a failure since the last success. Times are RFC 3339 in UTC.
+
+### Recommendations
+
+`GET /api/recommendations` scores the clubs from the last scan with [`uma-stable-match-scoring`](../scoring/README.md) and returns them best first.
+
+| Parameter | Required | Meaning |
+|---|---|---|
+| `pace` | Yes | Your daily fan gain, such as `7600000` |
+| `balance_weight` | No | Turns on balance scoring with this weight, from 0 to 1 |
+| `include_closed` | No | `true` to include clubs that aren't accepting members. Defaults to `false` |
+
+Clubs with fewer than 8 rankable members aren't returned, and with balance scoring on, neither are clubs whose balance can't be measured.
+
+```json
+{
+  "scanned_at": "2026-03-18T09:00:00Z",
+  "pace": 7600000.0,
+  "balance_weight": 0.5,
+  "include_closed": false,
+  "results": [
+    {
+      "circle_id": 1,
+      "name": "Example Club",
+      "url": "https://uma.moe/circles/1",
+      "tier": "A+",
+      "join_style": "open",
+      "policy": 2,
+      "member_count": 25,
+      "open_spots": 5,
+      "monthly_rank": 120,
+      "last_month_rank": 150,
+      "comment": "Made-up description",
+      "your_place": 9,
+      "club_size": 26,
+      "ranked_members": 24,
+      "median_per_day": 6400000.0,
+      "fit": 0.0562,
+      "score": 0.1062,
+      "balance": {
+        "score": 90,
+        "gini": 0.12,
+        "passengers": 1,
+        "counted": 24,
+        "bottom_quarter_per_day": 3100000.0,
+        "top3_share": 0.21
+      }
+    }
+  ]
+}
+```
+
+- `join_style` is `open`, `approval`, `closed` or `null`.
+- `tier` runs from `D` to `SS`, or is `null` when unknown.
+- `policy` is uma.moe's playstyle code.
+- `balance` is `null` unless `balance_weight` is set.
+- Lower `fit` and `score` are better.
+
+The [scoring README](../scoring/README.md) explains every value.
+
+Errors come back as `{"error": "..."}`:
+
+| Status | When |
+|---|---|
+| `400` | `pace` is missing, not a number, or zero or below; `balance_weight` isn't a number from 0 to 1; or `include_closed` isn't `true` or `false` |
+| `503` | No scan has finished yet. Try again shortly |
 
 ## Shutdown
 
