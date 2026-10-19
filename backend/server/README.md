@@ -1,6 +1,6 @@
 # uma-stable-match-server
 
-The API server for Uma Stable Match. For now it loads its settings, answers a health check and shuts down cleanly. It also includes the club scanner, which isn't scheduled yet. Later work adds the cache, the scan schedule and the recommendations API.
+The API server for Uma Stable Match. It scans uma.moe for candidate clubs on a schedule, keeps the results in memory and reports scan status. The recommendations API comes later.
 
 ## Run
 
@@ -22,6 +22,7 @@ Run these from the repository root. The server reads the first `.env` it finds i
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to scan |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to scan |
 | `SCAN_MAX_DETAILS` | `80` | Most clubs to fetch member data for in each scan |
+| `SCAN_INTERVAL_MINUTES` | `180` | Minutes between scans |
 
 Blank values count as unset. A missing key, an invalid address, a scan setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO` stops the server at startup, with an error message and exit code 1. The key is never logged, never included in errors and is redacted in `Debug` output. `.env` is git-ignored; never commit it.
 
@@ -38,12 +39,33 @@ A club whose details fail to load is logged and skipped. A failed list request f
 
 With the client's default 500 ms rate limit, a default scan takes about 45 seconds: around 9 list pages plus 80 club lookups.
 
+## Cache and schedule
+
+Scan results live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan finishes there are no results; with the defaults that takes about 45 seconds.
+
+- **No overlapping scans.** A new scan won't start while one is running.
+- **Failures keep the last results.** A failed scan is logged and recorded as the last error, and the previous results stay in place. The next successful scan replaces the results and clears the error.
+- **Shutdown cancels a running scan.** The cache then keeps whatever it had before that scan started.
+
 ## Endpoints
 
 | Method | Path | Response |
 |---|---|---|
 | `GET` | `/health` | `200 {"status":"ok"}` |
+| `GET` | `/api/status` | `200` with the scan state, below |
+
+`/api/status` looks like this:
+
+```json
+{
+  "scanning": false,
+  "last_scan": { "finished_at": "2026-03-18T09:00:00Z", "clubs": 80, "candidates": 214, "failed": 0 },
+  "last_error": null
+}
+```
+
+`last_scan` is `null` until the first scan succeeds. `last_error` holds `{ "at", "message" }` for a failure since the last success. Times are RFC 3339 in UTC.
 
 ## Shutdown
 
-Ctrl+C or SIGTERM (as sent by `docker stop`) stops accepting new connections, lets in-flight requests finish, and then exits.
+Ctrl+C or SIGTERM (as sent by `docker stop`) stops accepting new connections and cancels any running scan. In-flight requests finish, and then the server exits.
