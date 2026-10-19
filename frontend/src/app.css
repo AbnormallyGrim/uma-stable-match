@@ -1,53 +1,38 @@
-/* Global styles and colour tokens. Components use the tokens, so themes only change :root. */
+/* Global styles and colour tokens. Components use the tokens, so themes only change :root.
+   Each token is light-dark(light value, dark value); color-scheme picks which applies. */
 
 :root {
-  color-scheme: light;
-  --bg: #f3f5f8;
-  --card: #ffffff;
-  --surface: #f2f5f9;
-  --text: #111827;
-  --text-2: #374151;
-  --muted: #4b5563;
-  --border: rgb(17 24 39 / 12%);
-  --border-strong: rgb(17 24 39 / 20%);
-  --accent: #2563eb;
-  --up: #15803d;
-  --down: #b91c1c;
-  --open: #0f766e;
-  --approval: #b45309;
-  --closed: #b91c1c;
-  --policy: #6d28d9;
-  --gold: #946100;
-  --silver: #53616b;
-  --bronze: #9b521b;
+  color-scheme: light dark;
+  --bg: light-dark(#f3f5f8, #0a0a0a);
+  --card: light-dark(#ffffff, #161616);
+  --surface: light-dark(#f2f5f9, rgb(255 255 255 / 8%));
+  --text: light-dark(#111827, #ffffff);
+  --text-2: light-dark(#374151, rgb(255 255 255 / 70%));
+  --muted: light-dark(#4b5563, rgb(255 255 255 / 55%));
+  --border: light-dark(rgb(17 24 39 / 12%), rgb(255 255 255 / 12%));
+  --border-strong: light-dark(rgb(17 24 39 / 20%), rgb(255 255 255 / 20%));
+  --accent: light-dark(#2563eb, #64b5f6);
+  --up: light-dark(#15803d, #81c784);
+  --down: light-dark(#b91c1c, #e57373);
+  --open: light-dark(#0f766e, #81c784);
+  --approval: light-dark(#b45309, #ffb74d);
+  --closed: light-dark(#b91c1c, #e57373);
+  --policy: light-dark(#6d28d9, #ce93d8);
+  --gold: light-dark(#946100, #ffd700);
+  --silver: light-dark(#53616b, #c0c0c0);
+  --bronze: light-dark(#9b521b, #cd7f32);
   --radius-sm: 4px;
   --radius: 8px;
   --font: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Dark theme, following the system setting. A manual toggle comes later. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --bg: #0a0a0a;
-    --card: #161616;
-    --surface: rgb(255 255 255 / 8%);
-    --text: #ffffff;
-    --text-2: rgb(255 255 255 / 70%);
-    --muted: rgb(255 255 255 / 55%);
-    --border: rgb(255 255 255 / 12%);
-    --border-strong: rgb(255 255 255 / 20%);
-    --accent: #64b5f6;
-    --up: #81c784;
-    --down: #e57373;
-    --open: #81c784;
-    --approval: #ffb74d;
-    --closed: #e57373;
-    --policy: #ce93d8;
-    --gold: #ffd700;
-    --silver: #c0c0c0;
-    --bronze: #cd7f32;
-  }
+/* A theme chosen with the toggle overrides the system setting. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 *,
