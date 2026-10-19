@@ -1,6 +1,7 @@
 //! The API client.
 
 use std::fmt;
+use std::sync::Arc;
 
 use reqwest::header::{HeaderValue, ACCEPT};
 use reqwest::Url;
@@ -9,17 +10,19 @@ use serde::Serialize;
 
 use crate::config::ClientConfig;
 use crate::error::{ApiErrorBody, Error};
+use crate::rate_limit::RateLimiter;
 use crate::requests::{CircleRequest, ListCirclesRequest};
 use crate::types::{CircleListResponse, CircleResponse};
 
 const API_KEY_HEADER: &str = "X-API-Key";
 
-/// uma.moe API client. Clones share one connection pool.
+/// uma.moe API client. Clones share one connection pool and rate limit.
 #[derive(Clone)]
 pub struct Client {
     http: reqwest::Client,
     base_url: String,
     api_key: HeaderValue,
+    limiter: Arc<RateLimiter>,
 }
 
 impl fmt::Debug for Client {
@@ -50,6 +53,7 @@ impl Client {
             http,
             base_url,
             api_key,
+            limiter: Arc::new(RateLimiter::new(config.min_interval)),
         })
     }
 
@@ -78,6 +82,7 @@ impl Client {
         T: DeserializeOwned,
         Q: Serialize + ?Sized,
     {
+        self.limiter.acquire().await;
         let response = self
             .http
             .get(format!("{}{path}", self.base_url))
