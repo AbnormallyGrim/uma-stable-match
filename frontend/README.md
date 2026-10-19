@@ -46,6 +46,7 @@ src/main.ts                   Mounts the app
 src/App.svelte                Root component: runs searches and keeps them in the URL
 src/lib/api.ts                Typed API client
 src/lib/search.ts             Search validation, URL parameters and "remember me"
+src/lib/format.ts             Number, rank trend, label and time formatting
 src/lib/SearchForm.svelte     The search form
 src/**/*.test.ts              Unit and component tests
 src/setup-tests.ts            Adds jest-dom matchers to Vitest
@@ -72,6 +73,21 @@ Each search replaces the page URL's query with the same parameters the API uses,
 ### Remembering the trainer ID
 
 "Remember my trainer ID on this device" is off by default. When it's ticked at search time, the trainer ID is saved in the browser's local storage under `uma-stable-match:trainer-id`. Unticking it and searching again deletes it. Nothing else is stored. Without a search in the URL, a remembered ID fills the form, but doesn't start a search on its own. Browsers that block storage simply don't remember.
+
+## Display formatting
+
+`src/lib/format.ts` turns API values into display text. The functions are pure; `formatUpdated` takes the current time as a parameter, so tests can fix it.
+
+| Function | Example |
+|---|---|
+| `formatMillions` / `formatPerDay` | `6400000` → `6.4M` / `6.4M/day`; `850000` → `0.85M` |
+| `formatPlace` | `8, 30` → `8 of 30` |
+| `formatPercent` | `0.344` → `34%` |
+| `formatScore` | `0.10449` → `0.104` |
+| `rankTrend` | `111, 127` → `▲16` ("Up 16 places since last month"); no last-month rank → `new` |
+| `joinStyleLabel` | `approval` → `Approval` |
+| `playstyleLabel` | `2` → `Laid-back`, using uma.moe's names for policy codes 1 to 17 |
+| `formatUpdated` | 3 hours earlier → `3 hours ago`; a day earlier → `yesterday` |
 
 ## API client
 
