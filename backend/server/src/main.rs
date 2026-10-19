@@ -5,9 +5,7 @@ use std::process::ExitCode;
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 use tracing_subscriber::EnvFilter;
-use uma_stable_match_server::{
-    router, run_scheduler, AppState, Cache, Config, PaceLookup, DEFAULT_PACE_TTL,
-};
+use uma_stable_match_server::{router, run_scheduler, AppState, Cache, Config, PaceLookup};
 use uma_stable_match_umamoe_client::{Client, ClientConfig};
 
 #[tokio::main]
@@ -50,7 +48,7 @@ async fn main() -> ExitCode {
 
     let cache = Cache::new();
     let (stop, stopped) = watch::channel(false);
-    let paces = PaceLookup::new(client.clone(), DEFAULT_PACE_TTL);
+    let paces = PaceLookup::new(client.clone(), config.trainer_cache);
     let scheduler = tokio::spawn(run_scheduler(
         client,
         config.scan,

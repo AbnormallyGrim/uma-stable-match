@@ -14,10 +14,11 @@ fn lookup(vars: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
 fn defaults() {
     let config = Config::from_lookup(lookup(&[("UMAMOE_API_KEY", "test-key")])).unwrap();
     assert_eq!(config.api_key, ApiKey::new("test-key"));
-    assert_eq!(config.bind_addr, DEFAULT_BIND_ADDR.parse().unwrap());
+    assert_eq!(config.bind_addr, "127.0.0.1:8080".parse().unwrap());
     assert_eq!(config.base_url, None);
     assert_eq!(config.scan, ScanConfig::default());
     assert_eq!(config.scan_interval, Duration::from_secs(180 * 60));
+    assert_eq!(config.trainer_cache, Duration::from_secs(10 * 60));
 }
 
 #[test]
@@ -25,12 +26,15 @@ fn reads_all_settings() {
     let config = Config::from_lookup(lookup(&[
         ("UMAMOE_API_KEY", " test-key "),
         ("UMAMOE_BASE_URL", "http://localhost:9000"),
-        ("BIND_ADDR", "0.0.0.0:8080"),
+        ("HOST", "0.0.0.0"),
+        ("PORT", "9090"),
+        ("TRAINER_CACHE_MINUTES", "15"),
     ]))
     .unwrap();
     assert_eq!(config.api_key, ApiKey::new("test-key"));
     assert_eq!(config.base_url.as_deref(), Some("http://localhost:9000"));
-    assert_eq!(config.bind_addr, "0.0.0.0:8080".parse().unwrap());
+    assert_eq!(config.bind_addr, "0.0.0.0:9090".parse().unwrap());
+    assert_eq!(config.trainer_cache, Duration::from_secs(15 * 60));
 }
 
 #[test]
@@ -46,13 +50,48 @@ fn missing_or_blank_key_fails() {
 }
 
 #[test]
-fn invalid_bind_addr_fails() {
+fn ipv6_host() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("HOST", "::"),
+        ("PORT", "8080"),
+    ]))
+    .unwrap();
+    assert_eq!(config.bind_addr, "[::]:8080".parse().unwrap());
+}
+
+#[test]
+fn invalid_host_fails() {
+    for value in ["localhost", "not-an-address", "127.0.0.1:8080"] {
+        let error = Config::from_lookup(lookup(&[("UMAMOE_API_KEY", "test-key"), ("HOST", value)]))
+            .unwrap_err();
+        assert_eq!(error, ConfigError::InvalidHost(value.into()));
+    }
+}
+
+#[test]
+fn invalid_port_fails() {
+    for value in ["0", "65536", "-1", "http"] {
+        let error = Config::from_lookup(lookup(&[("UMAMOE_API_KEY", "test-key"), ("PORT", value)]))
+            .unwrap_err();
+        assert_eq!(error, ConfigError::InvalidPort(value.into()));
+    }
+}
+
+#[test]
+fn invalid_trainer_cache_fails() {
     let error = Config::from_lookup(lookup(&[
         ("UMAMOE_API_KEY", "test-key"),
-        ("BIND_ADDR", "not-an-address"),
+        ("TRAINER_CACHE_MINUTES", "0"),
     ]))
     .unwrap_err();
-    assert_eq!(error, ConfigError::InvalidBindAddr("not-an-address".into()));
+    assert!(matches!(
+        error,
+        ConfigError::InvalidNumber {
+            name: "TRAINER_CACHE_MINUTES",
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -60,11 +99,15 @@ fn blank_optional_settings_use_defaults() {
     let config = Config::from_lookup(lookup(&[
         ("UMAMOE_API_KEY", "test-key"),
         ("UMAMOE_BASE_URL", ""),
-        ("BIND_ADDR", " "),
+        ("HOST", " "),
+        ("PORT", ""),
     ]))
     .unwrap();
     assert_eq!(config.base_url, None);
-    assert_eq!(config.bind_addr, DEFAULT_BIND_ADDR.parse().unwrap());
+    assert_eq!(
+        config.bind_addr,
+        SocketAddr::new(DEFAULT_HOST, DEFAULT_PORT)
+    );
 }
 
 #[test]
@@ -72,11 +115,8 @@ fn debug_and_errors_hide_the_key() {
     let config = Config::from_lookup(lookup(&[("UMAMOE_API_KEY", "test-key")])).unwrap();
     assert!(!format!("{config:?}").contains("test-key"));
 
-    let error = Config::from_lookup(lookup(&[
-        ("UMAMOE_API_KEY", "test-key"),
-        ("BIND_ADDR", "bad"),
-    ]))
-    .unwrap_err();
+    let error = Config::from_lookup(lookup(&[("UMAMOE_API_KEY", "test-key"), ("PORT", "bad")]))
+        .unwrap_err();
     assert!(!error.to_string().contains("test-key"));
 }
 
