@@ -8,6 +8,7 @@ By taking part, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 - **Report a bug:** [open a bug report](https://github.com/AbnormallyGrim/uma-stable-match/issues/new?template=bug_report.yml).
 - **Suggest a feature:** [open a feature request](https://github.com/AbnormallyGrim/uma-stable-match/issues/new?template=feature_request.yml).
+- **Plan a change you'll work on:** [open a task](https://github.com/AbnormallyGrim/uma-stable-match/issues/new?template=task.yml).
 - **Ask a question or share an idea:** start a thread in [Discussions](https://github.com/AbnormallyGrim/uma-stable-match/discussions).
 - **Report a security issue:** follow the [Security Policy](SECURITY.md). Don't open a public issue.
 

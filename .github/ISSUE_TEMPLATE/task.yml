@@ -1,0 +1,82 @@
+name: Task
+description: Planned work, such as code, docs, tests or maintenance, done in one branch and one pull request.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use a task for work you or a maintainer will pick up. Once the issue is created:
+
+        1. Create a branch from `main` named `<issue-number>-<short-description>`, for example `12-balance-score-weighting`.
+        2. Write commit messages as `<type>: <summary> (#<issue-number>)`, for example `feat: add balance weight option (#12)`.
+        3. Open a pull request into `main` that includes `Closes #<issue-number>`. Pull requests are squash-merged.
+
+        See the [Contributing guide](https://github.com/AbnormallyGrim/uma-stable-match/blob/main/CONTRIBUTING.md) for details.
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      description: The commit type this work will use.
+      options:
+        - feat (new feature)
+        - fix (bug fix)
+        - docs (documentation only)
+        - test (adding or updating tests)
+        - refactor (no change in behaviour)
+        - build (build system, workspace or dependencies)
+        - ci (CI configuration)
+        - chore (other maintenance)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Scoring (backend/scoring)
+        - uma.moe client (backend/umamoe-client)
+        - Server (backend/server)
+        - Web interface (frontend)
+        - CI / GitHub
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What this work does and why.
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: The steps needed. Each one becomes a checkbox on the issue.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How we'll know it's done.
+      placeholder: |
+        - CI passes
+        - The README describes the new option
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Related issues, links or open questions.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: This issue and the planned changes contain no personal information, such as API keys, trainer IDs, email addresses or real player or club data.
+          required: true
