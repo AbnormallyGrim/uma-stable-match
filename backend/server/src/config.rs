@@ -1,15 +1,18 @@
 //! Server settings.
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
 use uma_stable_match_umamoe_client::ApiKey;
 
+use crate::pace::DEFAULT_PACE_TTL;
 use crate::scanner::ScanConfig;
 
-/// Address the server listens on when `BIND_ADDR` isn't set.
-pub const DEFAULT_BIND_ADDR: &str = "127.0.0.1:3000";
+pub const DEFAULT_HOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
+pub const DEFAULT_PORT: u16 = 8080;
+
+// TODO(#51): adjust the default once uma.moe agrees how often we may scan.
 /// Minutes between scans when `SCAN_INTERVAL_MINUTES` isn't set.
 pub const DEFAULT_SCAN_INTERVAL_MINUTES: u32 = 180;
 
@@ -26,6 +29,7 @@ pub struct Config {
     pub scan: ScanConfig,
     /// Time between scans, from `SCAN_INTERVAL_MINUTES`.
     pub scan_interval: Duration,
+    pub trainer_cache: Duration,
 }
 
 /// Invalid or missing settings.
@@ -34,9 +38,10 @@ pub enum ConfigError {
     /// `UMAMOE_API_KEY` is missing or blank.
     #[error("UMAMOE_API_KEY is not set")]
     MissingApiKey,
-    /// `BIND_ADDR` isn't a socket address.
-    #[error("BIND_ADDR is not a valid address: {0}")]
-    InvalidBindAddr(String),
+    #[error("HOST must be an IP address, got {0:?}")]
+    InvalidHost(String),
+    #[error("PORT must be a port number from 1 to 65535, got {0:?}")]
+    InvalidPort(String),
     /// A numeric setting isn't a positive whole number.
     #[error("{name} must be a positive whole number, got {value:?}")]
     InvalidNumber {
@@ -72,10 +77,19 @@ impl Config {
         let api_key = get("UMAMOE_API_KEY")
             .map(ApiKey::new)
             .ok_or(ConfigError::MissingApiKey)?;
-        let bind_addr = get("BIND_ADDR").unwrap_or_else(|| DEFAULT_BIND_ADDR.to_owned());
-        let bind_addr = bind_addr
-            .parse()
-            .map_err(|_| ConfigError::InvalidBindAddr(bind_addr))?;
+        let host = match get("HOST") {
+            None => DEFAULT_HOST,
+            Some(value) => value.parse().map_err(|_| ConfigError::InvalidHost(value))?,
+        };
+        let port = match get("PORT") {
+            None => DEFAULT_PORT,
+            Some(value) => value
+                .parse::<u16>()
+                .ok()
+                .filter(|p| *p > 0)
+                .ok_or(ConfigError::InvalidPort(value))?,
+        };
+        let bind_addr = SocketAddr::new(host, port);
 
         let number = |name: &'static str, default: u32| match get(name) {
             None => Ok(default),
@@ -98,6 +112,12 @@ impl Config {
                 DEFAULT_SCAN_INTERVAL_MINUTES,
             )?) * 60,
         );
+        let trainer_cache = Duration::from_secs(
+            u64::from(number(
+                "TRAINER_CACHE_MINUTES",
+                (DEFAULT_PACE_TTL.as_secs() / 60) as u32,
+            )?) * 60,
+        );
         if scan.rank_from > scan.rank_to {
             return Err(ConfigError::InvalidRankWindow {
                 from: scan.rank_from,
@@ -111,6 +131,7 @@ impl Config {
             bind_addr,
             scan,
             scan_interval,
+            trainer_cache,
         })
     }
 }
