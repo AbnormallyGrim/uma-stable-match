@@ -53,6 +53,24 @@ pub enum ScanError {
     List(#[source] Error),
 }
 
+impl ScanError {
+    /// A short message that's safe to show visitors: no URLs or upstream error text.
+    pub(crate) fn public_message(&self) -> String {
+        match self {
+            Self::List(error) => format!("listing clubs failed: {}", upstream_summary(error)),
+        }
+    }
+}
+
+fn upstream_summary(error: &Error) -> String {
+    match error {
+        Error::Status { status, .. } => format!("uma.moe returned {status}"),
+        Error::Transport(_) => "could not reach uma.moe".into(),
+        Error::Decode(_) => "unexpected response from uma.moe".into(),
+        Error::Config(_) | Error::InvalidRequest(_) => "internal error".into(),
+    }
+}
+
 /// Lists candidate clubs and fetches their member data.
 pub async fn scan(client: &Client, config: &ScanConfig) -> Result<Scan, ScanError> {
     let mut candidates = list_candidates(client, config).await?;
