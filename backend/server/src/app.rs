@@ -42,6 +42,7 @@ pub fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
+/// The routes plus security headers, serving the built frontend from `frontend_dir` if given.
 pub fn app(state: AppState, frontend_dir: Option<&Path>) -> Router {
     let mut app = router(state);
     if let Some(dir) = frontend_dir {

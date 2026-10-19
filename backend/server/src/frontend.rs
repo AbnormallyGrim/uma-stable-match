@@ -1,3 +1,5 @@
+//! Serving the built frontend, and the security headers on every response.
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -14,6 +16,7 @@ use axum::Router;
 use tower::ServiceExt;
 use tower_http::services::{ServeDir, ServeFile};
 
+/// The `Content-Security-Policy` header sent with every response.
 pub const CONTENT_SECURITY: &str = "default-src 'self'; script-src 'self'; style-src 'self'; \
 img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; \
 form-action 'self'; frame-ancestors 'none'";

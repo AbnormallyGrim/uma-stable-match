@@ -1,3 +1,5 @@
+//! Frontend serving and security header tests against a temporary directory.
+
 use std::fs;
 use std::path::Path;
 

@@ -46,6 +46,7 @@ pub struct Config {
     pub trainer_lookups_per_minute: u32,
     /// Whether to identify visitors by `X-Forwarded-For`, from `TRUST_FORWARDED_FOR`.
     pub trust_forwarded_for: bool,
+    /// Built frontend to serve, from `FRONTEND_DIR`. `None` serves only the API.
     pub frontend_dir: Option<PathBuf>,
 }
 
@@ -61,6 +62,7 @@ pub enum ConfigError {
     /// `PORT` isn't a port number from 1 to 65535.
     #[error("PORT must be a port number from 1 to 65535, got {0:?}")]
     InvalidPort(String),
+    /// `FRONTEND_DIR` isn't a directory containing `index.html`.
     #[error("FRONTEND_DIR must be a directory containing index.html, got {0:?}")]
     InvalidFrontendDir(String),
     /// A true-or-false setting is something else.
