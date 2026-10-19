@@ -11,6 +11,8 @@ cargo run -p uma-stable-match-server
 
 Run these from the repository root. The server reads the first `.env` it finds in the directory it's started in or a parent directory. Real environment variables take precedence over `.env`.
 
+To run it in Docker instead, see [Installation](../../README.md#installation) in the main README.
+
 ## Configuration
 
 | Variable | Default | Meaning |

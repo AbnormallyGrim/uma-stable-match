@@ -53,8 +53,6 @@ Enter your trainer ID and you'll get a ranked list of clubs, each with its tier,
 
 ## Installation
 
-*(coming soon)*
-
 ### 1. Get a uma.moe API key
 
 1. Sign in at [uma.moe/login](https://uma.moe/login) with Google or Discord.
@@ -84,6 +82,8 @@ UMAMOE_API_KEY=your-key-here
 docker compose up -d
 ```
 
+The first start builds the image, which takes a few minutes. Club data appears about a minute after the server starts, once the first scan finishes.
+
 Open **<http://localhost:8080>** in your browser.
 
 To stop it:
@@ -91,6 +91,20 @@ To stop it:
 ```bash
 docker compose down
 ```
+
+To update to the latest version:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+### Docker details
+
+- **Only this computer can open it.** The port is published on `127.0.0.1`. To open it from other devices, change `127.0.0.1:` to `0.0.0.0:` in `docker-compose.yml`, and only do that on a network you trust.
+- **`PORT` in `.env` picks the port on your computer.** Inside the container the server always listens on `0.0.0.0:8080`, so Compose ignores `HOST` and `FRONTEND_DIR` from `.env`.
+- **Logs:** `docker compose logs -f`.
+- **Locked down:** the container runs as a non-root user, on a read-only file system, with no Linux capabilities. The image holds only the server and the built web page, in a minimal [distroless](https://github.com/GoogleContainerTools/distroless) base. Your `.env` is never copied into it; Compose passes the settings in when the container starts.
 
 ## Usage
 
@@ -153,8 +167,8 @@ Only **current members** count. A member counts as current if they have data on 
 | Variable | Default | Description |
 |---|---|---|
 | `UMAMOE_API_KEY` | *(required)* | Your uma.moe API key |
-| `HOST` | `127.0.0.1` | IP address the web page and API listen on. The Docker setup uses `0.0.0.0` |
-| `PORT` | `8080` | Port the web page and API run on |
+| `HOST` | `127.0.0.1` | IP address the web page and API listen on. Ignored by the Docker setup, which always uses `0.0.0.0` inside the container |
+| `PORT` | `8080` | Port the web page and API run on. With Docker, the port on your computer |
 | `SCAN_INTERVAL_MINUTES` | `180` | How often club data refreshes, in minutes |
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to include |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to include |
@@ -163,7 +177,7 @@ Only **current members** count. A member counts as current if they have data on 
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests allowed per visitor per minute |
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer ID lookups allowed per visitor per minute, not counting cached ones |
 | `TRUST_FORWARDED_FOR` | `false` | Set to `true` behind a reverse proxy, so visitors are told apart by their own address |
-| `FRONTEND_DIR` | *(none)* | Folder with the built web page. The Docker setup sets it; leave it unset to run only the API |
+| `FRONTEND_DIR` | *(none)* | Folder with the built web page. Leave it unset to run only the API. Ignored by the Docker setup, which serves the page built into the image |
 | `REDIS_URL` | *(none)* | Optional. Share one cache between several servers |
 
 ## API
@@ -255,7 +269,7 @@ These rules can change, so check in-game if something doesn't match.
 
 - [Rust](https://rustup.rs) (latest stable)
 - [Node.js](https://nodejs.org) 22.22.2 or newer (or 24.15 or newer)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (optional, for Redis and full-stack runs)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (optional, to build and run the image)
 
 ### Project layout
 
@@ -289,6 +303,12 @@ FRONTEND_DIR=frontend/dist cargo run -p uma-stable-match-server
 ```
 
 Then open <http://localhost:8080>.
+
+To check the Docker image builds, as CI does:
+
+```bash
+docker build -t uma-stable-match .
+```
 
 ### Test
 
