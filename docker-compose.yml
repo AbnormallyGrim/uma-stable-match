@@ -2,6 +2,8 @@ services:
   server:
     build: .
     image: uma-stable-match
+    # Always build locally; never pull an image with this name from a registry.
+    pull_policy: build
     # Settings and the API key come from .env at start-up, never from the image.
     env_file: .env
     environment:
