@@ -44,10 +44,47 @@ CI runs `check`, `lint`, `test` and `build` on Node 22 for every push and pull r
 index.html          Page shell
 src/main.ts         Mounts the app
 src/App.svelte      Root component
+src/lib/api.ts      Typed API client
 src/*.test.ts       Component tests
 src/setup-tests.ts  Adds jest-dom matchers to Vitest
 vite.config.ts      Vite, the /api proxy and Vitest settings
 ```
+
+## API client
+
+`src/lib/api.ts` wraps the server's `/api/v1` endpoints. Its types match the responses described in the [server README](../backend/server/README.md#endpoints).
+
+```ts
+import { ApiError, fetchRecommendations } from './lib/api';
+
+try {
+  const result = await fetchRecommendations({
+    source: { trainerId: '123456789012' }, // or { pace: 7_600_000 }
+    balanceWeight: 0.5,
+    includeClosed: false,
+    limit: 50,
+  });
+  console.log(result.total, result.clubs[0]?.name);
+} catch (error) {
+  if (error instanceof ApiError && error.status === 429) {
+    console.log(`Try again in ${error.retryAfter} seconds`);
+  }
+}
+```
+
+- **Request:** `trainerId` is a string, so long IDs keep every digit. Options left unset aren't sent, so the server's defaults apply.
+- **Timeout:** requests fail with a `timeout` error after 15 seconds (`DEFAULT_TIMEOUT_MS`). Set `timeoutMs` to change it.
+- **Cancelling:** pass `signal` to cancel a request. A cancelled request rejects with the browser's own `AbortError`, not an `ApiError`, so it can be ignored easily.
+- **Errors:** every other failure throws an `ApiError` with a `kind`:
+
+| `kind` | When | `status` | `message` |
+|---|---|---|---|
+| `http` | The server answered with an error status | The HTTP status | The server's `error` text, or a generic message |
+| `network` | The server couldn't be reached | `null` | `Could not reach the server.` |
+| `timeout` | No answer within the timeout | `null` | `The server took too long to respond.` |
+| `invalid-response` | A success response that isn't JSON | `null` | `The server sent an unexpected response.` |
+
+`retryAfter` holds the response's `Retry-After` header in seconds, or `null` without one. The server sends it with `429` responses.
 
 ## Tooling
 
