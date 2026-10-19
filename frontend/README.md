@@ -50,6 +50,7 @@ src/lib/SearchStatus.svelte   Loading, waiting and error messages
 src/lib/DataStatus.svelte     How fresh the club data is, from /api/v1/status
 src/lib/ThemeToggle.svelte    System / Light / Dark switch
 src/lib/theme.ts              Saving and applying the theme choice
+src/lib/SiteFooter.svelte     Tips, privacy note, disclaimer, attributions and links
 src/lib/api.ts                Typed API client
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
@@ -161,6 +162,21 @@ A small inline script in `index.html` applies a saved theme before the page rend
 | `.check` | A checkbox and its label, aligned on one line |
 | `.segmented`, `.segmented.small` | A pill-shaped group of radio buttons, used for "Search by" and the theme switch. The selected option is styled with `:has(input:checked)` |
 | `:focus-visible` | A 2px accent ring around whatever has keyboard focus |
+
+### Footer
+
+`SiteFooter.svelte` is the page's `<footer>` landmark, below `<main>`.
+
+| Part | Content |
+|---|---|
+| Tips for switching clubs | Collapsible. The four tips from the root README: the 14-day rule, the 24-hour cooldown, the month-start lock, and checking activity first |
+| Privacy | Collapsible. What happens to a trainer ID (an uma.moe lookup; the pace is cached in memory briefly; nothing is logged or written to disk), per-IP rate limiting in memory, what's stored in the browser (remember me and the theme), and no accounts, cookies, ads or trackers |
+| Disclaimer | An unofficial, non-commercial fan tool, not affiliated with uma.moe or Cygames. uma.moe is credited as the data source, and the game and tier icons as © Cygames, Inc., with a link to Cygames' Fan-Created Content Guidelines |
+| Links | Source code, the MIT licence and issues |
+
+External links open in a new tab with `rel="noopener noreferrer"`.
+
+The disclaimer follows the root README's Disclaimer section; change both together. The privacy note describes the server's default behaviour. With `RUST_LOG=debug`, the HTTP libraries can log request URLs, which include trainer IDs. See the [server README](../backend/server/README.md#configuration).
 
 ### Accessibility
 

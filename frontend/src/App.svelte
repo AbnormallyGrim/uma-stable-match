@@ -7,6 +7,7 @@
   import { SearchRunner, type SearchState as RunnerState } from './lib/runner';
   import SearchForm from './lib/SearchForm.svelte';
   import SearchStatus from './lib/SearchStatus.svelte';
+  import SiteFooter from './lib/SiteFooter.svelte';
   import ThemeToggle from './lib/ThemeToggle.svelte';
   import {
     DEFAULT_SEARCH,
@@ -88,6 +89,8 @@
     <Results result={search.result} stale={busy} />
   {/if}
 </main>
+
+<SiteFooter />
 
 <style>
   header {
