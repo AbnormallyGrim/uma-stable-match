@@ -12,6 +12,7 @@ import {
   joinStyleLabel,
   playstyleLabel,
   rankTrend,
+  tierIndex,
 } from './format';
 
 describe('numbers', () => {
@@ -95,5 +96,15 @@ describe('formatUpdated', () => {
   it('treats future times as just now and bad input as unknown', () => {
     expect(formatUpdated('2026-03-18T12:05:00Z', now)).toBe('just now');
     expect(formatUpdated('not a date', now)).toBe('unknown');
+  });
+});
+
+describe('tierIndex', () => {
+  it('orders tiers from D to SS', () => {
+    expect(tierIndex('D')).toBe(0);
+    expect(tierIndex('A')).toBe(6);
+    expect(tierIndex('SS')).toBe(10);
+    expect(tierIndex('Z')).toBe(-1);
+    expect(tierIndex(null)).toBe(-1);
   });
 });
