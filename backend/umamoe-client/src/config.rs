@@ -36,6 +36,7 @@ pub struct ClientConfig {
     pub api_key: ApiKey,
     /// Timeout for each request.
     pub timeout: Duration,
+    pub min_interval: Duration,
     /// `User-Agent` header value.
     pub user_agent: String,
 }
@@ -47,6 +48,7 @@ impl ClientConfig {
             base_url: DEFAULT_BASE_URL.to_owned(),
             api_key,
             timeout: Duration::from_secs(15),
+            min_interval: Duration::from_millis(500),
             user_agent: concat!(
                 "uma-stable-match/",
                 env!("CARGO_PKG_VERSION"),
