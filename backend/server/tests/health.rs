@@ -22,7 +22,7 @@ fn app(cache: Cache) -> AppState {
 #[tokio::test]
 async fn health_returns_ok() {
     let response = router(app(Cache::new()))
-        .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+        .oneshot(Request::get("/api/v1/health").body(Body::empty()).unwrap())
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);

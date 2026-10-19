@@ -173,7 +173,8 @@ GET /api/v1/recommendations
 
 | Parameter | Required | Default | Description |
 |---|---|---|---|
-| `trainer_id` | yes | | Your 12-digit trainer ID |
+| `trainer_id` | yes, or `pace` | | Your 12-digit trainer ID |
+| `pace` | yes, or `trainer_id` | | Your daily fan gain, if you'd rather not look up a trainer |
 | `balance` | no | `false` | Include balance scoring |
 | `balance_weight` | no | `0.5` | Balance strength, 0–1. Setting it turns balance on. |
 | `include_closed` | no | `false` | Include closed clubs |
@@ -188,34 +189,48 @@ curl "http://localhost:8080/api/v1/recommendations?trainer_id=123456789012&balan
 ```json
 {
   "trainer": { "trainer_id": 123456789012, "pace_per_day": 7620000 },
+  "options": { "balance_weight": 0.6, "include_closed": false, "limit": 1 },
   "updated_at": "2026-10-19T08:00:00Z",
+  "total": 42,
   "clubs": [
     {
       "circle_id": 100000001,
       "name": "Example Club",
       "url": "https://uma.moe/circles/100000001",
       "tier": "A+",
+      "join_style": "approval",
+      "policy": 2,
+      "member_count": 29,
+      "open_spots": 1,
       "monthly_rank": 111,
       "last_month_rank": 127,
-      "members": 29,
-      "open_spots": 1,
-      "join_style": "approval",
-      "median_per_day": 5650000,
+      "comment": "Example description",
       "your_place": 12,
       "club_size": 30,
-      "score": 0.243,
+      "ranked_members": 28,
+      "median_per_day": 5650000,
       "fit": 0.104,
-      "balance": { "score": 76, "passengers": 0, "top3_share": 0.34 }
+      "score": 0.248,
+      "balance": {
+        "score": 76,
+        "gini": 0.18,
+        "passengers": 0,
+        "counted": 28,
+        "bottom_quarter_per_day": 3900000,
+        "top3_share": 0.34
+      }
     }
   ]
 }
 ```
 
+`total` is how many clubs were scored before `limit` was applied. The [server README](backend/server/README.md#recommendations) describes every field and error.
+
 ### Other endpoints
 
 | Endpoint | Returns |
 |---|---|
-| `GET /api/v1/status` | When club data was last refreshed, and how many clubs are cached |
+| `GET /api/v1/status` | When club data was last refreshed, how many clubs are cached, and the last scan error |
 | `GET /api/v1/health` | `200 OK` while the server is running |
 
 ## Tips for switching clubs
