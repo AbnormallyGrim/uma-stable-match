@@ -1,0 +1,159 @@
+// axe-core accessibility checks for the main views and states. All data is made up.
+
+import { render, screen, fireEvent } from '@testing-library/svelte';
+import axe from 'axe-core';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import App from './App.svelte';
+import type { Recommendations } from './lib/api';
+import DataStatus from './lib/DataStatus.svelte';
+import ResultsTable from './lib/ResultsTable.svelte';
+import SearchForm from './lib/SearchForm.svelte';
+import SearchStatus from './lib/SearchStatus.svelte';
+import { DEFAULT_SEARCH } from './lib/search';
+import { club, recommendations } from './lib/test-data';
+import ThemeToggle from './lib/ThemeToggle.svelte';
+
+// axe's colour-contrast rule needs real rendering, so contrast.test.ts covers it instead.
+// The landmark (region) rule only applies to whole-page checks.
+async function violations(node: Element, wholePage = false) {
+  const result = await axe.run(node, {
+    rules: {
+      'color-contrast': { enabled: false },
+      region: { enabled: wholePage },
+    },
+  });
+  return result.violations.map(
+    (v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`,
+  );
+}
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+const READY = {
+  scanning: false,
+  last_scan: { finished_at: '2026-03-18T09:00:00Z', clubs: 3, candidates: 5, failed: 0 },
+  last_error: null,
+};
+
+function stubApi(recommendationsResponse: () => Response) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: RequestInfo | URL) =>
+      Promise.resolve(
+        String(input).startsWith('/api/v1/status') ? json(READY) : recommendationsResponse(),
+      ),
+    ),
+  );
+}
+
+const balancedClubs = [1, 2, 3].map((id) =>
+  club({
+    circle_id: id,
+    name: `Club ${id}`,
+    url: `https://uma.moe/circles/${id}`,
+    join_style: id === 3 ? 'closed' : 'open',
+    balance: {
+      score: 80,
+      gini: 0.2,
+      passengers: 1,
+      counted: 20,
+      bottom_quarter_per_day: 3_000_000,
+      top3_share: 0.3,
+    },
+  }),
+);
+
+const withResults: Recommendations = recommendations({
+  total: 3,
+  clubs: balancedClubs,
+  options: { balance_weight: 0.5, include_closed: true, limit: 100 },
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  window.history.replaceState(null, '', '/');
+});
+
+describe('accessibility', () => {
+  it('has no violations on the empty page', async () => {
+    stubApi(() => json(withResults));
+    render(App);
+    await screen.findByTestId('data-status');
+    expect(await violations(document.body, true)).toEqual([]);
+  });
+
+  it('has no violations with results, cards and the table', async () => {
+    window.history.replaceState(null, '', '/?pace=7600000&balance_weight=0.5&include_closed=true');
+    stubApi(() => json(withResults));
+    render(App);
+    await screen.findByRole('table');
+    expect(await violations(document.body, true)).toEqual([]);
+  });
+
+  it('has no violations when a search fails', async () => {
+    window.history.replaceState(null, '', '/?trainer_id=123456789');
+    stubApi(() => json({ error: 'trainer not found' }, 404));
+    render(App);
+    await screen.findByRole('alert');
+    expect(await violations(document.body, true)).toEqual([]);
+  });
+
+  it('has no violations in the form with a validation error', async () => {
+    const { container } = render(SearchForm, {
+      initial: { ...DEFAULT_SEARCH, trainerId: '123' },
+      remember: false,
+      onsearch: vi.fn(),
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
+    expect(await violations(container)).toEqual([]);
+  });
+
+  it('has no violations in the pace form with balance on', async () => {
+    const { container } = render(SearchForm, {
+      initial: { ...DEFAULT_SEARCH, mode: 'pace', paceMillions: '7.6', balance: true },
+      remember: false,
+      onsearch: vi.fn(),
+    });
+    expect(await violations(container)).toEqual([]);
+  });
+
+  it('has no violations in the sorted table', async () => {
+    const { container } = render(ResultsTable, {
+      clubs: balancedClubs,
+      balanceOn: true,
+      includeClosed: true,
+    });
+    await fireEvent.click(screen.getByRole('button', { name: /^Median/ }));
+    expect(await violations(container)).toEqual([]);
+  });
+
+  it.each([
+    { phase: 'loading' as const },
+    { phase: 'waiting-for-scan' as const, retryIn: 5 },
+    { phase: 'rate-limited' as const, retryIn: 3 },
+    {
+      phase: 'error' as const,
+      message: { title: "Couldn't reach uma.moe", detail: 'Try again.', canRetry: true },
+    },
+  ])('has no violations in the $phase status', async (status) => {
+    const { container } = render(SearchStatus, { status, onretry: vi.fn() });
+    expect(await violations(container)).toEqual([]);
+  });
+
+  it('has no violations in the theme switch and data status', async () => {
+    const { container } = render(ThemeToggle, { storage: localStorage });
+    expect(await violations(container)).toEqual([]);
+
+    const status = render(DataStatus, {
+      load: () =>
+        Promise.resolve({
+          ...READY,
+          last_error: { at: '2026-03-18T10:00:00Z', message: 'could not reach uma.moe' },
+        }),
+    });
+    await screen.findByTestId('data-status');
+    expect(await violations(status.container)).toEqual([]);
+  });
+});
