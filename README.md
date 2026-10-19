@@ -163,6 +163,7 @@ Only **current members** count. A member counts as current if they have data on 
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests allowed per visitor per minute |
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer ID lookups allowed per visitor per minute, not counting cached ones |
 | `TRUST_FORWARDED_FOR` | `false` | Set to `true` behind a reverse proxy, so visitors are told apart by their own address |
+| `FRONTEND_DIR` | *(none)* | Folder with the built web page. The Docker setup sets it; leave it unset to run only the API |
 | `REDIS_URL` | *(none)* | Optional. Share one cache between several servers |
 
 ## API
@@ -279,6 +280,15 @@ npm run dev
 ```
 
 Open <http://localhost:5173>. The frontend dev server forwards `/api` requests to the backend. See the [frontend README](frontend/README.md).
+
+To run the production build the way it's deployed, build the frontend and let the server serve it:
+
+```bash
+(cd frontend && npm run build)
+FRONTEND_DIR=frontend/dist cargo run -p uma-stable-match-server
+```
+
+Then open <http://localhost:8080>.
 
 ### Test
 

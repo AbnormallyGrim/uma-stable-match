@@ -23,6 +23,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.7", features = ["fs", "set-header"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 uma-stable-match-scoring = { version = "0.1.0", path = "../scoring" }
@@ -30,7 +32,7 @@ uma-stable-match-umamoe-client = { version = "0.1.0", path = "../umamoe-client" 
 
 [dev-dependencies]
 http-body-util = "0.1"
-tower = { version = "0.5", features = ["util"] }
+tempfile = "3"
 wiremock = "0.6"
 
 [lints]

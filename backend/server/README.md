@@ -28,8 +28,9 @@ Run these from the repository root. The server reads the first `.env` it finds i
 | `RATE_LIMIT_PER_MINUTE` | `30` | Recommendation requests each visitor can make per minute |
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer lookups each visitor can make per minute that need a call to uma.moe |
 | `TRUST_FORWARDED_FOR` | `false` | `true` to identify visitors by `X-Forwarded-For`. Only turn this on behind a reverse proxy that sets the header |
+| `FRONTEND_DIR` | none | Built frontend to serve, such as `frontend/dist`. Unset, the server serves only the API |
 
-Blank values count as unset. A missing key, a `HOST` that isn't an IP address (hostnames such as `localhost` aren't accepted), a `PORT` outside 1 to 65535, a `TRUST_FORWARDED_FOR` other than `true` or `false`, a scan, cache or rate limit setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO` stops the server at startup, with an error message and exit code 1. The key is never logged, never included in errors and is redacted in `Debug` output. `.env` is git-ignored; never commit it.
+Blank values count as unset. A missing key, a `HOST` that isn't an IP address (hostnames such as `localhost` aren't accepted), a `PORT` outside 1 to 65535, a `TRUST_FORWARDED_FOR` other than `true` or `false`, a scan, cache or rate limit setting that isn't a positive whole number, `SCAN_RANK_FROM` above `SCAN_RANK_TO`, or a `FRONTEND_DIR` without an `index.html` stops the server at startup, with an error message and exit code 1. The key is never logged, never included in errors and is redacted in `Debug` output. `.env` is git-ignored; never commit it.
 
 ## Scanner
 
@@ -51,6 +52,37 @@ Scan results live in memory only, so nothing is written to disk. When the server
 - **No overlapping scans.** A new scan won't start while one is running.
 - **Failures keep the last results.** A failed scan is logged and recorded as the last error, and the previous results stay in place. The next successful scan replaces the results and clears the error.
 - **Shutdown cancels a running scan.** The cache then keeps whatever it had before that scan started.
+
+## Serving the frontend
+
+With `FRONTEND_DIR` set, the server also serves the built web page, so one process runs the whole site:
+
+```bash
+(cd frontend && npm run build)
+FRONTEND_DIR=frontend/dist cargo run -p uma-stable-match-server
+```
+
+| Request | Response |
+|---|---|
+| A file in the directory | The file |
+| `/assets/*` | Cached for a year as `immutable`. Vite puts a content hash in these file names, so a new build gets new names |
+| Any other file, including `index.html` | `Cache-Control: no-cache`, so browsers check for a new version on each visit |
+| A path without a file extension, such as `/clubs` | `index.html`, so the app handles the route |
+| A missing path with a file extension | `404` |
+| `/api` or anything under it | Always the API. Unknown API paths return `404 {"error":"not found"}`, never the page |
+
+### Security headers
+
+Every response, from the API and the frontend alike, carries these headers:
+
+| Header | Value |
+|---|---|
+| `Content-Security-Policy` | `CONTENT_SECURITY`: scripts, styles, fonts and requests only from the site itself, images also from `data:` URLs, no plugins, and no framing |
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `no-referrer` |
+| `X-Frame-Options` | `DENY` |
+
+The policy allows no inline scripts or styles, so the frontend must not add any. That's why the theme script lives in its own file.
 
 ## Endpoints
 

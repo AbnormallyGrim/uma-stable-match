@@ -1,14 +1,18 @@
 //! HTTP routes.
 
+use std::path::Path;
 use std::time::SystemTime;
 
 use axum::extract::State;
-use axum::middleware::from_fn_with_state;
-use axum::routing::get;
+use axum::http::StatusCode;
+use axum::middleware::{from_fn, from_fn_with_state};
+use axum::response::IntoResponse;
+use axum::routing::{any, get};
 use axum::{Json, Router};
 use serde_json::{json, Value};
 
 use crate::cache::Cache;
+use crate::frontend;
 use crate::limits::{limit_requests, RateLimits};
 use crate::pace::PaceLookup;
 use crate::recommendations::recommendations;
@@ -33,7 +37,22 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/recommendations",
             get(recommendations).route_layer(from_fn_with_state(state.clone(), limit_requests)),
         )
+        .route("/api", any(api_not_found))
+        .route("/api/{*rest}", any(api_not_found))
         .with_state(state)
+}
+
+/// The routes plus security headers, serving the built frontend from `frontend_dir` if given.
+pub fn app(state: AppState, frontend_dir: Option<&Path>) -> Router {
+    let mut app = router(state);
+    if let Some(dir) = frontend_dir {
+        app = app.fallback_service(frontend::service(dir));
+    }
+    app.layer(from_fn(frontend::security_headers))
+}
+
+async fn api_not_found() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, Json(json!({ "error": "not found" })))
 }
 
 async fn health() -> Json<Value> {

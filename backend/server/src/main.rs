@@ -7,7 +7,7 @@ use tokio::net::TcpListener;
 use tokio::sync::watch;
 use tracing_subscriber::EnvFilter;
 use uma_stable_match_server::{
-    router, run_scheduler, AppState, Cache, Config, PaceLookup, RateLimits,
+    app, run_scheduler, AppState, Cache, Config, PaceLookup, RateLimits,
 };
 use uma_stable_match_umamoe_client::{Client, ClientConfig};
 
@@ -65,11 +65,17 @@ async fn main() -> ExitCode {
         stopped,
     ));
 
-    let app = router(AppState {
-        cache,
-        paces,
-        limits,
-    });
+    if let Some(dir) = &config.frontend_dir {
+        tracing::info!("serving the frontend from {}", dir.display());
+    }
+    let app = app(
+        AppState {
+            cache,
+            paces,
+            limits,
+        },
+        config.frontend_dir.as_deref(),
+    );
     let served = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
