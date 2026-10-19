@@ -1,11 +1,13 @@
-//! Club scoring for Uma Stable Match.
-//!
-//! This crate ranks Umamusume: Pretty Derby clubs by how well they suit a
-//! trainer. It has no network or storage dependencies: club and member data
-//! goes in, scores come out.
+#![doc = include_str!("../README.md")]
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn crate_builds() {}
-}
+mod members;
+mod model;
+mod scoring;
+mod stats;
+
+pub use members::{current_members, daily_pace, MIN_DAYS_FOR_PACE};
+pub use model::{tier_label, Club, JoinStyle, MemberSnapshot, CLUB_CAP};
+pub use scoring::{
+    club_balance, score_club, score_clubs, Balance, ScoredClub, ScoringError, ScoringOptions,
+    DEFAULT_BALANCE_WEIGHT, MIN_RANKED_MEMBERS, PASSENGER_FLOOR, PASSENGER_SHARE_OF_MEDIAN,
+};
