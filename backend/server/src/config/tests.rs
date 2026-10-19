@@ -1,5 +1,6 @@
 use super::*;
 use std::collections::HashMap;
+use std::time::Duration;
 
 fn lookup(vars: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
     let vars: HashMap<String, String> = vars
@@ -16,6 +17,7 @@ fn defaults() {
     assert_eq!(config.bind_addr, DEFAULT_BIND_ADDR.parse().unwrap());
     assert_eq!(config.base_url, None);
     assert_eq!(config.scan, ScanConfig::default());
+    assert_eq!(config.scan_interval, Duration::from_secs(180 * 60));
 }
 
 #[test]
@@ -120,4 +122,27 @@ fn inverted_rank_window_fails() {
     ]))
     .unwrap_err();
     assert_eq!(error, ConfigError::InvalidRankWindow { from: 600, to: 500 });
+}
+
+#[test]
+fn reads_scan_interval() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("SCAN_INTERVAL_MINUTES", "15"),
+    ]))
+    .unwrap();
+    assert_eq!(config.scan_interval, Duration::from_secs(15 * 60));
+
+    let error = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("SCAN_INTERVAL_MINUTES", "0"),
+    ]))
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        ConfigError::InvalidNumber {
+            name: "SCAN_INTERVAL_MINUTES",
+            ..
+        }
+    ));
 }

@@ -4,11 +4,11 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
-use uma_stable_match_server::router;
+use uma_stable_match_server::{router, Cache};
 
 #[tokio::test]
 async fn health_returns_ok() {
-    let response = router()
+    let response = router(Cache::new())
         .oneshot(Request::get("/health").body(Body::empty()).unwrap())
         .await
         .unwrap();
@@ -20,7 +20,7 @@ async fn health_returns_ok() {
 
 #[tokio::test]
 async fn unknown_route_is_not_found() {
-    let response = router()
+    let response = router(Cache::new())
         .oneshot(Request::get("/nope").body(Body::empty()).unwrap())
         .await
         .unwrap();
