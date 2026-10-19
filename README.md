@@ -161,6 +161,8 @@ Only **current members** count. A member counts as current if they have data on 
 | `SCAN_MAX_DETAILS` | `80` | Most clubs to analyse in each refresh |
 | `TRAINER_CACHE_MINUTES` | `10` | How long a trainer's pace is reused before refreshing |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests allowed per visitor per minute |
+| `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer ID lookups allowed per visitor per minute, not counting cached ones |
+| `TRUST_FORWARDED_FOR` | `false` | Set to `true` behind a reverse proxy, so visitors are told apart by their own address |
 | `REDIS_URL` | *(none)* | Optional. Share one cache between several servers |
 
 ## API

@@ -25,8 +25,11 @@ Run these from the repository root. The server reads the first `.env` it finds i
 | `SCAN_MAX_DETAILS` | `80` | Most clubs to fetch member data for in each scan |
 | `SCAN_INTERVAL_MINUTES` | `180` | Minutes between scans. The default may change once uma.moe agrees how often scans can run |
 | `TRAINER_CACHE_MINUTES` | `10` | Minutes a trainer's looked-up pace is reused |
+| `RATE_LIMIT_PER_MINUTE` | `30` | Recommendation requests each visitor can make per minute |
+| `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer lookups each visitor can make per minute that need a call to uma.moe |
+| `TRUST_FORWARDED_FOR` | `false` | `true` to identify visitors by `X-Forwarded-For`. Only turn this on behind a reverse proxy that sets the header |
 
-Blank values count as unset. A missing key, a `HOST` that isn't an IP address (hostnames such as `localhost` aren't accepted), a `PORT` outside 1 to 65535, a scan or cache setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO` stops the server at startup, with an error message and exit code 1. The key is never logged, never included in errors and is redacted in `Debug` output. `.env` is git-ignored; never commit it.
+Blank values count as unset. A missing key, a `HOST` that isn't an IP address (hostnames such as `localhost` aren't accepted), a `PORT` outside 1 to 65535, a `TRUST_FORWARDED_FOR` other than `true` or `false`, a scan, cache or rate limit setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO` stops the server at startup, with an error message and exit code 1. The key is never logged, never included in errors and is redacted in `Debug` output. `.env` is git-ignored; never commit it.
 
 ## Scanner
 
@@ -163,7 +166,25 @@ Errors come back as `{"error": "..."}`:
 | `404` | uma.moe doesn't know the trainer, or they aren't in their club's data |
 | `422` | The trainer has too little fan data this month to work out a pace |
 | `502` | uma.moe couldn't be reached for the trainer lookup |
+| `429` | Too many requests from this visitor. The `Retry-After` header says how many seconds to wait |
 | `503` | No scan has finished yet. Try again shortly |
+
+### Rate limits
+
+`/api/v1/recommendations` is limited per visitor. Health and status aren't limited.
+
+- **All requests:** `RATE_LIMIT_PER_MINUTE` (30 by default).
+- **Trainer lookups:** `TRAINER_LOOKUPS_PER_MINUTE` (10 by default). This only counts `trainer_id` requests that need a call to uma.moe. Cached trainers and `pace` requests don't use it, so a public instance can't be used to flood uma.moe.
+
+Each limit allows a burst of its full size, then frees one request every 60 ÷ limit seconds. With the defaults, that's one request every 2 seconds and one trainer lookup every 6 seconds. Over the limit, the response is `429` with `Retry-After` and an error such as `"too many requests; try again in 2 seconds"`.
+
+Visitors are identified by IP address:
+
+- **IPv6 addresses** are grouped by their first 64 bits, the usual size of one home network.
+- **IPv4-mapped IPv6 addresses** count as IPv4.
+- **Behind a reverse proxy**, every request comes from the proxy's address. Set `TRUST_FORWARDED_FOR=true` and the server uses the right-most `X-Forwarded-For` address, the one your proxy added. Anything a client writes further left is ignored. Don't turn it on without a proxy, or clients can pick their own address.
+
+IP addresses are kept in memory only while they're being limited, and they're never logged.
 
 ## Shutdown
 

@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use tokio::sync::watch;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    router, run_scheduler, AppState, Cache, PaceLookup, ScanConfig, DEFAULT_PACE_TTL,
+    router, run_scheduler, AppState, Cache, PaceLookup, RateLimits, ScanConfig, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -106,6 +106,7 @@ fn app(server: &MockServer, cache: Cache, ttl: Duration) -> AppState {
     AppState {
         cache,
         paces: PaceLookup::new(client(server), ttl),
+        limits: RateLimits::new(10_000, 10_000, false),
     }
 }
 
