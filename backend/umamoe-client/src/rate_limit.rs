@@ -1,8 +1,11 @@
+//! Client-side rate limiting.
+
 use std::sync::Mutex;
 use std::time::Duration;
 
 use tokio::time::{sleep_until, Instant};
 
+/// Spaces requests at least `interval` apart, in the order they ask.
 #[derive(Debug)]
 pub(crate) struct RateLimiter {
     interval: Duration,
@@ -17,6 +20,7 @@ impl RateLimiter {
         }
     }
 
+    /// Waits for the next free slot.
     pub(crate) async fn acquire(&self) {
         let slot = {
             let mut next = self.next_slot.lock().unwrap_or_else(|e| e.into_inner());

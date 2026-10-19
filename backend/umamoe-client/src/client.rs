@@ -16,7 +16,7 @@ use crate::types::{CircleListResponse, CircleResponse};
 
 const API_KEY_HEADER: &str = "X-API-Key";
 
-/// uma.moe API client. Clones share one connection pool.
+/// uma.moe API client. Clones share one connection pool and rate limit.
 #[derive(Clone)]
 pub struct Client {
     http: reqwest::Client,

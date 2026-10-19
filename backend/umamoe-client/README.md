@@ -79,6 +79,10 @@ assert_eq!(club.tier(), Some("B+"));
 
 The key is sent as the `X-API-Key` header and marked sensitive. `ApiKey`, `ClientConfig` and `Client` all redact it in `Debug` output, and it never appears in error messages. Keep it in `.env` or your deployment's secret store.
 
+## Rate limiting
+
+Requests are spaced at least `min_interval` apart (500 ms by default) and go out in the order they were made. All clones of a `Client` share one limiter, so a scanner running many tasks still sends one request per slot. Idle time isn't saved up for bursts. Set `min_interval` to zero to turn the limit off.
+
 ## Errors
 
 Errors are returned straight away; requests aren't retried.

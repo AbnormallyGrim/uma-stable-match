@@ -36,6 +36,7 @@ pub struct ClientConfig {
     pub api_key: ApiKey,
     /// Timeout for each request.
     pub timeout: Duration,
+    /// Minimum gap between requests.
     pub min_interval: Duration,
     /// `User-Agent` header value.
     pub user_agent: String,
