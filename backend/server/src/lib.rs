@@ -34,4 +34,4 @@ pub use pool::{
 pub use recommendations::{MatchSettings, DEFAULT_FETCH_BUDGET};
 pub use scanner::{scan, Scan, ScanConfig, ScanError};
 pub use scheduler::run_scheduler;
-pub use shared::{club_key, pace_key, RedisUrl, SharedCache};
+pub use shared::{club_key, KeySecret, RedisUrl, SharedCache, SharedCacheError};

@@ -103,6 +103,8 @@ Everything lives in memory; nothing is written to disk. Restarting the server st
 
 Concurrent requests for the same club share one fetch, and failed fetches aren't cached.
 
+With `REDIS_URL` set, club details and trainer paces also go to Redis, as a second layer shared by every instance: a local miss checks Redis before uma.moe. Trainer IDs are replaced by a keyed hash, so Redis never holds them. If Redis stops answering, each instance carries on with its own cache. The pool, scanning and rate limits are still per instance. See the [server README](backend/server/README.md#shared-cache).
+
 ## Talking to uma.moe
 
 All calls go through the uma.moe client:

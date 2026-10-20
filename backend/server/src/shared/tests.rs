@@ -7,8 +7,12 @@ fn keys_include_the_month() {
         club_key(900001, Some((2026, 3))),
         "usm:v1:club:900001:2026-03"
     );
-    assert_eq!(pace_key(4242, None), "usm:v1:pace:4242:current");
-    assert_eq!(pace_key(4242, Some((2026, 12))), "usm:v1:pace:4242:2026-12");
+    let none = SharedCache::none();
+    assert_eq!(none.pace_key(4242, None), "usm:v1:pace:4242:current");
+    assert_eq!(
+        none.pace_key(4242, Some((2026, 12))),
+        "usm:v1:pace:4242:2026-12"
+    );
 }
 
 #[test]
@@ -38,4 +42,30 @@ async fn the_default_cache_stores_nothing() {
         .set("usm:v1:test", &42u32, Duration::from_secs(60))
         .await;
     assert_eq!(cache.get::<u32>("usm:v1:test").await, None);
+}
+
+const SECRET: &str = "made-up-secret-made-up-secret-0001";
+
+#[test]
+fn key_secrets_need_32_characters() {
+    assert!(KeySecret::parse(SECRET).is_some());
+    assert!(KeySecret::parse(&"x".repeat(32)).is_some());
+    assert!(KeySecret::parse(&"x".repeat(31)).is_none());
+    assert_eq!(
+        format!("{:?}", KeySecret::parse(SECRET).unwrap()),
+        "KeySecret(<redacted>)"
+    );
+}
+
+#[test]
+fn trainer_digests_are_keyed_and_hide_the_id() {
+    let secret = KeySecret::parse(SECRET).unwrap();
+    let other = KeySecret::parse("another-made-up-secret-0000000002").unwrap();
+    let digest = trainer_digest(&secret, 100000000001);
+    assert_eq!(digest.len(), 32);
+    assert!(digest.chars().all(|c| c.is_ascii_hexdigit()));
+    assert!(!digest.contains("100000000001"));
+    assert_eq!(digest, trainer_digest(&secret, 100000000001));
+    assert_ne!(digest, trainer_digest(&secret, 100000000002));
+    assert_ne!(digest, trainer_digest(&other, 100000000001));
 }
