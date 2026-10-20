@@ -29,6 +29,7 @@ flowchart TB
     end
 
     umamoe[(uma.moe API v4)]
+    redis[(Redis, optional)]
 
     visitor --> ui
     ui -- "/api/v1/*" --> router
@@ -44,6 +45,9 @@ flowchart TB
     details -- "interactive or background" --> api
     scanner -- "list clubs" --> api
     api --> umamoe
+    paces -. "shared paces" .-> redis
+    details -. "shared club details" .-> redis
+    scanner -. "scan lock and published scan" .-> redis
 ```
 
 The scanner fills the pool and the detail cache in the background. A visitor's request reads both, fetches a few missing clubs if it must, and scores everything it has. The server also serves the built web page, so one process runs the whole tool.
@@ -91,7 +95,7 @@ Every club whose details load gives the pool its **exact median**, and the pool 
 
 ## Caches
 
-Everything lives in memory; nothing is written to disk. Restarting the server starts with an empty cache and a fresh scan.
+Everything lives in memory; nothing is written to disk. Without Redis, restarting the server starts with an empty cache and a fresh scan. With Redis, a restarted server loads the current published scan and the cached clubs from Redis instead.
 
 | What | Key | Kept for | Where |
 |---|---|---|---|
@@ -132,4 +136,4 @@ The page is a single Svelte app, built by Vite into static files that the server
 
 - **Docker:** a multi-stage build. Node builds the page, Rust builds the server, and the result runs on a distroless, non-root base with only the binary and the built page. Compose runs it read-only, with no capabilities, on `127.0.0.1`, and an optional `redis` profile adds a memory-only Redis for the shared cache.
 - **Configuration:** environment variables only, read once at start-up and validated; see [Configuration](README.md#configuration). The API key is never logged or baked into the image.
-- **CI:** formatting, clippy and tests for the Rust workspace; docs, minimum Rust version and a publish dry run for the scoring crate; type check, lint, tests and build for the page; and a Docker image build.
+- **CI:** formatting, clippy and tests for the Rust workspace, with a Redis service container for the Redis tests; docs, minimum Rust version and a publish dry run for the scoring crate; type check, lint, tests and build for the page; and a Docker image build.

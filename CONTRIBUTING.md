@@ -61,6 +61,8 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
 ```
 
+The Redis tests are skipped unless `REDIS_TEST_URL` points at a Redis server, for example `REDIS_TEST_URL=redis://127.0.0.1:6379`. CI always runs them.
+
 ### Web frontend
 
 ```bash
