@@ -11,6 +11,11 @@ mod types;
 pub use client::Client;
 pub use config::{ApiKey, ClientConfig, RetryConfig, DEFAULT_BASE_URL};
 pub use error::{ApiErrorBody, Error};
-pub use requests::{CircleLookup, CircleRequest, CircleSort, ListCirclesRequest, SortDir};
+pub use requests::{
+    CircleLookup, CircleRequest, CircleSort, GainsSort, ListCirclesRequest, RankingsGainsRequest,
+    SortDir,
+};
 pub use reqwest::StatusCode;
-pub use types::{Circle, CircleListResponse, CircleMember, CircleResponse};
+pub use types::{
+    Circle, CircleListResponse, CircleMember, CircleResponse, GainsRanking, GainsRankingsResponse,
+};

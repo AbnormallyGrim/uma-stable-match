@@ -58,3 +58,43 @@ fn page_keeps_other_fields() {
     assert_eq!(next.page, Some(2));
     assert_eq!(next.name.as_deref(), Some("Example"));
 }
+
+#[test]
+fn gains_query_skips_unset_fields() {
+    let value = serde_json::to_value(RankingsGainsRequest::default()).unwrap();
+    assert_eq!(value, serde_json::json!({}));
+}
+
+#[test]
+fn gains_query_uses_api_names() {
+    for (sort, name) in [
+        (GainsSort::Gain3d, "gain_3d"),
+        (GainsSort::Gain7d, "gain_7d"),
+        (GainsSort::Gain30d, "gain_30d"),
+    ] {
+        let request = RankingsGainsRequest {
+            limit: Some(10),
+            sort_by: Some(sort),
+            ..RankingsGainsRequest::for_viewer(100000001)
+        }
+        .page(2);
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "page": 2,
+                "limit": 10,
+                "sort_by": name,
+                "query": "100000001",
+            })
+        );
+    }
+}
+
+#[test]
+fn gains_page_keeps_other_fields() {
+    let request = RankingsGainsRequest::for_viewer(100000001);
+    let next = request.page(1);
+    assert_eq!(next.page, Some(1));
+    assert_eq!(next.query.as_deref(), Some("100000001"));
+}

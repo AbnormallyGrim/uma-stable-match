@@ -4,8 +4,8 @@ use std::time::{Duration, Instant};
 
 use uma_stable_match_scoring::{Club, JoinStyle};
 use uma_stable_match_umamoe_client::{
-    ApiKey, CircleRequest, CircleSort, Client, ClientConfig, Error, ListCirclesRequest,
-    RetryConfig, SortDir, StatusCode,
+    ApiKey, CircleRequest, CircleSort, Client, ClientConfig, Error, GainsSort, ListCirclesRequest,
+    RankingsGainsRequest, RetryConfig, SortDir, StatusCode,
 };
 use wiremock::matchers::{header, method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -13,6 +13,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 const KEY: &str = "test-key";
 const CIRCLE: &str = include_str!("fixtures/circle.json");
 const CIRCLE_LIST: &str = include_str!("fixtures/circle_list.json");
+const GAINS: &str = include_str!("fixtures/gains.json");
 
 fn config(server: &MockServer) -> ClientConfig {
     ClientConfig {
@@ -146,6 +147,54 @@ async fn default_list_request_sends_no_filters() {
         .list_circles(&ListCirclesRequest::default())
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn fetches_gains_for_a_viewer() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/v4/rankings/gains"))
+        .and(query_param("query", "100000001"))
+        .and(query_param("sort_by", "gain_7d"))
+        .and(query_param_is_missing("page"))
+        .and(query_param_is_missing("limit"))
+        .and(header("x-api-key", KEY))
+        .and(header("accept", "application/json"))
+        .respond_with(json(GAINS))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let request = RankingsGainsRequest {
+        sort_by: Some(GainsSort::Gain7d),
+        ..RankingsGainsRequest::for_viewer(100000001)
+    };
+    let response = client(&server).rankings_gains(&request).await.unwrap();
+    assert_eq!(response.rankings.len(), 2);
+    assert_eq!(response.sort_by.as_deref(), Some("gain_7d"));
+    assert!(!response.has_next_page());
+
+    let me = response.viewer(100000001).unwrap();
+    assert_eq!(me.gain_7d, Some(14_000_000));
+    assert_eq!(me.rank_30d, Some(115));
+    assert_eq!(me.circle_id, Some(900001));
+    assert_eq!(response.viewer(1000000012).unwrap().circle_id, None);
+}
+
+#[tokio::test]
+async fn gains_errors_are_returned() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/rankings/gains"))
+        .respond_with(ResponseTemplate::new(404))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let error = client(&server)
+        .rankings_gains(&RankingsGainsRequest::for_viewer(100000001))
+        .await
+        .unwrap_err();
+    assert_eq!(error.status(), Some(StatusCode::NOT_FOUND));
 }
 
 #[tokio::test]

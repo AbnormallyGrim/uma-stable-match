@@ -121,5 +121,43 @@ impl ListCirclesRequest {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum GainsSort {
+    #[serde(rename = "gain_3d")]
+    Gain3d,
+    #[serde(rename = "gain_7d")]
+    Gain7d,
+    #[serde(rename = "gain_30d")]
+    Gain30d,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct RankingsGainsRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_by: Option<GainsSort>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+}
+
+impl RankingsGainsRequest {
+    pub fn for_viewer(viewer_id: u64) -> Self {
+        Self {
+            query: Some(viewer_id.to_string()),
+            ..Default::default()
+        }
+    }
+
+    pub fn page(&self, page: u32) -> Self {
+        Self {
+            page: Some(page),
+            ..self.clone()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests;

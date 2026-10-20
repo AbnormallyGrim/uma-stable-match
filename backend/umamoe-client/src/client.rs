@@ -11,9 +11,9 @@ use serde::Serialize;
 use crate::config::{ClientConfig, RetryConfig};
 use crate::error::{ApiErrorBody, Error};
 use crate::rate_limit::RateLimiter;
-use crate::requests::{CircleRequest, ListCirclesRequest};
+use crate::requests::{CircleRequest, ListCirclesRequest, RankingsGainsRequest};
 use crate::retry;
-use crate::types::{CircleListResponse, CircleResponse};
+use crate::types::{CircleListResponse, CircleResponse, GainsRankingsResponse};
 
 const API_KEY_HEADER: &str = "X-API-Key";
 
@@ -78,6 +78,13 @@ impl Client {
         request: &ListCirclesRequest,
     ) -> Result<CircleListResponse, Error> {
         self.get("/api/v4/circles/list", request).await
+    }
+
+    pub async fn rankings_gains(
+        &self,
+        request: &RankingsGainsRequest,
+    ) -> Result<GainsRankingsResponse, Error> {
+        self.get("/api/v4/rankings/gains", request).await
     }
 
     async fn get<T, Q>(&self, path: &str, query: &Q) -> Result<T, Error>

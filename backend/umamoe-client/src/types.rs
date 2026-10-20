@@ -124,6 +124,42 @@ impl CircleListResponse {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GainsRanking {
+    pub viewer_id: u64,
+    pub trainer_name: Option<String>,
+    pub gain_3d: Option<i64>,
+    pub gain_7d: Option<i64>,
+    pub gain_30d: Option<i64>,
+    pub rank_3d: Option<i32>,
+    pub rank_7d: Option<i32>,
+    pub rank_30d: Option<i32>,
+    pub circle_id: Option<u64>,
+    pub circle_name: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GainsRankingsResponse {
+    pub rankings: Vec<GainsRanking>,
+    pub total: i64,
+    pub page: i64,
+    pub limit: i64,
+    pub total_pages: i64,
+    pub sort_by: Option<String>,
+}
+
+impl GainsRankingsResponse {
+    pub fn has_next_page(&self) -> bool {
+        self.page + 1 < self.total_pages
+    }
+
+    pub fn viewer(&self, viewer_id: u64) -> Option<&GainsRanking> {
+        self.rankings.iter().find(|r| r.viewer_id == viewer_id)
+    }
+}
+
 impl From<Circle> for Club {
     /// Club details only: no members or tier.
     fn from(c: Circle) -> Self {
