@@ -191,7 +191,7 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
 | `total` | How many clubs were scored, before `limit` |
 | `clubs` | Up to `limit` clubs, best first |
 
-- `join_style` is `open`, `approval`, `closed` or `null`.
+- `join_style` is `open`, `approval`, `closed` or `null`. It's `null` when the style is unknown, including any new style the server doesn't recognise yet.
 - `tier` runs from `D` to `SS`, or is `null` when unknown.
 - `policy` is uma.moe's playstyle code.
 - `balance` is `null` unless balance scoring is on.
