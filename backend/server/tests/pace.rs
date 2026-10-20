@@ -9,7 +9,8 @@ use serde_json::{json, Value};
 use tokio::sync::watch;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    router, run_scheduler, AppState, Cache, PaceLookup, RateLimits, ScanConfig, DEFAULT_PACE_TTL,
+    router, run_scheduler, AppState, Cache, ClubDetails, DetailConfig, PaceLookup, RateLimits,
+    ScanConfig, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -43,7 +44,15 @@ fn club_detail() -> Value {
         .map(|i| json!({ "viewer_id": 9000 + i, "year": 2026, "month": 3, "daily_fans": series(4_000_000 + 500_000 * i) }))
         .collect();
     json!({
-        "circle": { "circle_id": 1, "name": "Pace Club", "member_count": 10, "join_style": 1, "monthly_rank": 100 },
+        "circle": {
+            "circle_id": 1,
+            "name": "Pace Club",
+            "member_count": 10,
+            "join_style": 1,
+            "monthly_rank": 100,
+            "monthly_point": 40_000_000,
+            "last_updated": "2026-03-19T15:00:00Z",
+        },
         "members": members,
     })
 }
@@ -67,7 +76,20 @@ async fn mount_trainer(server: &MockServer, response: ResponseTemplate, times: u
         .await;
 }
 
-async fn scanned(server: &MockServer) -> Cache {
+fn unscanned(server: &MockServer) -> (Cache, ClubDetails) {
+    (Cache::new(), details(server))
+}
+
+fn details(server: &MockServer) -> ClubDetails {
+    ClubDetails::new(
+        &client(server),
+        SharedPool::default(),
+        DetailConfig::default(),
+    )
+    .0
+}
+
+async fn scanned(server: &MockServer) -> (Cache, ClubDetails) {
     Mock::given(path("/api/v4/circles/list"))
         .respond_with(
             ResponseTemplate::new(200)
@@ -82,9 +104,11 @@ async fn scanned(server: &MockServer) -> Cache {
         .await;
 
     let cache = Cache::new();
+    let details = details(server);
     let (stop, stopped) = watch::channel(false);
     let handle = tokio::spawn(run_scheduler(
         client(server),
+        details.clone(),
         ScanConfig::default(),
         Duration::from_secs(3600),
         cache.clone(),
@@ -99,12 +123,13 @@ async fn scanned(server: &MockServer) -> Cache {
     .expect("scan did not finish");
     stop.send(true).unwrap();
     handle.await.unwrap();
-    cache
+    (cache, details)
 }
 
-fn app(server: &MockServer, cache: Cache, ttl: Duration) -> AppState {
+fn app(server: &MockServer, (cache, details): (Cache, ClubDetails), ttl: Duration) -> AppState {
     AppState {
         cache,
+        details,
         paces: PaceLookup::new(client(server), ttl),
         limits: RateLimits::new(10_000, 10_000, false),
     }
@@ -237,7 +262,7 @@ async fn upstream_failures_are_bad_gateway_and_not_cached() {
 async fn no_lookup_before_the_first_scan() {
     let server = MockServer::start().await;
     mount_trainer(&server, trainer_club(series(6_000_000)), 0).await;
-    let state = app(&server, Cache::new(), DEFAULT_PACE_TTL);
+    let state = app(&server, unscanned(&server), DEFAULT_PACE_TTL);
 
     let (status, _) = get(&state, &by_trainer()).await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
@@ -246,7 +271,7 @@ async fn no_lookup_before_the_first_scan() {
 #[tokio::test]
 async fn rejects_invalid_trainer_queries() {
     let server = MockServer::start().await;
-    let state = app(&server, Cache::new(), DEFAULT_PACE_TTL);
+    let state = app(&server, unscanned(&server), DEFAULT_PACE_TTL);
     let cases = [
         (
             format!("?pace=5000000&trainer_id={TRAINER}"),

@@ -38,6 +38,7 @@ pub struct Config {
     pub scan: ScanConfig,
     /// Time between scans, from `SCAN_INTERVAL_MINUTES`.
     pub scan_interval: Duration,
+    pub detail_cache: Duration,
     /// How long a trainer's pace is reused, from `TRAINER_CACHE_MINUTES`.
     pub trainer_cache: Duration,
     /// Recommendation requests per visitor per minute, from `RATE_LIMIT_PER_MINUTE`.
@@ -137,11 +138,10 @@ impl Config {
             max_details: number("SCAN_MAX_DETAILS", defaults.max_details)?,
             ..defaults
         };
-        let scan_interval = Duration::from_secs(
-            u64::from(number(
-                "SCAN_INTERVAL_MINUTES",
-                DEFAULT_SCAN_INTERVAL_MINUTES,
-            )?) * 60,
+        let scan_interval_minutes = number("SCAN_INTERVAL_MINUTES", DEFAULT_SCAN_INTERVAL_MINUTES)?;
+        let scan_interval = Duration::from_secs(u64::from(scan_interval_minutes) * 60);
+        let detail_cache = Duration::from_secs(
+            u64::from(number("DETAIL_CACHE_MINUTES", scan_interval_minutes)?) * 60,
         );
         let trainer_cache = Duration::from_secs(
             u64::from(number(
@@ -187,6 +187,7 @@ impl Config {
             bind_addr,
             scan,
             scan_interval,
+            detail_cache,
             trainer_cache,
             rate_limit_per_minute,
             trainer_lookups_per_minute,

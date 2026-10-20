@@ -157,6 +157,10 @@ impl ClubPool {
         self.calibration
     }
 
+    pub fn contains(&self, circle_id: u64) -> bool {
+        self.index.contains_key(&circle_id)
+    }
+
     /// Clubs whose exact median is known.
     pub fn exact_medians(&self) -> usize {
         self.entries

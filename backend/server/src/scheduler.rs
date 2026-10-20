@@ -6,6 +6,7 @@ use tokio::sync::watch;
 use uma_stable_match_umamoe_client::Client;
 
 use crate::cache::Cache;
+use crate::details::ClubDetails;
 use crate::scanner::{scan, ScanConfig};
 
 /// Scans now, then every `interval`, until `shutdown` turns true.
@@ -13,6 +14,7 @@ use crate::scanner::{scan, ScanConfig};
 /// A scan in progress at shutdown is cancelled.
 pub async fn run_scheduler(
     client: Client,
+    details: ClubDetails,
     config: ScanConfig,
     interval: Duration,
     cache: Cache,
@@ -22,7 +24,7 @@ pub async fn run_scheduler(
         if cache.begin_scan() {
             tracing::info!("scan started");
             tokio::select! {
-                result = scan(&client, &config) => {
+                result = scan(&client, &details, &config) => {
                     if let Err(error) = &result {
                         tracing::error!(%error, "scan failed; keeping the last results");
                     }

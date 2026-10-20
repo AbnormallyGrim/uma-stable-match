@@ -3,19 +3,17 @@
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::SystemTime;
 
-use uma_stable_match_scoring::Club;
-
 use crate::scanner::{Scan, ScanError};
 
 /// Results of the last successful scan.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Snapshot {
-    /// Clubs with member data, best rank first.
-    pub clubs: Vec<Club>,
     /// Clubs that passed the scan filters.
     pub candidates: usize,
+    pub prefetched: usize,
     /// Clubs whose details failed to load.
     pub failed: usize,
+    pub month: Option<String>,
     /// When the scan finished.
     pub scanned_at: SystemTime,
 }
@@ -89,9 +87,10 @@ impl Cache {
         match result {
             Ok(scan) => {
                 state.snapshot = Some(Arc::new(Snapshot {
-                    clubs: scan.clubs,
                     candidates: scan.candidates,
+                    prefetched: scan.prefetched,
                     failed: scan.failed,
+                    month: scan.month,
                     scanned_at: at,
                 }));
                 state.last_error = None;

@@ -1,13 +1,13 @@
 //! Shared club detail cache and background loader.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 use std::time::Duration;
 
 use moka::future::Cache;
 use tokio::sync::mpsc;
 use uma_stable_match_scoring::Club;
-use uma_stable_match_umamoe_client::{CircleRequest, Client, Error, Priority};
+use uma_stable_match_umamoe_client::{Circle, CircleRequest, Client, Error, Priority};
 
 use crate::calibration::club_median;
 use crate::pool::ClubPool;
@@ -47,6 +47,7 @@ struct Inner {
     background: Client,
     cache: Cache<u64, Arc<Club>>,
     pool: SharedPool,
+    listed: RwLock<HashMap<u64, Circle>>,
     queued: Mutex<HashSet<u64>>,
     sender: mpsc::Sender<u64>,
 }
@@ -55,6 +56,15 @@ struct Inner {
 pub struct BackgroundLoader {
     details: ClubDetails,
     receiver: mpsc::Receiver<u64>,
+}
+
+impl std::fmt::Debug for ClubDetails {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClubDetails")
+            .field("cached", &self.cached_clubs())
+            .field("queued", &self.queued())
+            .finish_non_exhaustive()
+    }
 }
 
 impl ClubDetails {
@@ -75,6 +85,7 @@ impl ClubDetails {
                 background: client.with_priority(Priority::Background),
                 cache,
                 pool,
+                listed: RwLock::new(HashMap::new()),
                 queued: Mutex::new(HashSet::new()),
                 sender,
             }),
@@ -97,9 +108,14 @@ impl ClubDetails {
                     Priority::Interactive => &inner.interactive,
                     Priority::Background => &inner.background,
                 };
-                let response = client
+                let mut response = client
                     .circle(&CircleRequest::by_circle_id(circle_id))
                     .await?;
+                if response.circle.circle_id == 0 {
+                    if let Some(listed) = read(&inner.listed).get(&circle_id) {
+                        response.circle = listed.clone();
+                    }
+                }
                 let mut club = Club::from(response);
                 if club.circle_id == 0 {
                     club.circle_id = circle_id;
@@ -149,6 +165,27 @@ impl ClubDetails {
         &self.inner.pool
     }
 
+    pub fn replace_pool(&self, pool: ClubPool) {
+        *write(&self.inner.pool) = pool;
+    }
+
+    pub fn set_listed(&self, rows: impl IntoIterator<Item = (u64, Circle)>) {
+        *write(&self.inner.listed) = rows.into_iter().collect();
+    }
+
+    pub fn cached_in_pool(&self) -> Vec<Arc<Club>> {
+        let pool = read(&self.inner.pool);
+        let mut clubs: Vec<Arc<Club>> = self
+            .inner
+            .cache
+            .iter()
+            .filter(|(id, _)| pool.contains(**id))
+            .map(|(_, club)| club)
+            .collect();
+        clubs.sort_by_key(|c| (c.monthly_rank.unwrap_or(u32::MAX), c.circle_id));
+        clubs
+    }
+
     /// Copies the exact medians of cached clubs into `pool`, such as a freshly scanned one.
     /// Returns how many were set.
     pub fn restore_exact_medians(&self, pool: &mut ClubPool) -> usize {
@@ -177,8 +214,12 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-fn write(pool: &SharedPool) -> std::sync::RwLockWriteGuard<'_, ClubPool> {
-    pool.write().unwrap_or_else(|e| e.into_inner())
+fn read<T>(lock: &RwLock<T>) -> std::sync::RwLockReadGuard<'_, T> {
+    lock.read().unwrap_or_else(|e| e.into_inner())
+}
+
+fn write<T>(lock: &RwLock<T>) -> std::sync::RwLockWriteGuard<'_, T> {
+    lock.write().unwrap_or_else(|e| e.into_inner())
 }
 
 #[cfg(test)]
