@@ -16,6 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 axum = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
 dotenvy = "0.15"
 governor = "0.10"
 humantime = "2"
@@ -31,7 +32,9 @@ uma-stable-match-scoring = { version = "0.1.0", path = "../scoring" }
 uma-stable-match-umamoe-client = { version = "0.1.0", path = "../umamoe-client" }
 
 [dev-dependencies]
+fastrand = "2"
 http-body-util = "0.1"
+proptest = "1"
 tempfile = "3"
 wiremock = "0.6"
 

@@ -46,6 +46,59 @@ A club whose details fail to load is logged and skipped. A failed list request f
 
 With the client's default 500 ms rate limit, a default scan takes about 80 seconds: around 9 list pages plus one lookup per candidate, about 150 at the time of writing.
 
+## Club pool
+
+The club pool is the first stage of two-stage matching (#87). It picks the clubs worth scoring for one trainer, using only the list endpoint's data. It isn't used by the scanner or recommendations yet.
+
+### Game months
+
+uma.moe's game month starts on the **2nd at 00:00 JST** (UTC+09:00), so the 1st still belongs to the previous month. `game_month_start` and `elapsed_days` follow this. A list row's `last_updated` is the daily 00:00 JST snapshot, so `elapsed_days` at that time is a whole number of days.
+
+### Estimate
+
+`ListedClub::from_circle` estimates each club's pace from its list row:
+
+```text
+raw rate = monthly_point ÷ elapsed days ÷ member_count
+```
+
+The raw rate estimates the club's **mean** daily gain per member. Clubs are left out when they're archived, full, have fewer than 8 members, or are missing points, a member count or a valid `last_updated`, and before a full day of the month has passed. Closed clubs stay in the pool, so each request can include or exclude them.
+
+### Calibration
+
+Fit uses the **median** of current members, which is usually below the mean. `Calibration` corrects for this with one factor for the whole pool:
+
+```text
+c = median of (true median ÷ raw rate)   over clubs with loaded details
+estimated median = c × raw rate
+```
+
+`Calibration::ratio` takes the true median from the scoring crate's `score_club`, so it is exactly the median the fit formula uses. With fewer than 20 valid samples, `c` is 1.0.
+
+### Shortlist
+
+`ClubPool::shortlist(target, k, include_closed)` returns the `k` clubs whose estimated median is nearest `target`, which is normally `TARGET_MEDIAN_RATIO` (0.85) × your pace. Distance is measured in log space, so half and double the target are equally far:
+
+```text
+distance = |ln(estimated median ÷ target)|
+```
+
+The pool is sorted once by estimate. A query binary-searches to the target and walks outwards in both directions, skipping closed clubs unless they're included. That costs O(log n + k). Ties go to the lower club ID, and a property test checks that the result always matches sorting every club by distance. A new calibration only moves the target, so it never re-sorts the pool.
+
+### Shortlist size
+
+`DEFAULT_SHORTLIST_SIZE` is 120. This was measured by comparing the top 10 from scoring every club with the top 10 from scoring only the shortlist (recall@10), across 40 paces from 0.4M to 8M fans a day:
+
+| Pool | Shortlist | Mean recall@10, fit only / closed included / with balance | Worst pace |
+|---|---|---|---|
+| 500 synthetic clubs | 60 (12%) | 0.88 / 0.85 / 0.96 | 0.4 |
+| 500 synthetic clubs | 120 (24%) | 0.98 / 0.97 / 0.995 | 0.8 |
+| 153 real clubs (ranks 80–900) | 30 (20%) | 0.72 / 0.63 / 0.75 | 0.3 |
+| 153 real clubs | 90 (59%) | 1.00 / 0.89 / 1.00 | 0.8 |
+| 153 real clubs | 120 (78%) | 1.00 / 0.99 / 1.00 | 0.9 |
+
+The synthetic pools (`tests/shortlist_recall.rs`) need a mean of at least 0.95 and at least 0.8 at every pace. On real data the estimate is much rougher: real clubs sit in a narrow pace band, and their median-to-mean ratio varies widely. So a shortlist needs a large share of the pool to keep recall high. A larger shortlist means more club details to look up for each request.
+
 ## Cache and schedule
 
 Scan results live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan finishes there are no results; with the defaults that takes about 45 seconds.
