@@ -31,6 +31,21 @@ uma-stable-match-scoring = { version = "0.1", features = ["serde"] }
 
 Rust 1.71, with or without the `serde` feature.
 
+## Versioning
+
+The crate follows [Semantic Versioning](https://semver.org/). While it's below 1.0, the minor version marks breaking changes: 0.1 → 0.2 is breaking, 0.1.0 → 0.1.1 isn't.
+
+| Change | Release |
+|---|---|
+| Removing or changing a public item | Breaking |
+| Changing how scores are calculated, or which clubs are left out | Breaking |
+| Raising the minimum Rust version | Breaking |
+| Adding a field to a `#[non_exhaustive]` type, or a variant to a `#[non_exhaustive]` enum | Non-breaking |
+| Adding a public item | Non-breaking |
+| Fixing a bug that doesn't change scores | Non-breaking |
+
+Every release is listed in the [changelog](https://github.com/AbnormallyGrim/uma-stable-match/blob/main/backend/scoring/CHANGELOG.md).
+
 ## Input data
 
 A `MemberSnapshot` holds one member's **cumulative** fan count for each day of the month, starting at day 1:
