@@ -140,10 +140,12 @@ impl ClubDetails {
         self.inner.cache.get(&(circle_id, self.period())).await
     }
 
+    /// The month whose details are fetched and served: `None` for the current game month.
     pub fn period(&self) -> Option<Period> {
         *read(&self.inner.period)
     }
 
+    /// Switches to another month's details. Details cached for other months are ignored.
     pub fn set_period(&self, period: Option<Period>) {
         *write(&self.inner.period) = period;
     }

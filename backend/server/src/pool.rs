@@ -18,8 +18,11 @@ const JST_OFFSET_SECONDS: i32 = 9 * 3600;
 const SECONDS_PER_DAY: f64 = 86_400.0;
 const MIN_ELAPSED_DAYS: f64 = 1.0;
 
+/// A game month as (year, month).
 pub type Period = (i32, u32);
 
+/// Before this many days into a game month there are fewer than 3 days of data, so the previous
+/// month is used instead.
 pub const EARLY_MONTH_DAYS: f64 = (MIN_DAYS_FOR_PACE - 1) as f64;
 
 /// Japan Standard Time (UTC+09:00), which uma.moe uses for months.
@@ -52,25 +55,31 @@ pub fn elapsed_days(at: DateTime<Utc>) -> f64 {
     (at - game_month_start(at)).num_seconds() as f64 / SECONDS_PER_DAY
 }
 
+/// The game month containing `at`.
 pub fn game_month(at: DateTime<Utc>) -> Period {
     let start = game_month_start(at).with_timezone(&jst());
     (start.year(), start.month())
 }
 
+/// The game month before the one containing `at`.
 pub fn previous_game_month(at: DateTime<Utc>) -> Period {
     game_month(game_month_start(at) - TimeDelta::seconds(1))
 }
 
+/// Length in days of the game month before the one containing `at`.
 pub fn previous_game_month_days(at: DateTime<Utc>) -> f64 {
     let start = game_month_start(at);
     let previous = game_month_start(start - TimeDelta::seconds(1));
     (start - previous).num_seconds() as f64 / SECONDS_PER_DAY
 }
 
+/// Whether `at` is too early in its game month to work out paces.
 pub fn is_early_month(at: DateTime<Utc>) -> bool {
     elapsed_days(at) < EARLY_MONTH_DAYS
 }
 
+/// Mean daily fans per member over the whole previous game month, or `None` without points or
+/// members.
 pub fn last_month_rate(last_month_point: i64, member_count: u32, at: DateTime<Utc>) -> Option<f64> {
     if last_month_point <= 0 || member_count == 0 {
         return None;
@@ -107,6 +116,7 @@ impl ListedClub {
         Self::build(circle, false)
     }
 
+    /// Like [`ListedClub::from_circle`], but estimated from `last_month_point`.
     pub fn from_circle_last_month(circle: &Circle) -> Option<Self> {
         Self::build(circle, true)
     }
