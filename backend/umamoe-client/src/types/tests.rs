@@ -104,3 +104,42 @@ fn has_next_page() {
     assert!(!page(1, 2).has_next_page());
     assert!(!page(0, 0).has_next_page());
 }
+
+#[test]
+fn gains_missing_and_null_fields_become_none() {
+    let r: GainsRanking =
+        serde_json::from_str(r#"{"viewer_id":100000001,"gain_7d":null,"new_field":1}"#).unwrap();
+    assert_eq!(r.viewer_id, 100000001);
+    assert_eq!(r.gain_7d, None);
+    assert_eq!(r.gain_30d, None);
+    assert_eq!(r.circle_id, None);
+}
+
+#[test]
+fn gains_has_next_page() {
+    let page = |page, total_pages| GainsRankingsResponse {
+        page,
+        total_pages,
+        ..Default::default()
+    };
+    assert!(page(0, 2).has_next_page());
+    assert!(!page(1, 2).has_next_page());
+    assert!(!page(0, 0).has_next_page());
+}
+
+#[test]
+fn gains_finds_an_exact_viewer() {
+    let ranking = |viewer_id| GainsRanking {
+        viewer_id,
+        ..Default::default()
+    };
+    let response = GainsRankingsResponse {
+        rankings: vec![ranking(1000000012), ranking(100000001)],
+        ..Default::default()
+    };
+    assert_eq!(
+        response.viewer(100000001).map(|r| r.viewer_id),
+        Some(100000001)
+    );
+    assert!(response.viewer(100000002).is_none());
+}
