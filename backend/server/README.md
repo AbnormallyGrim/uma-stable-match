@@ -34,7 +34,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer lookups each visitor can make per minute that need a call to uma.moe |
 | `TRUST_FORWARDED_FOR` | `false` | `true` to identify visitors by `X-Forwarded-For`. Only turn this on behind a reverse proxy that sets the header |
 | `FRONTEND_DIR` | none | Built frontend to serve, such as `frontend/dist`. Unset, the server serves only the API |
-| `REDIS_URL` | none | A `redis://` or `rediss://` URL to share club details and trainer paces with other instances. Unset, everything stays in this instance's memory. See [Shared cache](#shared-cache) |
+| `REDIS_URL` | none | A `redis://` or `rediss://` URL to share club details, trainer paces and scans with other instances. Unset, everything stays in this instance's memory. See [Shared cache](#shared-cache) |
 | `REDIS_KEY_SECRET` | none | Required with `REDIS_URL`: at least 32 characters, the same on every instance. Keys the hash that replaces trainer IDs in Redis |
 
 Blank values count as unset. These stop the server at startup, with an error message and exit code 1:
@@ -153,9 +153,27 @@ Without `REDIS_URL`, the shared cache stores nothing (`SharedCache::none()`) and
 | Each read or write | Times out after 500 ms. Any error or timeout counts as a miss, and the instance carries on with its own cache and uma.moe |
 | Redis goes away | One warning is logged; the connection reconnects by itself, and one message is logged when Redis is back |
 
-**Trainer IDs never reach Redis.** Pace keys use the first 32 hex characters of HMAC-SHA256(`REDIS_KEY_SECRET`, trainer ID), so every instance needs the same secret. Club keys keep the club ID, which isn't personal. Run Redis without persistence (for example `--save "" --appendonly no`), so paces stay in memory as they do without Redis.
+**Looked-up trainer IDs never reach Redis.** Pace keys use the first 32 hex characters of HMAC-SHA256(`REDIS_KEY_SECRET`, trainer ID), so every instance needs the same secret. Club keys keep the club ID, which isn't personal, and club data is stored as uma.moe publishes it. Run Redis without persistence (for example `--save "" --appendonly no`), so paces stay in memory as they do without Redis.
 
-Still per instance: rate limits, the background queue, and scanning. Sharing the scan is planned in [#41](https://github.com/AbnormallyGrim/uma-stable-match/issues/41).
+Still per instance: rate limits and the background queue.
+
+### Shared scans
+
+With Redis, instances that have the same `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `SCAN_MAX_DETAILS` share one scan, so uma.moe is scanned once per interval however many instances run. Whenever a scan is due, one Redis script decides what the instance does:
+
+| Situation | What the instance does |
+|---|---|
+| A scan was published less than one interval ago | Loads it unless it already has, then waits until the next scan is due |
+| No recent scan, and the scan lock is free | Takes the lock, scans, and publishes the result |
+| Another instance holds the lock | Reports `scanning: true` and checks again every second |
+| Redis doesn't answer | Scans on its own |
+
+- **Lock.** It lasts 60 seconds and is renewed every 20 seconds while scanning. Shutdown releases it; if an instance crashes, another takes over within 60 seconds.
+- **Publishing.** After prefetching, the leader publishes the listed clubs, marks them current for one `SCAN_INTERVAL_MINUTES`, and keeps them for two. The others build their pool from those rows and load club details from Redis, so they barely call uma.moe. An instance that starts later loads the published scan straight away.
+- **Failures.** A failed scan is published too: every instance records the same error, keeps its last results, and waits for the next interval.
+- **Missing data.** If a scan is marked current but its rows are gone from Redis, the instance scans on its own.
+
+The keys are `usm:v1:scan:<from>-<to>-<max>:lock`, `:fresh` and `:latest`, so instances with different scan windows don't share.
 
 The Redis tests in `tests/redis.rs` need a Redis server: set `REDIS_TEST_URL`, for example `REDIS_TEST_URL=redis://127.0.0.1:6379 cargo test`. Without it they're skipped. CI runs them against a Redis service container.
 
@@ -164,6 +182,7 @@ The Redis tests in `tests/redis.rs` need a Redis server: set `REDIS_TEST_URL`, f
 Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan finishes there are no results; with the defaults that takes about 80 seconds.
 
 - **No overlapping scans.** A new scan won't start while one is running.
+- **One scan for all instances.** With Redis, one instance scans and the others load its result; see [Shared scans](#shared-scans).
 - **Failures keep the last results.** A failed scan is logged and recorded as the last error, and the previous results stay in place. The next successful scan replaces the results and clears the error.
 - **Shutdown cancels a running scan.** The cache then keeps whatever it had before that scan started.
 

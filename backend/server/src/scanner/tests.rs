@@ -75,3 +75,16 @@ fn public_message_for_decode_errors() {
         "listing clubs failed: unexpected response from uma.moe"
     );
 }
+
+#[test]
+fn shared_failures_keep_their_public_message() {
+    let error = ScanError::Shared("listing clubs failed: could not reach uma.moe".into());
+    assert_eq!(
+        error.public_message(),
+        "listing clubs failed: could not reach uma.moe"
+    );
+    assert_eq!(
+        error.to_string(),
+        "listing clubs failed: could not reach uma.moe"
+    );
+}
