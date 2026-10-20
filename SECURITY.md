@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Uma Stable Match is in early development. Security fixes are made on the `main` branch and included in the next release.
+Security fixes are made on the `main` branch and included in the next release.
 
 | Version | Supported |
 |---|---|
@@ -41,5 +41,6 @@ Out of scope:
 If you run Uma Stable Match yourself:
 
 - Keep your uma.moe API key in `.env` or an environment variable, never in code or committed files.
-- Don't expose the server publicly without the built-in rate limiting enabled.
+- Rate limiting is always on. Behind a reverse proxy, set `TRUST_FORWARDED_FOR=true` so each visitor gets their own limit; otherwise everyone shares the proxy's.
+- Only set `TRUST_FORWARDED_FOR=true` behind a proxy that sets `X-Forwarded-For`, or visitors could pick their own address.
 - If your key leaks, revoke it at [uma.moe/settings](https://uma.moe/settings) and create a new one.
