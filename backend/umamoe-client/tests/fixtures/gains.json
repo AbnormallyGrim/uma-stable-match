@@ -1,0 +1,33 @@
+{
+  "rankings": [
+    {
+      "viewer_id": 1000000012,
+      "trainer_name": "Another Trainer",
+      "gain_3d": 9000000,
+      "gain_7d": 21000000,
+      "gain_30d": 90000000,
+      "rank_3d": 40,
+      "rank_7d": 41,
+      "rank_30d": 42,
+      "circle_id": null,
+      "circle_name": null
+    },
+    {
+      "viewer_id": 100000001,
+      "trainer_name": "Example Trainer",
+      "gain_3d": 6000000,
+      "gain_7d": 14000000,
+      "gain_30d": 60000000,
+      "rank_3d": 120,
+      "rank_7d": 118,
+      "rank_30d": 115,
+      "circle_id": 900001,
+      "circle_name": "Example Club"
+    }
+  ],
+  "total": 2,
+  "page": 0,
+  "limit": 100,
+  "total_pages": 1,
+  "sort_by": "gain_7d"
+}

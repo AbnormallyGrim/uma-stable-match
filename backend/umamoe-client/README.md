@@ -41,10 +41,25 @@ if let Some(circle) = page.circles.first() {
 |---|---|---|
 | `Client::circle` | `GET /api/v4/circles` | `CircleResponse`: a club, its members' daily fans and its tier |
 | `Client::list_circles` | `GET /api/v4/circles/list` | `CircleListResponse`: one page of clubs, without members or tier |
+| `Client::rankings_gains` | `GET /api/v4/rankings/gains` | `GainsRankingsResponse`: one page of trainers' fan gains over the last 3, 7 and 30 days |
 
 `CircleRequest` looks a club up by `circle_id` or by a member's `viewer_id`. Without `for_month`, the API returns the current game month, which starts on the 2nd (JST). A month outside 1 to 12 is rejected before any request is sent.
 
 `ListCirclesRequest` filters by name, minimum members and worst monthly rank, and sorts by name, member count, monthly rank or monthly points. Fields left as `None` aren't sent, so the API's defaults apply. Pages start at 0: use `has_next_page` on the response and `ListCirclesRequest::page` to walk them.
+
+`RankingsGainsRequest` sorts by 3-, 7- or 30-day gain and pages the same way, up to 100 trainers per page. The gains are rolling windows that cross month boundaries, so they're still available in the first days of a game month. `query` matches a trainer ID exactly but also matches parts of trainer and club names, so a search for an ID can return other trainers too. Use `GainsRankingsResponse::viewer` to pick the exact one:
+
+```rust
+use uma_stable_match_umamoe_client::GainsRankingsResponse;
+
+let json = r#"{"rankings": [
+    {"viewer_id": 100000012, "gain_7d": 21000000},
+    {"viewer_id": 100000001, "gain_7d": 14000000}
+]}"#;
+let response: GainsRankingsResponse = serde_json::from_str(json).unwrap();
+let me = response.viewer(100000001).unwrap();
+assert_eq!(me.gain_7d, Some(14_000_000));
+```
 
 ## Response types
 
@@ -52,6 +67,7 @@ if let Some(circle) = page.circles.first() {
 |---|---|
 | `CircleResponse` | `GET /api/v4/circles`: a club, its members' daily fans and its tier |
 | `CircleListResponse` | `GET /api/v4/circles/list`: one page of clubs, without members or tier |
+| `GainsRankingsResponse` | `GET /api/v4/rankings/gains`: one page of `GainsRanking` rows |
 
 The types follow the uma.moe OpenAPI schema but are lenient. Missing fields take their default, `null` becomes `None`, and unknown fields are ignored. Timestamps are kept as ISO 8601 strings.
 
