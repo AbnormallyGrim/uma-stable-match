@@ -90,6 +90,13 @@ To keep your email address out of commits, turn on **Keep my email addresses pri
 - `unsafe` code isn't allowed.
 - Prefer small, focused pull requests.
 
+### GitHub Actions
+
+- Pin every action to a full commit SHA, with its version in a comment, for example `actions/checkout@<sha> # v7.0.1`. Dependabot keeps the pins up to date.
+- Set `persist-credentials: false` on `actions/checkout`.
+- Workflows grant no permissions by default (`permissions: {}`). Give each job only the permissions it needs.
+- Check workflow changes with [zizmor](https://docs.zizmor.sh): `zizmor .github/workflows`.
+
 ### Documentation
 
 - Give every public item a short comment in the code. Missing documentation is flagged by the linter.
