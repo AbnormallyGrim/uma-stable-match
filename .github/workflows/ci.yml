@@ -62,6 +62,9 @@ jobs:
           rustup toolchain install "$msrv" --profile minimal
           echo "MSRV=$msrv" >> "$GITHUB_ENV"
 
+      - name: Publish dry run
+        run: cargo publish --dry-run -p uma-stable-match-scoring
+
       - name: Package crate
         run: |
           cargo package -p uma-stable-match-scoring --no-verify
