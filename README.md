@@ -2,15 +2,12 @@
 
 **Find your stable.** Uma Stable Match recommends Umamusume: Pretty Derby clubs that suit you: clubs where your fan pace fits and members pull their weight.
 
-![Stable Match results page: a summary of your pace and the clubs analysed, followed by ranked club recommendations showing each club's tier, rank trend, open spots, balance score and your expected place](docs/images/demo.png)
+![Uma Stable Match results page: the search form, a summary of your pace and the clubs analysed, then ranked club cards showing each club's tier, rank trend, open spots, join style, balance and your expected place](docs/images/demo.png)
 
-<sub>Example results page, shown with sample data.</sub>
+<sub>Example results page, shown with made-up clubs.</sub>
 
 > [!IMPORTANT]
 > Unofficial, non-commercial fan tool. Not affiliated with uma.moe or Cygames, Inc. See [Disclaimer](#disclaimer).
-
-> [!NOTE]
-> Uma Stable Match is in early development. Sections marked *(coming soon)* describe features that aren't available yet.
 
 ## Contents
 
@@ -70,7 +67,7 @@ cd uma-stable-match
 cp .env.example .env
 ```
 
-Open `.env` in a text editor and paste your key. Its name starts with a dot, so it's hidden: use `ls -a` to see it in a terminal, or press **Cmd+Shift+.** in Finder.
+Open `.env` in a text editor and paste your key.
 
 ```env
 UMAMOE_API_KEY=your-key-here
@@ -82,7 +79,7 @@ UMAMOE_API_KEY=your-key-here
 docker compose up -d
 ```
 
-Compose builds the image on your computer every time it starts; it never downloads one. The first build takes a few minutes, and later ones reuse what hasn't changed. Club data appears about a minute after the server starts, once the first scan finishes.
+The first build takes a few minutes. Club data appears about 80 seconds after the server starts, once the first scan finishes.
 
 Open **<http://localhost:8080>** in your browser.
 
@@ -108,21 +105,21 @@ docker compose up -d
 
 ## Usage
 
-*(coming soon)*
-
 1. Open Uma Stable Match in your browser.
-2. Enter your **trainer ID** and select **Find clubs**.
+2. Enter your **trainer ID**, or switch to **Daily pace** and enter your daily fan gain in millions. Tick **Remember my trainer ID on this device** to have it filled in next time.
 3. Optionally turn on **Balance scoring** and adjust its strength (0–1). Higher values push clubs with many low contributors further down.
-4. Browse **Top picks**, or use **All results** to search and sort every club.
-5. Select a club's name to open its uma.moe page in a new tab, then contact the leader.
+4. Optionally tick **Include closed clubs** to also see clubs that aren't recruiting.
+5. Select **Find clubs**. The search is saved in the page's address, so you can bookmark or share it.
+6. Browse **Top picks**, or use **All results** to search and sort every club.
+7. Select a club's name to open its uma.moe page in a new tab, then contact the leader.
 
-Club data refreshes automatically every 3 hours by default. The page shows when it was last updated.
+Club data refreshes automatically every 3 hours by default, and the line under the title shows when it last did. If some clubs are still loading, or it's the first two days of a game month and results use last month's data, a note under the summary says so.
 
 ## Understanding your results
 
-![All results table listing every analysed club with its tier, rank, last month's rank, open spots, join style, median daily gain, your place, balance score, passengers, top-3 share and fit score, with search, a hide-closed-clubs filter and sortable columns](docs/images/demo-results-table.png)
+![All results table listing every analysed club with its tier, rank, last month's rank, open spots, join style, median daily gain, your place, balance score, passengers, top-3 share and score, with a search box and sortable columns](docs/images/demo-results-table.png)
 
-<sub>The All results table, shown with sample data. Search by name, hide closed clubs, or select a column to sort.</sub>
+<sub>The All results table, shown with made-up clubs. Search by name, or select a column to sort. With closed clubs included, a filter can hide them again.</sub>
 
 | Field | Meaning |
 |---|---|
@@ -158,13 +155,13 @@ With balance scoring on, the final score is:
 score = fit + weight × (1 − balance ÷ 100)
 ```
 
-**Which clubs are compared.** Each refresh loads member data for the clubs in the rank range. For your search, the server also picks the clubs whose typical member is closest to your pace, and loads any of those it doesn't have yet. Every club with loaded data is scored, so results are complete once the cache is warm. If some clubs are still loading, the response says so in `coverage`.
+**Which clubs are compared:** every club with an open spot in the scanned rank range. [ARCHITECTURE.md](ARCHITECTURE.md#how-a-request-is-answered) explains how their data is loaded.
 
 Only **current members** count. A member counts as current if they have data on the club's most recent day, the same rule uma.moe uses. Members with fewer than 3 days of data are too new to rank, so they're placed below you and left out of the balance score.
 
 ## Configuration
 
-*(coming soon)* Set these in `.env`.
+Set these in `.env`. Only `UMAMOE_API_KEY` is required; [`.env.example`](.env.example) lists the rest with their defaults.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -187,7 +184,7 @@ Only **current members** count. A member counts as current if they have data on 
 
 ## API
 
-*(coming soon)* The web page is built on a JSON API you can also call directly.
+The web page is built on a JSON API you can also call directly.
 
 ### Get recommendations
 
@@ -199,8 +196,8 @@ GET /api/v1/recommendations
 |---|---|---|---|
 | `trainer_id` | yes, or `pace` | | Your 12-digit trainer ID |
 | `pace` | yes, or `trainer_id` | | Your daily fan gain, if you'd rather not look up a trainer |
-| `balance` | no | `false` | Include balance scoring |
-| `balance_weight` | no | `0.5` | Balance strength, 0–1. Setting it turns balance on. |
+| `balance` | no | `false` | `true` turns on balance scoring at strength 0.5 |
+| `balance_weight` | no | | Balance strength, 0–1. Setting it turns balance on |
 | `include_closed` | no | `false` | Include closed clubs |
 | `limit` | no | `50` | Maximum number of clubs returned |
 
@@ -217,7 +214,7 @@ curl "http://localhost:8080/api/v1/recommendations?trainer_id=123456789012&balan
   "updated_at": "2026-10-19T08:00:00Z",
   "month": "2026-10",
   "coverage": { "shortlisted": 102, "scored": 113, "pending": 0 },
-  "total": 42,
+  "total": 98,
   "clubs": [
     {
       "circle_id": 100000001,
@@ -250,13 +247,13 @@ curl "http://localhost:8080/api/v1/recommendations?trainer_id=123456789012&balan
 }
 ```
 
-`total` is how many clubs were scored before `limit` was applied. The [server README](backend/server/README.md#recommendations) describes every field and error.
+`total` is how many clubs were scored before `limit` was applied. `month` is the game month the data comes from, and `coverage.pending` counts clubs that are still loading. The [server README](backend/server/README.md#recommendations) describes every field and error.
 
 ### Other endpoints
 
 | Endpoint | Returns |
 |---|---|
-| `GET /api/v1/status` | When club data was last refreshed, how many clubs are cached, and the last scan error |
+| `GET /api/v1/status` | When club data was last refreshed, the club pool and cache, and the last scan error |
 | `GET /api/v1/health` | `200 OK` while the server is running |
 
 ## Tips for switching clubs
@@ -270,25 +267,19 @@ These rules can change, so check in-game if something doesn't match.
 
 ## Development
 
-*(coming soon)*
-
 ### Prerequisites
 
 - [Rust](https://rustup.rs) (latest stable)
-- [Node.js](https://nodejs.org) 22.22.2 or newer (or 24.15 or newer)
+- [Node.js](https://nodejs.org) 22.22.2 or newer, 24.15 or newer, or 26 or newer
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (optional, to build and run the image)
 
-### Project layout
+### Architecture
 
-```
-backend/
-  scoring/         Club scoring (no network or storage dependencies)
-  umamoe-client/   uma.moe API client
-  server/          API server, scheduled club scanner and cache
-frontend/          Web interface (Svelte + TypeScript)
-```
+[ARCHITECTURE.md](ARCHITECTURE.md) shows how the scoring crate, the uma.moe client, the server and the web page fit together, with a diagram, the project layout and how data is loaded and cached.
 
 ### Run locally
+
+The server reads `.env` from the folder you start it in, so set up `.env` first ([step 2](#2-download-and-configure)).
 
 ```bash
 # Backend
