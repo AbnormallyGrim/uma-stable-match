@@ -7,7 +7,7 @@ use uma_stable_match_server::{
     scan, ClubDetails, DetailConfig, Scan, ScanConfig, ScanError, SharedPool,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
-use wiremock::matchers::{method, path, query_param};
+use wiremock::matchers::{method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> Client {
@@ -371,4 +371,56 @@ async fn a_new_scan_replaces_the_pool_and_reuses_cached_details() {
     assert_eq!(second.prefetched, 2);
     assert_eq!(ids(&details), vec![2, 3]);
     assert!(details.cached(1).await.is_some());
+}
+
+fn early(id: u64, rank: i32) -> Value {
+    let mut row = listed(id, rank, 20);
+    row["last_updated"] = json!("2026-03-02T15:00:00Z");
+    row["monthly_point"] = json!(id as i64 * 10_000);
+    row["last_month_point"] = json!(id as i64 * 56_000_000);
+    row
+}
+
+#[tokio::test]
+async fn early_in_the_month_uses_last_month() {
+    let server = MockServer::start().await;
+    mount_page(&server, 0, vec![early(1, 12), early(2, 13)]).await;
+    for id in 1..=2 {
+        Mock::given(path("/api/v4/circles"))
+            .and(query_param("circle_id", id.to_string()))
+            .and(query_param("year", "2026"))
+            .and(query_param("month", "2"))
+            .respond_with(detail(id))
+            .expect(1)
+            .mount(&server)
+            .await;
+    }
+
+    let (scan, details) = run(&server, &config()).await;
+    let scan = scan.unwrap();
+    assert_eq!(scan.month.as_deref(), Some("2026-02"));
+    assert_eq!(scan.candidates, 2);
+    assert_eq!(scan.prefetched, 2);
+    assert_eq!(details.period(), Some((2026, 2)));
+    assert_eq!(ids(&details), vec![1, 2]);
+    let pool = details.pool().read().unwrap();
+    assert_eq!(pool.estimated_median(1), Some(1_000_000.0 / 10.0));
+}
+
+#[tokio::test]
+async fn later_in_the_month_uses_the_current_month() {
+    let server = MockServer::start().await;
+    mount_page(&server, 0, vec![listed(1, 12, 20)]).await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "1"))
+        .and(query_param_is_missing("year"))
+        .and(query_param_is_missing("month"))
+        .respond_with(detail(1))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let (scan, details) = run(&server, &config()).await;
+    assert_eq!(scan.unwrap().month.as_deref(), Some("2026-03"));
+    assert_eq!(details.period(), None);
 }

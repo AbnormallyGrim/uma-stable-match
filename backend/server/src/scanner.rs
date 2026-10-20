@@ -6,7 +6,7 @@ use uma_stable_match_umamoe_client::{
 };
 
 use crate::details::ClubDetails;
-use crate::pool::{game_month_start, jst, ClubPool, ListedClub};
+use crate::pool::{game_month, is_early_month, previous_game_month, ClubPool, ListedClub, Period};
 
 // Safety stop in case the API never returns a short page.
 const MAX_PAGES: u32 = 100;
@@ -82,15 +82,24 @@ pub async fn scan(
     config: &ScanConfig,
 ) -> Result<Scan, ScanError> {
     let rows = list_candidates(client, config).await?;
-    let month = rows
+    let snapshot = rows
         .iter()
         .filter_map(|c| c.last_updated.as_deref())
         .filter_map(|t| DateTime::parse_from_rfc3339(t).ok())
         .map(|t| t.with_timezone(&Utc))
-        .max()
-        .map(game_month);
+        .max();
+    let period = snapshot
+        .filter(|at| is_early_month(*at))
+        .map(previous_game_month);
+    let month = snapshot.map(|at| month_label(period.unwrap_or_else(|| game_month(at))));
 
-    let mut pool = ClubPool::new(rows.iter().filter_map(ListedClub::from_circle));
+    let listed = if period.is_some() {
+        ListedClub::from_circle_last_month
+    } else {
+        ListedClub::from_circle
+    };
+    let mut pool = ClubPool::new(rows.iter().filter_map(listed));
+    details.set_period(period);
     details.set_listed(rows.into_iter().map(|c| (c.circle_id, c)));
     details.restore_exact_medians(&mut pool);
     let candidates = pool.len();
@@ -126,11 +135,8 @@ fn prefetch_ids(pool: &ClubPool, max: usize) -> Vec<u64> {
     (0..max).map(|i| ids[i * ids.len() / max]).collect()
 }
 
-fn game_month(at: DateTime<Utc>) -> String {
-    game_month_start(at)
-        .with_timezone(&jst())
-        .format("%Y-%m")
-        .to_string()
+fn month_label((year, month): Period) -> String {
+    format!("{year:04}-{month:02}")
 }
 
 async fn list_candidates(client: &Client, config: &ScanConfig) -> Result<Vec<Circle>, ScanError> {

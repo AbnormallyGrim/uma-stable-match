@@ -10,7 +10,7 @@ use uma_stable_match_scoring::Club;
 use uma_stable_match_umamoe_client::{Circle, CircleRequest, Client, Error, Priority};
 
 use crate::calibration::club_median;
-use crate::pool::ClubPool;
+use crate::pool::{ClubPool, Period};
 
 /// The club pool, shared between requests and the detail cache.
 pub type SharedPool = Arc<RwLock<ClubPool>>;
@@ -45,7 +45,8 @@ pub struct ClubDetails {
 struct Inner {
     interactive: Client,
     background: Client,
-    cache: Cache<u64, Arc<Club>>,
+    cache: Cache<(u64, Option<Period>), Arc<Club>>,
+    period: RwLock<Option<Period>>,
     pool: SharedPool,
     listed: RwLock<HashMap<u64, Circle>>,
     queued: Mutex<HashSet<u64>>,
@@ -84,6 +85,7 @@ impl ClubDetails {
                 interactive: client.with_priority(Priority::Interactive),
                 background: client.with_priority(Priority::Background),
                 cache,
+                period: RwLock::new(None),
                 pool,
                 listed: RwLock::new(HashMap::new()),
                 queued: Mutex::new(HashSet::new()),
@@ -101,16 +103,19 @@ impl ClubDetails {
     /// club share a single fetch. Failed fetches aren't cached.
     pub async fn get(&self, circle_id: u64, priority: Priority) -> Result<Arc<Club>, Arc<Error>> {
         let inner = &self.inner;
+        let period = self.period();
         inner
             .cache
-            .try_get_with(circle_id, async {
+            .try_get_with((circle_id, period), async {
                 let client = match priority {
                     Priority::Interactive => &inner.interactive,
                     Priority::Background => &inner.background,
                 };
-                let mut response = client
-                    .circle(&CircleRequest::by_circle_id(circle_id))
-                    .await?;
+                let mut request = CircleRequest::by_circle_id(circle_id);
+                if let Some((year, month)) = period {
+                    request = request.for_month(year, month);
+                }
+                let mut response = client.circle(&request).await?;
                 if response.circle.circle_id == 0 {
                     if let Some(listed) = read(&inner.listed).get(&circle_id) {
                         response.circle = listed.clone();
@@ -121,7 +126,9 @@ impl ClubDetails {
                     club.circle_id = circle_id;
                 }
                 if let Some(median) = club_median(&club) {
-                    write(&inner.pool).set_exact_median(circle_id, median);
+                    if *read(&inner.period) == period {
+                        write(&inner.pool).set_exact_median(circle_id, median);
+                    }
                 }
                 Ok(Arc::new(club))
             })
@@ -130,13 +137,21 @@ impl ClubDetails {
 
     /// A club's details, only if they're cached.
     pub async fn cached(&self, circle_id: u64) -> Option<Arc<Club>> {
-        self.inner.cache.get(&circle_id).await
+        self.inner.cache.get(&(circle_id, self.period())).await
+    }
+
+    pub fn period(&self) -> Option<Period> {
+        *read(&self.inner.period)
+    }
+
+    pub fn set_period(&self, period: Option<Period>) {
+        *write(&self.inner.period) = period;
     }
 
     /// Queues a club for background loading. Returns `false` if it's cached, already queued, or the
     /// queue is full.
     pub fn queue(&self, circle_id: u64) -> bool {
-        if self.inner.cache.contains_key(&circle_id) {
+        if self.inner.cache.contains_key(&(circle_id, self.period())) {
             return false;
         }
         let mut queued = lock(&self.inner.queued);
@@ -177,12 +192,13 @@ impl ClubDetails {
 
     /// Cached clubs that are still in the pool, best rank first.
     pub fn cached_in_pool(&self) -> Vec<Arc<Club>> {
+        let period = self.period();
         let pool = read(&self.inner.pool);
         let mut clubs: Vec<Arc<Club>> = self
             .inner
             .cache
             .iter()
-            .filter(|(id, _)| pool.contains(**id))
+            .filter(|(key, _)| key.1 == period && pool.contains(key.0))
             .map(|(_, club)| club)
             .collect();
         clubs.sort_by_key(|c| (c.monthly_rank.unwrap_or(u32::MAX), c.circle_id));
@@ -192,11 +208,13 @@ impl ClubDetails {
     /// Copies the exact medians of cached clubs into `pool`, such as a freshly scanned one.
     /// Returns how many were set.
     pub fn restore_exact_medians(&self, pool: &mut ClubPool) -> usize {
+        let period = self.period();
         pool.set_exact_medians(
             self.inner
                 .cache
                 .iter()
-                .filter_map(|(id, club)| club_median(&club).map(|m| (*id, m))),
+                .filter(|(key, _)| key.1 == period)
+                .filter_map(|(key, club)| club_median(&club).map(|m| (key.0, m))),
         )
     }
 }

@@ -291,3 +291,45 @@ async fn debug_shows_counts_only() {
         "ClubDetails { cached: 0, queued: 0, .. }"
     );
 }
+
+#[tokio::test]
+async fn months_are_cached_separately() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "1"))
+        .and(query_param("month", "2"))
+        .respond_with(ok(1))
+        .expect(1)
+        .mount(&server)
+        .await;
+    mount(&server, 1, ok(1), 1).await;
+    let (details, _loader) = details(&server, DetailConfig::default(), &[1]);
+
+    details.get(1, Priority::Interactive).await.unwrap();
+    details.set_period(Some((2026, 2)));
+    assert!(details.cached(1).await.is_none());
+    assert!(details.cached_in_pool().is_empty());
+    assert!(details.queue(1));
+
+    details.get(1, Priority::Interactive).await.unwrap();
+    assert_eq!(details.cached_in_pool().len(), 1);
+    details.set_period(None);
+    assert!(details.cached(1).await.is_some());
+}
+
+#[tokio::test]
+async fn loads_from_an_old_month_leave_the_pool_alone() {
+    let server = MockServer::start().await;
+    mount(&server, 1, ok(1).set_delay(Duration::from_millis(200)), 1).await;
+    let (details, _loader) = details(&server, DetailConfig::default(), &[1]);
+
+    let loading = {
+        let details = details.clone();
+        tokio::spawn(async move { details.get(1, Priority::Interactive).await })
+    };
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    details.set_period(Some((2026, 2)));
+    loading.await.unwrap().unwrap();
+
+    assert_eq!(details.pool().read().unwrap().exact_medians(), 0);
+}

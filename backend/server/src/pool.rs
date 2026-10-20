@@ -2,8 +2,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Utc};
-use uma_stable_match_scoring::{JoinStyle, CLUB_CAP, MIN_RANKED_MEMBERS};
+use chrono::{DateTime, Datelike, FixedOffset, TimeDelta, TimeZone, Utc};
+use uma_stable_match_scoring::{JoinStyle, CLUB_CAP, MIN_DAYS_FOR_PACE, MIN_RANKED_MEMBERS};
 use uma_stable_match_umamoe_client::Circle;
 
 use crate::calibration::Calibration;
@@ -17,6 +17,10 @@ pub const DEFAULT_SHORTLIST_SIZE: usize = 120;
 const JST_OFFSET_SECONDS: i32 = 9 * 3600;
 const SECONDS_PER_DAY: f64 = 86_400.0;
 const MIN_ELAPSED_DAYS: f64 = 1.0;
+
+pub type Period = (i32, u32);
+
+pub const EARLY_MONTH_DAYS: f64 = (MIN_DAYS_FOR_PACE - 1) as f64;
 
 /// Japan Standard Time (UTC+09:00), which uma.moe uses for months.
 pub fn jst() -> FixedOffset {
@@ -48,6 +52,32 @@ pub fn elapsed_days(at: DateTime<Utc>) -> f64 {
     (at - game_month_start(at)).num_seconds() as f64 / SECONDS_PER_DAY
 }
 
+pub fn game_month(at: DateTime<Utc>) -> Period {
+    let start = game_month_start(at).with_timezone(&jst());
+    (start.year(), start.month())
+}
+
+pub fn previous_game_month(at: DateTime<Utc>) -> Period {
+    game_month(game_month_start(at) - TimeDelta::seconds(1))
+}
+
+pub fn previous_game_month_days(at: DateTime<Utc>) -> f64 {
+    let start = game_month_start(at);
+    let previous = game_month_start(start - TimeDelta::seconds(1));
+    (start - previous).num_seconds() as f64 / SECONDS_PER_DAY
+}
+
+pub fn is_early_month(at: DateTime<Utc>) -> bool {
+    elapsed_days(at) < EARLY_MONTH_DAYS
+}
+
+pub fn last_month_rate(last_month_point: i64, member_count: u32, at: DateTime<Utc>) -> Option<f64> {
+    if last_month_point <= 0 || member_count == 0 {
+        return None;
+    }
+    Some(last_month_point as f64 / previous_game_month_days(at) / f64::from(member_count))
+}
+
 /// Mean daily fans per member this game month, or `None` without points, members or a full day.
 pub fn raw_rate(monthly_point: i64, member_count: u32, at: DateTime<Utc>) -> Option<f64> {
     let days = elapsed_days(at);
@@ -74,6 +104,14 @@ impl ListedClub {
     /// Builds a pool entry, or `None` if the club is archived, full, too small to score or
     /// missing data.
     pub fn from_circle(circle: &Circle) -> Option<Self> {
+        Self::build(circle, false)
+    }
+
+    pub fn from_circle_last_month(circle: &Circle) -> Option<Self> {
+        Self::build(circle, true)
+    }
+
+    fn build(circle: &Circle, last_month: bool) -> Option<Self> {
         if circle.archived == Some(true) {
             return None;
         }
@@ -84,7 +122,11 @@ impl ListedClub {
         let at = DateTime::parse_from_rfc3339(circle.last_updated.as_deref()?)
             .ok()?
             .with_timezone(&Utc);
-        let raw_rate = raw_rate(circle.monthly_point?, member_count, at)?;
+        let raw_rate = if last_month {
+            last_month_rate(circle.last_month_point?, member_count, at)?
+        } else {
+            raw_rate(circle.monthly_point?, member_count, at)?
+        };
         let join_style = circle
             .join_style
             .and_then(|code| u8::try_from(code).ok())
