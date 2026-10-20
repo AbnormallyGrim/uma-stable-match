@@ -42,9 +42,10 @@ Blank values count as unset. A missing key, a `HOST` that isn't an IP address (h
 `scan` builds a new [club pool](#club-pool) and fills the [detail cache](#club-details):
 
 1. List clubs by monthly rank, best first, 100 per page and up to `SCAN_RANK_TO`. Stop after a page whose last club is ranked `SCAN_RANK_TO` or worse, after a short or empty page, or after 100 pages.
-2. Build a `ClubPool` from the clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO`. `ListedClub::from_circle` drops archived clubs, full clubs, clubs with fewer than 8 members, and rows missing points, a member count or `last_updated`. Closed clubs are kept, so each request can include or exclude them.
-3. Copy in the exact medians of clubs that are still cached, then swap the new pool in.
-4. Prefetch member data for up to `SCAN_MAX_DETAILS` clubs in the background lane, so visitors' requests go first. If the pool is larger, the clubs are spread evenly across the estimates, from slowest to fastest. If a club's details come back without club information, the listed details are used.
+2. Decide which month to use. Early in a game month the previous month is used instead; see [Early in the month](#early-in-the-month).
+3. Build a `ClubPool` from the clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO`. `ListedClub::from_circle` drops archived clubs, full clubs, clubs with fewer than 8 members, and rows missing points, a member count or `last_updated`. Closed clubs are kept, so each request can include or exclude them.
+4. Copy in the exact medians of clubs that are still cached for that month, then swap the new pool in.
+5. Prefetch member data for up to `SCAN_MAX_DETAILS` clubs in the background lane, so visitors' requests go first. If the pool is larger, the clubs are spread evenly across the estimates, from slowest to fastest. If a club's details come back without club information, the listed details are used.
 
 A club whose details fail to load is logged and skipped. A failed list request fails the whole scan and leaves the previous pool in place. `Scan` returns the number of candidates (the pool size), how many were prefetched, how many failed, and the game month of the listed data.
 
@@ -57,6 +58,19 @@ The club pool is the first stage of two-stage matching (#87). It picks the clubs
 ### Game months
 
 uma.moe's game month starts on the **2nd at 00:00 JST** (UTC+09:00), so the 1st still belongs to the previous month. `game_month_start` and `elapsed_days` follow this. A list row's `last_updated` is the daily 00:00 JST snapshot, so `elapsed_days` at that time is a whole number of days.
+
+### Early in the month
+
+On the first two days of a game month (the 2nd and 3rd in JST), there are fewer than 3 days of data, which isn't enough for a pace. Until the 4th, the whole flow uses the previous game month instead:
+
+| Part | Normal | Early in the month |
+|---|---|---|
+| Pool estimate | `monthly_point ÷ elapsed days ÷ member_count` | `last_month_point ÷ days in the previous game month ÷ member_count` (`from_circle_last_month`) |
+| Club details | Current month | `CircleRequest::for_month` with the previous month |
+| Trainer pace | This month's `daily_fans` | Last month's `daily_fans`, or the 7-day gain ÷ 7 from `rankings_gains` if that month has too little data |
+| `month` in responses | Current game month | Previous game month |
+
+The scan decides the month from the list's snapshot time (`is_early_month`), so clubs and trainers always use the same month. The detail cache and the trainer pace cache keep each month's data separately, so the switch on the 4th never mixes months. A detail load that started under the old month doesn't write its median into the new pool.
 
 ### Estimate
 
@@ -233,7 +247,7 @@ Cached clubs are always scored exactly, so the shortlist only decides which unca
 
 #### Looking up a trainer
 
-With `trainer_id`, the server fetches that trainer's club from uma.moe and finds their snapshot (the latest month if there's more than one). It then calculates their pace with `daily_pace`, which needs at least 3 days of data and a gain above zero.
+With `trainer_id`, the server fetches that trainer's club from uma.moe and finds their snapshot (the latest month if there's more than one). It then calculates their pace with `daily_pace`, which needs at least 3 days of data and a gain above zero. [Early in the month](#early-in-the-month), it uses last month's data, falling back to the trainer's 7-day gain.
 
 - **Cached for `TRAINER_CACHE_MINUTES`** (10 by default). A found pace, and a "not found" or "not enough data" answer, is reused for that long, so repeat requests don't call uma.moe again. Failed uma.moe requests aren't cached.
 - **IDs stay out of logs.** Trainer IDs never appear in log messages or error responses, only in the response to the trainer's own request. Failed lookups log only the HTTP status.

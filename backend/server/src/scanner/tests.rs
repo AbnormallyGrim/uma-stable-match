@@ -45,12 +45,9 @@ fn prefetch_spreads_across_the_estimates() {
 }
 
 #[test]
-fn game_month_is_the_jst_month_it_started_in() {
-    let at = |s: &str| DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc);
-    assert_eq!(game_month(at("2026-03-20T00:00:00+09:00")), "2026-03");
-    assert_eq!(game_month(at("2026-04-01T00:00:00+09:00")), "2026-03");
-    assert_eq!(game_month(at("2026-04-01T15:00:00Z")), "2026-04");
-    assert_eq!(game_month(at("2027-01-01T12:00:00+09:00")), "2026-12");
+fn month_labels_are_year_and_month() {
+    assert_eq!(month_label((2026, 3)), "2026-03");
+    assert_eq!(month_label((2026, 12)), "2026-12");
 }
 
 #[test]

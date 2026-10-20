@@ -328,3 +328,80 @@ fn exact_medians_in_a_batch() {
     assert_eq!(ids, vec![3, 2, 4, 1, 5]);
     assert_eq!(pool.set_exact_medians([]), 0);
 }
+
+#[test]
+fn game_month_is_the_jst_month_it_started_in() {
+    assert_eq!(game_month(utc("2026-03-20T00:00:00+09:00")), (2026, 3));
+    assert_eq!(game_month(utc("2026-04-01T00:00:00+09:00")), (2026, 3));
+    assert_eq!(game_month(utc("2026-04-01T15:00:00Z")), (2026, 4));
+    assert_eq!(game_month(utc("2027-01-01T12:00:00+09:00")), (2026, 12));
+}
+
+#[test]
+fn previous_game_month_and_its_length() {
+    assert_eq!(
+        previous_game_month(utc("2026-03-03T00:00:00+09:00")),
+        (2026, 2)
+    );
+    assert_eq!(
+        previous_game_month(utc("2027-01-02T00:00:00+09:00")),
+        (2026, 12)
+    );
+    assert_eq!(
+        previous_game_month(utc("2026-03-01T00:00:00+09:00")),
+        (2026, 1)
+    );
+    assert_eq!(
+        previous_game_month_days(utc("2026-03-03T00:00:00+09:00")),
+        28.0
+    );
+    assert_eq!(
+        previous_game_month_days(utc("2028-03-03T00:00:00+09:00")),
+        29.0
+    );
+    assert_eq!(
+        previous_game_month_days(utc("2026-04-03T00:00:00+09:00")),
+        31.0
+    );
+}
+
+#[test]
+fn early_month_is_the_first_two_game_days() {
+    assert!(is_early_month(utc("2026-03-02T00:00:00+09:00")));
+    assert!(is_early_month(utc("2026-03-03T00:00:00+09:00")));
+    assert!(is_early_month(utc("2026-03-03T23:59:59+09:00")));
+    assert!(!is_early_month(utc("2026-03-04T00:00:00+09:00")));
+    assert!(!is_early_month(utc("2026-03-01T00:00:00+09:00")));
+    assert!(!is_early_month(utc("2026-03-20T00:00:00+09:00")));
+}
+
+#[test]
+fn early_month_follows_jst_not_utc() {
+    assert!(is_early_month(utc("2026-03-01T15:00:00Z")));
+    assert!(!is_early_month(utc("2026-03-01T14:59:59Z")));
+}
+
+#[test]
+fn last_month_rate_uses_the_whole_previous_month() {
+    let at = utc("2026-03-03T00:00:00+09:00");
+    assert_eq!(last_month_rate(56_000_000, 20, at), Some(100_000.0));
+    assert_eq!(last_month_rate(0, 20, at), None);
+    assert_eq!(last_month_rate(56_000_000, 0, at), None);
+}
+
+#[test]
+fn listed_club_from_last_month() {
+    let mut c = circle();
+    c.last_updated = Some("2026-03-02T15:00:00Z".into());
+    c.monthly_point = Some(0);
+    c.last_month_point = Some(56_000_000);
+    let club = ListedClub::from_circle_last_month(&c).unwrap();
+    assert_eq!(club.raw_rate, 100_000.0);
+    assert!(ListedClub::from_circle(&c).is_none());
+
+    c.last_month_point = None;
+    assert!(ListedClub::from_circle_last_month(&c).is_none());
+    c.last_month_point = Some(56_000_000);
+    c.member_count = Some(30);
+    assert!(ListedClub::from_circle_last_month(&c).is_none());
+}

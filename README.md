@@ -138,7 +138,7 @@ Club data refreshes automatically every 3 hours by default. The page shows when 
 
 ### How clubs are ranked
 
-**Your pace** is your average daily fan gain this month.
+**Your pace** is your average daily fan gain this month. On the first two days of a game month, before there's enough data, both your pace and the clubs' data come from last month, and the results say so.
 
 **Fit** is best when you'd sit roughly 25–60% of the way down the club's members and the club's median is a little below your pace:
 
