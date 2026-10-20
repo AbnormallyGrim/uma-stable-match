@@ -2,8 +2,6 @@
 
 use uma_stable_match_scoring::{score_club, Club, ScoringOptions};
 
-use crate::pool::ListedClub;
-
 /// Samples needed before the factor is used.
 pub const MIN_CALIBRATION_SAMPLES: usize = 20;
 
@@ -48,14 +46,6 @@ impl Calibration {
         Self { factor, samples }
     }
 
-    /// A club's true median ÷ its raw rate, or `None` if it can't be scored.
-    pub fn ratio(listed: &ListedClub, club: &Club) -> Option<f64> {
-        let options = ScoringOptions::default().with_include_closed(true);
-        let scored = score_club(1.0, club, &options).ok()??;
-        let ratio = scored.median_per_day / listed.raw_rate;
-        (ratio.is_finite() && ratio > 0.0).then_some(ratio)
-    }
-
     /// The correction factor.
     pub fn factor(&self) -> f64 {
         self.factor
@@ -70,6 +60,12 @@ impl Calibration {
     pub fn is_calibrated(&self) -> bool {
         self.samples >= MIN_CALIBRATION_SAMPLES
     }
+}
+
+pub fn club_median(club: &Club) -> Option<f64> {
+    let options = ScoringOptions::default().with_include_closed(true);
+    let median = score_club(1.0, club, &options).ok()??.median_per_day;
+    (median.is_finite() && median > 0.0).then_some(median)
 }
 
 #[cfg(test)]
