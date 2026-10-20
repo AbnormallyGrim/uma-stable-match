@@ -16,6 +16,8 @@ const recommendations: Recommendations = {
   trainer: { trainer_id: 123456789012, pace_per_day: 7_600_000 },
   options: { balance_weight: null, include_closed: false, limit: 50 },
   updated_at: '2026-03-18T09:00:00Z',
+  month: '2026-03',
+  coverage: { shortlisted: 1, scored: 1, pending: 0 },
   total: 1,
   clubs: [
     {

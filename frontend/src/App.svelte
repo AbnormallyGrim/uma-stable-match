@@ -8,6 +8,7 @@
   import SearchForm from './lib/SearchForm.svelte';
   import SearchStatus from './lib/SearchStatus.svelte';
   import SiteFooter from './lib/SiteFooter.svelte';
+  import { resultNotices } from './lib/states';
   import ThemeToggle from './lib/ThemeToggle.svelte';
   import {
     DEFAULT_SEARCH,
@@ -38,6 +39,14 @@
   });
 
   const busy = $derived(search.status.phase === 'loading');
+  const announcement = $derived.by(() => {
+    if (search.status.phase !== 'done' || !search.result) {
+      return '';
+    }
+    const total = search.result.total;
+    const found = `Found ${total} ${total === 1 ? 'club' : 'clubs'}.`;
+    return [found, ...resultNotices(search.result)].join(' ');
+  });
   const showResults = $derived(
     search.result !== null && (search.status.phase === 'done' || search.status.phase === 'loading'),
   );
@@ -78,12 +87,7 @@
 
   <SearchStatus status={search.status} onretry={() => runner.retryNow()} />
 
-  <div aria-live="polite" class="visually-hidden">
-    {#if search.status.phase === 'done' && search.result}
-      Found {search.result.total}
-      {search.result.total === 1 ? 'club' : 'clubs'}.
-    {/if}
-  </div>
+  <div aria-live="polite" class="visually-hidden">{announcement}</div>
 
   {#if showResults && search.result}
     <Results result={search.result} stale={busy} />

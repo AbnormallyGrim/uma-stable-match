@@ -92,6 +92,21 @@ describe('accessibility', () => {
     expect(await violations(document.body, true)).toEqual([]);
   });
 
+  it('has no violations with coverage and last-month notices', async () => {
+    window.history.replaceState(null, '', '/?pace=7600000');
+    stubApi(() =>
+      json({
+        ...withResults,
+        updated_at: '2026-03-02T15:00:00Z',
+        month: '2026-02',
+        coverage: { shortlisted: 9, scored: 3, pending: 6 },
+      }),
+    );
+    render(App);
+    await screen.findAllByTestId('result-notice');
+    expect(await violations(document.body, true)).toEqual([]);
+  });
+
   it('has no violations when a search fails', async () => {
     window.history.replaceState(null, '', '/?trainer_id=123456789');
     stubApi(() => json({ error: 'trainer not found' }, 404));

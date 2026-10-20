@@ -1,6 +1,6 @@
 <!--
   @component
-  The results view: summary, the top ten picks as cards, then every club in a table.
+  The results view: summary, any notices, the top ten picks as cards, then every club in a table.
 -->
 
 <script lang="ts">
@@ -8,7 +8,7 @@
   import ClubCard from './ClubCard.svelte';
   import ResultsSummary from './ResultsSummary.svelte';
   import ResultsTable from './ResultsTable.svelte';
-  import { emptyHints } from './states';
+  import { emptyHints, resultNotices } from './states';
 
   const TOP_PICKS = 10;
 
@@ -23,11 +23,15 @@
   const picks = $derived(result.clubs.slice(0, TOP_PICKS));
   const balanceOn = $derived(result.options.balance_weight !== null);
   const hints = $derived(emptyHints(result.options));
+  const notices = $derived(resultNotices(result));
 </script>
 
 <section aria-labelledby="results-heading" class:stale aria-busy={stale}>
   <h2 id="results-heading" class="visually-hidden">Results</h2>
   <ResultsSummary {result} {now} />
+  {#each notices as notice (notice)}
+    <p class="notice" data-testid="result-notice">{notice}</p>
+  {/each}
 
   <h3>Top picks</h3>
   {#if picks.length === 0}
@@ -53,6 +57,15 @@
 </section>
 
 <style>
+  .notice {
+    margin: 10px 0 0;
+    padding: 12px 14px;
+    background: var(--card);
+    border: 1px solid color-mix(in srgb, var(--approval) 45%, transparent);
+    border-radius: var(--radius);
+    color: var(--text-2);
+  }
+
   .stale {
     opacity: 0.55;
     transition: opacity 0.2s;

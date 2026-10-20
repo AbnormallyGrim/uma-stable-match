@@ -104,8 +104,11 @@ After a search, the page shows a summary and the top ten picks.
   - **Details:** the monthly rank and trend, open spots, join style and playstyle tags, and the description
   - **How you'd compare:** your place, the club's median per day, and the fit (or the score, with balance on)
   - **With balance on:** the balance score as a bar, passengers and top-three share
+- **Notices:** under the summary, when they apply:
+  - "*N more clubs are still loading. Search again in a minute for complete results.*" when the API's `coverage.pending` is above 0
+  - "*These results are based on last month's data (February 2026), because the new game month has only just started.*" when `month` isn't the game month of `updated_at`
 - **Layout:** on narrow screens, the numbers move below the club details.
-- **Screen readers:** after a search, only a short "Found N clubs" message is announced, not the whole list. Rank trends have spoken descriptions, such as "Up 16 places since last month".
+- **Screen readers:** after a search, only a short "Found N clubs" message is announced, followed by any notices, not the whole list. The text goes into a live region that's always on the page, because a notice that appears together with new results isn't reliably announced. Rank trends have spoken descriptions, such as "Up 16 places since last month".
 
 ### Tier icons
 
@@ -266,6 +269,8 @@ When it sees a newly finished scan, it calls `onscanready`. If a search is waiti
 | `joinStyleLabel` | `approval` → `Approval` |
 | `playstyleLabel` | `2` → `Laid-back`, using uma.moe's names for policy codes 1 to 17 |
 | `formatUpdated` | 3 hours earlier → `3 hours ago`; a day earlier → `yesterday` |
+| `gameMonth` | `2026-03-01T15:00:00Z` (the 2nd in Japan) → `2026-03`; `2026-03-01T14:59:59Z` → `2026-02` |
+| `monthLabel` | `2026-02` → `February 2026` |
 
 ## API client
 

@@ -3,7 +3,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { ApiError } from './api';
-import { describeError, emptyHints } from './states';
+import { describeError, emptyHints, monthNotice, pendingNotice, resultNotices } from './states';
+import { recommendations } from './test-data';
 
 const http = (status: number, message = 'server message') =>
   new ApiError('http', message, status, null);
@@ -66,5 +67,39 @@ describe('emptyHints', () => {
       'Lower the balance strength or turn balance scoring off.',
     ]);
     expect(emptyHints(options(0, true))).toEqual([]);
+  });
+});
+
+describe('result notices', () => {
+  it('count clubs still loading', () => {
+    expect(pendingNotice({ shortlisted: 5, scored: 5, pending: 0 })).toBeNull();
+    expect(pendingNotice({ shortlisted: 5, scored: 4, pending: 1 })).toBe(
+      '1 more club is still loading. Search again in a minute for complete results.',
+    );
+    expect(pendingNotice({ shortlisted: 5, scored: 2, pending: 3 })).toBe(
+      '3 more clubs are still loading. Search again in a minute for complete results.',
+    );
+  });
+
+  it("mention last month's data only when it's used", () => {
+    const at = '2026-03-02T15:00:00Z';
+    expect(monthNotice({ updated_at: at, month: '2026-03' })).toBeNull();
+    expect(monthNotice({ updated_at: at, month: null })).toBeNull();
+    expect(monthNotice({ updated_at: at, month: '2026-02' })).toBe(
+      "These results are based on last month's data (February 2026), because the new game month has only just started.",
+    );
+  });
+
+  it('put the month first', () => {
+    const notices = resultNotices(
+      recommendations({
+        updated_at: '2026-03-02T15:00:00Z',
+        month: '2026-02',
+        coverage: { shortlisted: 3, scored: 1, pending: 2 },
+      }),
+    );
+    expect(notices).toHaveLength(2);
+    expect(notices[0]).toContain("last month's data");
+    expect(notices[1]).toContain('2 more clubs');
   });
 });
