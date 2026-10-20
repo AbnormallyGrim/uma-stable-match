@@ -9,11 +9,11 @@ use serde_json::{json, Value};
 use tokio::sync::watch;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    router, run_scheduler, AppState, Cache, ClubDetails, DetailConfig, MatchSettings, PaceLookup,
-    RateLimits, ScanConfig, SharedPool, DEFAULT_PACE_TTL,
+    router, run_scheduler, AppState, Cache, ClubDetails, DetailConfig, MatchSettings, PaceError,
+    PaceLookup, RateLimits, ScanConfig, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
-use wiremock::matchers::{path, query_param};
+use wiremock::matchers::{path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 const TRAINER: u64 = 4242;
@@ -293,4 +293,174 @@ async fn rejects_invalid_trainer_queries() {
         assert_eq!(status, StatusCode::BAD_REQUEST, "{query}");
         assert_eq!(body["error"], message, "{query}");
     }
+}
+
+const FEBRUARY: Option<(i32, u32)> = Some((2026, 2));
+
+async fn mount_last_month(server: &MockServer, response: ResponseTemplate, times: u64) {
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("viewer_id", TRAINER.to_string()))
+        .and(query_param("year", "2026"))
+        .and(query_param("month", "2"))
+        .respond_with(response)
+        .expect(times)
+        .mount(server)
+        .await;
+}
+
+async fn mount_gains(server: &MockServer, response: ResponseTemplate, times: u64) {
+    Mock::given(path("/api/v4/rankings/gains"))
+        .and(query_param("query", TRAINER.to_string()))
+        .respond_with(response)
+        .expect(times)
+        .mount(server)
+        .await;
+}
+
+fn gains(gain_7d: Option<i64>) -> ResponseTemplate {
+    let mut rankings = vec![json!({ "viewer_id": 1, "gain_7d": 99_000_000 })];
+    if let Some(gain) = gain_7d {
+        rankings.push(json!({ "viewer_id": TRAINER, "gain_7d": gain }));
+    }
+    ResponseTemplate::new(200).set_body_json(json!({ "rankings": rankings }))
+}
+
+fn one_day() -> Vec<i64> {
+    let mut fans = vec![0; 31];
+    fans[0] = 100_000_000;
+    fans
+}
+
+fn lookup(server: &MockServer) -> PaceLookup {
+    PaceLookup::new(client(server), DEFAULT_PACE_TTL)
+}
+
+#[tokio::test]
+async fn early_month_uses_last_months_fans() {
+    let server = MockServer::start().await;
+    mount_last_month(&server, trainer_club(series(3_000_000)), 1).await;
+    mount_gains(&server, gains(Some(70_000_000)), 0).await;
+
+    let pace = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap();
+    assert_eq!(pace, 3_000_000.0);
+}
+
+#[tokio::test]
+async fn early_month_falls_back_to_seven_day_gains() {
+    let server = MockServer::start().await;
+    mount_last_month(&server, trainer_club(one_day()), 1).await;
+    mount_gains(&server, gains(Some(70_000_000)), 1).await;
+
+    let pace = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap();
+    assert_eq!(pace, 10_000_000.0);
+}
+
+#[tokio::test]
+async fn early_month_without_gains_is_not_enough_data() {
+    let server = MockServer::start().await;
+    mount_last_month(&server, trainer_club(one_day()), 1).await;
+    mount_gains(&server, gains(None), 1).await;
+
+    let error = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap_err();
+    assert!(matches!(error, PaceError::NotEnoughData));
+}
+
+#[tokio::test]
+async fn early_month_ignores_zero_gains() {
+    let server = MockServer::start().await;
+    mount_last_month(&server, trainer_club(one_day()), 1).await;
+    mount_gains(&server, gains(Some(0)), 1).await;
+
+    let error = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap_err();
+    assert!(matches!(error, PaceError::NotEnoughData));
+}
+
+#[tokio::test]
+async fn early_month_unknown_trainer_is_not_found() {
+    let server = MockServer::start().await;
+    mount_last_month(&server, ResponseTemplate::new(404), 1).await;
+    mount_gains(&server, ResponseTemplate::new(404), 1).await;
+
+    let error = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap_err();
+    assert!(matches!(error, PaceError::NotFound));
+}
+
+#[tokio::test]
+async fn early_month_gains_failure_is_upstream() {
+    let server = MockServer::start().await;
+    mount_last_month(&server, trainer_club(one_day()), 1).await;
+    mount_gains(&server, ResponseTemplate::new(500), 1).await;
+
+    let error = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap_err();
+    assert!(matches!(error, PaceError::Upstream(_)));
+}
+
+#[tokio::test]
+async fn paces_are_cached_per_month() {
+    let server = MockServer::start().await;
+    mount_last_month(&server, trainer_club(series(3_000_000)), 1).await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("viewer_id", TRAINER.to_string()))
+        .and(query_param_is_missing("year"))
+        .respond_with(trainer_club(series(5_000_000)))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let paces = lookup(&server);
+    for _ in 0..2 {
+        assert_eq!(paces.pace(TRAINER, None).await.unwrap(), 5_000_000.0);
+        assert_eq!(paces.pace(TRAINER, FEBRUARY).await.unwrap(), 3_000_000.0);
+    }
+    assert!(paces.is_cached(TRAINER, None));
+    assert!(paces.is_cached(TRAINER, FEBRUARY));
+    assert!(!paces.is_cached(TRAINER, Some((2026, 1))));
+}
+
+#[tokio::test]
+async fn early_month_recommendations_use_last_month() {
+    let server = MockServer::start().await;
+    let mut row = club_detail()["circle"].clone();
+    row["last_updated"] = json!("2026-03-02T15:00:00Z");
+    row["last_month_point"] = json!(1_120_000_000);
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "circles": [row] })))
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "1"))
+        .and(query_param("month", "2"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(club_detail()))
+        .expect(1)
+        .mount(&server)
+        .await;
+    mount_last_month(&server, trainer_club(series(3_000_000)), 1).await;
+
+    let cache = Cache::new();
+    let details = details(&server);
+    let (stop, stopped) = watch::channel(false);
+    let handle = tokio::spawn(run_scheduler(
+        client(&server),
+        details.clone(),
+        ScanConfig::default(),
+        Duration::from_secs(3600),
+        cache.clone(),
+        stopped,
+    ));
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while cache.snapshot().is_none() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("scan did not finish");
+    stop.send(true).unwrap();
+    handle.await.unwrap();
+
+    let state = app(&server, (cache, details), DEFAULT_PACE_TTL);
+    let (status, body) = get(&state, &by_trainer()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["month"], "2026-02");
+    assert_eq!(body["trainer"]["pace_per_day"], 3_000_000.0);
+    assert_eq!(body["total"], 1);
 }

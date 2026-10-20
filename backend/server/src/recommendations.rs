@@ -175,10 +175,12 @@ pub(crate) async fn recommendations(
     let (pace, trainer_id) = match source {
         PaceSource::Given(pace) => (pace, None),
         PaceSource::Trainer(id) => {
-            if !state.paces.is_cached(id) {
+            let period = state.details.period();
+            if !state.paces.is_cached(id, period) {
                 state.limits.check_lookup(visitor)?;
             }
-            (state.paces.pace(id).await.map_err(pace_error)?, Some(id))
+            let pace = state.paces.pace(id, period).await.map_err(pace_error)?;
+            (pace, Some(id))
         }
     };
     score_clubs(pace, &[], &options).map_err(|e| ApiError::bad_request(e.to_string()))?;

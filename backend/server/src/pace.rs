@@ -5,7 +5,11 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use uma_stable_match_scoring::daily_pace;
-use uma_stable_match_umamoe_client::{CircleRequest, CircleResponse, Client, Error, StatusCode};
+use uma_stable_match_umamoe_client::{
+    CircleRequest, CircleResponse, Client, Error, RankingsGainsRequest, StatusCode,
+};
+
+use crate::pool::Period;
 
 /// How long a looked-up pace is reused.
 pub const DEFAULT_PACE_TTL: Duration = Duration::from_secs(10 * 60);
@@ -23,6 +27,8 @@ pub enum PaceError {
     #[error("could not reach uma.moe")]
     Upstream(#[source] Error),
 }
+
+type Entries = HashMap<(u64, Option<Period>), (Instant, Outcome)>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Outcome {
@@ -46,7 +52,7 @@ impl Outcome {
 pub struct PaceLookup {
     client: Client,
     ttl: Duration,
-    entries: Arc<Mutex<HashMap<u64, (Instant, Outcome)>>>,
+    entries: Arc<Mutex<Entries>>,
 }
 
 impl PaceLookup {
@@ -59,47 +65,86 @@ impl PaceLookup {
         }
     }
 
-    /// The trainer's daily fan gain this month.
+    /// The trainer's daily fan gain this month, or in `period` if given. For a given period it
+    /// falls back to the 7-day gain ÷ 7 when that month has too little data.
     ///
-    /// Found and not-found results are cached; uma.moe failures aren't.
-    pub async fn pace(&self, viewer_id: u64) -> Result<f64, PaceError> {
-        if let Some(outcome) = self.cached(viewer_id) {
+    /// Found and not-found results are cached per month; uma.moe failures aren't.
+    pub async fn pace(&self, viewer_id: u64, period: Option<Period>) -> Result<f64, PaceError> {
+        if let Some(outcome) = self.cached(viewer_id, period) {
             return outcome.into_result();
         }
 
-        let outcome = match self
-            .client
-            .circle(&CircleRequest::by_viewer_id(viewer_id))
-            .await
-        {
-            Ok(response) => pace_from_response(&response, viewer_id),
-            Err(error) if error.status() == Some(StatusCode::NOT_FOUND) => Outcome::NotFound,
-            Err(error) => {
-                tracing::warn!(status = ?error.status(), "trainer pace lookup failed");
-                return Err(PaceError::Upstream(error));
+        let outcome = match period {
+            None => {
+                self.lookup_club(CircleRequest::by_viewer_id(viewer_id), viewer_id)
+                    .await?
             }
+            Some(period) => self.lookup_last_month(viewer_id, period).await?,
         };
-        self.store(viewer_id, outcome);
+        self.store(viewer_id, period, outcome);
         outcome.into_result()
     }
 
     /// Whether a fresh result for this trainer is cached.
-    pub fn is_cached(&self, viewer_id: u64) -> bool {
-        self.cached(viewer_id).is_some()
+    pub fn is_cached(&self, viewer_id: u64, period: Option<Period>) -> bool {
+        self.cached(viewer_id, period).is_some()
     }
 
-    fn cached(&self, viewer_id: u64) -> Option<Outcome> {
+    async fn lookup_club(
+        &self,
+        request: CircleRequest,
+        viewer_id: u64,
+    ) -> Result<Outcome, PaceError> {
+        match self.client.circle(&request).await {
+            Ok(response) => Ok(pace_from_response(&response, viewer_id)),
+            Err(error) if error.status() == Some(StatusCode::NOT_FOUND) => Ok(Outcome::NotFound),
+            Err(error) => {
+                tracing::warn!(status = ?error.status(), "trainer pace lookup failed");
+                Err(PaceError::Upstream(error))
+            }
+        }
+    }
+
+    async fn lookup_last_month(
+        &self,
+        viewer_id: u64,
+        (year, month): Period,
+    ) -> Result<Outcome, PaceError> {
+        let request = CircleRequest::by_viewer_id(viewer_id).for_month(year, month);
+        let outcome = self.lookup_club(request, viewer_id).await?;
+        if matches!(outcome, Outcome::Pace(_)) {
+            return Ok(outcome);
+        }
+        let gains = match self
+            .client
+            .rankings_gains(&RankingsGainsRequest::for_viewer(viewer_id))
+            .await
+        {
+            Ok(gains) => gains,
+            Err(error) if error.status() == Some(StatusCode::NOT_FOUND) => return Ok(outcome),
+            Err(error) => {
+                tracing::warn!(status = ?error.status(), "trainer gains lookup failed");
+                return Err(PaceError::Upstream(error));
+            }
+        };
+        Ok(match gains.viewer(viewer_id).and_then(|r| r.gain_7d) {
+            Some(gain) if gain > 0 => Outcome::Pace(gain as f64 / 7.0),
+            _ => outcome,
+        })
+    }
+
+    fn cached(&self, viewer_id: u64, period: Option<Period>) -> Option<Outcome> {
         let entries = self.entries.lock().unwrap_or_else(|e| e.into_inner());
         entries
-            .get(&viewer_id)
+            .get(&(viewer_id, period))
             .filter(|(at, _)| at.elapsed() < self.ttl)
             .map(|(_, outcome)| *outcome)
     }
 
-    fn store(&self, viewer_id: u64, outcome: Outcome) {
+    fn store(&self, viewer_id: u64, period: Option<Period>, outcome: Outcome) {
         let mut entries = self.entries.lock().unwrap_or_else(|e| e.into_inner());
         entries.retain(|_, (at, _)| at.elapsed() < self.ttl);
-        entries.insert(viewer_id, (Instant::now(), outcome));
+        entries.insert((viewer_id, period), (Instant::now(), outcome));
     }
 }
 
