@@ -1,3 +1,5 @@
+//! Shortlist, fetch budget and coverage tests against a mock server. All data is made up.
+
 use std::time::Duration;
 
 use axum::body::Body;

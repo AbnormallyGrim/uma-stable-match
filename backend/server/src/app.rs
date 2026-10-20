@@ -29,6 +29,7 @@ pub struct AppState {
     pub limits: RateLimits,
     /// Cached club details and the club pool.
     pub details: ClubDetails,
+    /// Shortlist and fetch settings for recommendations.
     pub matching: MatchSettings,
 }
 

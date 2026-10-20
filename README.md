@@ -158,6 +158,8 @@ With balance scoring on, the final score is:
 score = fit + weight × (1 − balance ÷ 100)
 ```
 
+**Which clubs are compared.** Each refresh loads member data for the clubs in the rank range. For your search, the server also picks the clubs whose typical member is closest to your pace, and loads any of those it doesn't have yet. Every club with loaded data is scored, so results are complete once the cache is warm. If some clubs are still loading, the response says so in `coverage`.
+
 Only **current members** count. A member counts as current if they have data on the club's most recent day, the same rule uma.moe uses. Members with fewer than 3 days of data are too new to rank, so they're placed below you and left out of the balance score.
 
 ## Configuration
@@ -171,6 +173,8 @@ Only **current members** count. A member counts as current if they have data on 
 | `PORT` | `8080` | Port the web page and API run on. With Docker, the port on your computer |
 | `SCAN_INTERVAL_MINUTES` | `180` | How often club data refreshes, in minutes |
 | `DETAIL_CACHE_MINUTES` | Same as `SCAN_INTERVAL_MINUTES` | How long a club's member data is reused, in minutes |
+| `SHORTLIST_SIZE` | `120` | Clubs nearest your pace considered for each search |
+| `REQUEST_FETCH_BUDGET` | `10` | Most clubs loaded from uma.moe while you wait. The rest load in the background |
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to include |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to include |
 | `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is loaded in each refresh |
@@ -211,6 +215,8 @@ curl "http://localhost:8080/api/v1/recommendations?trainer_id=123456789012&balan
   "trainer": { "trainer_id": 123456789012, "pace_per_day": 7620000 },
   "options": { "balance_weight": 0.6, "include_closed": false, "limit": 1 },
   "updated_at": "2026-10-19T08:00:00Z",
+  "month": "2026-10",
+  "coverage": { "shortlisted": 102, "scored": 113, "pending": 0 },
   "total": 42,
   "clubs": [
     {

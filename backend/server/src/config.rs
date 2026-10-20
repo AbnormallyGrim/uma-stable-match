@@ -41,6 +41,7 @@ pub struct Config {
     pub scan_interval: Duration,
     /// How long a club's details are reused, from `DETAIL_CACHE_MINUTES`.
     pub detail_cache: Duration,
+    /// Shortlist and fetch settings, from `SHORTLIST_SIZE` and `REQUEST_FETCH_BUDGET`.
     pub matching: MatchSettings,
     /// How long a trainer's pace is reused, from `TRAINER_CACHE_MINUTES`.
     pub trainer_cache: Duration,

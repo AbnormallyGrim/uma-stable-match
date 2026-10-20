@@ -27,6 +27,8 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is prefetched in each scan |
 | `SCAN_INTERVAL_MINUTES` | `180` | Minutes between scans. The default may change once uma.moe agrees how often scans can run |
 | `DETAIL_CACHE_MINUTES` | `SCAN_INTERVAL_MINUTES` | Minutes a club's member data is reused |
+| `SHORTLIST_SIZE` | `120` | Clubs nearest your pace considered for each request |
+| `REQUEST_FETCH_BUDGET` | `10` | Most uncached clubs fetched while a visitor waits. At 500 ms spacing, 10 take about 5 seconds |
 | `TRAINER_CACHE_MINUTES` | `10` | Minutes a trainer's looked-up pace is reused |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Recommendation requests each visitor can make per minute |
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer lookups each visitor can make per minute that need a call to uma.moe |
@@ -50,7 +52,7 @@ With the client's default 500 ms rate limit, a default scan takes about 80 secon
 
 ## Club pool
 
-The club pool is the first stage of two-stage matching (#87). It picks the clubs worth scoring for one trainer, using only the list endpoint's data. Each scan builds a new pool. Recommendations don't use the shortlist yet.
+The club pool is the first stage of two-stage matching (#87). It picks the clubs worth scoring for one trainer, using only the list endpoint's data. Each scan builds a new pool, and [recommendations](#choosing-clubs) use its shortlist to decide which clubs to load.
 
 ### Game months
 
@@ -219,6 +221,16 @@ All endpoints are under `/api/v1`.
 
 `balance=false` together with `balance_weight` is rejected, because the request contradicts itself.
 
+#### Choosing clubs
+
+1. Check the pace and balance weight. An invalid request fails before anything is fetched.
+2. Shortlist the `SHORTLIST_SIZE` clubs whose estimated median is nearest `0.85 ×` your pace. Closed clubs are left out unless `include_closed=true`.
+3. Take every cached club in the pool, then fetch up to `REQUEST_FETCH_BUDGET` uncached shortlisted clubs in the interactive lane, nearest first. Requests that need the same club share one fetch.
+4. Queue the other uncached shortlisted clubs, and any that failed, for background loading.
+5. Score every loaded club in the pool, not only the shortlist.
+
+Cached clubs are always scored exactly, so the shortlist only decides which uncached clubs to load. Once every club is cached, which is the normal case when `SCAN_MAX_DETAILS` is at least the pool size, results are the same as scoring the whole pool. `coverage` says how complete a response is.
+
 #### Looking up a trainer
 
 With `trainer_id`, the server fetches that trainer's club from uma.moe and finds their snapshot (the latest month if there's more than one). It then calculates their pace with `daily_pace`, which needs at least 3 days of data and a gain above zero.
@@ -236,6 +248,8 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
   "trainer": { "trainer_id": 123456789012, "pace_per_day": 7600000.0 },
   "options": { "balance_weight": 0.5, "include_closed": false, "limit": 50 },
   "updated_at": "2026-03-18T09:00:00Z",
+  "month": "2026-03",
+  "coverage": { "shortlisted": 102, "scored": 113, "pending": 0 },
   "total": 62,
   "clubs": [
     {
@@ -275,6 +289,10 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
 | `trainer.pace_per_day` | The pace used: yours from uma.moe, or the `pace` you gave |
 | `options` | The settings used, after defaults: `balance_weight` is `null` when balance scoring is off |
 | `updated_at` | When the clubs were scanned |
+| `month` | Game month of the club data, `YYYY-MM` |
+| `coverage.shortlisted` | Clubs on the shortlist for your pace |
+| `coverage.scored` | Clubs with member data that were scored, including cached clubs outside the shortlist |
+| `coverage.pending` | Shortlisted clubs still loading in the background. Above 0, searching again shortly can give more results |
 | `total` | How many clubs were scored, before `limit` |
 | `clubs` | Up to `limit` clubs, best first |
 

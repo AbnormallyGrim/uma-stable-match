@@ -26,11 +26,15 @@ use crate::pool::{DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO};
 const CLUB_URL: &str = "https://uma.moe/circles/";
 const DEFAULT_LIMIT: u32 = 50;
 
+/// Most uncached club details one request fetches by default.
 pub const DEFAULT_FETCH_BUDGET: usize = 10;
 
+/// How each request picks and loads clubs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MatchSettings {
+    /// Clubs shortlisted per request, from `SHORTLIST_SIZE`.
     pub shortlist_size: usize,
+    /// Most uncached club details fetched while the visitor waits, from `REQUEST_FETCH_BUDGET`.
     pub fetch_budget: usize,
 }
 
@@ -204,6 +208,8 @@ pub(crate) async fn recommendations(
     }))
 }
 
+// Every cached club in the pool, plus up to `fetch_budget` uncached shortlisted clubs, nearest
+// first. The other misses are queued for the background loader.
 async fn load_clubs(
     details: &ClubDetails,
     settings: MatchSettings,
