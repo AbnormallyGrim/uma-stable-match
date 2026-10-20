@@ -1,5 +1,7 @@
 //! Stage 1: pace estimates from list rows, and nearest-pace shortlists.
 
+use std::collections::{HashMap, HashSet};
+
 use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Utc};
 use uma_stable_match_scoring::{JoinStyle, CLUB_CAP, MIN_RANKED_MEMBERS};
 use uma_stable_match_umamoe_client::Circle;
@@ -99,38 +101,40 @@ impl ListedClub {
 #[derive(Debug, Clone)]
 struct Entry {
     club: ListedClub,
-    ln_raw: f64,
+    exact_median: Option<f64>,
+    ln_estimate: f64,
 }
 
 /// Eligible clubs sorted by estimated median pace.
 #[derive(Debug, Clone, Default)]
 pub struct ClubPool {
     entries: Vec<Entry>,
+    index: HashMap<u64, usize>,
     calibration: Calibration,
 }
 
 impl ClubPool {
-    /// Builds an uncalibrated pool. Later duplicates and invalid rates are dropped.
+    /// Builds a pool with no exact medians and no calibration. Later duplicates and invalid rates
+    /// are dropped.
     pub fn new(clubs: impl IntoIterator<Item = ListedClub>) -> Self {
-        let mut seen = std::collections::HashSet::new();
-        let mut entries: Vec<Entry> = clubs
+        let mut seen = HashSet::new();
+        let entries = clubs
             .into_iter()
             .filter(|c| c.raw_rate.is_finite() && c.raw_rate > 0.0)
             .filter(|c| seen.insert(c.circle_id))
             .map(|club| Entry {
-                ln_raw: club.raw_rate.ln(),
+                ln_estimate: club.raw_rate.ln(),
+                exact_median: None,
                 club,
             })
             .collect();
-        entries.sort_by(|a, b| {
-            a.ln_raw
-                .total_cmp(&b.ln_raw)
-                .then(a.club.circle_id.cmp(&b.club.circle_id))
-        });
-        Self {
+        let mut pool = Self {
             entries,
+            index: HashMap::new(),
             calibration: Calibration::default(),
-        }
+        };
+        pool.refresh();
+        pool
     }
 
     /// Number of clubs.
@@ -153,14 +157,73 @@ impl ClubPool {
         self.calibration
     }
 
-    /// Replaces the calibration. The order doesn't change, so this is cheap.
-    pub fn set_calibration(&mut self, calibration: Calibration) {
-        self.calibration = calibration;
+    /// Clubs whose exact median is known.
+    pub fn exact_medians(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| e.exact_median.is_some())
+            .count()
     }
 
-    /// A club's estimated median daily pace.
-    pub fn estimated_median(&self, club: &ListedClub) -> f64 {
-        self.calibration.factor() * club.raw_rate
+    /// A club's median daily pace: exact if known, otherwise calibrated from its raw rate.
+    pub fn estimated_median(&self, circle_id: u64) -> Option<f64> {
+        let entry = &self.entries[*self.index.get(&circle_id)?];
+        Some(
+            entry
+                .exact_median
+                .unwrap_or(self.calibration.factor() * entry.club.raw_rate),
+        )
+    }
+
+    /// Records a club's exact median from its loaded details. Returns `false` for an unknown club
+    /// or an invalid median.
+    pub fn set_exact_median(&mut self, circle_id: u64, median: f64) -> bool {
+        self.set_exact_medians([(circle_id, median)]) == 1
+    }
+
+    /// Records several exact medians, then recalibrates and re-sorts once. Returns how many were
+    /// set.
+    pub fn set_exact_medians(&mut self, medians: impl IntoIterator<Item = (u64, f64)>) -> usize {
+        let mut set = 0;
+        for (circle_id, median) in medians {
+            if !(median.is_finite() && median > 0.0) {
+                continue;
+            }
+            if let Some(&i) = self.index.get(&circle_id) {
+                self.entries[i].exact_median = Some(median);
+                set += 1;
+            }
+        }
+        if set > 0 {
+            self.calibration = Calibration::from_ratios(
+                self.entries
+                    .iter()
+                    .filter_map(|e| e.exact_median.map(|m| m / e.club.raw_rate)),
+            );
+            self.refresh();
+        }
+        set
+    }
+
+    fn refresh(&mut self) {
+        let ln_factor = self.calibration.factor().ln();
+        for entry in &mut self.entries {
+            entry.ln_estimate = match entry.exact_median {
+                Some(median) => median.ln(),
+                None => entry.club.raw_rate.ln() + ln_factor,
+            };
+        }
+        self.entries.sort_by(|a, b| {
+            a.ln_estimate
+                .total_cmp(&b.ln_estimate)
+                .then(a.club.circle_id.cmp(&b.club.circle_id))
+        });
+        self.index = self
+            .entries
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.club.circle_id, i))
+            .collect();
     }
 
     /// IDs of the `k` clubs whose estimated median is nearest `target` in log space, nearest
@@ -169,10 +232,10 @@ impl ClubPool {
         if k == 0 || !(target.is_finite() && target > 0.0) {
             return Vec::new();
         }
-        let ln_target = target.ln() - self.calibration.factor().ln();
+        let ln_target = target.ln();
         let eligible = |e: &Entry| include_closed || e.club.join_style != Some(JoinStyle::Closed);
 
-        let split = self.entries.partition_point(|e| e.ln_raw < ln_target);
+        let split = self.entries.partition_point(|e| e.ln_estimate < ln_target);
         let (mut left, mut right) = (split, split);
         let mut below = self.previous(&mut left, &eligible);
         let mut above = self.next(&mut right, &eligible);
@@ -231,7 +294,7 @@ impl ClubPool {
 }
 
 fn distance(entry: &Entry, ln_target: f64) -> f64 {
-    (entry.ln_raw - ln_target).abs()
+    (entry.ln_estimate - ln_target).abs()
 }
 
 #[cfg(test)]

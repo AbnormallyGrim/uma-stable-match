@@ -226,20 +226,53 @@ fn shortlist_of_nothing() {
 }
 
 #[test]
-fn calibration_scales_the_estimates() {
+fn exact_medians_replace_the_estimate() {
     let mut pool = pool();
-    let samples = std::iter::repeat_n(0.5, MIN_CALIBRATION_SAMPLES);
-    pool.set_calibration(Calibration::from_ratios(samples));
+    assert_eq!(pool.estimated_median(1), Some(100.0));
+    assert!(pool.set_exact_median(1, 1000.0));
+    assert_eq!(pool.estimated_median(1), Some(1000.0));
+    assert_eq!(pool.exact_medians(), 1);
+    assert_eq!(pool.shortlist(1000.0, 1, false), vec![1]);
+    assert_eq!(pool.clubs().last().unwrap().circle_id, 5);
+    assert_eq!(pool.calibration().factor(), 1.0);
+}
+
+#[test]
+fn exact_medians_need_a_known_club_and_a_valid_value() {
+    let mut pool = pool();
+    assert!(!pool.set_exact_median(99, 100.0));
+    assert!(!pool.set_exact_median(1, 0.0));
+    assert!(!pool.set_exact_median(1, -5.0));
+    assert!(!pool.set_exact_median(1, f64::NAN));
+    assert_eq!(pool.exact_medians(), 0);
+    assert_eq!(pool.estimated_median(99), None);
+}
+
+#[test]
+fn exact_medians_calibrate_the_rest() {
+    let n = MIN_CALIBRATION_SAMPLES as u64;
+    let mut pool = ClubPool::new((1..=n + 1).map(|id| listed(id, 1000.0 * id as f64)));
+    for id in 1..n {
+        pool.set_exact_median(id, 500.0 * id as f64);
+    }
+    assert!(!pool.calibration().is_calibrated());
+    assert_eq!(pool.estimated_median(n + 1), Some(1000.0 * (n + 1) as f64));
+
+    pool.set_exact_median(n, 500.0 * n as f64);
+    assert!(pool.calibration().is_calibrated());
     assert_eq!(pool.calibration().factor(), 0.5);
-    assert_eq!(pool.estimated_median(&listed(1, 800.0)), 400.0);
-    assert_eq!(pool.shortlist(400.0, 1, false), vec![4]);
+    assert_eq!(pool.estimated_median(n + 1), Some(500.0 * (n + 1) as f64));
+    assert_eq!(
+        pool.shortlist(500.0 * (n + 1) as f64, 1, false),
+        vec![n + 1]
+    );
 }
 
 fn brute_force(pool: &ClubPool, target: f64, k: usize, include_closed: bool) -> Vec<u64> {
     if k == 0 || !(target.is_finite() && target > 0.0) {
         return Vec::new();
     }
-    let ln_target = target.ln() - pool.calibration().factor().ln();
+    let ln_target = target.ln();
     let mut all: Vec<(f64, u64)> = pool
         .entries
         .iter()
@@ -250,13 +283,14 @@ fn brute_force(pool: &ClubPool, target: f64, k: usize, include_closed: bool) -> 
     all.into_iter().take(k).map(|(_, id)| id).collect()
 }
 
-fn arb_club() -> impl Strategy<Value = (f64, bool)> {
+fn arb_club() -> impl Strategy<Value = (f64, bool, Option<f64>)> {
     // Some repeated rates, so ties are common.
     let rate = prop_oneof![
         3 => (8.0f64..20.0).prop_map(f64::exp),
         1 => prop::sample::select(vec![1e5, 5e5, 2e6]),
     ];
-    (rate, prop::bool::weighted(0.3))
+    let exact = prop::option::weighted(0.4, (8.0f64..20.0).prop_map(f64::exp));
+    (rate, prop::bool::weighted(0.3), exact)
 }
 
 proptest! {
@@ -266,16 +300,15 @@ proptest! {
         ln_target in 7.0f64..21.0,
         k in 0usize..30,
         include_closed: bool,
-        factor in prop::option::of(0.2f64..2.0),
     ) {
-        let mut pool = ClubPool::new(clubs.iter().enumerate().map(|(i, (rate, is_closed))| {
+        let mut pool = ClubPool::new(clubs.iter().enumerate().map(|(i, (rate, is_closed, _))| {
             let id = i as u64 + 1;
             if *is_closed { closed(id, *rate) } else { listed(id, *rate) }
         }));
-        if let Some(f) = factor {
-            pool.set_calibration(Calibration::from_ratios(
-                std::iter::repeat_n(f, MIN_CALIBRATION_SAMPLES),
-            ));
+        for (i, (_, _, exact)) in clubs.iter().enumerate() {
+            if let Some(median) = exact {
+                pool.set_exact_median(i as u64 + 1, *median);
+            }
         }
         let target = ln_target.exp();
         prop_assert_eq!(
@@ -283,4 +316,15 @@ proptest! {
             brute_force(&pool, target, k, include_closed)
         );
     }
+}
+
+#[test]
+fn exact_medians_in_a_batch() {
+    let mut pool = pool();
+    let set = pool.set_exact_medians([(1, 1600.0), (99, 10.0), (2, f64::NAN), (3, 50.0)]);
+    assert_eq!(set, 2);
+    assert_eq!(pool.exact_medians(), 2);
+    let ids: Vec<_> = pool.clubs().map(|c| c.circle_id).collect();
+    assert_eq!(ids, vec![3, 2, 4, 1, 5]);
+    assert_eq!(pool.set_exact_medians([]), 0);
 }
