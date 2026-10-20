@@ -1,10 +1,19 @@
 [package]
 name = "uma-stable-match-scoring"
 description = "Scores Umamusume: Pretty Derby clubs by how well they fit a trainer's fan pace and how evenly their members contribute."
-version.workspace = true
+version = "0.1.0"
 edition.workspace = true
+rust-version = "1.71"
 license.workspace = true
 repository.workspace = true
+documentation = "https://docs.rs/uma-stable-match-scoring"
+readme = "README.md"
+keywords = ["umamusume", "scoring", "ranking", "clubs", "game"]
+categories = ["games", "algorithms"]
+include = ["src/**/*.rs", "README.md", "LICENSE"]
+
+[package.metadata.docs.rs]
+all-features = true
 
 [lib]
 name = "uma_stable_match_scoring"

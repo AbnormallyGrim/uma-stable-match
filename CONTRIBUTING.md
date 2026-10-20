@@ -85,6 +85,8 @@ To keep your email address out of commits, turn on **Keep my email addresses pri
 ## Code guidelines
 
 - Keep the `scoring` crate free of network and storage code. Data goes in, scores come out.
+- The `scoring` crate must build on its minimum Rust version, set as `rust-version` in its `Cargo.toml`. Avoid standard library APIs newer than that. CI tests the packaged crate on that version.
+- A crate published to crates.io needs a `LICENSE` symlink to the root `LICENSE`, listed in its `include`, so the license text ships with it.
 - `unsafe` code isn't allowed.
 - Prefer small, focused pull requests.
 
