@@ -21,7 +21,8 @@ struct PublishedScan {
 
 /// Scans now, then every `interval`, until `shutdown` turns true.
 ///
-/// A scan in progress at shutdown is cancelled.
+/// With Redis, instances share one scan: one scans and publishes, the others load it. A scan in
+/// progress at shutdown is cancelled.
 pub async fn run_scheduler(
     client: Client,
     details: ClubDetails,

@@ -54,6 +54,7 @@ pub enum ScanError {
     /// A list request failed.
     #[error("listing clubs failed: {0}")]
     List(#[source] Error),
+    /// Another instance's scan failed, with its public message.
     #[error("{0}")]
     Shared(String),
 }

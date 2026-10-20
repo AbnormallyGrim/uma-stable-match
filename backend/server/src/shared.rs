@@ -232,6 +232,7 @@ impl SharedCache {
         }
     }
 
+    /// Decides in one Redis script whether this instance scans, waits, or loads a published scan.
     pub(crate) async fn scan_turn(&self, config: &ScanConfig) -> ScanTurn {
         let Backend::Redis(redis) = &self.backend else {
             return ScanTurn::Alone;
@@ -262,6 +263,7 @@ impl SharedCache {
         }
     }
 
+    /// The last scan published for this scan window.
     pub(crate) async fn published_scan<T: DeserializeOwned>(
         &self,
         config: &ScanConfig,
@@ -271,13 +273,19 @@ impl SharedCache {
     }
 }
 
+/// What an instance does when a scan is due.
 pub(crate) enum ScanTurn {
+    /// No Redis, or it didn't answer: scan without sharing.
     Alone,
+    /// This instance holds the scan lock: scan, then publish.
     Lead(ScanLease),
+    /// Another instance is scanning: check again shortly.
     Wait,
+    /// A scan was published less than an interval ago: load it if it's new.
     Fresh { id: String, remaining: Duration },
 }
 
+/// The scan lock, held until published or released, or until it lapses without renewal.
 pub(crate) struct ScanLease {
     redis: RedisBackend,
     keys: ScanKeys,
@@ -303,6 +311,7 @@ impl ScanLease {
         }
     }
 
+    /// Stores `value` for two intervals, marks it current for one, and releases the lock.
     pub(crate) async fn publish<T: Serialize>(self, value: &T, fresh_for: Duration) {
         let Ok(bytes) = serde_json::to_vec(value) else {
             self.release().await;
