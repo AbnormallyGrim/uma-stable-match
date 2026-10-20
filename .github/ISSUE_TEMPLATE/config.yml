@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/AbnormallyGrim/uma-stable-match/discussions
     about: Ask questions and share ideas in Discussions.
   - name: Report a security vulnerability
-    url: https://github.com/AbnormallyGrim/uma-stable-match/security
+    url: https://github.com/AbnormallyGrim/uma-stable-match/security/advisories/new
     about: Report security issues privately. Please don't open a public issue.
