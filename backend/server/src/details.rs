@@ -11,6 +11,7 @@ use uma_stable_match_umamoe_client::{Circle, CircleRequest, Client, Error, Prior
 
 use crate::calibration::club_median;
 use crate::pool::{ClubPool, Period};
+use crate::shared::{club_key, SharedCache};
 
 /// The club pool, shared between requests and the detail cache.
 pub type SharedPool = Arc<RwLock<ClubPool>>;
@@ -51,6 +52,8 @@ struct Inner {
     listed: RwLock<HashMap<u64, Circle>>,
     queued: Mutex<HashSet<u64>>,
     sender: mpsc::Sender<u64>,
+    shared: SharedCache,
+    ttl: Duration,
 }
 
 /// Loads queued clubs in the background lane. Run it once with [`BackgroundLoader::run`].
@@ -75,6 +78,17 @@ impl ClubDetails {
         pool: SharedPool,
         config: DetailConfig,
     ) -> (Self, BackgroundLoader) {
+        Self::with_shared(client, pool, config, SharedCache::none())
+    }
+
+    /// Like [`ClubDetails::new`], checking `shared` before uma.moe and storing each loaded club in
+    /// it.
+    pub fn with_shared(
+        client: &Client,
+        pool: SharedPool,
+        config: DetailConfig,
+        shared: SharedCache,
+    ) -> (Self, BackgroundLoader) {
         let cache = Cache::builder()
             .time_to_live(config.ttl)
             .max_capacity(config.max_clubs)
@@ -89,6 +103,8 @@ impl ClubDetails {
                 pool,
                 listed: RwLock::new(HashMap::new()),
                 queued: Mutex::new(HashSet::new()),
+                shared,
+                ttl: config.ttl,
                 sender,
             }),
         };
@@ -107,6 +123,11 @@ impl ClubDetails {
         inner
             .cache
             .try_get_with((circle_id, period), async {
+                let key = club_key(circle_id, period);
+                if let Some(club) = inner.shared.get::<Club>(&key).await {
+                    record_median(inner, &club, circle_id, period);
+                    return Ok(Arc::new(club));
+                }
                 let client = match priority {
                     Priority::Interactive => &inner.interactive,
                     Priority::Background => &inner.background,
@@ -125,11 +146,8 @@ impl ClubDetails {
                 if club.circle_id == 0 {
                     club.circle_id = circle_id;
                 }
-                if let Some(median) = club_median(&club) {
-                    if *read(&inner.period) == period {
-                        write(&inner.pool).set_exact_median(circle_id, median);
-                    }
-                }
+                record_median(inner, &club, circle_id, period);
+                inner.shared.set(&key, &club, inner.ttl).await;
                 Ok(Arc::new(club))
             })
             .await
@@ -229,6 +247,14 @@ impl BackgroundLoader {
                 tracing::warn!(circle_id, %error, "background club load failed");
             }
             lock(&self.details.inner.queued).remove(&circle_id);
+        }
+    }
+}
+
+fn record_median(inner: &Inner, club: &Club, circle_id: u64, period: Option<Period>) {
+    if let Some(median) = club_median(club) {
+        if *read(&inner.period) == period {
+            write(&inner.pool).set_exact_median(circle_id, median);
         }
     }
 }

@@ -9,6 +9,7 @@ use uma_stable_match_umamoe_client::ApiKey;
 use crate::pace::DEFAULT_PACE_TTL;
 use crate::recommendations::MatchSettings;
 use crate::scanner::ScanConfig;
+use crate::shared::RedisUrl;
 
 /// Address the server listens on when `HOST` isn't set.
 pub const DEFAULT_HOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
@@ -53,6 +54,8 @@ pub struct Config {
     pub trust_forwarded_for: bool,
     /// Built frontend to serve, from `FRONTEND_DIR`. `None` serves only the API.
     pub frontend_dir: Option<PathBuf>,
+    /// Shared cache to use, from `REDIS_URL`. Not used yet.
+    pub redis_url: Option<RedisUrl>,
 }
 
 /// Invalid or missing settings.
@@ -70,6 +73,10 @@ pub enum ConfigError {
     /// `FRONTEND_DIR` isn't a directory containing `index.html`.
     #[error("FRONTEND_DIR must be a directory containing index.html, got {0:?}")]
     InvalidFrontendDir(String),
+    /// `REDIS_URL` isn't a `redis://` or `rediss://` URL. The value isn't shown, as it can hold a
+    /// password.
+    #[error("REDIS_URL must be a redis:// or rediss:// URL")]
+    InvalidRedisUrl,
     /// A true-or-false setting is something else.
     #[error("{name} must be true or false, got {value:?}")]
     InvalidBool {
@@ -185,6 +192,10 @@ impl Config {
                 Some(dir)
             }
         };
+        let redis_url = match get("REDIS_URL") {
+            None => None,
+            Some(value) => Some(RedisUrl::parse(&value).ok_or(ConfigError::InvalidRedisUrl)?),
+        };
         if scan.rank_from > scan.rank_to {
             return Err(ConfigError::InvalidRankWindow {
                 from: scan.rank_from,
@@ -205,6 +216,7 @@ impl Config {
             trainer_lookups_per_minute,
             trust_forwarded_for,
             frontend_dir,
+            redis_url,
         })
     }
 }

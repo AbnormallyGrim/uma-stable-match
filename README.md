@@ -180,7 +180,7 @@ Set these in `.env`. Only `UMAMOE_API_KEY` is required; [`.env.example`](.env.ex
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer ID lookups allowed per visitor per minute, not counting cached ones |
 | `TRUST_FORWARDED_FOR` | `false` | Set to `true` behind a reverse proxy, so visitors are told apart by their own address |
 | `FRONTEND_DIR` | *(none)* | Folder with the built web page. Leave it unset to run only the API. Ignored by the Docker setup, which serves the page built into the image |
-| `REDIS_URL` | *(none)* | *Not available yet* ([#41](https://github.com/AbnormallyGrim/uma-stable-match/issues/41)). The server ignores it for now |
+| `REDIS_URL` | *(none)* | *Not available yet* ([#41](https://github.com/AbnormallyGrim/uma-stable-match/issues/41)). It must be a `redis://` or `rediss://` URL; the server checks it and logs a warning, but doesn't use it yet |
 
 ## API
 

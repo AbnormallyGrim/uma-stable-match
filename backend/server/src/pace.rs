@@ -10,6 +10,7 @@ use uma_stable_match_umamoe_client::{
 };
 
 use crate::pool::Period;
+use crate::shared::{pace_key, SharedCache};
 
 /// How long a looked-up pace is reused.
 pub const DEFAULT_PACE_TTL: Duration = Duration::from_secs(10 * 60);
@@ -30,7 +31,7 @@ pub enum PaceError {
 
 type Entries = HashMap<(u64, Option<Period>), (Instant, Outcome)>;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 enum Outcome {
     Pace(f64),
     NotFound,
@@ -53,6 +54,7 @@ pub struct PaceLookup {
     client: Client,
     ttl: Duration,
     entries: Arc<Mutex<Entries>>,
+    shared: SharedCache,
 }
 
 impl PaceLookup {
@@ -62,7 +64,13 @@ impl PaceLookup {
             client,
             ttl,
             entries: Arc::default(),
+            shared: SharedCache::none(),
         }
+    }
+
+    /// Checks `shared` before uma.moe, and stores each result in it.
+    pub fn with_shared(self, shared: SharedCache) -> Self {
+        Self { shared, ..self }
     }
 
     /// The trainer's daily fan gain this month, or in `period` if given. For a given period it
@@ -71,6 +79,11 @@ impl PaceLookup {
     /// Found and not-found results are cached per month; uma.moe failures aren't.
     pub async fn pace(&self, viewer_id: u64, period: Option<Period>) -> Result<f64, PaceError> {
         if let Some(outcome) = self.cached(viewer_id, period) {
+            return outcome.into_result();
+        }
+        let key = pace_key(viewer_id, period);
+        if let Some(outcome) = self.shared.get::<Outcome>(&key).await {
+            self.store(viewer_id, period, outcome);
             return outcome.into_result();
         }
 
@@ -82,6 +95,7 @@ impl PaceLookup {
             Some(period) => self.lookup_last_month(viewer_id, period).await?,
         };
         self.store(viewer_id, period, outcome);
+        self.shared.set(&key, &outcome, self.ttl).await;
         outcome.into_result()
     }
 
