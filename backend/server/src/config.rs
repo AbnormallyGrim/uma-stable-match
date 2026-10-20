@@ -54,8 +54,10 @@ pub struct Config {
     pub trust_forwarded_for: bool,
     /// Built frontend to serve, from `FRONTEND_DIR`. `None` serves only the API.
     pub frontend_dir: Option<PathBuf>,
-    /// Shared cache to use, from `REDIS_URL`. Not used yet.
+    /// Redis to share caches with other instances, from `REDIS_URL`. `None` keeps everything local.
     pub redis_url: Option<RedisUrl>,
+    /// Secret for hashing trainer IDs in Redis keys, from `REDIS_KEY_SECRET`. Set whenever
+    /// `redis_url` is.
     pub redis_key_secret: Option<KeySecret>,
 }
 
@@ -78,8 +80,10 @@ pub enum ConfigError {
     /// password.
     #[error("REDIS_URL must be a redis:// or rediss:// URL")]
     InvalidRedisUrl,
+    /// `REDIS_URL` is set without `REDIS_KEY_SECRET`.
     #[error("REDIS_KEY_SECRET is required when REDIS_URL is set")]
     MissingRedisKeySecret,
+    /// `REDIS_KEY_SECRET` is shorter than 32 characters. The value isn't shown.
     #[error("REDIS_KEY_SECRET must be at least 32 characters")]
     InvalidRedisKeySecret,
     /// A true-or-false setting is something else.

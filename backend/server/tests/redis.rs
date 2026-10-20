@@ -1,3 +1,8 @@
+//! Redis shared-cache tests. All data is made up.
+//!
+//! The tests marked as needing Redis run only when `REDIS_TEST_URL` is set, for example
+//! `REDIS_TEST_URL=redis://127.0.0.1:6379 cargo test`; CI sets it. The others use a fake server.
+
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 

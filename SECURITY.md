@@ -44,3 +44,4 @@ If you run Uma Stable Match yourself:
 - Rate limiting is always on. Behind a reverse proxy, set `TRUST_FORWARDED_FOR=true` so each visitor gets their own limit; otherwise everyone shares the proxy's.
 - Only set `TRUST_FORWARDED_FOR=true` behind a proxy that sets `X-Forwarded-For`, or visitors could pick their own address.
 - If your key leaks, revoke it at [uma.moe/settings](https://uma.moe/settings) and create a new one.
+- With Redis, keep `REDIS_KEY_SECRET` as secret as the API key, give Redis a password or keep it on a private network, and run it without persistence so cached paces aren't written to disk.

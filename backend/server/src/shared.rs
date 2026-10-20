@@ -45,10 +45,12 @@ impl fmt::Debug for RedisUrl {
     }
 }
 
+/// Secret that keys the trainer ID hash in shared-cache keys. `Debug` output hides it.
 #[derive(Clone, PartialEq, Eq)]
 pub struct KeySecret(String);
 
 impl KeySecret {
+    /// The secret, or `None` if it's shorter than 32 characters.
     pub fn parse(value: &str) -> Option<Self> {
         (value.chars().count() >= MIN_SECRET_LEN).then(|| Self(value.to_owned()))
     }
@@ -60,8 +62,10 @@ impl fmt::Debug for KeySecret {
     }
 }
 
+/// Why the shared cache couldn't start. Messages never include the URL.
 #[derive(Debug, thiserror::Error)]
 pub enum SharedCacheError {
+    /// Redis couldn't be reached or didn't answer `PING`, with the kind of failure.
     #[error("could not connect to Redis ({0})")]
     Connect(String),
 }
@@ -113,6 +117,8 @@ impl SharedCache {
         Self::default()
     }
 
+    /// Connects to Redis and checks it answers, within 5 seconds. Later failures don't end the
+    /// connection: calls count as misses while it reconnects.
     pub async fn connect(url: &RedisUrl, secret: KeySecret) -> Result<Self, SharedCacheError> {
         let client =
             redis::Client::open(url.expose()).map_err(|e| SharedCacheError::Connect(kind(&e)))?;
@@ -144,6 +150,8 @@ impl SharedCache {
         }
     }
 
+    /// Shared-cache key for a trainer's pace in a month. With Redis, the trainer ID is replaced by
+    /// a keyed hash, so Redis never holds it.
     pub fn pace_key(&self, viewer_id: u64, period: Option<Period>) -> String {
         let id = match &self.backend {
             Backend::None => viewer_id.to_string(),
@@ -208,6 +216,7 @@ fn kind(error: &redis::RedisError) -> String {
     format!("{:?}", error.kind())
 }
 
+// The first 128 bits of HMAC-SHA256: enough to avoid collisions, short enough for keys.
 pub(crate) fn trainer_digest(secret: &KeySecret, viewer_id: u64) -> String {
     let mut mac =
         Hmac::<Sha256>::new_from_slice(secret.0.as_bytes()).expect("HMAC accepts any key length");
