@@ -81,6 +81,8 @@ impl ClubDetails {
         Self::with_shared(client, pool, config, SharedCache::none())
     }
 
+    /// Like [`ClubDetails::new`], checking `shared` before uma.moe and storing each loaded club in
+    /// it.
     pub fn with_shared(
         client: &Client,
         pool: SharedPool,

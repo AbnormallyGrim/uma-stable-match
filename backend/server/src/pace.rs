@@ -68,6 +68,7 @@ impl PaceLookup {
         }
     }
 
+    /// Checks `shared` before uma.moe, and stores each result in it.
     pub fn with_shared(self, shared: SharedCache) -> Self {
         Self { shared, ..self }
     }

@@ -34,8 +34,9 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer lookups each visitor can make per minute that need a call to uma.moe |
 | `TRUST_FORWARDED_FOR` | `false` | `true` to identify visitors by `X-Forwarded-For`. Only turn this on behind a reverse proxy that sets the header |
 | `FRONTEND_DIR` | none | Built frontend to serve, such as `frontend/dist`. Unset, the server serves only the API |
+| `REDIS_URL` | none | Not used yet ([#41](https://github.com/AbnormallyGrim/uma-stable-match/issues/41)). It must be a `redis://` or `rediss://` URL, and the server logs a warning when it's set |
 
-Blank values count as unset. A missing key, a `HOST` that isn't an IP address (hostnames such as `localhost` aren't accepted), a `PORT` outside 1 to 65535, a `TRUST_FORWARDED_FOR` other than `true` or `false`, a scan, cache or rate limit setting that isn't a positive whole number, `SCAN_RANK_FROM` above `SCAN_RANK_TO`, or a `FRONTEND_DIR` without an `index.html` stops the server at startup, with an error message and exit code 1. The key is never logged, never included in errors and is redacted in `Debug` output. `.env` is git-ignored; never commit it.
+Blank values count as unset. A missing key, a `HOST` that isn't an IP address (hostnames such as `localhost` aren't accepted), a `PORT` outside 1 to 65535, a `TRUST_FORWARDED_FOR` other than `true` or `false`, a scan, cache or rate limit setting that isn't a positive whole number, `SCAN_RANK_FROM` above `SCAN_RANK_TO`, a `FRONTEND_DIR` without an `index.html`, or a `REDIS_URL` without a `redis://` or `rediss://` scheme stops the server at startup, with an error message and exit code 1. The key and `REDIS_URL`, which can hold a password, are never logged, never included in errors and are redacted in `Debug` output. `.env` is git-ignored; never commit it.
 
 ## Scanner
 
@@ -130,6 +131,12 @@ Exact medians help most when many clubs have them. With an exact median for ever
 - **Lanes.** Visitors' fetches use the interactive lane, so they go ahead of queued background loads. If a background load for a club is already running, a visitor asking for that club waits for it rather than starting a second fetch.
 
 `queued()` and `cached_clubs()` report the queue length and the approximate cache size.
+
+## Shared cache
+
+`SharedCache` is a second cache layer for running several server instances against one store. On a local miss, `ClubDetails` and `PaceLookup` check it before calling uma.moe, and store what they load in it with the same expiry, under keys such as `usm:v1:club:<id>:<month>`. A club found there still gives the pool its exact median.
+
+The only backend so far stores nothing (`SharedCache::none()`), so every instance works alone. Redis support is planned in [#41](https://github.com/AbnormallyGrim/uma-stable-match/issues/41).
 
 ## Cache and schedule
 

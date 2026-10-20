@@ -54,6 +54,7 @@ pub struct Config {
     pub trust_forwarded_for: bool,
     /// Built frontend to serve, from `FRONTEND_DIR`. `None` serves only the API.
     pub frontend_dir: Option<PathBuf>,
+    /// Shared cache to use, from `REDIS_URL`. Not used yet.
     pub redis_url: Option<RedisUrl>,
 }
 
@@ -72,6 +73,8 @@ pub enum ConfigError {
     /// `FRONTEND_DIR` isn't a directory containing `index.html`.
     #[error("FRONTEND_DIR must be a directory containing index.html, got {0:?}")]
     InvalidFrontendDir(String),
+    /// `REDIS_URL` isn't a `redis://` or `rediss://` URL. The value isn't shown, as it can hold a
+    /// password.
     #[error("REDIS_URL must be a redis:// or rediss:// URL")]
     InvalidRedisUrl,
     /// A true-or-false setting is something else.
