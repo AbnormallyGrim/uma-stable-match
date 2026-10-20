@@ -178,7 +178,7 @@ async fn skips_full_clubs_and_unknown_sizes() {
 }
 
 #[tokio::test]
-async fn fetches_climbers_first_up_to_the_cap() {
+async fn fetches_in_rank_order_up_to_the_cap() {
     let server = MockServer::start().await;
     mount_page(
         &server,
@@ -196,9 +196,9 @@ async fn fetches_climbers_first_up_to_the_cap() {
         vec![listed(4, 15, 15, 20), listed(5, 16, 10, 20)],
     )
     .await;
+    mount_detail(&server, 1, detail(1), 1).await;
     mount_detail(&server, 2, detail(2), 1).await;
-    mount_detail(&server, 3, detail(3), 1).await;
-    for id in [1, 4, 5] {
+    for id in [3, 4, 5] {
         mount_detail(&server, id, detail(id), 0).await;
     }
 
@@ -206,18 +206,50 @@ async fn fetches_climbers_first_up_to_the_cap() {
     config.max_details = 2;
     let scan = scan(&client(&server), &config).await.unwrap();
     assert_eq!(scan.candidates, 5);
-    assert_eq!(ids(&scan), vec![2, 3]);
+    assert_eq!(ids(&scan), vec![1, 2]);
 }
 
 #[tokio::test]
-async fn equal_climbs_keep_list_order() {
+async fn filters_before_the_cap() {
     let server = MockServer::start().await;
+    let mut archived = listed(1, 12, 12, 20);
+    archived["archived"] = json!(true);
     mount_page(
         &server,
         0,
-        vec![listed(1, 12, 22, 20), listed(2, 13, 23, 20)],
+        vec![archived, listed(2, 13, 13, 30), listed(3, 14, 14, 7)],
     )
     .await;
+    mount_page(
+        &server,
+        1,
+        vec![
+            listed(4, 15, 15, 20),
+            listed(5, 16, 16, 20),
+            listed(6, 17, 17, 20),
+        ],
+    )
+    .await;
+    mount_page(&server, 2, vec![]).await;
+    for id in [1, 2, 3, 6] {
+        mount_detail(&server, id, detail(id), 0).await;
+    }
+    mount_detail(&server, 4, detail(4), 1).await;
+    mount_detail(&server, 5, detail(5), 1).await;
+
+    let mut config = config();
+    config.max_details = 2;
+    let scan = scan(&client(&server), &config).await.unwrap();
+    assert_eq!(scan.candidates, 3);
+    assert_eq!(ids(&scan), vec![4, 5]);
+}
+
+#[tokio::test]
+async fn keeps_closed_clubs() {
+    let server = MockServer::start().await;
+    let mut closed = listed(1, 12, 12, 20);
+    closed["join_style"] = json!(3);
+    mount_page(&server, 0, vec![closed, listed(2, 13, 13, 20)]).await;
     mount_detail(&server, 1, detail(1), 1).await;
     mount_detail(&server, 2, detail(2), 1).await;
 
