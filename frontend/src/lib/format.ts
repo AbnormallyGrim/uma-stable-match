@@ -143,3 +143,44 @@ export function formatUpdated(iso: string, now: Date = new Date()): string {
   }
   return 'just now';
 }
+
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+const JST_OFFSET_MS = 9 * 3_600_000;
+
+export function gameMonth(iso: string): string | null {
+  const time = new Date(iso).getTime();
+  if (Number.isNaN(time)) {
+    return null;
+  }
+  const jst = new Date(time + JST_OFFSET_MS);
+  let year = jst.getUTCFullYear();
+  let month = jst.getUTCMonth() + 1;
+  if (jst.getUTCDate() < 2) {
+    month -= 1;
+    if (month === 0) {
+      month = 12;
+      year -= 1;
+    }
+  }
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+export function monthLabel(month: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  const name = match ? MONTHS[Number(match[2]) - 1] : undefined;
+  return match && name ? `${name} ${match[1]}` : month;
+}

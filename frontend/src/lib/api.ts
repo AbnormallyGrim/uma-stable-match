@@ -40,6 +40,8 @@ export interface Recommendations {
   trainer: { trainer_id: number | null; pace_per_day: number };
   options: { balance_weight: number | null; include_closed: boolean; limit: number };
   updated_at: string;
+  month: string | null;
+  coverage: { shortlisted: number; scored: number; pending: number };
   total: number;
   clubs: Club[];
 }

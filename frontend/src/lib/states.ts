@@ -1,6 +1,7 @@
 /** User-facing messages for search errors and empty results. */
 
 import { ApiError, type Recommendations } from './api';
+import { gameMonth, monthLabel } from './format';
 
 /** A friendly error: a short title, what to do, and whether retrying can help. */
 export interface ErrorMessage {
@@ -84,4 +85,26 @@ export function emptyHints(options: Recommendations['options']): string[] {
     hints.push('Lower the balance strength or turn balance scoring off.');
   }
   return hints;
+}
+
+export function pendingNotice(coverage: Recommendations['coverage']): string | null {
+  const pending = coverage.pending;
+  if (pending <= 0) {
+    return null;
+  }
+  const clubs = pending === 1 ? 'club is' : 'clubs are';
+  return `${pending} more ${clubs} still loading. Search again in a minute for complete results.`;
+}
+
+export function monthNotice(result: Pick<Recommendations, 'month' | 'updated_at'>): string | null {
+  if (result.month === null || result.month === gameMonth(result.updated_at)) {
+    return null;
+  }
+  return `These results are based on last month's data (${monthLabel(result.month)}), because the new game month has only just started.`;
+}
+
+export function resultNotices(result: Recommendations): string[] {
+  return [monthNotice(result), pendingNotice(result.coverage)].filter(
+    (notice): notice is string => notice !== null,
+  );
 }
