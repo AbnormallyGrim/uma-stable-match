@@ -13,11 +13,12 @@ Security fixes are made on the `main` branch and included in the next release.
 
 **Please don't report security issues in public issues, discussions or pull requests.**
 
-Report them privately through GitHub:
+Report them privately through GitHub's private vulnerability reporting:
 
-1. Go to the repository's [Security tab](https://github.com/AbnormallyGrim/uma-stable-match/security).
-2. Select **Report a vulnerability**.
-3. Describe the issue, how to reproduce it, and its possible impact.
+1. Open the [private report form](https://github.com/AbnormallyGrim/uma-stable-match/security/advisories/new). You can also get there from the repository's **Security** tab by selecting **Report a vulnerability**.
+2. Describe the issue, how to reproduce it, and its possible impact.
+
+Only the maintainers can see your report. Please don't include real API keys, trainer IDs or other personal data in it; describe them instead.
 
 You can expect an acknowledgement within 7 days. Confirmed issues will be fixed as quickly as possible, and you'll be credited in the advisory unless you'd prefer not to be.
 
