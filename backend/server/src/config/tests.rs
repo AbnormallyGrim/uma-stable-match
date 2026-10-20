@@ -19,6 +19,7 @@ fn defaults() {
     assert_eq!(config.scan, ScanConfig::default());
     assert_eq!(config.scan_interval, Duration::from_secs(180 * 60));
     assert_eq!(config.detail_cache, Duration::from_secs(180 * 60));
+    assert_eq!(config.matching, MatchSettings::default());
     assert_eq!(config.trainer_cache, Duration::from_secs(10 * 60));
     assert_eq!(config.rate_limit_per_minute, 30);
     assert_eq!(config.trainer_lookups_per_minute, 10);
@@ -305,5 +306,35 @@ fn invalid_detail_cache_fails() {
                 value: value.into()
             }
         );
+    }
+}
+
+#[test]
+fn reads_match_settings() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("SHORTLIST_SIZE", "40"),
+        ("REQUEST_FETCH_BUDGET", "3"),
+    ]))
+    .unwrap();
+    assert_eq!(config.matching.shortlist_size, 40);
+    assert_eq!(config.matching.fetch_budget, 3);
+}
+
+#[test]
+fn invalid_match_settings_fail() {
+    for name in ["SHORTLIST_SIZE", "REQUEST_FETCH_BUDGET"] {
+        for value in ["0", "-1", "lots"] {
+            let error =
+                Config::from_lookup(lookup(&[("UMAMOE_API_KEY", "test-key"), (name, value)]))
+                    .unwrap_err();
+            assert_eq!(
+                error,
+                ConfigError::InvalidNumber {
+                    name,
+                    value: value.into()
+                }
+            );
+        }
     }
 }

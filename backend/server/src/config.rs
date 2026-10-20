@@ -7,6 +7,7 @@ use std::time::Duration;
 use uma_stable_match_umamoe_client::ApiKey;
 
 use crate::pace::DEFAULT_PACE_TTL;
+use crate::recommendations::MatchSettings;
 use crate::scanner::ScanConfig;
 
 /// Address the server listens on when `HOST` isn't set.
@@ -40,6 +41,7 @@ pub struct Config {
     pub scan_interval: Duration,
     /// How long a club's details are reused, from `DETAIL_CACHE_MINUTES`.
     pub detail_cache: Duration,
+    pub matching: MatchSettings,
     /// How long a trainer's pace is reused, from `TRAINER_CACHE_MINUTES`.
     pub trainer_cache: Duration,
     /// Recommendation requests per visitor per minute, from `RATE_LIMIT_PER_MINUTE`.
@@ -144,6 +146,13 @@ impl Config {
         let detail_cache = Duration::from_secs(
             u64::from(number("DETAIL_CACHE_MINUTES", scan_interval_minutes)?) * 60,
         );
+        let match_defaults = MatchSettings::default();
+        let matching = MatchSettings {
+            shortlist_size: number("SHORTLIST_SIZE", match_defaults.shortlist_size as u32)?
+                as usize,
+            fetch_budget: number("REQUEST_FETCH_BUDGET", match_defaults.fetch_budget as u32)?
+                as usize,
+        };
         let trainer_cache = Duration::from_secs(
             u64::from(number(
                 "TRAINER_CACHE_MINUTES",
@@ -189,6 +198,7 @@ impl Config {
             scan,
             scan_interval,
             detail_cache,
+            matching,
             trainer_cache,
             rate_limit_per_minute,
             trainer_lookups_per_minute,
