@@ -9,6 +9,7 @@ pub const CLUB_CAP: u32 = 30;
 /// One member's cumulative fan count for each day of a month.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[non_exhaustive]
 pub struct MemberSnapshot {
     /// Trainer ID.
     pub viewer_id: u64,
@@ -20,10 +21,22 @@ pub struct MemberSnapshot {
     pub daily_fans: Vec<i64>,
 }
 
+impl MemberSnapshot {
+    /// A snapshot with no year or month set.
+    pub fn new(viewer_id: u64, daily_fans: Vec<i64>) -> Self {
+        Self {
+            viewer_id,
+            daily_fans,
+            ..Self::default()
+        }
+    }
+}
+
 /// How a club accepts new members.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[non_exhaustive]
 pub enum JoinStyle {
     /// Anyone can join.
     Open,
@@ -48,6 +61,7 @@ impl JoinStyle {
 /// A club and its member snapshots for one month.
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[non_exhaustive]
 pub struct Club {
     /// Club ID.
     pub circle_id: u64,
@@ -72,6 +86,15 @@ pub struct Club {
 }
 
 impl Club {
+    /// A club with only its ID and name set.
+    pub fn new(circle_id: u64, name: impl Into<String>) -> Self {
+        Self {
+            circle_id,
+            name: name.into(),
+            ..Self::default()
+        }
+    }
+
     /// Open spots, if the member count is known.
     pub fn open_spots(&self) -> Option<u32> {
         self.member_count.map(|n| CLUB_CAP.saturating_sub(n))

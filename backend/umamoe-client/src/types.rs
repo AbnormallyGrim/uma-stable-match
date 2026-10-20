@@ -127,42 +127,35 @@ impl CircleListResponse {
 impl From<Circle> for Club {
     /// Club details only: no members or tier.
     fn from(c: Circle) -> Self {
-        Club {
-            circle_id: c.circle_id,
-            name: c.name,
-            member_count: to_u32(c.member_count),
-            monthly_rank: to_u32(c.monthly_rank),
-            last_month_rank: to_u32(c.last_month_rank),
-            join_style: c
-                .join_style
-                .and_then(|code| u8::try_from(code).ok())
-                .and_then(JoinStyle::from_code),
-            policy: to_u32(c.policy),
-            club_rank: None,
-            comment: c.comment,
-            members: Vec::new(),
-        }
+        let mut club = Club::new(c.circle_id, c.name);
+        club.member_count = to_u32(c.member_count);
+        club.monthly_rank = to_u32(c.monthly_rank);
+        club.last_month_rank = to_u32(c.last_month_rank);
+        club.join_style = c
+            .join_style
+            .and_then(|code| u8::try_from(code).ok())
+            .and_then(JoinStyle::from_code);
+        club.policy = to_u32(c.policy);
+        club.comment = c.comment;
+        club
     }
 }
 
 impl From<CircleResponse> for Club {
     fn from(r: CircleResponse) -> Self {
-        Club {
-            club_rank: r.club_rank.and_then(|code| u8::try_from(code).ok()),
-            members: r.members.into_iter().map(MemberSnapshot::from).collect(),
-            ..Club::from(r.circle)
-        }
+        let mut club = Club::from(r.circle);
+        club.club_rank = r.club_rank.and_then(|code| u8::try_from(code).ok());
+        club.members = r.members.into_iter().map(MemberSnapshot::from).collect();
+        club
     }
 }
 
 impl From<CircleMember> for MemberSnapshot {
     fn from(m: CircleMember) -> Self {
-        MemberSnapshot {
-            viewer_id: m.viewer_id,
-            year: m.year,
-            month: to_u32(m.month),
-            daily_fans: m.daily_fans,
-        }
+        let mut member = MemberSnapshot::new(m.viewer_id, m.daily_fans);
+        member.year = m.year;
+        member.month = to_u32(m.month);
+        member
     }
 }
 

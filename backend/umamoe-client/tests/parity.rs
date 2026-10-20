@@ -61,10 +61,8 @@ fn matches_prototype() {
     assert!(!expected.scenarios.is_empty());
 
     for scenario in &expected.scenarios {
-        let options = ScoringOptions {
-            balance_weight: scenario.balance_weight,
-            include_closed: true,
-        };
+        let mut options = ScoringOptions::default().with_include_closed(true);
+        options.balance_weight = scenario.balance_weight;
         let scored = score_clubs(scenario.pace, &clubs, &options).unwrap();
         let label = format!(
             "pace {} balance {:?}",

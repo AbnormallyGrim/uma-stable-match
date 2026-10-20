@@ -129,10 +129,8 @@ pub(crate) async fn recommendations(
             .ok_or_else(|| ApiError::bad_request("limit must be a positive whole number"))?,
     };
 
-    let options = ScoringOptions {
-        balance_weight,
-        include_closed,
-    };
+    let mut options = ScoringOptions::default().with_include_closed(include_closed);
+    options.balance_weight = balance_weight;
     let snapshot = state.cache.snapshot().ok_or(ApiError::new(
         StatusCode::SERVICE_UNAVAILABLE,
         "no scan results yet; try again shortly",
@@ -213,10 +211,11 @@ fn recommendation(scored: &ScoredClub<'_>) -> Recommendation {
         name: club.name.clone(),
         url: format!("{CLUB_URL}{}", club.circle_id),
         tier: club.tier(),
-        join_style: club.join_style.map(|style| match style {
-            JoinStyle::Open => "open",
-            JoinStyle::Approval => "approval",
-            JoinStyle::Closed => "closed",
+        join_style: club.join_style.and_then(|style| match style {
+            JoinStyle::Open => Some("open"),
+            JoinStyle::Approval => Some("approval"),
+            JoinStyle::Closed => Some("closed"),
+            _ => None,
         }),
         policy: club.policy,
         member_count: club.member_count,
