@@ -27,7 +27,7 @@
     fromUrl ?? (remembered ? { ...DEFAULT_SEARCH, trainerId: remembered } : DEFAULT_SEARCH);
 
   // Above a scan's default 80 clubs, so the table can list them all.
-  const RESULT_LIMIT = 100;
+  const RESULT_LIMIT = 1000;
 
   let search = $state<RunnerState>({ status: { phase: 'idle' }, result: null });
 
