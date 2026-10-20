@@ -69,3 +69,29 @@ fn trainer_digests_are_keyed_and_hide_the_id() {
     assert_ne!(digest, trainer_digest(&secret, 100000000002));
     assert_ne!(digest, trainer_digest(&other, 100000000001));
 }
+
+#[test]
+fn scan_keys_depend_on_the_scan_window() {
+    let keys = ScanKeys::new(&ScanConfig::default());
+    assert_eq!(keys.lock, "usm:v1:scan:80-900-200:lock");
+    assert_eq!(keys.fresh, "usm:v1:scan:80-900-200:fresh");
+    assert_eq!(keys.latest, "usm:v1:scan:80-900-200:latest");
+    let other = ScanKeys::new(&ScanConfig {
+        rank_to: 500,
+        ..ScanConfig::default()
+    });
+    assert_eq!(other.lock, "usm:v1:scan:80-500-200:lock");
+}
+
+#[tokio::test]
+async fn without_redis_every_instance_scans_alone() {
+    let cache = SharedCache::none();
+    assert!(matches!(
+        cache.scan_turn(&ScanConfig::default()).await,
+        ScanTurn::Alone
+    ));
+    assert_eq!(
+        cache.published_scan::<u32>(&ScanConfig::default()).await,
+        None
+    );
+}

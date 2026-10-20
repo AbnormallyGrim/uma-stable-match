@@ -9,9 +9,11 @@ use std::time::{Duration, Instant};
 use serde_json::json;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
+use tokio::sync::watch;
+use tokio::task::JoinHandle;
 use uma_stable_match_server::{
-    club_key, ClubDetails, ClubPool, DetailConfig, KeySecret, ListedClub, PaceLookup, RedisUrl,
-    SharedCache, SharedPool, DEFAULT_PACE_TTL,
+    club_key, run_scheduler, Cache, CacheStatus, ClubDetails, ClubPool, DetailConfig, KeySecret,
+    ListedClub, PaceLookup, RedisUrl, ScanConfig, SharedCache, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -252,4 +254,171 @@ async fn instances_share_trainer_paces_under_hashed_keys() {
         .await
         .unwrap();
     assert!(keys.iter().all(|k| !k.contains(&trainer.to_string())));
+}
+
+fn scan_config() -> ScanConfig {
+    ScanConfig {
+        rank_from: 1,
+        rank_to: fastrand::u32(1_000..1_000_000),
+        ..ScanConfig::default()
+    }
+}
+
+async fn mount_scan(server: &MockServer, id: u64) {
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(listed_club(id))
+        .expect(1)
+        .mount(server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", id.to_string()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(detail(id)))
+        .expect(1)
+        .mount(server)
+        .await;
+}
+
+fn listed_club(id: u64) -> ResponseTemplate {
+    ResponseTemplate::new(200).set_body_json(json!({
+        "circles": [{
+            "circle_id": id,
+            "name": "Shared Club",
+            "monthly_rank": 100,
+            "member_count": 9,
+            "monthly_point": 20_000_000,
+            "last_updated": "2026-03-19T15:00:00Z",
+        }],
+    }))
+}
+
+struct Instance {
+    cache: Cache,
+    details: ClubDetails,
+    stop: watch::Sender<bool>,
+    handle: JoinHandle<()>,
+}
+
+fn instance(server: &MockServer, config: ScanConfig, shared: SharedCache) -> Instance {
+    let cache = Cache::new();
+    let (details, _loader) = ClubDetails::with_shared(
+        &client(server),
+        SharedPool::default(),
+        DetailConfig {
+            ttl: Duration::from_secs(60),
+            ..DetailConfig::default()
+        },
+        shared,
+    );
+    let (stop, stopped) = watch::channel(false);
+    let handle = tokio::spawn(run_scheduler(
+        client(server),
+        details.clone(),
+        config,
+        Duration::from_secs(3600),
+        cache.clone(),
+        stopped,
+    ));
+    Instance {
+        cache,
+        details,
+        stop,
+        handle,
+    }
+}
+
+impl Instance {
+    async fn wait_until(&self, done: impl Fn(&CacheStatus) -> bool) {
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while !done(&self.cache.status()) {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("condition not reached in time");
+    }
+
+    async fn stop(self) {
+        self.stop.send(true).unwrap();
+        tokio::time::timeout(Duration::from_secs(2), self.handle)
+            .await
+            .expect("scheduler did not stop")
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn scans_alone_when_redis_stops_answering() {
+    let server = MockServer::start().await;
+    mount_scan(&server, unique_id()).await;
+    let shared = SharedCache::connect(&silent_after_ping().await, secret())
+        .await
+        .unwrap();
+
+    let only = instance(&server, scan_config(), shared);
+    only.wait_until(|s| s.snapshot.is_some()).await;
+    assert_eq!(only.cache.snapshot().unwrap().candidates, 1);
+    only.stop().await;
+}
+
+#[tokio::test]
+async fn instances_share_one_scan() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let second_shared = redis().await.unwrap();
+    let server = MockServer::start().await;
+    let id = unique_id();
+    mount_scan(&server, id).await;
+    let config = scan_config();
+
+    let first = instance(&server, config, first_shared);
+    let second = instance(&server, config, second_shared);
+    for running in [&first, &second] {
+        running.wait_until(|s| s.snapshot.is_some()).await;
+        let snapshot = running.cache.snapshot().unwrap();
+        assert_eq!(snapshot.candidates, 1);
+        assert_eq!(snapshot.prefetched, 1);
+        assert_eq!(snapshot.month.as_deref(), Some("2026-03"));
+        assert_eq!(
+            running.details.pool().read().unwrap().estimated_median(id),
+            Some(500.0)
+        );
+    }
+
+    let late = instance(&server, config, redis().await.unwrap());
+    late.wait_until(|s| s.snapshot.is_some()).await;
+    assert_eq!(late.cache.snapshot().unwrap().candidates, 1);
+
+    for running in [first, second, late] {
+        running.stop().await;
+    }
+}
+
+#[tokio::test]
+async fn a_failed_shared_scan_is_reported_by_every_instance() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let second_shared = redis().await.unwrap();
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ResponseTemplate::new(503))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let config = scan_config();
+
+    let first = instance(&server, config, first_shared);
+    let second = instance(&server, config, second_shared);
+    for running in [&first, &second] {
+        running.wait_until(|s| s.last_error.is_some()).await;
+        assert_eq!(
+            running.cache.status().last_error.unwrap().message,
+            "listing clubs failed: uma.moe returned 503 Service Unavailable"
+        );
+    }
+
+    for running in [first, second] {
+        running.stop().await;
+    }
 }
