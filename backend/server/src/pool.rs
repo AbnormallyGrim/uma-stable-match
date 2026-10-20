@@ -1,24 +1,31 @@
+//! Stage 1: pace estimates from list rows, and nearest-pace shortlists.
+
 use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Utc};
 use uma_stable_match_scoring::{JoinStyle, CLUB_CAP, MIN_RANKED_MEMBERS};
 use uma_stable_match_umamoe_client::Circle;
 
 use crate::calibration::Calibration;
 
+/// Ideal club median as a share of your pace, as in the fit formula.
 pub const TARGET_MEDIAN_RATIO: f64 = 0.85;
 
+/// Clubs considered per request by default.
 pub const DEFAULT_SHORTLIST_SIZE: usize = 120;
 
 const JST_OFFSET_SECONDS: i32 = 9 * 3600;
 const SECONDS_PER_DAY: f64 = 86_400.0;
 const MIN_ELAPSED_DAYS: f64 = 1.0;
 
+/// Japan Standard Time (UTC+09:00), which uma.moe uses for months.
 pub fn jst() -> FixedOffset {
     FixedOffset::east_opt(JST_OFFSET_SECONDS).expect("valid offset")
 }
 
+/// Start of the game month containing `at`: the 2nd at 00:00 JST.
 pub fn game_month_start(at: DateTime<Utc>) -> DateTime<Utc> {
     let local = at.with_timezone(&jst());
     let (mut year, mut month) = (local.year(), local.month());
+    // The 1st still belongs to the previous game month.
     if local.day() < 2 {
         if month == 1 {
             year -= 1;
@@ -34,10 +41,12 @@ pub fn game_month_start(at: DateTime<Utc>) -> DateTime<Utc> {
         .with_timezone(&Utc)
 }
 
+/// Days from the start of the game month to `at`.
 pub fn elapsed_days(at: DateTime<Utc>) -> f64 {
     (at - game_month_start(at)).num_seconds() as f64 / SECONDS_PER_DAY
 }
 
+/// Mean daily fans per member this game month, or `None` without points, members or a full day.
 pub fn raw_rate(monthly_point: i64, member_count: u32, at: DateTime<Utc>) -> Option<f64> {
     let days = elapsed_days(at);
     if monthly_point <= 0 || member_count == 0 || days < MIN_ELAPSED_DAYS {
@@ -46,15 +55,22 @@ pub fn raw_rate(monthly_point: i64, member_count: u32, at: DateTime<Utc>) -> Opt
     Some(monthly_point as f64 / days / f64::from(member_count))
 }
 
+/// A club from the list endpoint with its stage-1 estimate.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListedClub {
+    /// Club ID.
     pub circle_id: u64,
+    /// Official member count.
     pub member_count: u32,
+    /// Join style, kept so closed clubs can be filtered per request.
     pub join_style: Option<JoinStyle>,
+    /// Mean daily fans per member, from [`raw_rate`].
     pub raw_rate: f64,
 }
 
 impl ListedClub {
+    /// Builds a pool entry, or `None` if the club is archived, full, too small to score or
+    /// missing data.
     pub fn from_circle(circle: &Circle) -> Option<Self> {
         if circle.archived == Some(true) {
             return None;
@@ -86,6 +102,7 @@ struct Entry {
     ln_raw: f64,
 }
 
+/// Eligible clubs sorted by estimated median pace.
 #[derive(Debug, Clone, Default)]
 pub struct ClubPool {
     entries: Vec<Entry>,
@@ -93,6 +110,7 @@ pub struct ClubPool {
 }
 
 impl ClubPool {
+    /// Builds an uncalibrated pool. Later duplicates and invalid rates are dropped.
     pub fn new(clubs: impl IntoIterator<Item = ListedClub>) -> Self {
         let mut seen = std::collections::HashSet::new();
         let mut entries: Vec<Entry> = clubs
@@ -115,30 +133,38 @@ impl ClubPool {
         }
     }
 
+    /// Number of clubs.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
+    /// Whether the pool has no clubs.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
+    /// Clubs from the slowest estimate to the fastest.
     pub fn clubs(&self) -> impl ExactSizeIterator<Item = &ListedClub> {
         self.entries.iter().map(|e| &e.club)
     }
 
+    /// The current calibration.
     pub fn calibration(&self) -> Calibration {
         self.calibration
     }
 
+    /// Replaces the calibration. The order doesn't change, so this is cheap.
     pub fn set_calibration(&mut self, calibration: Calibration) {
         self.calibration = calibration;
     }
 
+    /// A club's estimated median daily pace.
     pub fn estimated_median(&self, club: &ListedClub) -> f64 {
         self.calibration.factor() * club.raw_rate
     }
 
+    /// IDs of the `k` clubs whose estimated median is nearest `target` in log space, nearest
+    /// first. Ties go to the lower ID.
     pub fn shortlist(&self, target: f64, k: usize, include_closed: bool) -> Vec<u64> {
         if k == 0 || !(target.is_finite() && target > 0.0) {
             return Vec::new();
@@ -166,6 +192,7 @@ impl ClubPool {
                 break;
             }
             picked.push((d, entry.club.circle_id));
+            // Keep collecting clubs tied with the k-th, so the cut below matches a full sort.
             if picked.len() == k {
                 cutoff = Some(d);
             }

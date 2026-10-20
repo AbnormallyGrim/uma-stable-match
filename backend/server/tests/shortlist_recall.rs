@@ -1,3 +1,5 @@
+//! Shortlist recall against exhaustive scoring on synthetic pools. All data is made up.
+
 use std::collections::HashSet;
 
 use uma_stable_match_scoring::{score_clubs, Club, JoinStyle, MemberSnapshot, ScoringOptions};

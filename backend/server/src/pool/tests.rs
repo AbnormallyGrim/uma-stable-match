@@ -251,6 +251,7 @@ fn brute_force(pool: &ClubPool, target: f64, k: usize, include_closed: bool) -> 
 }
 
 fn arb_club() -> impl Strategy<Value = (f64, bool)> {
+    // Some repeated rates, so ties are common.
     let rate = prop_oneof![
         3 => (8.0f64..20.0).prop_map(f64::exp),
         1 => prop::sample::select(vec![1e5, 5e5, 2e6]),
