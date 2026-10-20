@@ -29,5 +29,6 @@ pub use pool::{
     elapsed_days, game_month_start, jst, raw_rate, ClubPool, ListedClub, DEFAULT_SHORTLIST_SIZE,
     TARGET_MEDIAN_RATIO,
 };
+pub use recommendations::{MatchSettings, DEFAULT_FETCH_BUDGET};
 pub use scanner::{scan, Scan, ScanConfig, ScanError};
 pub use scheduler::run_scheduler;

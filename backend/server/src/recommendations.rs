@@ -1,23 +1,51 @@
 //! `GET /api/v1/recommendations`: scores the cached clubs for a pace or a trainer.
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use axum::extract::rejection::QueryRejection;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
 use serde::{Deserialize, Serialize};
+use tokio::task::JoinSet;
 use uma_stable_match_scoring::{
     score_clubs, Balance, Club, JoinStyle, ScoredClub, ScoringOptions, DEFAULT_BALANCE_WEIGHT,
 };
+use uma_stable_match_umamoe_client::Priority;
 
 use crate::api_error::ApiError;
 use crate::app::timestamp;
 use crate::app::AppState;
+use crate::details::ClubDetails;
 use crate::limits::Visitor;
 use crate::pace::PaceError;
+use crate::pool::{DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO};
 
 const CLUB_URL: &str = "https://uma.moe/circles/";
 const DEFAULT_LIMIT: u32 = 50;
+
+/// Most uncached club details one request fetches by default.
+pub const DEFAULT_FETCH_BUDGET: usize = 10;
+
+/// How each request picks and loads clubs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MatchSettings {
+    /// Clubs shortlisted per request, from `SHORTLIST_SIZE`.
+    pub shortlist_size: usize,
+    /// Most uncached club details fetched while the visitor waits, from `REQUEST_FETCH_BUDGET`.
+    pub fetch_budget: usize,
+}
+
+impl Default for MatchSettings {
+    fn default() -> Self {
+        Self {
+            shortlist_size: DEFAULT_SHORTLIST_SIZE,
+            fetch_budget: DEFAULT_FETCH_BUDGET,
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Params {
@@ -34,8 +62,17 @@ pub(crate) struct Recommendations {
     trainer: TrainerView,
     options: OptionsView,
     updated_at: String,
+    month: Option<String>,
+    coverage: Coverage,
     total: usize,
     clubs: Vec<Recommendation>,
+}
+
+#[derive(Debug, Serialize)]
+struct Coverage {
+    shortlisted: usize,
+    scored: usize,
+    pending: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -144,12 +181,8 @@ pub(crate) async fn recommendations(
             (state.paces.pace(id).await.map_err(pace_error)?, Some(id))
         }
     };
-    let clubs: Vec<Club> = state
-        .details
-        .cached_in_pool()
-        .iter()
-        .map(|club| Club::clone(club))
-        .collect();
+    score_clubs(pace, &[], &options).map_err(|e| ApiError::bad_request(e.to_string()))?;
+    let (clubs, coverage) = load_clubs(&state.details, state.matching, pace, include_closed).await;
     let scored =
         score_clubs(pace, &clubs, &options).map_err(|e| ApiError::bad_request(e.to_string()))?;
 
@@ -164,6 +197,8 @@ pub(crate) async fn recommendations(
             limit,
         },
         updated_at: timestamp(snapshot.scanned_at),
+        month: snapshot.month.clone(),
+        coverage,
         total: scored.len(),
         clubs: scored
             .iter()
@@ -171,6 +206,73 @@ pub(crate) async fn recommendations(
             .map(recommendation)
             .collect(),
     }))
+}
+
+// Every cached club in the pool, plus up to `fetch_budget` uncached shortlisted clubs, nearest
+// first. The other misses are queued for the background loader.
+async fn load_clubs(
+    details: &ClubDetails,
+    settings: MatchSettings,
+    pace: f64,
+    include_closed: bool,
+) -> (Vec<Club>, Coverage) {
+    let shortlist = details
+        .pool()
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .shortlist(
+            TARGET_MEDIAN_RATIO * pace,
+            settings.shortlist_size,
+            include_closed,
+        );
+    let mut loaded: HashMap<u64, Arc<Club>> = details
+        .cached_in_pool()
+        .into_iter()
+        .map(|club| (club.circle_id, club))
+        .collect();
+
+    let misses: Vec<u64> = shortlist
+        .iter()
+        .copied()
+        .filter(|id| !loaded.contains_key(id))
+        .collect();
+    let (fetch, later) = misses.split_at(settings.fetch_budget.min(misses.len()));
+    let mut fetches = JoinSet::new();
+    for &circle_id in fetch {
+        let details = details.clone();
+        fetches.spawn(async move {
+            (
+                circle_id,
+                details.get(circle_id, Priority::Interactive).await,
+            )
+        });
+    }
+    let mut failed = Vec::new();
+    while let Some(joined) = fetches.join_next().await {
+        match joined {
+            Ok((circle_id, Ok(club))) => {
+                loaded.insert(circle_id, club);
+            }
+            Ok((circle_id, Err(_))) => failed.push(circle_id),
+            Err(_) => {}
+        }
+    }
+    for &circle_id in later.iter().chain(&failed) {
+        details.queue(circle_id);
+    }
+
+    let pending = shortlist
+        .iter()
+        .filter(|id| !loaded.contains_key(id))
+        .count();
+    let mut clubs: Vec<Club> = loaded.into_values().map(|c| Club::clone(&c)).collect();
+    clubs.sort_by_key(|c| (c.monthly_rank.unwrap_or(u32::MAX), c.circle_id));
+    let coverage = Coverage {
+        shortlisted: shortlist.len(),
+        scored: clubs.len(),
+        pending,
+    };
+    (clubs, coverage)
 }
 
 enum PaceSource {

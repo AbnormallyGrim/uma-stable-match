@@ -12,8 +12,8 @@ use serde_json::{json, Value};
 use tokio::sync::watch;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    router, run_scheduler, AppState, Cache, ClubDetails, DetailConfig, PaceLookup, RateLimits,
-    ScanConfig, SharedPool, DEFAULT_PACE_TTL,
+    router, run_scheduler, AppState, Cache, ClubDetails, DetailConfig, MatchSettings, PaceLookup,
+    RateLimits, ScanConfig, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -40,6 +40,7 @@ fn app(cache: Cache, details: ClubDetails, base_url: String, limits: RateLimits)
     router(AppState {
         cache,
         details,
+        matching: MatchSettings::default(),
         paces: PaceLookup::new(client(base_url), DEFAULT_PACE_TTL),
         limits,
     })
