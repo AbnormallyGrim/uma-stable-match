@@ -29,7 +29,7 @@ tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.7", features = ["fs", "set-header"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-uma-stable-match-scoring = { version = "0.1.0", path = "../scoring" }
+uma-stable-match-scoring = { version = "0.1.0", path = "../scoring", features = ["serde"] }
 uma-stable-match-umamoe-client = { version = "0.1.0", path = "../umamoe-client" }
 
 [dev-dependencies]
