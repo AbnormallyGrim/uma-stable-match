@@ -27,6 +27,10 @@ Enable the `serde` feature to deserialise `Club` and `MemberSnapshot` directly f
 uma-stable-match-scoring = { version = "0.1", features = ["serde"] }
 ```
 
+## Minimum supported Rust version
+
+Rust 1.71, with or without the `serde` feature.
+
 ## Input data
 
 A `MemberSnapshot` holds one member's **cumulative** fan count for each day of the month, starting at day 1:
