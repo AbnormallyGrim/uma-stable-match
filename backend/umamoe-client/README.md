@@ -97,7 +97,31 @@ The key is sent as the `X-API-Key` header and marked sensitive. `ApiKey`, `Clien
 
 ## Rate limiting
 
-Requests are spaced at least `min_interval` apart (500 ms by default). Retries count too. Requests go out in the order they were made. All clones of a `Client` share one limiter, so a scanner running many tasks still sends one request per slot. Idle time isn't saved up for bursts. Set `min_interval` to zero to turn the limit off.
+Requests are spaced at least `min_interval` apart (500 ms by default). Retries count too. All clones of a `Client` share one limiter, so a scanner running many tasks still sends one request per slot. Idle time isn't saved up for bursts. Set `min_interval` to zero to turn the limit off.
+
+Each client sends its requests in one of two lanes:
+
+| `Priority` | Use for |
+|---|---|
+| `Interactive` (default) | Requests someone is waiting for |
+| `Background` | Prefetching and other work that can wait |
+
+When a slot opens, the oldest waiting interactive request takes it. Background requests only get a slot when no interactive request is waiting. Within a lane, requests go out in the order they were made. A request that's cancelled while waiting gives up its place.
+
+`Client::with_priority` returns a clone that uses another lane but shares the same limiter, so both lanes together stay within `min_interval`:
+
+```rust,no_run
+use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority};
+
+# fn run() -> Result<(), uma_stable_match_umamoe_client::Error> {
+let key = std::env::var("UMAMOE_API_KEY").expect("UMAMOE_API_KEY is set");
+let client = Client::new(ClientConfig::new(ApiKey::new(key)))?;
+let prefetch = client.with_priority(Priority::Background);
+# Ok(())
+# }
+```
+
+A steady stream of interactive requests can hold background ones back indefinitely. That's intended: prefetching should never slow down a visitor.
 
 ## Retries
 
