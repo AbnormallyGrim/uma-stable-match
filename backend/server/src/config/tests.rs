@@ -350,9 +350,11 @@ fn reads_redis_url() {
     let config = Config::from_lookup(lookup(&[
         ("UMAMOE_API_KEY", "test-key"),
         ("REDIS_URL", "redis://127.0.0.1:6379"),
+        ("REDIS_KEY_SECRET", "made-up-secret-made-up-secret-0001"),
     ]))
     .unwrap();
     assert_eq!(config.redis_url.unwrap().expose(), "redis://127.0.0.1:6379");
+    assert!(config.redis_key_secret.is_some());
 }
 
 #[test]
@@ -377,7 +379,42 @@ fn config_debug_hides_the_redis_url() {
             "REDIS_URL",
             "redis://user:made-up-password@cache.example.com:6379",
         ),
+        ("REDIS_KEY_SECRET", "made-up-secret-made-up-secret-0001"),
     ]))
     .unwrap();
-    assert!(!format!("{config:?}").contains("made-up-password"));
+    let debug = format!("{config:?}");
+    assert!(!debug.contains("made-up-password"));
+    assert!(!debug.contains("made-up-secret"));
+}
+
+#[test]
+fn redis_needs_a_key_secret() {
+    let error = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("REDIS_URL", "redis://127.0.0.1:6379"),
+    ]))
+    .unwrap_err();
+    assert_eq!(error, ConfigError::MissingRedisKeySecret);
+}
+
+#[test]
+fn short_key_secrets_fail_without_echoing_them() {
+    let error = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("REDIS_URL", "redis://127.0.0.1:6379"),
+        ("REDIS_KEY_SECRET", "too-short-made-up"),
+    ]))
+    .unwrap_err();
+    assert_eq!(error, ConfigError::InvalidRedisKeySecret);
+    assert!(!error.to_string().contains("too-short"));
+}
+
+#[test]
+fn key_secret_is_ignored_without_redis() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("REDIS_KEY_SECRET", "short"),
+    ]))
+    .unwrap();
+    assert!(config.redis_key_secret.is_none());
 }

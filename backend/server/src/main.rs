@@ -8,7 +8,7 @@ use tokio::sync::watch;
 use tracing_subscriber::EnvFilter;
 use uma_stable_match_server::{
     app, run_scheduler, AppState, Cache, ClubDetails, Config, DetailConfig, PaceLookup, RateLimits,
-    SharedPool,
+    SharedCache, SharedPool,
 };
 use uma_stable_match_umamoe_client::{Client, ClientConfig};
 
@@ -29,10 +29,6 @@ async fn main() -> ExitCode {
         }
     };
 
-    if config.redis_url.is_some() {
-        tracing::warn!("REDIS_URL is set, but this version doesn't use Redis yet");
-    }
-
     let mut client_config = ClientConfig::new(config.api_key.clone());
     if let Some(base_url) = &config.base_url {
         client_config.base_url = base_url.clone();
@@ -43,6 +39,20 @@ async fn main() -> ExitCode {
             tracing::error!("{error}");
             return ExitCode::FAILURE;
         }
+    };
+
+    let shared = match (&config.redis_url, &config.redis_key_secret) {
+        (Some(url), Some(secret)) => match SharedCache::connect(url, secret.clone()).await {
+            Ok(shared) => {
+                tracing::info!("using Redis as a shared cache");
+                shared
+            }
+            Err(error) => {
+                tracing::error!("{error}");
+                return ExitCode::FAILURE;
+            }
+        },
+        _ => SharedCache::none(),
     };
 
     let listener = match TcpListener::bind(config.bind_addr).await {
@@ -56,14 +66,14 @@ async fn main() -> ExitCode {
 
     let cache = Cache::new();
     let (stop, stopped) = watch::channel(false);
-    let paces = PaceLookup::new(client.clone(), config.trainer_cache);
+    let paces = PaceLookup::new(client.clone(), config.trainer_cache).with_shared(shared.clone());
     let limits = RateLimits::new(
         config.rate_limit_per_minute,
         config.trainer_lookups_per_minute,
         config.trust_forwarded_for,
     );
     let window = u64::from(config.scan.rank_to - config.scan.rank_from + 1);
-    let (details, loader) = ClubDetails::new(
+    let (details, loader) = ClubDetails::with_shared(
         &client,
         SharedPool::default(),
         DetailConfig {
@@ -71,6 +81,7 @@ async fn main() -> ExitCode {
             max_clubs: window * 2,
             queue_size: window as usize,
         },
+        shared,
     );
     tokio::spawn(loader.run());
     let scheduler = tokio::spawn(run_scheduler(

@@ -34,9 +34,18 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer lookups each visitor can make per minute that need a call to uma.moe |
 | `TRUST_FORWARDED_FOR` | `false` | `true` to identify visitors by `X-Forwarded-For`. Only turn this on behind a reverse proxy that sets the header |
 | `FRONTEND_DIR` | none | Built frontend to serve, such as `frontend/dist`. Unset, the server serves only the API |
-| `REDIS_URL` | none | Not used yet ([#41](https://github.com/AbnormallyGrim/uma-stable-match/issues/41)). It must be a `redis://` or `rediss://` URL, and the server logs a warning when it's set |
+| `REDIS_URL` | none | A `redis://` or `rediss://` URL to share club details and trainer paces with other instances. Unset, everything stays in this instance's memory. See [Shared cache](#shared-cache) |
+| `REDIS_KEY_SECRET` | none | Required with `REDIS_URL`: at least 32 characters, the same on every instance. Keys the hash that replaces trainer IDs in Redis |
 
-Blank values count as unset. A missing key, a `HOST` that isn't an IP address (hostnames such as `localhost` aren't accepted), a `PORT` outside 1 to 65535, a `TRUST_FORWARDED_FOR` other than `true` or `false`, a scan, cache or rate limit setting that isn't a positive whole number, `SCAN_RANK_FROM` above `SCAN_RANK_TO`, a `FRONTEND_DIR` without an `index.html`, or a `REDIS_URL` without a `redis://` or `rediss://` scheme stops the server at startup, with an error message and exit code 1. The key and `REDIS_URL`, which can hold a password, are never logged, never included in errors and are redacted in `Debug` output. `.env` is git-ignored; never commit it.
+Blank values count as unset. These stop the server at startup, with an error message and exit code 1:
+
+- a missing key, or a `HOST` that isn't an IP address (hostnames such as `localhost` aren't accepted)
+- a `PORT` outside 1 to 65535, or a `TRUST_FORWARDED_FOR` other than `true` or `false`
+- a scan, cache or rate limit setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO`
+- a `FRONTEND_DIR` without an `index.html`
+- a `REDIS_URL` without a `redis://` or `rediss://` scheme, a missing or short `REDIS_KEY_SECRET`, or a Redis that can't be reached within 5 seconds
+
+The API key, `REDIS_URL` (which can hold a password) and `REDIS_KEY_SECRET` are never logged, never included in errors and are redacted in `Debug` output. `.env` is git-ignored; never commit it.
 
 ## Scanner
 
@@ -136,7 +145,19 @@ Exact medians help most when many clubs have them. With an exact median for ever
 
 `SharedCache` is a second cache layer for running several server instances against one store. On a local miss, `ClubDetails` and `PaceLookup` check it before calling uma.moe, and store what they load in it with the same expiry, under keys such as `usm:v1:club:<id>:<month>`. A club found there still gives the pool its exact median.
 
-The only backend so far stores nothing (`SharedCache::none()`), so every instance works alone. Redis support is planned in [#41](https://github.com/AbnormallyGrim/uma-stable-match/issues/41).
+Without `REDIS_URL`, the shared cache stores nothing (`SharedCache::none()`) and each instance works alone. With it, the server uses Redis:
+
+| Situation | What happens |
+|---|---|
+| Start-up | The server connects and sends `PING`. If Redis can't be reached within 5 seconds, it stops with exit code 1, so a wrong URL is caught straight away |
+| Each read or write | Times out after 500 ms. Any error or timeout counts as a miss, and the instance carries on with its own cache and uma.moe |
+| Redis goes away | One warning is logged; the connection reconnects by itself, and one message is logged when Redis is back |
+
+**Trainer IDs never reach Redis.** Pace keys use the first 32 hex characters of HMAC-SHA256(`REDIS_KEY_SECRET`, trainer ID), so every instance needs the same secret. Club keys keep the club ID, which isn't personal. Run Redis without persistence (for example `--save "" --appendonly no`), so paces stay in memory as they do without Redis.
+
+Still per instance: rate limits, the background queue, and scanning. Sharing the scan is planned in [#41](https://github.com/AbnormallyGrim/uma-stable-match/issues/41).
+
+The Redis tests in `tests/redis.rs` need a Redis server: set `REDIS_TEST_URL`, for example `REDIS_TEST_URL=redis://127.0.0.1:6379 cargo test`. Without it they're skipped. CI runs them against a Redis service container.
 
 ## Cache and schedule
 
