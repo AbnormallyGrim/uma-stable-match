@@ -4,9 +4,10 @@ use uma_stable_match_umamoe_client::Error;
 
 fn scan(ids: &[u64]) -> Scan {
     Scan {
-        clubs: ids.iter().map(|id| Club::new(*id, "")).collect(),
         candidates: ids.len() + 1,
+        prefetched: ids.len(),
         failed: 1,
+        month: Some("2026-03".into()),
     }
 }
 
@@ -52,9 +53,10 @@ fn success_replaces_snapshot_and_clears_error() {
     cache.finish_scan(Ok(scan(&[1, 2])), at(20));
 
     let snapshot = cache.snapshot().unwrap();
-    assert_eq!(snapshot.clubs.len(), 2);
+    assert_eq!(snapshot.prefetched, 2);
     assert_eq!(snapshot.candidates, 3);
     assert_eq!(snapshot.failed, 1);
+    assert_eq!(snapshot.month.as_deref(), Some("2026-03"));
     assert_eq!(snapshot.scanned_at, at(20));
     assert_eq!(cache.status().last_error, None);
 }
@@ -89,5 +91,5 @@ fn clones_share_state() {
     let clone = cache.clone();
     clone.begin_scan();
     clone.finish_scan(Ok(scan(&[7])), at(5));
-    assert_eq!(cache.snapshot().unwrap().clubs[0].circle_id, 7);
+    assert_eq!(cache.snapshot().unwrap().prefetched, 1);
 }

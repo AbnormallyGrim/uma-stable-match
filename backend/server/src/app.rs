@@ -12,6 +12,7 @@ use axum::{Json, Router};
 use serde_json::{json, Value};
 
 use crate::cache::Cache;
+use crate::details::ClubDetails;
 use crate::frontend;
 use crate::limits::{limit_requests, RateLimits};
 use crate::pace::PaceLookup;
@@ -26,6 +27,8 @@ pub struct AppState {
     pub paces: PaceLookup,
     /// Per-visitor rate limits.
     pub limits: RateLimits,
+    /// Cached club details and the club pool.
+    pub details: ClubDetails,
 }
 
 /// The server's routes.
@@ -61,14 +64,35 @@ async fn health() -> Json<Value> {
 
 async fn status(State(state): State<AppState>) -> Json<Value> {
     let status = state.cache.status();
+    let (pool_clubs, exact_medians, calibration) = {
+        let pool = state
+            .details
+            .pool()
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
+        (pool.len(), pool.exact_medians(), pool.calibration())
+    };
     Json(json!({
         "scanning": status.scanning,
         "last_scan": status.snapshot.map(|s| json!({
             "finished_at": timestamp(s.scanned_at),
-            "clubs": s.clubs.len(),
+            "clubs": s.prefetched,
             "candidates": s.candidates,
             "failed": s.failed,
+            "month": s.month,
         })),
+        "pool": {
+            "clubs": pool_clubs,
+            "exact_medians": exact_medians,
+            "calibration": {
+                "factor": calibration.factor(),
+                "samples": calibration.samples(),
+            },
+        },
+        "details": {
+            "cached": state.details.cached_clubs(),
+            "queued": state.details.queued(),
+        },
         "last_error": status.last_error.map(|e| json!({
             "at": timestamp(e.at),
             "message": e.message,

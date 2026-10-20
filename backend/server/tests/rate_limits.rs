@@ -12,7 +12,8 @@ use serde_json::{json, Value};
 use tokio::sync::watch;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    router, run_scheduler, AppState, Cache, PaceLookup, RateLimits, ScanConfig, DEFAULT_PACE_TTL,
+    router, run_scheduler, AppState, Cache, ClubDetails, DetailConfig, PaceLookup, RateLimits,
+    ScanConfig, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -31,16 +32,23 @@ fn client(base_url: String) -> Client {
     .unwrap()
 }
 
-fn app(cache: Cache, base_url: String, limits: RateLimits) -> Router {
+fn details(client: &Client) -> ClubDetails {
+    ClubDetails::new(client, SharedPool::default(), DetailConfig::default()).0
+}
+
+fn app(cache: Cache, details: ClubDetails, base_url: String, limits: RateLimits) -> Router {
     router(AppState {
         cache,
+        details,
         paces: PaceLookup::new(client(base_url), DEFAULT_PACE_TTL),
         limits,
     })
 }
 
 fn offline(limits: RateLimits) -> Router {
-    app(Cache::new(), "http://127.0.0.1:9".into(), limits)
+    let base_url = "http://127.0.0.1:9".to_owned();
+    let details = details(&client(base_url.clone()));
+    app(Cache::new(), details, base_url, limits)
 }
 
 struct Call<'a> {
@@ -217,12 +225,20 @@ fn series(pace: i64) -> Vec<i64> {
     fans
 }
 
-async fn scanned_server() -> (MockServer, Cache) {
+async fn scanned_server() -> (MockServer, Cache, ClubDetails) {
     let server = MockServer::start().await;
     let members: Vec<Value> = (0..10)
         .map(|i| json!({ "viewer_id": 9000 + i, "year": 2026, "month": 3, "daily_fans": series(4_000_000 + 500_000 * i) }))
         .collect();
-    let circle = json!({ "circle_id": 1, "name": "Limit Club", "member_count": 10, "join_style": 1, "monthly_rank": 100 });
+    let circle = json!({
+        "circle_id": 1,
+        "name": "Limit Club",
+        "member_count": 10,
+        "join_style": 1,
+        "monthly_rank": 100,
+        "monthly_point": 40_000_000,
+        "last_updated": "2026-03-19T15:00:00Z",
+    });
     Mock::given(path("/api/v4/circles/list"))
         .respond_with(
             ResponseTemplate::new(200).set_body_json(json!({ "circles": [circle.clone()] })),
@@ -249,9 +265,11 @@ async fn scanned_server() -> (MockServer, Cache) {
     }
 
     let cache = Cache::new();
+    let details = details(&client(server.uri()));
     let (stop, stopped) = watch::channel(false);
     let handle = tokio::spawn(run_scheduler(
         client(server.uri()),
+        details.clone(),
         ScanConfig::default(),
         Duration::from_secs(3600),
         cache.clone(),
@@ -266,7 +284,7 @@ async fn scanned_server() -> (MockServer, Cache) {
     .expect("scan did not finish");
     stop.send(true).unwrap();
     handle.await.unwrap();
-    (server, cache)
+    (server, cache, details)
 }
 
 async fn lookups(server: &MockServer) -> usize {
@@ -281,8 +299,8 @@ async fn lookups(server: &MockServer) -> usize {
 
 #[tokio::test]
 async fn trainer_lookups_have_their_own_budget() {
-    let (server, cache) = scanned_server().await;
-    let app = app(cache, server.uri(), RateLimits::new(100, 1, false));
+    let (server, cache, details) = scanned_server().await;
+    let app = app(cache, details, server.uri(), RateLimits::new(100, 1, false));
     let visitor = "203.0.113.1:5000";
 
     let (first, _, _) = Call::to("/api/v1/recommendations?trainer_id=4001")

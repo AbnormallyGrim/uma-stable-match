@@ -10,7 +10,8 @@ use tokio::sync::watch;
 use tower::ServiceExt;
 use uma_stable_match_scoring::{score_clubs, Club, ScoringOptions};
 use uma_stable_match_server::{
-    router, run_scheduler, AppState, Cache, PaceLookup, RateLimits, ScanConfig, DEFAULT_PACE_TTL,
+    router, run_scheduler, AppState, Cache, ClubDetails, DetailConfig, PaceLookup, RateLimits,
+    ScanConfig, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, CircleResponse, Client, ClientConfig, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -18,15 +19,26 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 const M: f64 = 1_000_000.0;
 
-fn app(cache: Cache) -> AppState {
-    let client = Client::new(ClientConfig {
+type Scanned = (Cache, ClubDetails);
+
+fn offline() -> Client {
+    Client::new(ClientConfig {
         base_url: "http://127.0.0.1:9".into(),
         ..ClientConfig::new(ApiKey::new("test-key"))
     })
-    .unwrap();
+    .unwrap()
+}
+
+fn unscanned() -> Scanned {
+    let details = ClubDetails::new(&offline(), SharedPool::default(), DetailConfig::default()).0;
+    (Cache::new(), details)
+}
+
+fn app((cache, details): Scanned) -> AppState {
     AppState {
         cache,
-        paces: PaceLookup::new(client, DEFAULT_PACE_TTL),
+        details,
+        paces: PaceLookup::new(offline(), DEFAULT_PACE_TTL),
         limits: RateLimits::new(10_000, 10_000, false),
     }
 }
@@ -62,6 +74,8 @@ fn detail(id: u64, join_style: i32, member_count: i32, paces: &[f64]) -> Value {
             "monthly_rank": 100 + id,
             "last_month_rank": 110 + id,
             "comment": "Made-up club",
+            "monthly_point": 20_000_000,
+            "last_updated": "2026-03-19T15:00:00Z",
         },
         "members": members,
         "club_rank": 7,
@@ -88,7 +102,7 @@ fn clubs() -> Vec<Club> {
         .collect()
 }
 
-async fn scanned_cache() -> Cache {
+async fn scanned_cache() -> Scanned {
     let server = MockServer::start().await;
     let listed: Vec<Value> = details().iter().map(|d| d["circle"].clone()).collect();
     Mock::given(path("/api/v4/circles/list"))
@@ -115,9 +129,11 @@ async fn scanned_cache() -> Cache {
     })
     .unwrap();
     let cache = Cache::new();
+    let details = ClubDetails::new(&client, SharedPool::default(), DetailConfig::default()).0;
     let (stop, stopped) = watch::channel(false);
     let handle = tokio::spawn(run_scheduler(
         client,
+        details.clone(),
         ScanConfig::default(),
         Duration::from_secs(3600),
         cache.clone(),
@@ -132,11 +148,11 @@ async fn scanned_cache() -> Cache {
     .expect("scan did not finish");
     stop.send(true).unwrap();
     handle.await.unwrap();
-    cache
+    (cache, details)
 }
 
-async fn get(cache: &Cache, query: &str) -> (StatusCode, Value) {
-    let response = router(app(cache.clone()))
+async fn get(scanned: &Scanned, query: &str) -> (StatusCode, Value) {
+    let response = router(app(scanned.clone()))
         .oneshot(
             Request::get(format!("/api/v1/recommendations{query}"))
                 .body(Body::empty())
@@ -168,14 +184,14 @@ fn ids(body: &Value) -> Vec<u64> {
 
 #[tokio::test]
 async fn unavailable_before_first_scan() {
-    let (status, body) = get(&Cache::new(), "?pace=7600000").await;
+    let (status, body) = get(&unscanned(), "?pace=7600000").await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(body["error"], "no scan results yet; try again shortly");
 }
 
 #[tokio::test]
 async fn rejects_invalid_input() {
-    let cache = Cache::new();
+    let cache = unscanned();
     let cases = [
         ("", "pace or trainer_id is required"),
         ("?pace=", "pace or trainer_id is required"),

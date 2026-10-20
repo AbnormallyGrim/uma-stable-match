@@ -257,3 +257,37 @@ async fn visitors_go_before_background_loads() {
         vec!["circle_id=1", "circle_id=4", "circle_id=2", "circle_id=3"]
     );
 }
+
+#[tokio::test]
+async fn cached_clubs_outside_the_pool_are_left_out() {
+    let server = MockServer::start().await;
+    for id in 1..=3 {
+        mount(&server, id, ok(id), 1).await;
+    }
+    let (details, _loader) = details(&server, DetailConfig::default(), &[1, 2, 3]);
+    for id in [3, 1, 2] {
+        details.get(id, Priority::Interactive).await.unwrap();
+    }
+
+    let ids = |details: &ClubDetails| -> Vec<u64> {
+        details
+            .cached_in_pool()
+            .iter()
+            .map(|c| c.circle_id)
+            .collect()
+    };
+    assert_eq!(ids(&details), vec![1, 2, 3]);
+    details.replace_pool(pool(&[2, 3]).read().unwrap().clone());
+    assert_eq!(ids(&details), vec![2, 3]);
+    assert!(details.cached(1).await.is_some());
+}
+
+#[tokio::test]
+async fn debug_shows_counts_only() {
+    let server = MockServer::start().await;
+    let (details, _loader) = details(&server, DetailConfig::default(), &[]);
+    assert_eq!(
+        format!("{details:?}"),
+        "ClubDetails { cached: 0, queued: 0, .. }"
+    );
+}
