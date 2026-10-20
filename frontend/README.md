@@ -116,7 +116,7 @@ Tiers are shown with the game's own icons, D to SS, from [`src/assets/tiers/`](s
 
 ### All results table
 
-Below the cards, every scored club is listed in a table. The app asks the API for up to 100 clubs (a scan loads at most 80 by default), so nothing is cut off.
+Below the cards, every scored club is listed in a table. The app asks the API for up to 1000 clubs, more than the default rank window (80 to 900) can hold, so nothing is cut off.
 
 | Column | Sorts first by |
 |---|---|
