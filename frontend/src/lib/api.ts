@@ -40,7 +40,9 @@ export interface Recommendations {
   trainer: { trainer_id: number | null; pace_per_day: number };
   options: { balance_weight: number | null; include_closed: boolean; limit: number };
   updated_at: string;
+  /** Game month of the club data, `YYYY-MM`. */
   month: string | null;
+  /** How complete the result is: clubs shortlisted, scored, and still loading. */
   coverage: { shortlisted: number; scored: number; pending: number };
   total: number;
   clubs: Club[];

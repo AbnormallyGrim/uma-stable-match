@@ -161,6 +161,7 @@ const MONTHS = [
 
 const JST_OFFSET_MS = 9 * 3_600_000;
 
+/** The game month containing a time, as `YYYY-MM`. Game months start on the 2nd in Japan time. */
 export function gameMonth(iso: string): string | null {
   const time = new Date(iso).getTime();
   if (Number.isNaN(time)) {
@@ -179,6 +180,7 @@ export function gameMonth(iso: string): string | null {
   return `${year}-${String(month).padStart(2, '0')}`;
 }
 
+/** `2026-02` → `February 2026`. Anything else is returned unchanged. */
 export function monthLabel(month: string): string {
   const match = /^(\d{4})-(\d{2})$/.exec(month);
   const name = match ? MONTHS[Number(match[2]) - 1] : undefined;
