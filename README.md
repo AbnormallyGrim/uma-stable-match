@@ -102,6 +102,7 @@ docker compose up -d
 - **`PORT` in `.env` picks the port on your computer.** Inside the container the server always listens on `0.0.0.0:8080`, so Compose ignores `HOST` and `FRONTEND_DIR` from `.env`.
 - **Logs:** `docker compose logs -f`.
 - **Locked down:** the container runs as a non-root user, on a read-only file system, with no Linux capabilities. The image holds only the server and the built web page, in a minimal [distroless](https://github.com/GoogleContainerTools/distroless) base. Your `.env` is never copied into it; Compose passes the settings in when the container starts.
+- **Optional Redis:** to try the [shared cache](backend/server/README.md#shared-cache), add `REDIS_URL=redis://redis:6379` and a `REDIS_KEY_SECRET` of at least 32 characters to `.env`, then start with `docker compose --profile redis up -d` (and stop with `docker compose --profile redis down`). Redis keeps everything in memory, isn't reachable from outside Compose, and is locked down like the server. Without the profile it doesn't run; if `REDIS_URL` is set without it, the server stops because it can't reach Redis.
 
 ## Usage
 
