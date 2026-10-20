@@ -77,7 +77,7 @@ Every `SCAN_INTERVAL_MINUTES` (180 by default), and once at start-up, the scanne
 3. Copies in the exact medians of clubs still in the detail cache, then swaps the new pool in.
 4. Prefetches member data for up to `SCAN_MAX_DETAILS` clubs (200) in the **background lane**, spread evenly across the estimates. Today's pool (about 150 clubs) is prefetched whole.
 
-Every club whose details load gives the pool its **exact median**, and the pool recalibrates its estimates for the rest. A failed list request keeps the previous pool and results.
+Every club whose details load gives the pool its **exact median**, and the pool recalibrates its estimates for the rest. A failed list request keeps the previous pool and results. With Redis, one instance scans for all of them; see [Caches](#caches).
 
 ## How a request is answered
 
@@ -103,7 +103,7 @@ Everything lives in memory; nothing is written to disk. Restarting the server st
 
 Concurrent requests for the same club share one fetch, and failed fetches aren't cached.
 
-With `REDIS_URL` set, club details and trainer paces also go to Redis, as a second layer shared by every instance: a local miss checks Redis before uma.moe. Trainer IDs are replaced by a keyed hash, so Redis never holds them. If Redis stops answering, each instance carries on with its own cache. The pool, scanning and rate limits are still per instance. See the [server README](backend/server/README.md#shared-cache).
+With `REDIS_URL` set, club details and trainer paces also go to Redis, as a second layer shared by every instance: a local miss checks Redis before uma.moe. Looked-up trainer IDs are replaced by a keyed hash, so Redis never holds them. Scans are shared too: one instance takes a lock in Redis, scans, and publishes the listed clubs, and the others build their pool from them. If Redis stops answering, each instance carries on with its own cache and scans. Rate limits are still per instance. See the [server README](backend/server/README.md#shared-cache).
 
 ## Talking to uma.moe
 

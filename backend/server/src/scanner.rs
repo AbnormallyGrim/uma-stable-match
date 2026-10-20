@@ -54,6 +54,9 @@ pub enum ScanError {
     /// A list request failed.
     #[error("listing clubs failed: {0}")]
     List(#[source] Error),
+    /// Another instance's scan failed, with its public message.
+    #[error("{0}")]
+    Shared(String),
 }
 
 impl ScanError {
@@ -61,6 +64,7 @@ impl ScanError {
     pub(crate) fn public_message(&self) -> String {
         match self {
             Self::List(error) => format!("listing clubs failed: {}", upstream_summary(error)),
+            Self::Shared(message) => message.clone(),
         }
     }
 }
@@ -82,6 +86,10 @@ pub async fn scan(
     config: &ScanConfig,
 ) -> Result<Scan, ScanError> {
     let rows = list_candidates(client, config).await?;
+    Ok(load(details, rows, config).await)
+}
+
+pub(crate) async fn load(details: &ClubDetails, rows: Vec<Circle>, config: &ScanConfig) -> Scan {
     let snapshot = rows
         .iter()
         .filter_map(|c| c.last_updated.as_deref())
@@ -119,12 +127,12 @@ pub async fn scan(
     }
 
     tracing::info!(candidates, prefetched, failed, "scan finished");
-    Ok(Scan {
+    Scan {
         candidates,
         prefetched,
         failed,
         month,
-    })
+    }
 }
 
 fn prefetch_ids(pool: &ClubPool, max: usize) -> Vec<u64> {
@@ -139,7 +147,10 @@ fn month_label((year, month): Period) -> String {
     format!("{year:04}-{month:02}")
 }
 
-async fn list_candidates(client: &Client, config: &ScanConfig) -> Result<Vec<Circle>, ScanError> {
+pub(crate) async fn list_candidates(
+    client: &Client,
+    config: &ScanConfig,
+) -> Result<Vec<Circle>, ScanError> {
     let request = ListCirclesRequest {
         limit: Some(config.page_size),
         max_rank: Some(config.rank_to),

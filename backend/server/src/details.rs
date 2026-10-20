@@ -195,6 +195,10 @@ impl ClubDetails {
         self.inner.cache.entry_count()
     }
 
+    pub(crate) fn shared(&self) -> &SharedCache {
+        &self.inner.shared
+    }
+
     /// The pool that loads write exact medians into.
     pub fn pool(&self) -> &SharedPool {
         &self.inner.pool

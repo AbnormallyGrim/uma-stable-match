@@ -7,18 +7,21 @@ use std::time::Duration;
 
 use hmac::{Hmac, KeyInit, Mac};
 use redis::aio::ConnectionManager;
-use redis::AsyncCommands;
+use redis::{AsyncCommands, FromRedisValue, Script, ScriptInvocation};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sha2::Sha256;
 use tokio::time::timeout;
 
 use crate::pool::Period;
+use crate::scanner::ScanConfig;
 
 const KEY_PREFIX: &str = "usm:v1";
 const MIN_SECRET_LEN: usize = 32;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const OP_TIMEOUT: Duration = Duration::from_millis(500);
+const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(5);
+const SCAN_LEASE: Duration = Duration::from_secs(60);
 
 /// A `redis://` or `rediss://` URL. `Debug` output hides it, since it can hold a password.
 #[derive(Clone, PartialEq, Eq)]
@@ -109,6 +112,28 @@ impl RedisBackend {
             tracing::warn!(reason, "Redis is unavailable; using the local cache only");
         }
     }
+
+    async fn invoke<T: FromRedisValue>(
+        &self,
+        invocation: &ScriptInvocation<'_>,
+        limit: Duration,
+    ) -> Option<T> {
+        let mut conn = self.conn.clone();
+        match timeout(limit, invocation.invoke_async(&mut conn)).await {
+            Ok(Ok(value)) => {
+                self.up();
+                Some(value)
+            }
+            Ok(Err(error)) => {
+                self.down(&kind(&error));
+                None
+            }
+            Err(_) => {
+                self.down("timed out");
+                None
+            }
+        }
+    }
 }
 
 impl SharedCache {
@@ -162,11 +187,15 @@ impl SharedCache {
 
     /// The stored value, or `None` when it's missing, expired or unreadable.
     pub async fn get<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
+        self.get_within(key, OP_TIMEOUT).await
+    }
+
+    async fn get_within<T: DeserializeOwned>(&self, key: &str, limit: Duration) -> Option<T> {
         let Backend::Redis(redis) = &self.backend else {
             return None;
         };
         let mut conn = redis.conn.clone();
-        match timeout(OP_TIMEOUT, conn.get::<_, Option<Vec<u8>>>(key)).await {
+        match timeout(limit, conn.get::<_, Option<Vec<u8>>>(key)).await {
             Ok(Ok(value)) => {
                 redis.up();
                 serde_json::from_slice(&value?).ok()
@@ -190,14 +219,185 @@ impl SharedCache {
         let Ok(bytes) = serde_json::to_vec(value) else {
             return;
         };
-        let millis = u64::try_from(ttl.as_millis()).unwrap_or(u64::MAX).max(1);
         let mut conn = redis.conn.clone();
-        match timeout(OP_TIMEOUT, conn.pset_ex::<_, _, ()>(key, bytes, millis)).await {
+        match timeout(
+            OP_TIMEOUT,
+            conn.pset_ex::<_, _, ()>(key, bytes, millis(ttl)),
+        )
+        .await
+        {
             Ok(Ok(())) => redis.up(),
             Ok(Err(error)) => redis.down(&kind(&error)),
             Err(_) => redis.down("timed out"),
         }
     }
+
+    /// Decides in one Redis script whether this instance scans, waits, or loads a published scan.
+    pub(crate) async fn scan_turn(&self, config: &ScanConfig) -> ScanTurn {
+        let Backend::Redis(redis) = &self.backend else {
+            return ScanTurn::Alone;
+        };
+        let keys = ScanKeys::new(config);
+        let token = format!("{:016x}{:016x}", fastrand::u64(..), fastrand::u64(..));
+        let script = Script::new(TURN_SCRIPT);
+        let mut invocation = script.prepare_invoke();
+        invocation
+            .key(&keys.fresh)
+            .key(&keys.lock)
+            .arg(&token)
+            .arg(millis(SCAN_LEASE));
+        let Some(reply) = redis.invoke::<Vec<String>>(&invocation, OP_TIMEOUT).await else {
+            return ScanTurn::Alone;
+        };
+        match reply.as_slice() {
+            [state] if state == "lead" => ScanTurn::Lead(ScanLease {
+                redis: redis.clone(),
+                keys,
+                token,
+            }),
+            [state, ttl, id] if state == "fresh" => ScanTurn::Fresh {
+                id: id.clone(),
+                remaining: Duration::from_millis(ttl.parse().unwrap_or(0)),
+            },
+            _ => ScanTurn::Wait,
+        }
+    }
+
+    /// The last scan published for this scan window.
+    pub(crate) async fn published_scan<T: DeserializeOwned>(
+        &self,
+        config: &ScanConfig,
+    ) -> Option<T> {
+        self.get_within(&ScanKeys::new(config).latest, SNAPSHOT_TIMEOUT)
+            .await
+    }
+}
+
+/// What an instance does when a scan is due.
+pub(crate) enum ScanTurn {
+    /// No Redis, or it didn't answer: scan without sharing.
+    Alone,
+    /// This instance holds the scan lock: scan, then publish.
+    Lead(ScanLease),
+    /// Another instance is scanning: check again shortly.
+    Wait,
+    /// A scan was published less than an interval ago: load it if it's new.
+    Fresh { id: String, remaining: Duration },
+}
+
+/// The scan lock, held until published or released, or until it lapses without renewal.
+pub(crate) struct ScanLease {
+    redis: RedisBackend,
+    keys: ScanKeys,
+    token: String,
+}
+
+impl ScanLease {
+    pub(crate) const RENEW_EVERY: Duration = Duration::from_secs(SCAN_LEASE.as_secs() / 3);
+
+    pub(crate) fn id(&self) -> &str {
+        &self.token
+    }
+
+    pub(crate) async fn renew(&self) {
+        let script = Script::new(RENEW_SCRIPT);
+        let mut invocation = script.prepare_invoke();
+        invocation
+            .key(&self.keys.lock)
+            .arg(&self.token)
+            .arg(millis(SCAN_LEASE));
+        if self.redis.invoke::<i64>(&invocation, OP_TIMEOUT).await == Some(0) {
+            tracing::warn!("lost the scan lease; another instance may scan too");
+        }
+    }
+
+    /// Stores `value` for two intervals, marks it current for one, and releases the lock.
+    pub(crate) async fn publish<T: Serialize>(self, value: &T, fresh_for: Duration) {
+        let Ok(bytes) = serde_json::to_vec(value) else {
+            self.release().await;
+            return;
+        };
+        let script = Script::new(PUBLISH_SCRIPT);
+        let mut invocation = script.prepare_invoke();
+        invocation
+            .key(&self.keys.latest)
+            .key(&self.keys.fresh)
+            .key(&self.keys.lock)
+            .arg(bytes)
+            .arg(millis(fresh_for * 2))
+            .arg(&self.token)
+            .arg(millis(fresh_for));
+        self.redis
+            .invoke::<i64>(&invocation, SNAPSHOT_TIMEOUT)
+            .await;
+    }
+
+    pub(crate) async fn release(self) {
+        let script = Script::new(RELEASE_SCRIPT);
+        let mut invocation = script.prepare_invoke();
+        invocation.key(&self.keys.lock).arg(&self.token);
+        self.redis.invoke::<i64>(&invocation, OP_TIMEOUT).await;
+    }
+}
+
+struct ScanKeys {
+    lock: String,
+    fresh: String,
+    latest: String,
+}
+
+impl ScanKeys {
+    fn new(config: &ScanConfig) -> Self {
+        let base = format!(
+            "{KEY_PREFIX}:scan:{}-{}-{}",
+            config.rank_from, config.rank_to, config.max_details
+        );
+        Self {
+            lock: format!("{base}:lock"),
+            fresh: format!("{base}:fresh"),
+            latest: format!("{base}:latest"),
+        }
+    }
+}
+
+const TURN_SCRIPT: &str = r"
+local ttl = redis.call('PTTL', KEYS[1])
+if ttl > 0 then
+  return {'fresh', tostring(ttl), redis.call('GET', KEYS[1])}
+end
+if redis.call('SET', KEYS[2], ARGV[1], 'NX', 'PX', ARGV[2]) then
+  return {'lead'}
+end
+return {'wait'}
+";
+
+const RENEW_SCRIPT: &str = r"
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('PEXPIRE', KEYS[1], ARGV[2])
+end
+return 0
+";
+
+const PUBLISH_SCRIPT: &str = r"
+redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
+redis.call('SET', KEYS[2], ARGV[3], 'PX', ARGV[4])
+if redis.call('GET', KEYS[3]) == ARGV[3] then
+  redis.call('DEL', KEYS[3])
+end
+return 1
+";
+
+const RELEASE_SCRIPT: &str = r"
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+";
+
+fn millis(duration: Duration) -> u64 {
+    u64::try_from(duration.as_millis())
+        .unwrap_or(u64::MAX)
+        .max(1)
 }
 
 /// Shared-cache key for a club's details in a month (`None` = the current game month).
