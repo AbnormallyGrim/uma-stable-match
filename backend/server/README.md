@@ -153,7 +153,7 @@ Without `REDIS_URL`, the shared cache stores nothing (`SharedCache::none()`) and
 | Each read or write | Times out after 500 ms. Any error or timeout counts as a miss, and the instance carries on with its own cache and uma.moe |
 | Redis goes away | One warning is logged; the connection reconnects by itself, and one message is logged when Redis is back |
 
-**Looked-up trainer IDs never reach Redis.** Pace keys use the first 32 hex characters of HMAC-SHA256(`REDIS_KEY_SECRET`, trainer ID), so every instance needs the same secret. Club keys keep the club ID, which isn't personal, and club data is stored as uma.moe publishes it. Run Redis without persistence (for example `--save "" --appendonly no`), so paces stay in memory as they do without Redis.
+**Looked-up trainer IDs never reach Redis.** Pace keys use the first 32 hex characters of HMAC-SHA256(`REDIS_KEY_SECRET`, trainer ID), so every instance needs the same secret. Club keys keep the club ID, which isn't personal, and club data is stored as uma.moe publishes it. Run Redis without persistence (for example `--save "" --appendonly no`), so paces stay in memory as they do without Redis. The `redis` profile in `docker-compose.yml` runs it this way; see [Docker details](../../README.md#docker-details).
 
 Still per instance: rate limits and the background queue.
 

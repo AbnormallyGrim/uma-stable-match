@@ -13,6 +13,38 @@ services:
     # Reachable only from this computer. PORT in .env picks the port.
     ports:
       - "127.0.0.1:${PORT:-8080}:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  # Optional shared cache: `docker compose --profile redis up` with REDIS_URL=redis://redis:6379.
+  redis:
+    image: redis:7.4-alpine
+    profiles: [redis]
+    # Memory only: no snapshots or append-only file, so nothing reaches the disk.
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - 128mb
+      - --maxmemory-policy
+      - volatile-lru
+    # Not published: only the server can reach it, over the Compose network.
+    user: redis
+    tmpfs: [/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]
