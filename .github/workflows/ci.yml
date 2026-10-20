@@ -39,6 +39,42 @@ jobs:
       - name: Test
         run: cargo test --workspace --all-features
 
+  scoring:
+    name: Scoring crate (docs, MSRV)
+    runs-on: ubuntu-latest
+    env:
+      CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: fallback
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build docs
+        run: cargo doc -p uma-stable-match-scoring --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+      - name: Install MSRV toolchain
+        run: |
+          msrv=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "uma-stable-match-scoring") | .rust_version')
+          rustup toolchain install "$msrv" --profile minimal
+          echo "MSRV=$msrv" >> "$GITHUB_ENV"
+
+      - name: Package crate
+        run: |
+          cargo package -p uma-stable-match-scoring --no-verify
+          mkdir "$RUNNER_TEMP/scoring"
+          tar -xzf target/package/uma-stable-match-scoring-*.crate -C "$RUNNER_TEMP/scoring" --strip-components 1
+
+      - name: Test on MSRV
+        working-directory: ${{ runner.temp }}/scoring
+        run: |
+          cargo +stable generate-lockfile
+          cargo +"$MSRV" test
+          cargo +"$MSRV" test --all-features
+
   frontend:
     name: Frontend (check, lint, test, build)
     runs-on: ubuntu-latest
