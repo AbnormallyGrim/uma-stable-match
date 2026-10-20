@@ -24,8 +24,9 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `RUST_LOG` | `info` | Log filter, such as `debug` or `uma_stable_match_server=debug`. At `debug`, the HTTP libraries can log request URLs, which include trainer IDs |
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to scan |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to scan |
-| `SCAN_MAX_DETAILS` | `200` | Most clubs to fetch member data for in each scan |
+| `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is prefetched in each scan |
 | `SCAN_INTERVAL_MINUTES` | `180` | Minutes between scans. The default may change once uma.moe agrees how often scans can run |
+| `DETAIL_CACHE_MINUTES` | `SCAN_INTERVAL_MINUTES` | Minutes a club's member data is reused |
 | `TRAINER_CACHE_MINUTES` | `10` | Minutes a trainer's looked-up pace is reused |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Recommendation requests each visitor can make per minute |
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer lookups each visitor can make per minute that need a call to uma.moe |
@@ -36,19 +37,20 @@ Blank values count as unset. A missing key, a `HOST` that isn't an IP address (h
 
 ## Scanner
 
-`scan` finds clubs worth recommending and fetches their member data:
+`scan` builds a new [club pool](#club-pool) and fills the [detail cache](#club-details):
 
 1. List clubs by monthly rank, best first, 100 per page and up to `SCAN_RANK_TO`. Stop after a page whose last club is ranked `SCAN_RANK_TO` or worse, after a short or empty page, or after 100 pages.
-2. Keep clubs ranked from `SCAN_RANK_FROM` to `SCAN_RANK_TO` that aren't archived and have 8 to 29 members. Full clubs have no room, smaller ones can't be scored, and a club with an unknown member count is skipped. Closed clubs are kept, so each request can include or exclude them.
-3. Fetch member data for the first `SCAN_MAX_DETAILS` clubs, best rank first, and convert each one to a `Club`. If there are more candidates, a warning is logged. If a club's details come back without club information, the listed details are used.
+2. Build a `ClubPool` from the clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO`. `ListedClub::from_circle` drops archived clubs, full clubs, clubs with fewer than 8 members, and rows missing points, a member count or `last_updated`. Closed clubs are kept, so each request can include or exclude them.
+3. Copy in the exact medians of clubs that are still cached, then swap the new pool in.
+4. Prefetch member data for up to `SCAN_MAX_DETAILS` clubs in the background lane, so visitors' requests go first. If the pool is larger, the clubs are spread evenly across the estimates, from slowest to fastest. If a club's details come back without club information, the listed details are used.
 
-A club whose details fail to load is logged and skipped. A failed list request fails the whole scan. `Scan` returns the loaded clubs, the number of candidates and the number that failed.
+A club whose details fail to load is logged and skipped. A failed list request fails the whole scan and leaves the previous pool in place. `Scan` returns the number of candidates (the pool size), how many were prefetched, how many failed, and the game month of the listed data.
 
-With the client's default 500 ms rate limit, a default scan takes about 80 seconds: around 9 list pages plus one lookup per candidate, about 150 at the time of writing.
+With the client's default 500 ms rate limit, a default scan takes about 80 seconds: around 9 list pages plus one lookup per candidate, about 150 at the time of writing. Clubs still cached from the previous scan aren't fetched again.
 
 ## Club pool
 
-The club pool is the first stage of two-stage matching (#87). It picks the clubs worth scoring for one trainer, using only the list endpoint's data. It isn't used by the scanner or recommendations yet.
+The club pool is the first stage of two-stage matching (#87). It picks the clubs worth scoring for one trainer, using only the list endpoint's data. Each scan builds a new pool. Recommendations don't use the shortlist yet.
 
 ### Game months
 
@@ -115,7 +117,7 @@ Exact medians help most when many clubs have them. With an exact median for ever
 
 ## Cache and schedule
 
-Scan results live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan finishes there are no results; with the defaults that takes about 45 seconds.
+Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan finishes there are no results; with the defaults that takes about 80 seconds.
 
 - **No overlapping scans.** A new scan won't start while one is running.
 - **Failures keep the last results.** A failed scan is logged and recorded as the last error, and the previous results stay in place. The next successful scan replaces the results and clears the error.
@@ -167,10 +169,29 @@ All endpoints are under `/api/v1`.
 ```json
 {
   "scanning": false,
-  "last_scan": { "finished_at": "2026-03-18T09:00:00Z", "clubs": 152, "candidates": 152, "failed": 0 },
-  "last_error": null
+  "last_scan": {
+    "finished_at": "2026-03-18T09:00:00Z",
+    "clubs": 152,
+    "candidates": 152,
+    "failed": 0,
+    "month": "2026-03"
+  },
+  "last_error": null,
+  "pool": { "clubs": 152, "exact_medians": 152, "calibration": { "factor": 0.86, "samples": 152 } },
+  "details": { "cached": 152, "queued": 0 }
 }
 ```
+
+| Field | Meaning |
+|---|---|
+| `last_scan.clubs` | Clubs whose member data the scan prefetched |
+| `last_scan.candidates` | Clubs in the pool after the scan's filters |
+| `last_scan.month` | Game month of the listed data, `YYYY-MM` |
+| `pool.clubs` | Clubs in the current pool |
+| `pool.exact_medians` | Pool clubs whose exact median is known from loaded details |
+| `pool.calibration` | The mean-to-median factor and how many clubs it's based on |
+| `details.cached` | Clubs in the detail cache (approximate) |
+| `details.queued` | Clubs waiting for a background load |
 
 `last_scan` is `null` until the first scan succeeds. `last_error` holds `{ "at", "message" }` for a failure since the last success. Times are RFC 3339 in UTC.
 
@@ -185,7 +206,7 @@ All endpoints are under `/api/v1`.
 
 ### Recommendations
 
-`GET /api/v1/recommendations` scores the clubs from the last scan with [`uma-stable-match-scoring`](../scoring/README.md) and returns them best first.
+`GET /api/v1/recommendations` scores every cached club that's in the current pool with [`uma-stable-match-scoring`](../scoring/README.md) and returns them best first.
 
 | Parameter | Required | Default | Meaning |
 |---|---|---|---|

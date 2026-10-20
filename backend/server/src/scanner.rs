@@ -40,9 +40,11 @@ impl Default for ScanConfig {
 pub struct Scan {
     /// Clubs that passed the scan filters.
     pub candidates: usize,
+    /// Clubs whose details were loaded.
     pub prefetched: usize,
     /// Clubs whose details failed to load.
     pub failed: usize,
+    /// Game month of the listed data, as `YYYY-MM`.
     pub month: Option<String>,
 }
 
@@ -72,7 +74,8 @@ fn upstream_summary(error: &Error) -> String {
     }
 }
 
-/// Lists candidate clubs and fetches their member data.
+/// Lists the rank window into a new club pool, swaps it into `details`, and prefetches club
+/// details in the background lane.
 pub async fn scan(
     client: &Client,
     details: &ClubDetails,

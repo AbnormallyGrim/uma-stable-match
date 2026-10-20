@@ -157,6 +157,7 @@ impl ClubPool {
         self.calibration
     }
 
+    /// Whether the club is in the pool.
     pub fn contains(&self, circle_id: u64) -> bool {
         self.index.contains_key(&circle_id)
     }

@@ -10,9 +10,11 @@ use crate::scanner::{Scan, ScanError};
 pub struct Snapshot {
     /// Clubs that passed the scan filters.
     pub candidates: usize,
+    /// Clubs whose details were loaded.
     pub prefetched: usize,
     /// Clubs whose details failed to load.
     pub failed: usize,
+    /// Game month of the listed data, as `YYYY-MM`.
     pub month: Option<String>,
     /// When the scan finished.
     pub scanned_at: SystemTime,

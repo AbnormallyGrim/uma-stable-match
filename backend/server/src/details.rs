@@ -165,14 +165,17 @@ impl ClubDetails {
         &self.inner.pool
     }
 
+    /// Replaces the shared pool, such as after a scan.
     pub fn replace_pool(&self, pool: ClubPool) {
         *write(&self.inner.pool) = pool;
     }
 
+    /// Replaces the listed rows used when a club's details come back without club information.
     pub fn set_listed(&self, rows: impl IntoIterator<Item = (u64, Circle)>) {
         *write(&self.inner.listed) = rows.into_iter().collect();
     }
 
+    /// Cached clubs that are still in the pool, best rank first.
     pub fn cached_in_pool(&self) -> Vec<Arc<Club>> {
         let pool = read(&self.inner.pool);
         let mut clubs: Vec<Arc<Club>> = self

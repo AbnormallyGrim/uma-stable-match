@@ -38,6 +38,7 @@ pub struct Config {
     pub scan: ScanConfig,
     /// Time between scans, from `SCAN_INTERVAL_MINUTES`.
     pub scan_interval: Duration,
+    /// How long a club's details are reused, from `DETAIL_CACHE_MINUTES`.
     pub detail_cache: Duration,
     /// How long a trainer's pace is reused, from `TRAINER_CACHE_MINUTES`.
     pub trainer_cache: Duration,

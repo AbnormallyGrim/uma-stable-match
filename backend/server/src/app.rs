@@ -27,6 +27,7 @@ pub struct AppState {
     pub paces: PaceLookup,
     /// Per-visitor rate limits.
     pub limits: RateLimits,
+    /// Cached club details and the club pool.
     pub details: ClubDetails,
 }
 
