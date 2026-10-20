@@ -1,6 +1,6 @@
 # Uma Stable Match
 
-**Find your stable.** Uma Stable Match recommends Umamusume: Pretty Derby clubs that suit you: clubs where your fan pace fits, the club is climbing, and members pull their weight.
+**Find your stable.** Uma Stable Match recommends Umamusume: Pretty Derby clubs that suit you: clubs where your fan pace fits and members pull their weight.
 
 ![Stable Match results page: a summary of your pace and the clubs analysed, followed by ranked club recommendations showing each club's tier, rank trend, open spots, balance score and your expected place](docs/images/demo.png)
 
@@ -30,7 +30,7 @@
 
 ## Overview
 
-Club leaderboards show how big a club is, not whether it's right for you. Uma Stable Match compares your daily fan gain with the members of every club that has an open spot, and ranks the clubs where you'd be a solid member: secure enough not to be cut, without carrying everyone else.
+Club leaderboards show how big a club is, not whether it's right for you. Uma Stable Match compares your daily fan gain with the members of every club in the scanned rank range (80 to 900 by default) that has an open spot, and ranks the clubs where you'd be a solid member: secure enough not to be cut, without carrying everyone else.
 
 Enter your trainer ID and you'll get a ranked list of clubs, each with its tier, rank trend, open spots, join style, how you'd compare with its members, and a link to the club's page on [uma.moe](https://uma.moe).
 
@@ -172,13 +172,13 @@ Only **current members** count. A member counts as current if they have data on 
 | `SCAN_INTERVAL_MINUTES` | `180` | How often club data refreshes, in minutes |
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to include |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to include |
-| `SCAN_MAX_DETAILS` | `80` | Most clubs to analyse in each refresh |
+| `SCAN_MAX_DETAILS` | `200` | Most clubs to analyse in each refresh |
 | `TRAINER_CACHE_MINUTES` | `10` | How long a trainer's pace is reused before refreshing |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests allowed per visitor per minute |
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer ID lookups allowed per visitor per minute, not counting cached ones |
 | `TRUST_FORWARDED_FOR` | `false` | Set to `true` behind a reverse proxy, so visitors are told apart by their own address |
 | `FRONTEND_DIR` | *(none)* | Folder with the built web page. Leave it unset to run only the API. Ignored by the Docker setup, which serves the page built into the image |
-| `REDIS_URL` | *(none)* | Optional. Share one cache between several servers |
+| `REDIS_URL` | *(none)* | *Not available yet* ([#41](https://github.com/AbnormallyGrim/uma-stable-match/issues/41)). The server ignores it for now |
 
 ## API
 

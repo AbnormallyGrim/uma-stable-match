@@ -24,7 +24,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `RUST_LOG` | `info` | Log filter, such as `debug` or `uma_stable_match_server=debug`. At `debug`, the HTTP libraries can log request URLs, which include trainer IDs |
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to scan |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to scan |
-| `SCAN_MAX_DETAILS` | `80` | Most clubs to fetch member data for in each scan |
+| `SCAN_MAX_DETAILS` | `200` | Most clubs to fetch member data for in each scan |
 | `SCAN_INTERVAL_MINUTES` | `180` | Minutes between scans. The default may change once uma.moe agrees how often scans can run |
 | `TRAINER_CACHE_MINUTES` | `10` | Minutes a trainer's looked-up pace is reused |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Recommendation requests each visitor can make per minute |
@@ -36,16 +36,15 @@ Blank values count as unset. A missing key, a `HOST` that isn't an IP address (h
 
 ## Scanner
 
-`scan` finds clubs worth recommending and fetches their member data, following the same rules as the original prototype:
+`scan` finds clubs worth recommending and fetches their member data:
 
 1. List clubs by monthly rank, best first, 100 per page and up to `SCAN_RANK_TO`. Stop after a page whose last club is ranked `SCAN_RANK_TO` or worse, after a short or empty page, or after 100 pages.
-2. Keep clubs ranked from `SCAN_RANK_FROM` to `SCAN_RANK_TO` that have open spots. A club with an unknown or zero member count is treated as full.
-3. Sort climbers first, by last month's rank minus this month's. A club with no rank last month counts as a big climber. Clubs that climbed equally keep their list order.
-4. Fetch member data for the first `SCAN_MAX_DETAILS` clubs and convert each one to a `Club`. If a club's details come back without club information, the listed details are used.
+2. Keep clubs ranked from `SCAN_RANK_FROM` to `SCAN_RANK_TO` that aren't archived and have 8 to 29 members. Full clubs have no room, smaller ones can't be scored, and a club with an unknown member count is skipped. Closed clubs are kept, so each request can include or exclude them.
+3. Fetch member data for the first `SCAN_MAX_DETAILS` clubs, best rank first, and convert each one to a `Club`. If there are more candidates, a warning is logged. If a club's details come back without club information, the listed details are used.
 
 A club whose details fail to load is logged and skipped. A failed list request fails the whole scan. `Scan` returns the loaded clubs, the number of candidates and the number that failed.
 
-With the client's default 500 ms rate limit, a default scan takes about 45 seconds: around 9 list pages plus 80 club lookups.
+With the client's default 500 ms rate limit, a default scan takes about 80 seconds: around 9 list pages plus one lookup per candidate, about 150 at the time of writing.
 
 ## Cache and schedule
 
@@ -101,7 +100,7 @@ All endpoints are under `/api/v1`.
 ```json
 {
   "scanning": false,
-  "last_scan": { "finished_at": "2026-03-18T09:00:00Z", "clubs": 80, "candidates": 214, "failed": 0 },
+  "last_scan": { "finished_at": "2026-03-18T09:00:00Z", "clubs": 152, "candidates": 152, "failed": 0 },
   "last_error": null
 }
 ```
