@@ -10,7 +10,7 @@ documentation = "https://docs.rs/uma-stable-match-scoring"
 readme = "README.md"
 keywords = ["umamusume", "scoring", "ranking", "clubs", "game"]
 categories = ["games", "algorithms"]
-include = ["src/**/*.rs", "README.md"]
+include = ["src/**/*.rs", "README.md", "LICENSE"]
 
 [package.metadata.docs.rs]
 all-features = true
