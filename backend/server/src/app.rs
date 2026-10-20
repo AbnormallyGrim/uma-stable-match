@@ -16,7 +16,7 @@ use crate::details::ClubDetails;
 use crate::frontend;
 use crate::limits::{limit_requests, RateLimits};
 use crate::pace::PaceLookup;
-use crate::recommendations::recommendations;
+use crate::recommendations::{recommendations, MatchSettings};
 
 /// Shared state for request handlers.
 #[derive(Debug, Clone)]
@@ -29,6 +29,8 @@ pub struct AppState {
     pub limits: RateLimits,
     /// Cached club details and the club pool.
     pub details: ClubDetails,
+    /// Shortlist and fetch settings for recommendations.
+    pub matching: MatchSettings,
 }
 
 /// The server's routes.

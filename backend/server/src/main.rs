@@ -87,6 +87,7 @@ async fn main() -> ExitCode {
             paces,
             limits,
             details,
+            matching: config.matching,
         },
         config.frontend_dir.as_deref(),
     );
