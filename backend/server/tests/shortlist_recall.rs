@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use uma_stable_match_scoring::{score_clubs, Club, JoinStyle, MemberSnapshot, ScoringOptions};
 use uma_stable_match_server::{
-    Calibration, ClubPool, ListedClub, DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO,
+    club_median, ClubPool, ListedClub, DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO,
 };
 use uma_stable_match_umamoe_client::Circle;
 
@@ -76,16 +76,14 @@ fn synthetic(seed: u64) -> Synthetic {
 
 fn calibrated_pool(data: &Synthetic) -> ClubPool {
     let mut pool = ClubPool::new(data.listed.clone());
-    let sorted: Vec<&ListedClub> = pool.clubs().collect();
+    let sorted: Vec<u64> = pool.clubs().map(|l| l.circle_id).collect();
     let step = sorted.len() as f64 / PREFETCH as f64;
-    let ratios: Vec<f64> = (0..PREFETCH)
-        .map(|i| sorted[(i as f64 * step) as usize])
-        .filter_map(|l| {
-            let club = &data.clubs[(l.circle_id - 1) as usize];
-            Calibration::ratio(l, club)
-        })
-        .collect();
-    pool.set_calibration(Calibration::from_ratios(ratios));
+    for i in 0..PREFETCH {
+        let id = sorted[(i as f64 * step) as usize];
+        if let Some(median) = club_median(&data.clubs[(id - 1) as usize]) {
+            pool.set_exact_median(id, median);
+        }
+    }
     pool
 }
 

@@ -2,15 +2,6 @@ use uma_stable_match_scoring::{JoinStyle, MemberSnapshot};
 
 use super::*;
 
-fn listed(raw_rate: f64) -> ListedClub {
-    ListedClub {
-        circle_id: 1,
-        member_count: 9,
-        join_style: Some(JoinStyle::Closed),
-        raw_rate,
-    }
-}
-
 fn club(daily_gains: &[i64]) -> Club {
     let mut club = Club::new(1, "Example Club");
     club.member_count = Some(daily_gains.len() as u32);
@@ -74,15 +65,13 @@ fn zero_negative_and_non_finite_ratios_are_ignored() {
 }
 
 #[test]
-fn ratio_uses_the_scoring_median() {
+fn club_median_uses_the_scoring_median() {
     let gains = [100, 200, 300, 400, 500, 600, 700, 800, 5000];
-    let ratio = Calibration::ratio(&listed(1000.0), &club(&gains)).unwrap();
-    assert_eq!(ratio, 0.5);
+    assert_eq!(club_median(&club(&gains)), Some(500.0));
 }
 
 #[test]
-fn ratio_needs_a_scorable_club_and_a_rate() {
-    assert!(Calibration::ratio(&listed(1000.0), &club(&[100; 7])).is_none());
-    assert!(Calibration::ratio(&listed(0.0), &club(&[100; 9])).is_none());
-    assert!(Calibration::ratio(&listed(1000.0), &club(&[0; 9])).is_none());
+fn club_median_needs_a_scorable_club() {
+    assert_eq!(club_median(&club(&[100; 7])), None);
+    assert_eq!(club_median(&club(&[0; 9])), None);
 }
