@@ -338,3 +338,46 @@ fn invalid_match_settings_fail() {
         }
     }
 }
+
+#[test]
+fn redis_url_is_optional() {
+    let config = Config::from_lookup(lookup(&[("UMAMOE_API_KEY", "test-key")])).unwrap();
+    assert_eq!(config.redis_url, None);
+}
+
+#[test]
+fn reads_redis_url() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("REDIS_URL", "redis://127.0.0.1:6379"),
+    ]))
+    .unwrap();
+    assert_eq!(config.redis_url.unwrap().expose(), "redis://127.0.0.1:6379");
+}
+
+#[test]
+fn invalid_redis_url_fails_without_echoing_it() {
+    let error = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        (
+            "REDIS_URL",
+            "http://user:made-up-password@cache.example.com",
+        ),
+    ]))
+    .unwrap_err();
+    assert_eq!(error, ConfigError::InvalidRedisUrl);
+    assert!(!error.to_string().contains("made-up-password"));
+}
+
+#[test]
+fn config_debug_hides_the_redis_url() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        (
+            "REDIS_URL",
+            "redis://user:made-up-password@cache.example.com:6379",
+        ),
+    ]))
+    .unwrap();
+    assert!(!format!("{config:?}").contains("made-up-password"));
+}

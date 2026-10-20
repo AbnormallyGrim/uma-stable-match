@@ -29,6 +29,10 @@ async fn main() -> ExitCode {
         }
     };
 
+    if config.redis_url.is_some() {
+        tracing::warn!("REDIS_URL is set, but this version doesn't use Redis yet");
+    }
+
     let mut client_config = ClientConfig::new(config.api_key.clone());
     if let Some(base_url) = &config.base_url {
         client_config.base_url = base_url.clone();
