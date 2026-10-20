@@ -179,7 +179,7 @@ The Redis tests in `tests/redis.rs` need a Redis server: set `REDIS_TEST_URL`, f
 
 ## Cache and schedule
 
-Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan finishes there are no results; with the defaults that takes about 80 seconds.
+Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan finishes there are no results; with the defaults that takes about 80 seconds. With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule.
 
 - **No overlapping scans.** A new scan won't start while one is running.
 - **One scan for all instances.** With Redis, one instance scans and the others load its result; see [Shared scans](#shared-scans).
@@ -247,6 +247,7 @@ All endpoints are under `/api/v1`.
 
 | Field | Meaning |
 |---|---|
+| `scanning` | Whether a scan is running. With Redis, also while waiting for another instance's scan |
 | `last_scan.clubs` | Clubs whose member data the scan prefetched |
 | `last_scan.candidates` | Clubs in the pool after the scan's filters |
 | `last_scan.month` | Game month of the listed data, `YYYY-MM` |

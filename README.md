@@ -274,6 +274,7 @@ These rules can change, so check in-game if something doesn't match.
 - [Rust](https://rustup.rs) (latest stable)
 - [Node.js](https://nodejs.org) 22.22.2 or newer, 24.15 or newer, or 26 or newer
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (optional, to build and run the image)
+- [Redis](https://redis.io) (optional, to run the Redis tests; see [Shared cache](backend/server/README.md#shared-cache))
 
 ### Architecture
 
