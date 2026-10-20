@@ -121,29 +121,39 @@ impl ListCirclesRequest {
     }
 }
 
+/// Sort field for the gains rankings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum GainsSort {
+    /// Fans gained over 3 days.
     #[serde(rename = "gain_3d")]
     Gain3d,
+    /// Fans gained over 7 days.
     #[serde(rename = "gain_7d")]
     Gain7d,
+    /// Fans gained over 30 days.
     #[serde(rename = "gain_30d")]
     Gain30d,
 }
 
+/// Parameters for `GET /api/v4/rankings/gains`. Unset fields use the API's defaults.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct RankingsGainsRequest {
+    /// Page number (0-indexed).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page: Option<u32>,
+    /// Page size, up to 100.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
+    /// Sort field.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sort_by: Option<GainsSort>,
+    /// Exact trainer ID, or a partial trainer or club name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query: Option<String>,
 }
 
 impl RankingsGainsRequest {
+    /// Searches for a trainer ID. Results can also include partial name matches.
     pub fn for_viewer(viewer_id: u64) -> Self {
         Self {
             query: Some(viewer_id.to_string()),
@@ -151,6 +161,7 @@ impl RankingsGainsRequest {
         }
     }
 
+    /// The same request for another page.
     pub fn page(&self, page: u32) -> Self {
         Self {
             page: Some(page),

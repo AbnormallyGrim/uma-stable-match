@@ -80,6 +80,7 @@ impl Client {
         self.get("/api/v4/circles/list", request).await
     }
 
+    /// Fetches one page of rolling fan gains (`GET /api/v4/rankings/gains`).
     pub async fn rankings_gains(
         &self,
         request: &RankingsGainsRequest,

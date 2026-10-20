@@ -124,37 +124,57 @@ impl CircleListResponse {
     }
 }
 
+/// A trainer's rolling fan gains. Missing fields take their default.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct GainsRanking {
+    /// Trainer ID.
     pub viewer_id: u64,
+    /// Trainer name.
     pub trainer_name: Option<String>,
+    /// Fans gained over the last 3 days.
     pub gain_3d: Option<i64>,
+    /// Fans gained over the last 7 days.
     pub gain_7d: Option<i64>,
+    /// Fans gained over the last 30 days.
     pub gain_30d: Option<i64>,
+    /// Rank by 3-day gain.
     pub rank_3d: Option<i32>,
+    /// Rank by 7-day gain.
     pub rank_7d: Option<i32>,
+    /// Rank by 30-day gain.
     pub rank_30d: Option<i32>,
+    /// Current club ID.
     pub circle_id: Option<u64>,
+    /// Current club name.
     pub circle_name: Option<String>,
 }
 
+/// Response from `GET /api/v4/rankings/gains`.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct GainsRankingsResponse {
+    /// Trainers on this page.
     pub rankings: Vec<GainsRanking>,
+    /// Total matching trainers.
     pub total: i64,
+    /// Page number (0-indexed).
     pub page: i64,
+    /// Page size.
     pub limit: i64,
+    /// Total pages.
     pub total_pages: i64,
+    /// Sort field used.
     pub sort_by: Option<String>,
 }
 
 impl GainsRankingsResponse {
+    /// Whether a later page exists.
     pub fn has_next_page(&self) -> bool {
         self.page + 1 < self.total_pages
     }
 
+    /// The row for exactly this trainer ID, if it's on this page.
     pub fn viewer(&self, viewer_id: u64) -> Option<&GainsRanking> {
         self.rankings.iter().find(|r| r.viewer_id == viewer_id)
     }
