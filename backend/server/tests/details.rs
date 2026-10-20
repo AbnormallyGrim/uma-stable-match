@@ -1,3 +1,5 @@
+//! Club detail cache tests against a mock server. All data is made up.
+
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 

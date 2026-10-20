@@ -62,6 +62,7 @@ impl Calibration {
     }
 }
 
+/// A club's median daily pace, as the fit formula computes it, or `None` if it can't be scored.
 pub fn club_median(club: &Club) -> Option<f64> {
     let options = ScoringOptions::default().with_include_closed(true);
     let median = score_club(1.0, club, &options).ok()??.median_per_day;

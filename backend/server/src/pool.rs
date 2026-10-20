@@ -114,7 +114,8 @@ pub struct ClubPool {
 }
 
 impl ClubPool {
-    /// Builds an uncalibrated pool. Later duplicates and invalid rates are dropped.
+    /// Builds a pool with no exact medians and no calibration. Later duplicates and invalid rates
+    /// are dropped.
     pub fn new(clubs: impl IntoIterator<Item = ListedClub>) -> Self {
         let mut seen = HashSet::new();
         let entries = clubs
@@ -156,6 +157,7 @@ impl ClubPool {
         self.calibration
     }
 
+    /// Clubs whose exact median is known.
     pub fn exact_medians(&self) -> usize {
         self.entries
             .iter()
@@ -163,7 +165,7 @@ impl ClubPool {
             .count()
     }
 
-    /// A club's estimated median daily pace.
+    /// A club's median daily pace: exact if known, otherwise calibrated from its raw rate.
     pub fn estimated_median(&self, circle_id: u64) -> Option<f64> {
         let entry = &self.entries[*self.index.get(&circle_id)?];
         Some(
@@ -173,10 +175,14 @@ impl ClubPool {
         )
     }
 
+    /// Records a club's exact median from its loaded details. Returns `false` for an unknown club
+    /// or an invalid median.
     pub fn set_exact_median(&mut self, circle_id: u64, median: f64) -> bool {
         self.set_exact_medians([(circle_id, median)]) == 1
     }
 
+    /// Records several exact medians, then recalibrates and re-sorts once. Returns how many were
+    /// set.
     pub fn set_exact_medians(&mut self, medians: impl IntoIterator<Item = (u64, f64)>) -> usize {
         let mut set = 0;
         for (circle_id, median) in medians {

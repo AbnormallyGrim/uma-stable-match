@@ -69,11 +69,11 @@ The raw rate estimates the club's **mean** daily gain per member. Clubs are left
 Fit uses the **median** of current members, which is usually below the mean. `Calibration` corrects for this with one factor for the whole pool:
 
 ```text
-c = median of (true median ÷ raw rate)   over clubs with loaded details
-estimated median = c × raw rate
+c = median of (exact median ÷ raw rate)   over clubs with loaded details
+estimated median = exact median if known, otherwise c × raw rate
 ```
 
-`Calibration::ratio` takes the true median from the scoring crate's `score_club`, so it is exactly the median the fit formula uses. With fewer than 20 valid samples, `c` is 1.0.
+`club_median` takes the exact median from the scoring crate's `score_club`, so it is exactly the median the fit formula uses. `ClubPool::set_exact_median` records one for a club, recalculates `c` from every exact median, and re-sorts the pool. `set_exact_medians` does the same for several clubs at once. With fewer than 20 valid samples, `c` is 1.0.
 
 ### Shortlist
 
@@ -83,7 +83,7 @@ estimated median = c × raw rate
 distance = |ln(estimated median ÷ target)|
 ```
 
-The pool is sorted once by estimate. A query binary-searches to the target and walks outwards in both directions, skipping closed clubs unless they're included. That costs O(log n + k). Ties go to the lower club ID, and a property test checks that the result always matches sorting every club by distance. A new calibration only moves the target, so it never re-sorts the pool.
+The pool is sorted once by estimate. A query binary-searches to the target and walks outwards in both directions, skipping closed clubs unless they're included. That costs O(log n + k). Ties go to the lower club ID, and a property test checks that the result always matches sorting every club by distance. Clubs are re-sorted only when exact medians are added, not for each query.
 
 ### Shortlist size
 
@@ -98,6 +98,20 @@ The pool is sorted once by estimate. A query binary-searches to the target and w
 | 153 real clubs | 120 (78%) | 1.00 / 0.99 / 1.00 | 0.9 |
 
 The synthetic pools (`tests/shortlist_recall.rs`) need a mean of at least 0.95 and at least 0.8 at every pace. On real data the estimate is much rougher: real clubs sit in a narrow pace band, and their median-to-mean ratio varies widely. So a shortlist needs a large share of the pool to keep recall high. A larger shortlist means more club details to look up for each request.
+
+Exact medians help most when many clubs have them. With an exact median for every synthetic club, a shortlist of 60 reaches 0.995. On real data, with exact medians for the 80 prefetched clubs (about half the pool), a shortlist of 30 rises from 0.72 to 0.77, and one of 60 barely changes. Fit also depends on where you'd place among the members, so on real data being close in median isn't a strong enough signal on its own.
+
+## Club details
+
+`ClubDetails` is a shared cache of club details (`Club` with members), built on [`moka`](https://crates.io/crates/moka). Clones share one cache.
+
+- **Single flight.** `get(circle_id, priority)` fetches a club only if it isn't cached. Concurrent calls for the same club share one request to uma.moe. Failed fetches aren't cached, so the next call tries again.
+- **Expiry.** Entries expire after `DetailConfig::ttl` (180 minutes by default, one scan interval). The cache holds at most `max_clubs` (2,000 by default).
+- **Exact medians.** Each successful load writes the club's exact median into the shared `ClubPool`. After a scan builds a new pool, `restore_exact_medians` copies in the medians of clubs that are still cached.
+- **Background loading.** `queue(circle_id)` adds a club for `BackgroundLoader::run` to fetch in the background lane. Clubs that are already cached or queued are skipped, and once `queue_size` clubs are waiting (1,000 by default), `queue` returns `false`. A failed background load is logged, and the club leaves the queue.
+- **Lanes.** Visitors' fetches use the interactive lane, so they go ahead of queued background loads. If a background load for a club is already running, a visitor asking for that club waits for it rather than starting a second fetch.
+
+`queued()` and `cached_clubs()` report the queue length and the approximate cache size.
 
 ## Cache and schedule
 
