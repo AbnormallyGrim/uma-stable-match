@@ -63,6 +63,7 @@ impl Client {
         })
     }
 
+    /// A clone whose requests wait in another lane. It shares this client's rate limit.
     pub fn with_priority(&self, priority: Priority) -> Self {
         Self {
             priority,

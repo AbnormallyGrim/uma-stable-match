@@ -7,10 +7,13 @@ use std::time::Duration;
 use tokio::sync::Notify;
 use tokio::time::{sleep_until, Instant};
 
+/// Which lane a client's requests wait in.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum Priority {
+    /// Someone is waiting for the answer. Always goes first.
     #[default]
     Interactive,
+    /// Prefetching and other work that can wait.
     Background,
 }
 
@@ -38,7 +41,8 @@ impl State {
     }
 }
 
-/// Spaces requests at least `interval` apart, in the order they ask.
+/// Spaces requests at least `interval` apart. Interactive requests go first, and each lane keeps
+/// the order its requests asked in.
 #[derive(Debug)]
 pub(crate) struct RateLimiter {
     interval: Duration,
@@ -115,6 +119,7 @@ impl RateLimiter {
     }
 }
 
+// Takes a cancelled request out of its lane so it doesn't hold up the ones behind it.
 struct Waiter<'a> {
     limiter: &'a RateLimiter,
     priority: Priority,
