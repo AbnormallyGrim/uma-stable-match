@@ -6,13 +6,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App.svelte';
 import type { Recommendations } from './lib/api';
 
-function recommendations(total: number, pace = 7_600_000): Recommendations {
+function recommendations(
+  total: number,
+  pace = 7_600_000,
+  extra: Partial<Recommendations> = {},
+): Recommendations {
   return {
     trainer: { trainer_id: null, pace_per_day: pace },
     options: { balance_weight: null, include_closed: false, limit: 50 },
     updated_at: '2026-03-18T09:00:00Z',
+    month: '2026-03',
+    coverage: { shortlisted: total, scored: total, pending: 0 },
     total,
     clubs: [],
+    ...extra,
   };
 }
 
@@ -60,6 +67,24 @@ afterEach(() => {
 });
 
 describe('App', () => {
+  it("announces clubs still loading and last month's data", async () => {
+    const result = recommendations(2, 7_600_000, {
+      updated_at: '2026-03-02T15:00:00Z',
+      month: '2026-02',
+      coverage: { shortlisted: 7, scored: 2, pending: 5 },
+    });
+    stubApi(() => json(result));
+    render(App);
+    await fireEvent.input(trainerInput(), { target: { value: '123456789012' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
+
+    await screen.findByTestId('result-summary');
+    const live = document.querySelector('[aria-live="polite"]');
+    expect(live).toHaveTextContent(
+      "Found 2 clubs. These results are based on last month's data (February 2026), because the new game month has only just started. 5 more clubs are still loading. Search again in a minute for complete results.",
+    );
+  });
+
   it('searches and puts the search in the URL', async () => {
     const { recommendationCalls } = stubApi(() => json(recommendations(3)));
     render(App);

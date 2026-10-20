@@ -3,6 +3,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  gameMonth,
+  monthLabel,
   formatMillions,
   formatPercent,
   formatPerDay,
@@ -106,5 +108,24 @@ describe('tierIndex', () => {
     expect(tierIndex('SS')).toBe(10);
     expect(tierIndex('Z')).toBe(-1);
     expect(tierIndex(null)).toBe(-1);
+  });
+});
+
+describe('game months', () => {
+  it('start on the 2nd in Japan time', () => {
+    expect(gameMonth('2026-03-20T00:00:00+09:00')).toBe('2026-03');
+    expect(gameMonth('2026-03-02T00:00:00+09:00')).toBe('2026-03');
+    expect(gameMonth('2026-04-01T23:59:59+09:00')).toBe('2026-03');
+    expect(gameMonth('2026-03-01T15:00:00Z')).toBe('2026-03');
+    expect(gameMonth('2026-03-01T14:59:59Z')).toBe('2026-02');
+    expect(gameMonth('2027-01-01T12:00:00+09:00')).toBe('2026-12');
+    expect(gameMonth('not a date')).toBeNull();
+  });
+
+  it('have readable labels', () => {
+    expect(monthLabel('2026-02')).toBe('February 2026');
+    expect(monthLabel('2026-12')).toBe('December 2026');
+    expect(monthLabel('2026-13')).toBe('2026-13');
+    expect(monthLabel('soon')).toBe('soon');
   });
 });

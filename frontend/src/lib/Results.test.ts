@@ -73,4 +73,29 @@ describe('Results states', () => {
     expect(section).toHaveClass('stale');
     expect(section).toHaveAttribute('aria-busy', 'true');
   });
+
+  it('shows no notices for complete, current results', () => {
+    render(Results, { result: recommendations(), now });
+    expect(screen.queryByTestId('result-notice')).not.toBeInTheDocument();
+  });
+
+  it('says how many clubs are still loading', () => {
+    render(Results, {
+      result: recommendations({ coverage: { shortlisted: 10, scored: 6, pending: 4 } }),
+      now,
+    });
+    expect(screen.getByTestId('result-notice')).toHaveTextContent(
+      '4 more clubs are still loading. Search again in a minute for complete results.',
+    );
+  });
+
+  it("says when results use last month's data", () => {
+    render(Results, {
+      result: recommendations({ updated_at: '2026-03-02T15:00:00Z', month: '2026-02' }),
+      now,
+    });
+    expect(screen.getByTestId('result-notice')).toHaveTextContent(
+      "These results are based on last month's data (February 2026)",
+    );
+  });
 });

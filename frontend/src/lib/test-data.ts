@@ -31,6 +31,8 @@ export function recommendations(overrides: Partial<Recommendations> = {}): Recom
     trainer: { trainer_id: null, pace_per_day: 7_600_000 },
     options: { balance_weight: null, include_closed: false, limit: 50 },
     updated_at: '2026-03-18T09:00:00Z',
+    month: '2026-03',
+    coverage: { shortlisted: 0, scored: 0, pending: 0 },
     total: 0,
     clubs: [],
     ...overrides,
