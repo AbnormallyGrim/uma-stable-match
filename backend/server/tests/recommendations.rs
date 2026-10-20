@@ -299,10 +299,7 @@ async fn adds_balance_when_weighted() {
     assert_eq!(status, StatusCode::OK);
 
     let clubs = clubs();
-    let options = ScoringOptions {
-        balance_weight: Some(0.5),
-        include_closed: false,
-    };
+    let options = ScoringOptions::default().with_balance_weight(0.5);
     let expected = score_clubs(7.6 * M, &clubs, &options).unwrap();
     assert_eq!(
         ids(&body),

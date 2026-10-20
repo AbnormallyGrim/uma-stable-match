@@ -29,6 +29,7 @@ const MEDIAN_WEIGHT: f64 = 0.3;
 /// Options for [`score_clubs`] and [`score_club`].
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[non_exhaustive]
 pub struct ScoringOptions {
     /// Turns on balance scoring with this weight (0 to 1).
     pub balance_weight: Option<f64>,
@@ -36,8 +37,21 @@ pub struct ScoringOptions {
     pub include_closed: bool,
 }
 
+impl ScoringOptions {
+    pub fn with_balance_weight(mut self, weight: f64) -> Self {
+        self.balance_weight = Some(weight);
+        self
+    }
+
+    pub fn with_include_closed(mut self, include: bool) -> Self {
+        self.include_closed = include;
+        self
+    }
+}
+
 /// Invalid input to [`score_clubs`] or [`score_club`].
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub enum ScoringError {
     /// Pace must be finite and above zero.
     InvalidPace(f64),
@@ -61,6 +75,7 @@ impl std::error::Error for ScoringError {}
 /// How evenly a club's current members contribute.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[non_exhaustive]
 pub struct Balance {
     /// 0 to 100; higher is more even.
     pub score: u8,
@@ -78,6 +93,7 @@ pub struct Balance {
 
 /// A club's scores for one trainer.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct ScoredClub<'a> {
     /// The club that was scored.
     pub club: &'a Club,

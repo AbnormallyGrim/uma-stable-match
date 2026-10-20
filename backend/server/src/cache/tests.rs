@@ -4,13 +4,7 @@ use uma_stable_match_umamoe_client::Error;
 
 fn scan(ids: &[u64]) -> Scan {
     Scan {
-        clubs: ids
-            .iter()
-            .map(|id| Club {
-                circle_id: *id,
-                ..Default::default()
-            })
-            .collect(),
+        clubs: ids.iter().map(|id| Club::new(*id, "")).collect(),
         candidates: ids.len() + 1,
         failed: 1,
     }
