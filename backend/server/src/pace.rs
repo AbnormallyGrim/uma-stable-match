@@ -10,7 +10,7 @@ use uma_stable_match_umamoe_client::{
 };
 
 use crate::pool::Period;
-use crate::shared::{pace_key, SharedCache};
+use crate::shared::SharedCache;
 
 /// How long a looked-up pace is reused.
 pub const DEFAULT_PACE_TTL: Duration = Duration::from_secs(10 * 60);
@@ -81,7 +81,7 @@ impl PaceLookup {
         if let Some(outcome) = self.cached(viewer_id, period) {
             return outcome.into_result();
         }
-        let key = pace_key(viewer_id, period);
+        let key = self.shared.pace_key(viewer_id, period);
         if let Some(outcome) = self.shared.get::<Outcome>(&key).await {
             self.store(viewer_id, period, outcome);
             return outcome.into_result();

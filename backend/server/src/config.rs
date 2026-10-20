@@ -9,7 +9,7 @@ use uma_stable_match_umamoe_client::ApiKey;
 use crate::pace::DEFAULT_PACE_TTL;
 use crate::recommendations::MatchSettings;
 use crate::scanner::ScanConfig;
-use crate::shared::RedisUrl;
+use crate::shared::{KeySecret, RedisUrl};
 
 /// Address the server listens on when `HOST` isn't set.
 pub const DEFAULT_HOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
@@ -56,6 +56,7 @@ pub struct Config {
     pub frontend_dir: Option<PathBuf>,
     /// Shared cache to use, from `REDIS_URL`. Not used yet.
     pub redis_url: Option<RedisUrl>,
+    pub redis_key_secret: Option<KeySecret>,
 }
 
 /// Invalid or missing settings.
@@ -77,6 +78,10 @@ pub enum ConfigError {
     /// password.
     #[error("REDIS_URL must be a redis:// or rediss:// URL")]
     InvalidRedisUrl,
+    #[error("REDIS_KEY_SECRET is required when REDIS_URL is set")]
+    MissingRedisKeySecret,
+    #[error("REDIS_KEY_SECRET must be at least 32 characters")]
+    InvalidRedisKeySecret,
     /// A true-or-false setting is something else.
     #[error("{name} must be true or false, got {value:?}")]
     InvalidBool {
@@ -196,6 +201,13 @@ impl Config {
             None => None,
             Some(value) => Some(RedisUrl::parse(&value).ok_or(ConfigError::InvalidRedisUrl)?),
         };
+        let redis_key_secret = match (&redis_url, get("REDIS_KEY_SECRET")) {
+            (None, _) => None,
+            (Some(_), None) => return Err(ConfigError::MissingRedisKeySecret),
+            (Some(_), Some(value)) => {
+                Some(KeySecret::parse(&value).ok_or(ConfigError::InvalidRedisKeySecret)?)
+            }
+        };
         if scan.rank_from > scan.rank_to {
             return Err(ConfigError::InvalidRankWindow {
                 from: scan.rank_from,
@@ -217,6 +229,7 @@ impl Config {
             trust_forwarded_for,
             frontend_dir,
             redis_url,
+            redis_key_secret,
         })
     }
 }

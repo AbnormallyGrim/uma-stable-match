@@ -1,14 +1,24 @@
 //! Optional cache shared between server instances.
 
 use std::fmt;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
+use hmac::{Hmac, KeyInit, Mac};
+use redis::aio::ConnectionManager;
+use redis::AsyncCommands;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use sha2::Sha256;
+use tokio::time::timeout;
 
 use crate::pool::Period;
 
 const KEY_PREFIX: &str = "usm:v1";
+const MIN_SECRET_LEN: usize = 32;
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+const OP_TIMEOUT: Duration = Duration::from_millis(500);
 
 /// A `redis://` or `rediss://` URL. `Debug` output hides it, since it can hold a password.
 #[derive(Clone, PartialEq, Eq)]
@@ -35,6 +45,27 @@ impl fmt::Debug for RedisUrl {
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
+pub struct KeySecret(String);
+
+impl KeySecret {
+    pub fn parse(value: &str) -> Option<Self> {
+        (value.chars().count() >= MIN_SECRET_LEN).then(|| Self(value.to_owned()))
+    }
+}
+
+impl fmt::Debug for KeySecret {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("KeySecret(<redacted>)")
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SharedCacheError {
+    #[error("could not connect to Redis ({0})")]
+    Connect(String),
+}
+
 /// A cache shared between server instances, behind each instance's own cache. The default
 /// stores nothing.
 #[derive(Debug, Clone, Default)]
@@ -46,6 +77,34 @@ pub struct SharedCache {
 enum Backend {
     #[default]
     None,
+    Redis(RedisBackend),
+}
+
+#[derive(Clone)]
+struct RedisBackend {
+    conn: ConnectionManager,
+    secret: Arc<KeySecret>,
+    healthy: Arc<AtomicBool>,
+}
+
+impl fmt::Debug for RedisBackend {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RedisBackend").finish_non_exhaustive()
+    }
+}
+
+impl RedisBackend {
+    fn up(&self) {
+        if !self.healthy.swap(true, Ordering::Relaxed) {
+            tracing::info!("Redis is available again");
+        }
+    }
+
+    fn down(&self, reason: &str) {
+        if self.healthy.swap(false, Ordering::Relaxed) {
+            tracing::warn!(reason, "Redis is unavailable; using the local cache only");
+        }
+    }
 }
 
 impl SharedCache {
@@ -54,18 +113,62 @@ impl SharedCache {
         Self::default()
     }
 
+    pub async fn connect(url: &RedisUrl, secret: KeySecret) -> Result<Self, SharedCacheError> {
+        let client =
+            redis::Client::open(url.expose()).map_err(|e| SharedCacheError::Connect(kind(&e)))?;
+        let mut conn = timeout(CONNECT_TIMEOUT, ConnectionManager::new(client))
+            .await
+            .map_err(|_| SharedCacheError::Connect("timed out".into()))?
+            .map_err(|e| SharedCacheError::Connect(kind(&e)))?;
+        timeout(
+            CONNECT_TIMEOUT,
+            redis::cmd("PING").query_async::<String>(&mut conn),
+        )
+        .await
+        .map_err(|_| SharedCacheError::Connect("timed out".into()))?
+        .map_err(|e| SharedCacheError::Connect(kind(&e)))?;
+        Ok(Self {
+            backend: Backend::Redis(RedisBackend {
+                conn,
+                secret: Arc::new(secret),
+                healthy: Arc::new(AtomicBool::new(true)),
+            }),
+        })
+    }
+
     /// Whether values are actually shared.
     pub fn is_enabled(&self) -> bool {
         match self.backend {
             Backend::None => false,
+            Backend::Redis(_) => true,
         }
+    }
+
+    pub fn pace_key(&self, viewer_id: u64, period: Option<Period>) -> String {
+        let id = match &self.backend {
+            Backend::None => viewer_id.to_string(),
+            Backend::Redis(redis) => trainer_digest(&redis.secret, viewer_id),
+        };
+        format!("{KEY_PREFIX}:pace:{id}:{}", period_part(period))
     }
 
     /// The stored value, or `None` when it's missing, expired or unreadable.
     pub async fn get<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
-        match self.backend {
-            Backend::None => {
-                let _ = key;
+        let Backend::Redis(redis) = &self.backend else {
+            return None;
+        };
+        let mut conn = redis.conn.clone();
+        match timeout(OP_TIMEOUT, conn.get::<_, Option<Vec<u8>>>(key)).await {
+            Ok(Ok(value)) => {
+                redis.up();
+                serde_json::from_slice(&value?).ok()
+            }
+            Ok(Err(error)) => {
+                redis.down(&kind(&error));
+                None
+            }
+            Err(_) => {
+                redis.down("timed out");
                 None
             }
         }
@@ -73,10 +176,18 @@ impl SharedCache {
 
     /// Stores a value until `ttl` passes. Failures are ignored, as the value can be fetched again.
     pub async fn set<T: Serialize + Sync>(&self, key: &str, value: &T, ttl: Duration) {
-        match self.backend {
-            Backend::None => {
-                let _ = (key, value, ttl);
-            }
+        let Backend::Redis(redis) = &self.backend else {
+            return;
+        };
+        let Ok(bytes) = serde_json::to_vec(value) else {
+            return;
+        };
+        let millis = u64::try_from(ttl.as_millis()).unwrap_or(u64::MAX).max(1);
+        let mut conn = redis.conn.clone();
+        match timeout(OP_TIMEOUT, conn.pset_ex::<_, _, ()>(key, bytes, millis)).await {
+            Ok(Ok(())) => redis.up(),
+            Ok(Err(error)) => redis.down(&kind(&error)),
+            Err(_) => redis.down("timed out"),
         }
     }
 }
@@ -86,16 +197,27 @@ pub fn club_key(circle_id: u64, period: Option<Period>) -> String {
     format!("{KEY_PREFIX}:club:{circle_id}:{}", period_part(period))
 }
 
-/// Shared-cache key for a trainer's pace in a month (`None` = the current game month).
-pub fn pace_key(viewer_id: u64, period: Option<Period>) -> String {
-    format!("{KEY_PREFIX}:pace:{viewer_id}:{}", period_part(period))
-}
-
 fn period_part(period: Option<Period>) -> String {
     match period {
         None => "current".to_owned(),
         Some((year, month)) => format!("{year:04}-{month:02}"),
     }
+}
+
+fn kind(error: &redis::RedisError) -> String {
+    format!("{:?}", error.kind())
+}
+
+pub(crate) fn trainer_digest(secret: &KeySecret, viewer_id: u64) -> String {
+    let mut mac =
+        Hmac::<Sha256>::new_from_slice(secret.0.as_bytes()).expect("HMAC accepts any key length");
+    mac.update(viewer_id.to_string().as_bytes());
+    mac.finalize()
+        .into_bytes()
+        .iter()
+        .take(16)
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 #[cfg(test)]
