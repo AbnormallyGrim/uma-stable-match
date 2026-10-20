@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use uma_stable_match_scoring::{Club, JoinStyle};
 use uma_stable_match_umamoe_client::{
     ApiKey, CircleRequest, CircleSort, Client, ClientConfig, Error, GainsSort, ListCirclesRequest,
-    RankingsGainsRequest, RetryConfig, SortDir, StatusCode,
+    Priority, RankingsGainsRequest, RetryConfig, SortDir, StatusCode,
 };
 use wiremock::matchers::{header, method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -408,4 +408,69 @@ async fn clones_share_the_rate_limit() {
     a.unwrap();
     b.unwrap();
     assert!(start.elapsed() >= Duration::from_millis(200));
+}
+
+#[tokio::test]
+async fn interactive_requests_go_before_queued_background_ones() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(json(CIRCLE_LIST))
+        .expect(3)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(json(CIRCLE))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let mut config = config(&server);
+    config.min_interval = Duration::from_millis(200);
+    let interactive = Client::new(config).unwrap();
+    let background = interactive.with_priority(Priority::Background);
+
+    let mut tasks = Vec::new();
+    for page in 0..3 {
+        let client = background.clone();
+        tasks.push(tokio::spawn(async move {
+            client
+                .list_circles(&ListCirclesRequest::default().page(page))
+                .await
+                .unwrap();
+        }));
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    interactive
+        .circle(&CircleRequest::by_circle_id(900001))
+        .await
+        .unwrap();
+    for task in tasks {
+        task.await.unwrap();
+    }
+
+    let paths: Vec<_> = server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .map(|r| r.url.path().to_owned())
+        .collect();
+    assert_eq!(
+        paths,
+        vec![
+            "/api/v4/circles/list",
+            "/api/v4/circles",
+            "/api/v4/circles/list",
+            "/api/v4/circles/list",
+        ]
+    );
+}
+
+#[test]
+fn clients_default_to_interactive() {
+    let client = Client::new(ClientConfig::new(ApiKey::new(KEY))).unwrap();
+    assert!(format!("{client:?}").contains("Interactive"));
+    let background = client.with_priority(Priority::Background);
+    assert!(format!("{background:?}").contains("Background"));
 }

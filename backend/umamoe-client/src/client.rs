@@ -10,7 +10,7 @@ use serde::Serialize;
 
 use crate::config::{ClientConfig, RetryConfig};
 use crate::error::{ApiErrorBody, Error};
-use crate::rate_limit::RateLimiter;
+use crate::rate_limit::{Priority, RateLimiter};
 use crate::requests::{CircleRequest, ListCirclesRequest, RankingsGainsRequest};
 use crate::retry;
 use crate::types::{CircleListResponse, CircleResponse, GainsRankingsResponse};
@@ -25,12 +25,14 @@ pub struct Client {
     api_key: HeaderValue,
     retry: RetryConfig,
     limiter: Arc<RateLimiter>,
+    priority: Priority,
 }
 
 impl fmt::Debug for Client {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Client")
             .field("base_url", &self.base_url)
+            .field("priority", &self.priority)
             .finish_non_exhaustive()
     }
 }
@@ -57,7 +59,15 @@ impl Client {
             api_key,
             retry: config.retry,
             limiter: Arc::new(RateLimiter::new(config.min_interval)),
+            priority: Priority::default(),
         })
+    }
+
+    pub fn with_priority(&self, priority: Priority) -> Self {
+        Self {
+            priority,
+            ..self.clone()
+        }
     }
 
     /// Fetches a club and its members' fan data (`GET /api/v4/circles`).
@@ -96,7 +106,7 @@ impl Client {
         let url = format!("{}{path}", self.base_url);
         let mut retries = 0;
         loop {
-            self.limiter.acquire().await;
+            self.limiter.acquire(self.priority).await;
             let result = self
                 .http
                 .get(&url)
