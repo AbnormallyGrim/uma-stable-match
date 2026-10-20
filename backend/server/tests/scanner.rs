@@ -3,7 +3,9 @@
 use std::time::Duration;
 
 use serde_json::{json, Value};
-use uma_stable_match_server::{scan, ScanConfig, ScanError};
+use uma_stable_match_server::{
+    scan, ClubDetails, DetailConfig, Scan, ScanConfig, ScanError, SharedPool,
+};
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -30,15 +32,30 @@ fn config() -> ScanConfig {
     }
 }
 
-fn listed(id: u64, rank: i32, last_rank: i32, members: i32) -> Value {
+fn listed(id: u64, rank: i32, members: i32) -> Value {
     json!({
         "circle_id": id,
         "name": format!("Scan Club {id}"),
         "monthly_rank": rank,
-        "last_month_rank": last_rank,
         "member_count": members,
         "join_style": 1,
+        "monthly_point": id as i64 * 1_000_000,
+        "last_updated": "2026-03-19T15:00:00Z",
     })
+}
+
+fn details(server: &MockServer) -> ClubDetails {
+    ClubDetails::new(
+        &client(server),
+        SharedPool::default(),
+        DetailConfig::default(),
+    )
+    .0
+}
+
+async fn run(server: &MockServer, config: &ScanConfig) -> (Result<Scan, ScanError>, ClubDetails) {
+    let details = details(server);
+    (scan(&client(server), &details, config).await, details)
 }
 
 fn page(circles: Vec<Value>) -> ResponseTemplate {
@@ -82,8 +99,12 @@ async fn mount_detail(server: &MockServer, id: u64, response: ResponseTemplate, 
         .await;
 }
 
-fn ids(scan: &uma_stable_match_server::Scan) -> Vec<u64> {
-    scan.clubs.iter().map(|c| c.circle_id).collect()
+fn ids(details: &ClubDetails) -> Vec<u64> {
+    details
+        .cached_in_pool()
+        .iter()
+        .map(|c| c.circle_id)
+        .collect()
 }
 
 #[tokio::test]
@@ -92,47 +113,36 @@ async fn pages_until_past_the_window() {
     mount_page(
         &server,
         0,
-        vec![
-            listed(1, 5, 5, 20),
-            listed(2, 12, 12, 20),
-            listed(3, 20, 20, 20),
-        ],
+        vec![listed(1, 5, 20), listed(2, 12, 20), listed(3, 20, 20)],
     )
     .await;
     mount_page(
         &server,
         1,
-        vec![
-            listed(4, 30, 30, 20),
-            listed(5, 40, 40, 20),
-            listed(6, 50, 50, 20),
-        ],
+        vec![listed(4, 30, 20), listed(5, 40, 20), listed(6, 50, 20)],
     )
     .await;
     for id in 2..=6 {
         mount_detail(&server, id, detail(id), 1).await;
     }
 
-    let scan = scan(&client(&server), &config()).await.unwrap();
+    let (scan, details) = run(&server, &config()).await;
+    let scan = scan.unwrap();
     assert_eq!(scan.candidates, 5);
     assert_eq!(scan.failed, 0);
-    assert_eq!(ids(&scan), vec![2, 3, 4, 5, 6]);
+    assert_eq!(ids(&details), vec![2, 3, 4, 5, 6]);
 }
 
 #[tokio::test]
 async fn stops_on_a_short_page() {
     let server = MockServer::start().await;
-    mount_page(
-        &server,
-        0,
-        vec![listed(1, 12, 12, 20), listed(2, 13, 13, 20)],
-    )
-    .await;
+    mount_page(&server, 0, vec![listed(1, 12, 20), listed(2, 13, 20)]).await;
     mount_detail(&server, 1, detail(1), 1).await;
     mount_detail(&server, 2, detail(2), 1).await;
 
-    let scan = scan(&client(&server), &config()).await.unwrap();
-    assert_eq!(ids(&scan), vec![1, 2]);
+    let (scan, details) = run(&server, &config()).await;
+    scan.unwrap();
+    assert_eq!(ids(&details), vec![1, 2]);
 }
 
 #[tokio::test]
@@ -141,11 +151,7 @@ async fn stops_on_an_empty_page() {
     mount_page(
         &server,
         0,
-        vec![
-            listed(1, 12, 12, 20),
-            listed(2, 13, 13, 20),
-            listed(3, 14, 14, 20),
-        ],
+        vec![listed(1, 12, 20), listed(2, 13, 20), listed(3, 14, 20)],
     )
     .await;
     mount_page(&server, 1, vec![]).await;
@@ -153,19 +159,20 @@ async fn stops_on_an_empty_page() {
         mount_detail(&server, id, detail(id), 1).await;
     }
 
-    let scan = scan(&client(&server), &config()).await.unwrap();
+    let (scan, _) = run(&server, &config()).await;
+    let scan = scan.unwrap();
     assert_eq!(scan.candidates, 3);
 }
 
 #[tokio::test]
 async fn skips_full_clubs_and_unknown_sizes() {
     let server = MockServer::start().await;
-    let mut unknown = listed(3, 14, 14, 20);
+    let mut unknown = listed(3, 14, 20);
     unknown["member_count"] = Value::Null;
     mount_page(
         &server,
         0,
-        vec![listed(1, 12, 12, 30), listed(2, 13, 13, 29), unknown],
+        vec![listed(1, 12, 30), listed(2, 13, 29), unknown],
     )
     .await;
     mount_page(&server, 1, vec![]).await;
@@ -173,61 +180,51 @@ async fn skips_full_clubs_and_unknown_sizes() {
     mount_detail(&server, 2, detail(2), 1).await;
     mount_detail(&server, 3, detail(3), 0).await;
 
-    let scan = scan(&client(&server), &config()).await.unwrap();
-    assert_eq!(ids(&scan), vec![2]);
+    let (scan, details) = run(&server, &config()).await;
+    scan.unwrap();
+    assert_eq!(ids(&details), vec![2]);
 }
 
 #[tokio::test]
-async fn fetches_in_rank_order_up_to_the_cap() {
+async fn prefetches_evenly_across_the_estimates() {
     let server = MockServer::start().await;
     mount_page(
         &server,
         0,
-        vec![
-            listed(1, 12, 13, 20),
-            listed(2, 13, 40, 20),
-            listed(3, 14, 30, 20),
-        ],
+        vec![listed(1, 12, 20), listed(2, 13, 20), listed(3, 14, 20)],
     )
     .await;
-    mount_page(
-        &server,
-        1,
-        vec![listed(4, 15, 15, 20), listed(5, 16, 10, 20)],
-    )
-    .await;
+    mount_page(&server, 1, vec![listed(4, 15, 20), listed(5, 16, 20)]).await;
     mount_detail(&server, 1, detail(1), 1).await;
-    mount_detail(&server, 2, detail(2), 1).await;
-    for id in [3, 4, 5] {
+    mount_detail(&server, 3, detail(3), 1).await;
+    for id in [2, 4, 5] {
         mount_detail(&server, id, detail(id), 0).await;
     }
 
     let mut config = config();
     config.max_details = 2;
-    let scan = scan(&client(&server), &config).await.unwrap();
+    let (scan, details) = run(&server, &config).await;
+    let scan = scan.unwrap();
     assert_eq!(scan.candidates, 5);
-    assert_eq!(ids(&scan), vec![1, 2]);
+    assert_eq!(scan.prefetched, 2);
+    assert_eq!(ids(&details), vec![1, 3]);
 }
 
 #[tokio::test]
 async fn filters_before_the_cap() {
     let server = MockServer::start().await;
-    let mut archived = listed(1, 12, 12, 20);
+    let mut archived = listed(1, 12, 20);
     archived["archived"] = json!(true);
     mount_page(
         &server,
         0,
-        vec![archived, listed(2, 13, 13, 30), listed(3, 14, 14, 7)],
+        vec![archived, listed(2, 13, 30), listed(3, 14, 7)],
     )
     .await;
     mount_page(
         &server,
         1,
-        vec![
-            listed(4, 15, 15, 20),
-            listed(5, 16, 16, 20),
-            listed(6, 17, 17, 20),
-        ],
+        vec![listed(4, 15, 20), listed(5, 16, 20), listed(6, 17, 20)],
     )
     .await;
     mount_page(&server, 2, vec![]).await;
@@ -239,49 +236,48 @@ async fn filters_before_the_cap() {
 
     let mut config = config();
     config.max_details = 2;
-    let scan = scan(&client(&server), &config).await.unwrap();
+    let (scan, details) = run(&server, &config).await;
+    let scan = scan.unwrap();
     assert_eq!(scan.candidates, 3);
-    assert_eq!(ids(&scan), vec![4, 5]);
+    assert_eq!(ids(&details), vec![4, 5]);
 }
 
 #[tokio::test]
 async fn keeps_closed_clubs() {
     let server = MockServer::start().await;
-    let mut closed = listed(1, 12, 12, 20);
+    let mut closed = listed(1, 12, 20);
     closed["join_style"] = json!(3);
-    mount_page(&server, 0, vec![closed, listed(2, 13, 13, 20)]).await;
+    mount_page(&server, 0, vec![closed, listed(2, 13, 20)]).await;
     mount_detail(&server, 1, detail(1), 1).await;
     mount_detail(&server, 2, detail(2), 1).await;
 
-    let scan = scan(&client(&server), &config()).await.unwrap();
-    assert_eq!(ids(&scan), vec![1, 2]);
+    let (scan, details) = run(&server, &config()).await;
+    scan.unwrap();
+    assert_eq!(ids(&details), vec![1, 2]);
 }
 
 #[tokio::test]
 async fn skips_clubs_that_fail_to_load() {
     let server = MockServer::start().await;
-    mount_page(
-        &server,
-        0,
-        vec![listed(1, 12, 12, 20), listed(2, 13, 13, 20)],
-    )
-    .await;
+    mount_page(&server, 0, vec![listed(1, 12, 20), listed(2, 13, 20)]).await;
     mount_detail(&server, 1, ResponseTemplate::new(500), 1).await;
     mount_detail(&server, 2, detail(2), 1).await;
 
-    let scan = scan(&client(&server), &config()).await.unwrap();
+    let (scan, details) = run(&server, &config()).await;
+    let scan = scan.unwrap();
     assert_eq!(scan.failed, 1);
-    assert_eq!(ids(&scan), vec![2]);
+    assert_eq!(ids(&details), vec![2]);
 }
 
 #[tokio::test]
 async fn converts_details_to_clubs() {
     let server = MockServer::start().await;
-    mount_page(&server, 0, vec![listed(1, 12, 12, 20)]).await;
+    mount_page(&server, 0, vec![listed(1, 12, 20)]).await;
     mount_detail(&server, 1, detail(1), 1).await;
 
-    let scan = scan(&client(&server), &config()).await.unwrap();
-    let club = &scan.clubs[0];
+    let (scan, details) = run(&server, &config()).await;
+    assert_eq!(scan.unwrap().prefetched, 1);
+    let club = details.cached(1).await.unwrap();
     assert_eq!(club.club_rank, Some(5));
     assert_eq!(club.members.len(), 1);
     assert_eq!(club.members[0].daily_fans, vec![100, 200, 300]);
@@ -290,7 +286,7 @@ async fn converts_details_to_clubs() {
 #[tokio::test]
 async fn falls_back_to_listed_details_when_missing() {
     let server = MockServer::start().await;
-    mount_page(&server, 0, vec![listed(1, 12, 12, 20)]).await;
+    mount_page(&server, 0, vec![listed(1, 12, 20)]).await;
     mount_detail(
         &server,
         1,
@@ -299,8 +295,9 @@ async fn falls_back_to_listed_details_when_missing() {
     )
     .await;
 
-    let scan = scan(&client(&server), &config()).await.unwrap();
-    let club = &scan.clubs[0];
+    let (scan, details) = run(&server, &config()).await;
+    scan.unwrap();
+    let club = details.cached(1).await.unwrap();
     assert_eq!(club.circle_id, 1);
     assert_eq!(club.name, "Scan Club 1");
     assert_eq!(club.monthly_rank, Some(12));
@@ -315,6 +312,63 @@ async fn list_failure_fails_the_scan() {
         .mount(&server)
         .await;
 
-    let error = scan(&client(&server), &config()).await.unwrap_err();
+    let error = run(&server, &config()).await.0.unwrap_err();
     assert!(matches!(error, ScanError::List(_)));
+}
+
+#[tokio::test]
+async fn skips_rows_without_points() {
+    let server = MockServer::start().await;
+    let mut no_points = listed(1, 12, 20);
+    no_points["monthly_point"] = Value::Null;
+    mount_page(&server, 0, vec![no_points, listed(2, 13, 20)]).await;
+    mount_detail(&server, 1, detail(1), 0).await;
+    mount_detail(&server, 2, detail(2), 1).await;
+
+    let (scan, details) = run(&server, &config()).await;
+    assert_eq!(scan.unwrap().candidates, 1);
+    assert_eq!(ids(&details), vec![2]);
+}
+
+#[tokio::test]
+async fn reports_the_game_month() {
+    let server = MockServer::start().await;
+    mount_page(&server, 0, vec![listed(1, 12, 20)]).await;
+    mount_detail(&server, 1, detail(1), 1).await;
+
+    let (scan, _) = run(&server, &config()).await;
+    assert_eq!(scan.unwrap().month.as_deref(), Some("2026-03"));
+}
+
+#[tokio::test]
+async fn a_new_scan_replaces_the_pool_and_reuses_cached_details() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(page(vec![listed(1, 12, 20), listed(2, 13, 20)]))
+        .up_to_n_times(1)
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(page(vec![
+            listed(1, 12, 30),
+            listed(2, 13, 20),
+            listed(3, 14, 20),
+            listed(9, 60, 20),
+        ]))
+        .expect(1)
+        .mount(&server)
+        .await;
+    for id in 1..=3 {
+        mount_detail(&server, id, detail(id), 1).await;
+    }
+
+    let details = details(&server);
+    scan(&client(&server), &details, &config()).await.unwrap();
+    assert_eq!(ids(&details), vec![1, 2]);
+    let second = scan(&client(&server), &details, &config()).await.unwrap();
+    assert_eq!(second.candidates, 2);
+    assert_eq!(second.prefetched, 2);
+    assert_eq!(ids(&details), vec![2, 3]);
+    assert!(details.cached(1).await.is_some());
 }

@@ -9,7 +9,8 @@ use axum::Router;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    app, AppState, Cache, PaceLookup, RateLimits, CONTENT_SECURITY, DEFAULT_PACE_TTL,
+    app, AppState, Cache, ClubDetails, DetailConfig, PaceLookup, RateLimits, SharedPool,
+    CONTENT_SECURITY, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig};
 
@@ -24,6 +25,7 @@ fn state() -> AppState {
     .unwrap();
     AppState {
         cache: Cache::new(),
+        details: ClubDetails::new(&client, SharedPool::default(), DetailConfig::default()).0,
         paces: PaceLookup::new(client, DEFAULT_PACE_TTL),
         limits: RateLimits::new(10_000, 10_000, false),
     }

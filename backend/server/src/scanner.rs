@@ -1,9 +1,12 @@
 //! Finds candidate clubs and fetches their member data.
 
-use uma_stable_match_scoring::{Club, CLUB_CAP, MIN_RANKED_MEMBERS};
+use chrono::{DateTime, Utc};
 use uma_stable_match_umamoe_client::{
-    Circle, CircleRequest, CircleSort, Client, Error, ListCirclesRequest, SortDir,
+    Circle, CircleSort, Client, Error, ListCirclesRequest, Priority, SortDir,
 };
+
+use crate::details::ClubDetails;
+use crate::pool::{game_month_start, jst, ClubPool, ListedClub};
 
 // Safety stop in case the API never returns a short page.
 const MAX_PAGES: u32 = 100;
@@ -33,14 +36,16 @@ impl Default for ScanConfig {
 }
 
 /// Result of one scan.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scan {
-    /// Clubs with member data, best rank first.
-    pub clubs: Vec<Club>,
     /// Clubs that passed the scan filters.
     pub candidates: usize,
+    /// Clubs whose details were loaded.
+    pub prefetched: usize,
     /// Clubs whose details failed to load.
     pub failed: usize,
+    /// Game month of the listed data, as `YYYY-MM`.
+    pub month: Option<String>,
 }
 
 /// Why a scan failed.
@@ -69,31 +74,34 @@ fn upstream_summary(error: &Error) -> String {
     }
 }
 
-/// Lists candidate clubs and fetches their member data.
-pub async fn scan(client: &Client, config: &ScanConfig) -> Result<Scan, ScanError> {
-    let mut candidates = list_candidates(client, config).await?;
-    let total = candidates.len();
+/// Lists the rank window into a new club pool, swaps it into `details`, and prefetches club
+/// details in the background lane.
+pub async fn scan(
+    client: &Client,
+    details: &ClubDetails,
+    config: &ScanConfig,
+) -> Result<Scan, ScanError> {
+    let rows = list_candidates(client, config).await?;
+    let month = rows
+        .iter()
+        .filter_map(|c| c.last_updated.as_deref())
+        .filter_map(|t| DateTime::parse_from_rfc3339(t).ok())
+        .map(|t| t.with_timezone(&Utc))
+        .max()
+        .map(game_month);
 
-    if total > config.max_details as usize {
-        tracing::warn!(
-            candidates = total,
-            max_details = config.max_details,
-            "more candidates than SCAN_MAX_DETAILS, skipping the lowest ranked"
-        );
-        candidates.truncate(config.max_details as usize);
-    }
+    let mut pool = ClubPool::new(rows.iter().filter_map(ListedClub::from_circle));
+    details.set_listed(rows.into_iter().map(|c| (c.circle_id, c)));
+    details.restore_exact_medians(&mut pool);
+    let candidates = pool.len();
+    let ids = prefetch_ids(&pool, config.max_details as usize);
+    details.replace_pool(pool);
 
-    let mut clubs = Vec::with_capacity(candidates.len());
+    let mut prefetched = 0;
     let mut failed = 0;
-    for listed in candidates {
-        let circle_id = listed.circle_id;
-        match client.circle(&CircleRequest::by_circle_id(circle_id)).await {
-            Ok(mut response) => {
-                if response.circle.circle_id == 0 {
-                    response.circle = listed;
-                }
-                clubs.push(Club::from(response));
-            }
+    for circle_id in ids {
+        match details.get(circle_id, Priority::Background).await {
+            Ok(_) => prefetched += 1,
             Err(error) => {
                 failed += 1;
                 tracing::warn!(circle_id, %error, "skipping club that failed to load");
@@ -101,17 +109,28 @@ pub async fn scan(client: &Client, config: &ScanConfig) -> Result<Scan, ScanErro
         }
     }
 
-    tracing::info!(
-        candidates = total,
-        loaded = clubs.len(),
-        failed,
-        "scan finished"
-    );
+    tracing::info!(candidates, prefetched, failed, "scan finished");
     Ok(Scan {
-        clubs,
-        candidates: total,
+        candidates,
+        prefetched,
         failed,
+        month,
     })
+}
+
+fn prefetch_ids(pool: &ClubPool, max: usize) -> Vec<u64> {
+    let ids: Vec<u64> = pool.clubs().map(|c| c.circle_id).collect();
+    if ids.len() <= max {
+        return ids;
+    }
+    (0..max).map(|i| ids[i * ids.len() / max]).collect()
+}
+
+fn game_month(at: DateTime<Utc>) -> String {
+    game_month_start(at)
+        .with_timezone(&jst())
+        .format("%Y-%m")
+        .to_string()
 }
 
 async fn list_candidates(client: &Client, config: &ScanConfig) -> Result<Vec<Circle>, ScanError> {
@@ -134,7 +153,7 @@ async fn list_candidates(client: &Client, config: &ScanConfig) -> Result<Vec<Cir
         let done = last.monthly_rank.unwrap_or(0) >= config.rank_to as i32
             || rows.len() < config.page_size as usize;
 
-        candidates.extend(rows.into_iter().filter(|c| is_candidate(c, config)));
+        candidates.extend(rows.into_iter().filter(|c| in_window(c, config)));
         if done {
             break;
         }
@@ -142,15 +161,11 @@ async fn list_candidates(client: &Client, config: &ScanConfig) -> Result<Vec<Cir
     Ok(candidates)
 }
 
-fn is_candidate(circle: &Circle, config: &ScanConfig) -> bool {
-    let in_window = circle
+fn in_window(circle: &Circle, config: &ScanConfig) -> bool {
+    circle
         .monthly_rank
         .and_then(|r| u32::try_from(r).ok())
-        .is_some_and(|r| (config.rank_from..=config.rank_to).contains(&r));
-    let has_room = circle
-        .member_count
-        .is_some_and(|n| (MIN_RANKED_MEMBERS as i32..CLUB_CAP as i32).contains(&n));
-    in_window && has_room && circle.archived != Some(true)
+        .is_some_and(|r| (config.rank_from..=config.rank_to).contains(&r))
 }
 
 #[cfg(test)]

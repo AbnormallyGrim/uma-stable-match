@@ -7,7 +7,8 @@ use tokio::net::TcpListener;
 use tokio::sync::watch;
 use tracing_subscriber::EnvFilter;
 use uma_stable_match_server::{
-    app, run_scheduler, AppState, Cache, Config, PaceLookup, RateLimits,
+    app, run_scheduler, AppState, Cache, ClubDetails, Config, DetailConfig, PaceLookup, RateLimits,
+    SharedPool,
 };
 use uma_stable_match_umamoe_client::{Client, ClientConfig};
 
@@ -57,8 +58,20 @@ async fn main() -> ExitCode {
         config.trainer_lookups_per_minute,
         config.trust_forwarded_for,
     );
+    let window = u64::from(config.scan.rank_to - config.scan.rank_from + 1);
+    let (details, loader) = ClubDetails::new(
+        &client,
+        SharedPool::default(),
+        DetailConfig {
+            ttl: config.detail_cache,
+            max_clubs: window * 2,
+            queue_size: window as usize,
+        },
+    );
+    tokio::spawn(loader.run());
     let scheduler = tokio::spawn(run_scheduler(
         client,
+        details.clone(),
         config.scan,
         config.scan_interval,
         cache.clone(),
@@ -73,6 +86,7 @@ async fn main() -> ExitCode {
             cache,
             paces,
             limits,
+            details,
         },
         config.frontend_dir.as_deref(),
     );

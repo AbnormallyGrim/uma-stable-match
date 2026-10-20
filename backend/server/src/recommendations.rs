@@ -7,7 +7,7 @@ use axum::Extension;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use uma_stable_match_scoring::{
-    score_clubs, Balance, JoinStyle, ScoredClub, ScoringOptions, DEFAULT_BALANCE_WEIGHT,
+    score_clubs, Balance, Club, JoinStyle, ScoredClub, ScoringOptions, DEFAULT_BALANCE_WEIGHT,
 };
 
 use crate::api_error::ApiError;
@@ -144,8 +144,14 @@ pub(crate) async fn recommendations(
             (state.paces.pace(id).await.map_err(pace_error)?, Some(id))
         }
     };
-    let scored = score_clubs(pace, &snapshot.clubs, &options)
-        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    let clubs: Vec<Club> = state
+        .details
+        .cached_in_pool()
+        .iter()
+        .map(|club| Club::clone(club))
+        .collect();
+    let scored =
+        score_clubs(pace, &clubs, &options).map_err(|e| ApiError::bad_request(e.to_string()))?;
 
     Ok(Json(Recommendations {
         trainer: TrainerView {

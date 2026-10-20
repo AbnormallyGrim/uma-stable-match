@@ -18,6 +18,7 @@ fn defaults() {
     assert_eq!(config.base_url, None);
     assert_eq!(config.scan, ScanConfig::default());
     assert_eq!(config.scan_interval, Duration::from_secs(180 * 60));
+    assert_eq!(config.detail_cache, Duration::from_secs(180 * 60));
     assert_eq!(config.trainer_cache, Duration::from_secs(10 * 60));
     assert_eq!(config.rate_limit_per_minute, 30);
     assert_eq!(config.trainer_lookups_per_minute, 10);
@@ -265,5 +266,44 @@ fn rejects_a_frontend_dir_without_index_html() {
         ]))
         .unwrap_err();
         assert_eq!(error, ConfigError::InvalidFrontendDir(value));
+    }
+}
+
+#[test]
+fn detail_cache_follows_the_scan_interval() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("SCAN_INTERVAL_MINUTES", "45"),
+    ]))
+    .unwrap();
+    assert_eq!(config.detail_cache, Duration::from_secs(45 * 60));
+}
+
+#[test]
+fn reads_detail_cache() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("SCAN_INTERVAL_MINUTES", "45"),
+        ("DETAIL_CACHE_MINUTES", "90"),
+    ]))
+    .unwrap();
+    assert_eq!(config.detail_cache, Duration::from_secs(90 * 60));
+}
+
+#[test]
+fn invalid_detail_cache_fails() {
+    for value in ["0", "-5", "abc"] {
+        let error = Config::from_lookup(lookup(&[
+            ("UMAMOE_API_KEY", "test-key"),
+            ("DETAIL_CACHE_MINUTES", value),
+        ]))
+        .unwrap_err();
+        assert_eq!(
+            error,
+            ConfigError::InvalidNumber {
+                name: "DETAIL_CACHE_MINUTES",
+                value: value.into()
+            }
+        );
     }
 }

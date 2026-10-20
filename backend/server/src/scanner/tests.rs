@@ -1,59 +1,56 @@
 use super::*;
 use uma_stable_match_umamoe_client::{ApiErrorBody, StatusCode};
 
-fn circle(monthly_rank: Option<i32>, member_count: Option<i32>) -> Circle {
+fn circle(monthly_rank: Option<i32>) -> Circle {
     Circle {
         circle_id: 1,
         monthly_rank,
-        member_count,
         ..Default::default()
     }
 }
 
-#[test]
-fn candidate_needs_rank_in_window() {
-    let config = ScanConfig::default();
-    assert!(is_candidate(&circle(Some(80), Some(20)), &config));
-    assert!(is_candidate(&circle(Some(900), Some(20)), &config));
-    assert!(!is_candidate(&circle(Some(79), Some(20)), &config));
-    assert!(!is_candidate(&circle(Some(901), Some(20)), &config));
-    assert!(!is_candidate(&circle(None, Some(20)), &config));
-    assert!(!is_candidate(&circle(Some(-1), Some(20)), &config));
+fn listed(circle_id: u64, raw_rate: f64) -> ListedClub {
+    ListedClub {
+        circle_id,
+        member_count: 20,
+        join_style: None,
+        raw_rate,
+    }
 }
 
 #[test]
-fn candidate_needs_open_spots() {
+fn window_is_the_rank_range() {
     let config = ScanConfig::default();
-    assert!(is_candidate(&circle(Some(100), Some(29)), &config));
-    assert!(!is_candidate(&circle(Some(100), Some(30)), &config));
-    assert!(!is_candidate(&circle(Some(100), None), &config));
-    assert!(!is_candidate(&circle(Some(100), Some(0)), &config));
+    assert!(in_window(&circle(Some(80)), &config));
+    assert!(in_window(&circle(Some(900)), &config));
+    assert!(!in_window(&circle(Some(79)), &config));
+    assert!(!in_window(&circle(Some(901)), &config));
+    assert!(!in_window(&circle(None), &config));
+    assert!(!in_window(&circle(Some(-1)), &config));
 }
 
 #[test]
-fn candidate_needs_enough_members_to_score() {
-    let config = ScanConfig::default();
-    assert!(is_candidate(&circle(Some(100), Some(8)), &config));
-    assert!(!is_candidate(&circle(Some(100), Some(7)), &config));
-    assert!(!is_candidate(&circle(Some(100), Some(1)), &config));
+fn prefetch_takes_everything_that_fits() {
+    let pool = ClubPool::new((1..=3).map(|id| listed(id, 100.0 * id as f64)));
+    assert_eq!(prefetch_ids(&pool, 3), vec![1, 2, 3]);
+    assert_eq!(prefetch_ids(&pool, 10), vec![1, 2, 3]);
 }
 
 #[test]
-fn candidate_is_not_archived() {
-    let config = ScanConfig::default();
-    let mut c = circle(Some(100), Some(20));
-    c.archived = Some(true);
-    assert!(!is_candidate(&c, &config));
-    c.archived = Some(false);
-    assert!(is_candidate(&c, &config));
+fn prefetch_spreads_across_the_estimates() {
+    let pool = ClubPool::new((1..=10).map(|id| listed(id, 100.0 * id as f64)));
+    assert_eq!(prefetch_ids(&pool, 5), vec![1, 3, 5, 7, 9]);
+    assert_eq!(prefetch_ids(&pool, 3), vec![1, 4, 7]);
+    assert!(prefetch_ids(&pool, 0).is_empty());
 }
 
 #[test]
-fn closed_clubs_are_candidates() {
-    let config = ScanConfig::default();
-    let mut c = circle(Some(100), Some(20));
-    c.join_style = Some(3);
-    assert!(is_candidate(&c, &config));
+fn game_month_is_the_jst_month_it_started_in() {
+    let at = |s: &str| DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc);
+    assert_eq!(game_month(at("2026-03-20T00:00:00+09:00")), "2026-03");
+    assert_eq!(game_month(at("2026-04-01T00:00:00+09:00")), "2026-03");
+    assert_eq!(game_month(at("2026-04-01T15:00:00Z")), "2026-04");
+    assert_eq!(game_month(at("2027-01-01T12:00:00+09:00")), "2026-12");
 }
 
 #[test]
