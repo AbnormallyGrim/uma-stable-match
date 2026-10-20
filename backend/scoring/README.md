@@ -14,7 +14,7 @@ let pace = daily_pace(&my_fans).expect("at least three days of data");
 // Load clubs and their member snapshots from your data source.
 let clubs: Vec<Club> = Vec::new();
 
-let options = ScoringOptions { balance_weight: Some(0.5), ..Default::default() };
+let options = ScoringOptions::default().with_balance_weight(0.5);
 for scored in score_clubs(pace, &clubs, &options).expect("valid pace and options") {
     println!("{}: place {} of {}, score {:.3}",
         scored.club.name, scored.your_place, scored.club_size, scored.score);
@@ -38,6 +38,27 @@ A `MemberSnapshot` holds one member's **cumulative** fan count for each day of t
 | Negative | Fan count recorded while in a previous club |
 
 A `Club` holds the club's details and its member snapshots for the month.
+
+`Club`, `MemberSnapshot` and `ScoringOptions` are `#[non_exhaustive]`, so new fields can be added without a breaking release. Build them with a constructor and set the other fields directly:
+
+```rust
+use uma_stable_match_scoring::{Club, JoinStyle, MemberSnapshot, ScoringOptions};
+
+let mut member = MemberSnapshot::new(1, vec![100_000_000, 105_000_000, 110_000_000]);
+member.year = Some(2026);
+member.month = Some(3);
+
+let mut club = Club::new(1, "Example Club");
+club.member_count = Some(25);
+club.join_style = Some(JoinStyle::Open);
+club.members.push(member);
+
+let options = ScoringOptions::default()
+    .with_balance_weight(0.5)
+    .with_include_closed(true);
+```
+
+`JoinStyle`, `ScoringError`, `Balance` and `ScoredClub` are also `#[non_exhaustive]`. A `match` on `JoinStyle` or `ScoringError` needs a `_` arm, and `Balance` and `ScoredClub` can only be read, not built.
 
 ## How scoring works
 

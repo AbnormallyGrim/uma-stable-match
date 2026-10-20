@@ -22,6 +22,7 @@ pub struct MemberSnapshot {
 }
 
 impl MemberSnapshot {
+    /// A snapshot with no year or month set.
     pub fn new(viewer_id: u64, daily_fans: Vec<i64>) -> Self {
         Self {
             viewer_id,
@@ -85,6 +86,7 @@ pub struct Club {
 }
 
 impl Club {
+    /// A club with only its ID and name set.
     pub fn new(circle_id: u64, name: impl Into<String>) -> Self {
         Self {
             circle_id,

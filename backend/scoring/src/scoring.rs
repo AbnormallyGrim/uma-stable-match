@@ -38,11 +38,13 @@ pub struct ScoringOptions {
 }
 
 impl ScoringOptions {
+    /// Turns on balance scoring with this weight (0 to 1).
     pub fn with_balance_weight(mut self, weight: f64) -> Self {
         self.balance_weight = Some(weight);
         self
     }
 
+    /// Sets whether to include clubs that aren't accepting members.
     pub fn with_include_closed(mut self, include: bool) -> Self {
         self.include_closed = include;
         self
