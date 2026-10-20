@@ -10,9 +10,9 @@ use crate::scanner::{Scan, ScanError};
 /// Results of the last successful scan.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Snapshot {
-    /// Clubs with member data, climbers first.
+    /// Clubs with member data, best rank first.
     pub clubs: Vec<Club>,
-    /// Clubs that matched the rank window and had open spots.
+    /// Clubs that passed the scan filters.
     pub candidates: usize,
     /// Clubs whose details failed to load.
     pub failed: usize,
