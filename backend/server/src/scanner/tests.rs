@@ -31,16 +31,29 @@ fn candidate_needs_open_spots() {
 }
 
 #[test]
-fn climb_is_last_month_minus_this_month() {
-    let c = |now, last| Circle {
-        monthly_rank: now,
-        last_month_rank: last,
-        ..Default::default()
-    };
-    assert_eq!(climb(&c(Some(100), Some(150))), 50);
-    assert_eq!(climb(&c(Some(150), Some(100))), -50);
-    assert_eq!(climb(&c(Some(100), None)), 1_000_000_000 - 100);
-    assert_eq!(climb(&c(None, Some(100))), 100);
+fn candidate_needs_enough_members_to_score() {
+    let config = ScanConfig::default();
+    assert!(is_candidate(&circle(Some(100), Some(8)), &config));
+    assert!(!is_candidate(&circle(Some(100), Some(7)), &config));
+    assert!(!is_candidate(&circle(Some(100), Some(1)), &config));
+}
+
+#[test]
+fn candidate_is_not_archived() {
+    let config = ScanConfig::default();
+    let mut c = circle(Some(100), Some(20));
+    c.archived = Some(true);
+    assert!(!is_candidate(&c, &config));
+    c.archived = Some(false);
+    assert!(is_candidate(&c, &config));
+}
+
+#[test]
+fn closed_clubs_are_candidates() {
+    let config = ScanConfig::default();
+    let mut c = circle(Some(100), Some(20));
+    c.join_style = Some(3);
+    assert!(is_candidate(&c, &config));
 }
 
 #[test]

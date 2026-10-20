@@ -1,8 +1,6 @@
 //! Finds candidate clubs and fetches their member data.
 
-use std::cmp::Reverse;
-
-use uma_stable_match_scoring::{Club, CLUB_CAP};
+use uma_stable_match_scoring::{Club, CLUB_CAP, MIN_RANKED_MEMBERS};
 use uma_stable_match_umamoe_client::{
     Circle, CircleRequest, CircleSort, Client, Error, ListCirclesRequest, SortDir,
 };
@@ -28,7 +26,7 @@ impl Default for ScanConfig {
         Self {
             rank_from: 80,
             rank_to: 900,
-            max_details: 80,
+            max_details: 200,
             page_size: 100,
         }
     }
@@ -76,8 +74,14 @@ pub async fn scan(client: &Client, config: &ScanConfig) -> Result<Scan, ScanErro
     let mut candidates = list_candidates(client, config).await?;
     let total = candidates.len();
 
-    candidates.sort_by_key(|c| Reverse(climb(c)));
-    candidates.truncate(config.max_details as usize);
+    if total > config.max_details as usize {
+        tracing::warn!(
+            candidates = total,
+            max_details = config.max_details,
+            "more candidates than SCAN_MAX_DETAILS, skipping the lowest ranked"
+        );
+        candidates.truncate(config.max_details as usize);
+    }
 
     let mut clubs = Vec::with_capacity(candidates.len());
     let mut failed = 0;
@@ -143,17 +147,10 @@ fn is_candidate(circle: &Circle, config: &ScanConfig) -> bool {
         .monthly_rank
         .and_then(|r| u32::try_from(r).ok())
         .is_some_and(|r| (config.rank_from..=config.rank_to).contains(&r));
-    let members = circle
+    let has_room = circle
         .member_count
-        .filter(|n| *n > 0)
-        .unwrap_or(CLUB_CAP as i32);
-    in_window && members < CLUB_CAP as i32
-}
-
-fn climb(circle: &Circle) -> i64 {
-    let last = circle.last_month_rank.map_or(1_000_000_000, i64::from);
-    let now = circle.monthly_rank.map_or(0, i64::from);
-    last - now
+        .is_some_and(|n| (MIN_RANKED_MEMBERS as i32..CLUB_CAP as i32).contains(&n));
+    in_window && has_room && circle.archived != Some(true)
 }
 
 #[cfg(test)]
