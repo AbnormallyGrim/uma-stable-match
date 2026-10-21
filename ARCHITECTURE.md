@@ -101,7 +101,7 @@ The refresher loads each club's member data in the background lane, then refresh
 
 ## Caches
 
-Everything lives in memory; nothing is written to disk. Without Redis, restarting the server starts with an empty cache and a fresh scan. With Redis, a restarted server loads the current published scan and the cached clubs from Redis instead.
+The server keeps everything in memory. Without Redis, restarting it starts with an empty cache and a fresh scan. With Redis, a restarted server loads the current published scan, the refresh schedule and the cached clubs from Redis instead. The bundled Redis keeps its data on disk, so they also survive a Redis restart.
 
 | What | Key | Kept for | Where |
 |---|---|---|---|
