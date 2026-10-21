@@ -2,10 +2,11 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock};
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 
 use chrono::{DateTime, Utc};
 use moka::future::Cache;
+use moka::Expiry;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use uma_stable_match_scoring::Club;
@@ -19,26 +20,26 @@ use crate::shared::{club_key, SharedCache};
 /// The club pool, shared between requests and the detail cache.
 pub type SharedPool = Arc<RwLock<ClubPool>>;
 
+const KEEP_AFTER_DUE: Duration = Duration::from_secs(24 * 60 * 60);
+
 /// Detail cache settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DetailConfig {
-    /// How long a club's details are reused without a refresher, and kept in the shared cache.
-    pub ttl: Duration,
     /// Most clubs kept in the cache.
     pub max_clubs: u64,
     /// Most clubs waiting for a background load.
     pub queue_size: usize,
-    /// Refresh settings. `Some` keeps details until they're replaced, by a [`Refresher`].
-    pub refresh: Option<RefreshConfig>,
+    pub refresh: RefreshConfig,
+    pub refresher: bool,
 }
 
 impl Default for DetailConfig {
     fn default() -> Self {
         Self {
-            ttl: Duration::from_secs(180 * 60),
             max_clubs: 2_000,
             queue_size: 1_000,
-            refresh: None,
+            refresh: RefreshConfig::default(),
+            refresher: false,
         }
     }
 }
@@ -60,7 +61,7 @@ struct Inner {
     queued: Mutex<HashSet<u64>>,
     sender: mpsc::Sender<u64>,
     shared: SharedCache,
-    ttl: Duration,
+    timing: RefreshConfig,
     refreshing: Option<Arc<Refreshing>>,
 }
 
@@ -68,12 +69,21 @@ struct Inner {
 struct Entry {
     club: Arc<Club>,
     last_updated: Option<i64>,
+    due_ms: i64,
 }
 
 #[derive(Serialize, Deserialize)]
 struct Stored {
     club: Club,
     last_updated: Option<i64>,
+    #[serde(default)]
+    due_ms: Option<i64>,
+}
+
+impl Stored {
+    fn is_current(&self, now: DateTime<Utc>) -> bool {
+        self.due_ms.is_some_and(|due| due > now.timestamp_millis())
+    }
 }
 
 impl From<Stored> for Entry {
@@ -81,7 +91,43 @@ impl From<Stored> for Entry {
         Self {
             club: Arc::new(stored.club),
             last_updated: stored.last_updated,
+            due_ms: stored.due_ms.unwrap_or(0),
         }
+    }
+}
+
+struct UntilDue {
+    keep: bool,
+}
+
+impl UntilDue {
+    fn remaining(&self, entry: &Entry) -> Option<Duration> {
+        if self.keep {
+            return None;
+        }
+        let left = entry.due_ms - utc_now().timestamp_millis();
+        Some(Duration::from_millis(u64::try_from(left).unwrap_or(0)))
+    }
+}
+
+impl Expiry<(u64, Option<Period>), Entry> for UntilDue {
+    fn expire_after_create(
+        &self,
+        _: &(u64, Option<Period>),
+        entry: &Entry,
+        _: Instant,
+    ) -> Option<Duration> {
+        self.remaining(entry)
+    }
+
+    fn expire_after_update(
+        &self,
+        _: &(u64, Option<Period>),
+        entry: &Entry,
+        _: Instant,
+        _: Option<Duration>,
+    ) -> Option<Duration> {
+        self.remaining(entry)
     }
 }
 
@@ -118,11 +164,12 @@ impl ClubDetails {
         config: DetailConfig,
         shared: SharedCache,
     ) -> (Self, BackgroundLoader) {
-        let mut builder = Cache::builder().max_capacity(config.max_clubs);
-        if config.refresh.is_none() {
-            builder = builder.time_to_live(config.ttl);
-        }
-        let cache = builder.build();
+        let cache = Cache::builder()
+            .max_capacity(config.max_clubs)
+            .expire_after(UntilDue {
+                keep: config.refresher,
+            })
+            .build();
         let (sender, receiver) = mpsc::channel(config.queue_size.max(1));
         let details = Self {
             inner: Arc::new(Inner {
@@ -135,8 +182,10 @@ impl ClubDetails {
                 listing: RwLock::new(None),
                 queued: Mutex::new(HashSet::new()),
                 shared,
-                ttl: config.ttl,
-                refreshing: config.refresh.map(|c| Arc::new(Refreshing::new(c))),
+                timing: config.refresh,
+                refreshing: config
+                    .refresher
+                    .then(|| Arc::new(Refreshing::new(config.refresh))),
                 sender,
             }),
         };
@@ -160,12 +209,26 @@ impl ClubDetails {
             .cache
             .try_get_with((circle_id, period), async {
                 let key = club_key(circle_id, period);
-                if let Some(stored) = inner.shared.get::<Stored>(&key).await {
-                    count_detail("redis");
-                    record_median(inner, &stored.club, circle_id, period);
-                    return Ok(Entry::from(stored));
+                let stale = match inner.shared.get::<Stored>(&key).await {
+                    Some(stored) if stored.is_current(utc_now()) => {
+                        count_detail("redis");
+                        record_median(inner, &stored.club, circle_id, period);
+                        return Ok(Entry::from(stored));
+                    }
+                    stale => stale,
+                };
+                match fetch(inner, circle_id, period, priority).await {
+                    Ok(entry) => Ok(entry),
+                    Err(error) => {
+                        let Some(mut stored) = stale else {
+                            return Err(error);
+                        };
+                        count_detail("stale");
+                        record_median(inner, &stored.club, circle_id, period);
+                        stored.due_ms = Some((utc_now() + inner.timing.retry).timestamp_millis());
+                        Ok(Entry::from(stored))
+                    }
                 }
-                fetch(inner, circle_id, period, priority).await
             })
             .await
             .map(|entry| entry.club)
@@ -374,10 +437,20 @@ async fn fetch(
     }
     record_median(inner, &club, circle_id, period);
     track(inner, circle_id, last_updated);
-    let stored = Stored { club, last_updated };
+    let now = utc_now();
+    let due = inner.timing.next_refresh(
+        last_updated.and_then(|t| DateTime::from_timestamp(t, 0)),
+        now,
+    );
+    let keep = due.signed_duration_since(now).to_std().unwrap_or_default() + KEEP_AFTER_DUE;
+    let stored = Stored {
+        club,
+        last_updated,
+        due_ms: Some(due.timestamp_millis()),
+    };
     inner
         .shared
-        .set(&club_key(circle_id, period), &stored, inner.ttl)
+        .set(&club_key(circle_id, period), &stored, keep)
         .await;
     Ok(Entry::from(stored))
 }

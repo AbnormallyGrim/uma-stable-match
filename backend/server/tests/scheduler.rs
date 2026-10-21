@@ -213,7 +213,8 @@ async fn rescans_on_the_interval() {
 
 fn refreshing(server: &MockServer) -> ClubDetails {
     let config = DetailConfig {
-        refresh: Some(RefreshConfig::default()),
+        refresh: RefreshConfig::default(),
+        refresher: true,
         ..DetailConfig::default()
     };
     ClubDetails::new(&client(server), SharedPool::default(), config).0

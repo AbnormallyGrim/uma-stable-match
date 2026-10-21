@@ -36,7 +36,8 @@ async fn queue_is_bounded() {
 #[test]
 fn default_config() {
     let config = DetailConfig::default();
-    assert_eq!(config.ttl, Duration::from_secs(180 * 60));
+    assert_eq!(config.refresh, RefreshConfig::default());
+    assert!(!config.refresher);
     assert!(config.max_clubs > 0);
     assert!(config.queue_size > 0);
 }
