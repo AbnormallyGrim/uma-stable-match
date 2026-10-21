@@ -4,7 +4,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 use std::time::{Duration, SystemTime};
 
+use chrono::{DateTime, Utc};
 use moka::future::Cache;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use uma_stable_match_scoring::Club;
 use uma_stable_match_umamoe_client::{Circle, CircleRequest, Client, Error, Priority};
@@ -46,7 +48,7 @@ pub struct ClubDetails {
 struct Inner {
     interactive: Client,
     background: Client,
-    cache: Cache<(u64, Option<Period>), Arc<Club>>,
+    cache: Cache<(u64, Option<Period>), Entry>,
     period: RwLock<Option<Period>>,
     pool: SharedPool,
     listed: RwLock<HashMap<u64, Circle>>,
@@ -55,6 +57,27 @@ struct Inner {
     sender: mpsc::Sender<u64>,
     shared: SharedCache,
     ttl: Duration,
+}
+
+#[derive(Clone)]
+struct Entry {
+    club: Arc<Club>,
+    last_updated: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Stored {
+    club: Club,
+    last_updated: Option<i64>,
+}
+
+impl From<Stored> for Entry {
+    fn from(stored: Stored) -> Self {
+        Self {
+            club: Arc::new(stored.club),
+            last_updated: stored.last_updated,
+        }
+    }
 }
 
 /// Loads queued clubs in the background lane. Run it once with [`BackgroundLoader::run`].
@@ -122,50 +145,54 @@ impl ClubDetails {
     pub async fn get(&self, circle_id: u64, priority: Priority) -> Result<Arc<Club>, Arc<Error>> {
         let inner = &self.inner;
         let period = self.period();
-        if let Some(club) = inner.cache.get(&(circle_id, period)).await {
+        if let Some(entry) = inner.cache.get(&(circle_id, period)).await {
             count_detail("memory");
-            return Ok(club);
+            return Ok(entry.club);
         }
         inner
             .cache
             .try_get_with((circle_id, period), async {
                 let key = club_key(circle_id, period);
-                if let Some(club) = inner.shared.get::<Club>(&key).await {
+                if let Some(stored) = inner.shared.get::<Stored>(&key).await {
                     count_detail("redis");
-                    record_median(inner, &club, circle_id, period);
-                    return Ok(Arc::new(club));
+                    record_median(inner, &stored.club, circle_id, period);
+                    return Ok(Entry::from(stored));
                 }
-                let client = match priority {
-                    Priority::Interactive => &inner.interactive,
-                    Priority::Background => &inner.background,
-                };
-                let mut request = CircleRequest::by_circle_id(circle_id);
-                if let Some((year, month)) = period {
-                    request = request.for_month(year, month);
-                }
-                let mut response = client.circle(&request).await.inspect_err(|_| {
-                    count_detail("error");
-                })?;
-                count_detail("umamoe");
-                if response.circle.circle_id == 0 {
-                    if let Some(listed) = read(&inner.listed).get(&circle_id) {
-                        response.circle = listed.clone();
-                    }
-                }
-                let mut club = Club::from(response);
-                if club.circle_id == 0 {
-                    club.circle_id = circle_id;
-                }
-                record_median(inner, &club, circle_id, period);
-                inner.shared.set(&key, &club, inner.ttl).await;
-                Ok(Arc::new(club))
+                fetch(inner, circle_id, period, priority).await
             })
             .await
+            .map(|entry| entry.club)
+    }
+
+    /// Fetches a club's details in the given lane, even if cached, and replaces the cached copy.
+    /// On failure the cached copy stays.
+    pub async fn refresh(
+        &self,
+        circle_id: u64,
+        priority: Priority,
+    ) -> Result<Arc<Club>, Arc<Error>> {
+        let inner = &self.inner;
+        let period = self.period();
+        let entry = fetch(inner, circle_id, period, priority)
+            .await
+            .map_err(Arc::new)?;
+        inner.cache.insert((circle_id, period), entry.clone()).await;
+        Ok(entry.club)
+    }
+
+    /// When uma.moe last updated a cached club, if it said.
+    pub async fn last_updated(&self, circle_id: u64) -> Option<DateTime<Utc>> {
+        let entry = self.inner.cache.get(&(circle_id, self.period())).await?;
+        DateTime::from_timestamp(entry.last_updated?, 0)
     }
 
     /// A club's details, only if they're cached.
     pub async fn cached(&self, circle_id: u64) -> Option<Arc<Club>> {
-        self.inner.cache.get(&(circle_id, self.period())).await
+        self.inner
+            .cache
+            .get(&(circle_id, self.period()))
+            .await
+            .map(|entry| entry.club)
     }
 
     /// The month whose details are fetched and served: `None` for the current game month.
@@ -245,7 +272,7 @@ impl ClubDetails {
             .cache
             .iter()
             .filter(|(key, _)| key.1 == period && pool.contains(key.0))
-            .map(|(_, club)| club)
+            .map(|(_, entry)| entry.club)
             .collect();
         clubs.sort_by_key(|c| (c.monthly_rank.unwrap_or(u32::MAX), c.circle_id));
         clubs
@@ -260,7 +287,7 @@ impl ClubDetails {
                 .cache
                 .iter()
                 .filter(|(key, _)| key.1 == period)
-                .filter_map(|(key, club)| club_median(&club).map(|m| (key.0, m))),
+                .filter_map(|(key, entry)| club_median(&entry.club).map(|m| (key.0, m))),
         )
     }
 }
@@ -275,6 +302,48 @@ impl BackgroundLoader {
             lock(&self.details.inner.queued).remove(&circle_id);
         }
     }
+}
+
+async fn fetch(
+    inner: &Inner,
+    circle_id: u64,
+    period: Option<Period>,
+    priority: Priority,
+) -> Result<Entry, Error> {
+    let client = match priority {
+        Priority::Interactive => &inner.interactive,
+        Priority::Background => &inner.background,
+    };
+    let mut request = CircleRequest::by_circle_id(circle_id);
+    if let Some((year, month)) = period {
+        request = request.for_month(year, month);
+    }
+    let mut response = client.circle(&request).await.inspect_err(|_| {
+        count_detail("error");
+    })?;
+    count_detail("umamoe");
+    if response.circle.circle_id == 0 {
+        if let Some(listed) = read(&inner.listed).get(&circle_id) {
+            response.circle = listed.clone();
+        }
+    }
+    let last_updated = response
+        .circle
+        .last_updated
+        .as_deref()
+        .and_then(|t| DateTime::parse_from_rfc3339(t).ok())
+        .map(|t| t.timestamp());
+    let mut club = Club::from(response);
+    if club.circle_id == 0 {
+        club.circle_id = circle_id;
+    }
+    record_median(inner, &club, circle_id, period);
+    let stored = Stored { club, last_updated };
+    inner
+        .shared
+        .set(&club_key(circle_id, period), &stored, inner.ttl)
+        .await;
+    Ok(Entry::from(stored))
 }
 
 fn count_detail(source: &'static str) {
