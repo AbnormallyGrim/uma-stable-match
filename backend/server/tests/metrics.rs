@@ -9,15 +9,17 @@ use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use metrics_exporter_prometheus::PrometheusHandle;
 use serde_json::json;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::net::TcpListener;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    app, install_metrics, metrics_router, AppState, Cache, ClubDetails, DetailConfig,
-    MatchSettings, PaceLookup, RateLimits, SharedPool, DEFAULT_PACE_TTL,
+    app, install_metrics, metrics_router, AppState, Cache, ClubDetails, DetailConfig, KeySecret,
+    MatchSettings, PaceLookup, RateLimits, RedisUrl, SharedCache, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{
-    ApiKey, Client, ClientConfig, ListCirclesRequest, RetryConfig,
+    ApiKey, Client, ClientConfig, ListCirclesRequest, Priority, RetryConfig,
 };
-use wiremock::matchers::path;
+use wiremock::matchers::{path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 static HANDLE: OnceLock<PrometheusHandle> = OnceLock::new();
@@ -156,7 +158,7 @@ async fn umamoe_calls_are_counted_by_status_with_retries() {
 }
 
 #[tokio::test]
-async fn the_metrics_route_reports_the_pool_and_scan() {
+async fn the_metrics_route_reports_the_pool_scan_and_caches() {
     let handle = handle();
     let response = metrics_router(handle.clone(), state())
         .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
@@ -165,11 +167,155 @@ async fn the_metrics_route_reports_the_pool_and_scan() {
     assert_eq!(response.status(), StatusCode::OK);
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let rendered = String::from_utf8(body.to_vec()).unwrap();
-    for name in ["pool_clubs", "pool_calibration_factor", "scan_running"] {
+    for name in [
+        "pool_clubs",
+        "pool_calibration_factor",
+        "detail_cache_clubs",
+        "detail_queue_clubs",
+        "scan_running",
+    ] {
         assert!(
             rendered.lines().any(|l| l.starts_with(&format!("{name} "))),
             "missing {name}"
         );
     }
     assert!(has(&rendered, "build_info", &[r#"version=""#]));
+}
+
+#[tokio::test]
+async fn club_details_are_counted_by_source() {
+    let handle = handle();
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "900000201"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "circle": { "circle_id": 900000201, "name": "Metrics Club", "member_count": 20 },
+            "members": [],
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "900000202"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&server)
+        .await;
+    let (details, _loader) = ClubDetails::new(
+        &client(server.uri()),
+        SharedPool::default(),
+        DetailConfig::default(),
+    );
+
+    details.get(900000201, Priority::Interactive).await.unwrap();
+    details.get(900000201, Priority::Interactive).await.unwrap();
+    details
+        .get(900000202, Priority::Interactive)
+        .await
+        .unwrap_err();
+
+    let rendered = handle.render();
+    for source in ["umamoe", "memory", "error"] {
+        assert!(
+            has(
+                &rendered,
+                "club_detail_lookups_total",
+                &[&format!(r#"source="{source}""#)]
+            ),
+            "missing {source}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn trainer_paces_are_counted_by_source() {
+    let handle = handle();
+    let server = MockServer::start().await;
+    let fans: Vec<i64> = (0..4).map(|day| 100_000_000 + 3_000_000 * day).collect();
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("viewer_id", "100000000301"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "circle": { "circle_id": 900000301 },
+            "members": [{ "viewer_id": 100000000301u64, "year": 2026, "month": 3, "daily_fans": fans }],
+        })))
+        .mount(&server)
+        .await;
+    let paces = PaceLookup::new(client(server.uri()), DEFAULT_PACE_TTL);
+
+    paces.pace(100000000301, None).await.unwrap();
+    paces.pace(100000000301, None).await.unwrap();
+
+    let rendered = handle.render();
+    for source in ["umamoe", "memory"] {
+        assert!(
+            has(
+                &rendered,
+                "pace_lookups_total",
+                &[&format!(r#"source="{source}""#)]
+            ),
+            "missing {source}"
+        );
+    }
+}
+
+async fn read_command<R: AsyncBufReadExt + Unpin>(reader: &mut R) -> Option<Vec<String>> {
+    let mut line = String::new();
+    reader.read_line(&mut line).await.ok()?;
+    let count: usize = line.trim().strip_prefix('*')?.parse().ok()?;
+    let mut args = Vec::with_capacity(count);
+    for _ in 0..count {
+        line.clear();
+        reader.read_line(&mut line).await.ok()?;
+        let len: usize = line.trim().strip_prefix('$')?.parse().ok()?;
+        let mut bytes = vec![0; len + 2];
+        reader.read_exact(&mut bytes).await.ok()?;
+        args.push(String::from_utf8_lossy(&bytes[..len]).into_owned());
+    }
+    Some(args)
+}
+
+async fn silent_after_ping() -> RedisUrl {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = RedisUrl::parse(&format!("redis://{}", listener.local_addr().unwrap())).unwrap();
+    tokio::spawn(async move {
+        loop {
+            let (socket, _) = listener.accept().await.unwrap();
+            tokio::spawn(async move {
+                let (read, mut write) = socket.into_split();
+                let mut reader = BufReader::new(read);
+                while let Some(args) = read_command(&mut reader).await {
+                    let reply: &[u8] = match args.first().map(|a| a.to_ascii_uppercase()) {
+                        Some(cmd) if cmd == "PING" => b"+PONG\r\n",
+                        Some(cmd) if cmd == "CLIENT" => b"+OK\r\n",
+                        _ => {
+                            tokio::time::sleep(Duration::from_secs(30)).await;
+                            return;
+                        }
+                    };
+                    if write.write_all(reply).await.is_err() {
+                        return;
+                    }
+                }
+            });
+        }
+    });
+    url
+}
+
+#[tokio::test]
+async fn redis_failures_are_recorded() {
+    let handle = handle();
+    let secret = KeySecret::parse("made-up-secret-made-up-secret-0001").unwrap();
+    let shared = SharedCache::connect(&silent_after_ping().await, secret)
+        .await
+        .unwrap();
+
+    assert_eq!(shared.get::<u32>("usm:v1:test:metrics").await, None);
+
+    let rendered = handle.render();
+    assert!(rendered.lines().any(|l| l == "redis_up 0"));
+    assert!(has(&rendered, "redis_errors_total", &["reason="]));
+    assert!(has(
+        &rendered,
+        "redis_op_duration_seconds_bucket",
+        &[r#"op="get""#]
+    ));
 }

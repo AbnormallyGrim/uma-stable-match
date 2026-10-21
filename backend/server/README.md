@@ -153,7 +153,7 @@ Without `REDIS_URL`, the shared cache stores nothing (`SharedCache::none()`) and
 |---|---|
 | Start-up | The server connects and sends `PING`. If Redis can't be reached within 5 seconds, it stops with exit code 1, so a wrong URL is caught straight away |
 | Each read or write | Times out after 500 ms. Any error or timeout counts as a miss, and the instance carries on with its own cache and uma.moe |
-| Redis goes away | One warning is logged; the connection reconnects by itself, and one message is logged when Redis is back |
+| Redis goes away | One warning is logged; the connection reconnects by itself, and one message is logged when Redis is back. With [metrics](#metrics) on, `redis_up` shows the state and `redis_errors_total` counts each failure |
 
 **Looked-up trainer IDs never reach Redis.** Pace keys use the first 32 hex characters of HMAC-SHA256(`REDIS_KEY_SECRET`, trainer ID), so every instance needs the same secret. Club keys keep the club ID, which isn't personal, and club data is stored as uma.moe publishes it. Run Redis without persistence (for example `--save "" --appendonly no`), so paces stay in memory as they do without Redis. The `redis` profile in `docker-compose.yml` runs it this way; see [Docker details](../../README.md#docker-details).
 
@@ -429,8 +429,15 @@ Keep the address private: `127.0.0.1:<port>` on its own, or in Docker `0.0.0.0:<
 | `umamoe_queue_wait_seconds` | histogram | `lane` | Time waiting for the client's 500 ms spacing |
 | `umamoe_retries_total` | counter | `endpoint`, `status` | uma.moe retries, by the status that caused them |
 | `umamoe_decode_errors_total` | counter | `endpoint` | uma.moe responses that couldn't be read |
+| `club_detail_lookups_total` | counter | `source`: `memory`, `redis`, `umamoe` or `error` | Where each club's details came from; `error` means the uma.moe fetch failed |
+| `pace_lookups_total` | counter | `source`: `memory`, `redis`, `umamoe` or `error` | Where each trainer's pace came from |
+| `detail_cache_clubs` | gauge | | Clubs in this instance's detail cache |
+| `detail_queue_clubs` | gauge | | Clubs waiting for a background load |
+| `redis_up` | gauge | | `1` while Redis answers, `0` after a failure. Absent without Redis |
+| `redis_errors_total` | counter | `reason` | Failed or timed-out Redis operations, by the kind of failure |
+| `redis_op_duration_seconds` | histogram | `op`: `get`, `set` or `script` | Time per Redis operation, failures included |
 
-The `scan_last_*`, `last_scan_*`, `scan_running` and `pool_*` values are read from the server each time `/metrics` is requested. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
+The `scan_last_*`, `last_scan_*`, `scan_running`, `pool_*` and `detail_*` values are read from the server each time `/metrics` is requested; the detail cache settles its pending work first, so `detail_cache_clubs` is exact. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
 
 ## Shutdown
 
