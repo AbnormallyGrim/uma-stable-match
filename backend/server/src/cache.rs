@@ -38,23 +38,35 @@ pub struct CacheStatus {
     pub snapshot: Option<Arc<Snapshot>>,
     /// Failure since the last successful scan, if any.
     pub last_error: Option<ScanFailure>,
+    /// The running scan's progress, while a scan runs.
     pub progress: Option<ScanProgress>,
 }
 
+/// What a running scan is doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScanPhase {
+    /// Listing clubs in the rank window.
     Listing,
+    /// Loading club details.
     Loading,
+    /// Waiting for another instance's scan, with Redis.
     Waiting,
 }
 
+/// How far the running scan has got.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScanProgress {
+    /// What the scan is doing.
     pub phase: ScanPhase,
+    /// When the scan started. A resumed scan keeps its original start.
     pub started_at: Option<SystemTime>,
+    /// Clubs in the rank window listed so far.
     pub listed: usize,
+    /// Clubs whose details the scan loads.
     pub to_load: usize,
+    /// Clubs loaded so far.
     pub loaded: usize,
+    /// Clubs that failed to load.
     pub failed: usize,
 }
 

@@ -172,7 +172,7 @@ With Redis, instances that have the same `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `S
 
 - **Lock.** It lasts 60 seconds and is renewed every 20 seconds while scanning. Shutdown releases it; if an instance crashes, another takes over within 60 seconds.
 - **Publishing.** After prefetching, the leader publishes the listed clubs, marks them current for one `SCAN_INTERVAL_MINUTES`, and keeps them for two. The others build their pool from those rows and load club details from Redis, so they barely call uma.moe. An instance that starts later loads the published scan straight away.
-- **Resuming.** As soon as the leader has listed the clubs, it saves the list in Redis with when it was listed. An instance that takes the lock later, after a restart, redeploy or crash, continues that scan instead of listing again, if the list is less than one interval old and from the current game month (counting the [early-month](#early-in-the-month) switch). Clubs already loaded are read from Redis, so only the rest are fetched from uma.moe. Publishing the finished scan deletes the saved list.
+- **Resuming.** As soon as the leader has listed the clubs, it saves the list in Redis with when it was listed. An instance that takes the lock later, after a restart, redeploy or crash, continues that scan instead of listing again, if the list is less than one interval old and from the current game month (counting the [early-month](#early-in-the-month) switch). Clubs already loaded are read from Redis, so only the rest are fetched from uma.moe. The resumed scan keeps its original start time in `/api/v1/status` and the metrics. Publishing the finished scan deletes the saved list.
 - **Failures.** A failed scan is published too: every instance records the same error, keeps its last results, and waits for the next interval.
 - **Missing data.** If a scan is marked current but its rows are gone from Redis, the instance scans on its own.
 
@@ -256,6 +256,7 @@ All endpoints are under `/api/v1`.
 ```json
 {
   "scanning": false,
+  "scan": null,
   "last_scan": {
     "finished_at": "2026-03-18T09:00:00Z",
     "clubs": 152,
@@ -272,6 +273,7 @@ All endpoints are under `/api/v1`.
 | Field | Meaning |
 |---|---|
 | `scanning` | Whether a scan is running. With Redis, also while waiting for another instance's scan |
+| `scan` | The running scan's progress, or `null` when no scan is running. See below |
 | `last_scan.clubs` | Clubs whose member data the scan prefetched |
 | `last_scan.candidates` | Clubs in the pool after the scan's filters |
 | `last_scan.month` | Game month of the listed data, `YYYY-MM` |
@@ -280,6 +282,19 @@ All endpoints are under `/api/v1`.
 | `pool.calibration` | The mean-to-median factor and how many clubs it's based on |
 | `details.cached` | Clubs in the detail cache (approximate) |
 | `details.queued` | Clubs waiting for a background load |
+
+While a scan runs, `scan` looks like this:
+
+```json
+"scan": { "phase": "loading", "started_at": "2026-03-18T08:58:00Z", "listed": 152, "to_load": 152, "loaded": 40, "failed": 0 }
+```
+
+| Field | Meaning |
+|---|---|
+| `scan.phase` | `listing` clubs, `loading` club details, or `waiting` for another instance's scan (with Redis) |
+| `scan.started_at` | When the scan started. A [resumed scan](#shared-scans) keeps its original start; a waiting instance shows the leader's once it has the saved club list, and `null` before that |
+| `scan.listed` | Clubs in the rank window listed so far |
+| `scan.to_load`, `scan.loaded`, `scan.failed` | Clubs whose details the scan loads, has loaded, and failed to load. A resumed scan counts again from 0, quickly passing clubs already in Redis |
 
 `last_scan` is `null` until the first scan succeeds. `last_error` holds `{ "at", "message" }` for a failure since the last success. Times are RFC 3339 in UTC.
 
@@ -431,11 +446,11 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `http_requests_total` | counter | `route`, `method`, `status` | Requests answered, by HTTP status code |
 | `http_request_duration_seconds` | histogram | `route`, `method` | Time to answer a request |
 | `rate_limited_total` | counter | `limit`: `requests` or `trainer_lookups` | Requests turned away by a [rate limit](#rate-limits) |
-| `scan_phase` | gauge | | `0` idle, `1` listing clubs, `2` loading club details |
+| `scan_phase` | gauge | | `0` idle or waiting for another instance's scan, `1` listing clubs, `2` loading club details |
 | `scan_listed_clubs` | gauge | | Clubs in the rank window listed so far in this scan |
 | `scan_clubs_to_load`, `scan_clubs_loaded`, `scan_clubs_failed` | gauge | | Progress of the current scan's prefetch |
 | `scans_total` | counter | `source`: `alone`, `lead` or `published`; `result`: `ok` or `error` | Scans finished, whether run here or loaded from another instance |
-| `scan_duration_seconds` | histogram | `source` | Time from a scan's start to its end |
+| `scan_duration_seconds` | histogram | `source` | Time from a scan's start to its end. A resumed scan counts from its original start, before the restart |
 | `scan_turns_total` | counter | `turn`: `alone`, `lead`, `wait` or `fresh` | What the instance did when a scan was due; see [Shared scans](#shared-scans) |
 | `scan_last_success_timestamp_seconds` | gauge | | Unix time of the last successful scan |
 | `pool_clubs`, `pool_exact_medians` | gauge | | Clubs in the pool, and how many have an exact median |
