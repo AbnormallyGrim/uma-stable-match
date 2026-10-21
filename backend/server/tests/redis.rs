@@ -12,8 +12,8 @@ use tokio::net::TcpListener;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use uma_stable_match_server::{
-    club_key, run_scheduler, Cache, CacheStatus, ClubDetails, ClubPool, DetailConfig, KeySecret,
-    ListedClub, PaceLookup, RedisUrl, RefreshConfig, ScanConfig, ScanPhase, SharedCache,
+    club_key, run_scheduler, scan, Cache, CacheStatus, ClubDetails, ClubPool, DetailConfig,
+    KeySecret, ListedClub, PaceLookup, RedisUrl, RefreshConfig, ScanConfig, ScanPhase, SharedCache,
     SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
@@ -753,4 +753,192 @@ async fn the_last_copy_in_redis_is_served_when_uma_moe_fails() {
         "Kept"
     );
     assert_eq!(server.received_requests().await.unwrap().len(), 2);
+}
+
+fn refreshing(server: &MockServer, scan: ScanConfig, shared: SharedCache) -> ClubDetails {
+    let config = DetailConfig {
+        refresher: true,
+        scan,
+        ..DetailConfig::default()
+    };
+    ClubDetails::with_shared(&client(server), SharedPool::default(), config, shared).0
+}
+
+async fn mount_details(server: &MockServer, ids: &[u64]) {
+    for id in ids {
+        Mock::given(path("/api/v4/circles"))
+            .and(query_param("circle_id", id.to_string()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(detail(*id)))
+            .mount(server)
+            .await;
+    }
+}
+
+#[tokio::test]
+async fn the_refresh_schedule_is_shared_by_every_instance() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let ids = [unique_id(), unique_id(), unique_id()];
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(listed_clubs(&[
+            (ids[0], 10_000_000),
+            (ids[1], 20_000_000),
+            (ids[2], 30_000_000),
+        ]))
+        .mount(&server)
+        .await;
+    let config = scan_config();
+    let first = refreshing(&server, config, first_shared);
+    let second = refreshing(&server, config, redis().await.unwrap());
+
+    scan(&client(&server), &first, &config).await.unwrap();
+    assert_eq!(second.scheduled().await, 3);
+    for id in ids {
+        assert!(second.next_refresh(id).await.is_some());
+    }
+}
+
+#[tokio::test]
+async fn only_one_instance_refreshes_each_club() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let ids = [unique_id(), unique_id(), unique_id()];
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(listed_clubs(&[
+            (ids[0], 10_000_000),
+            (ids[1], 20_000_000),
+            (ids[2], 30_000_000),
+        ]))
+        .mount(&server)
+        .await;
+    mount_details(&server, &ids).await;
+    let config = scan_config();
+    let first = refreshing(&server, config, first_shared);
+    let second = refreshing(&server, config, redis().await.unwrap());
+    scan(&client(&server), &first, &config).await.unwrap();
+
+    let a = tokio::spawn(first.refresher().unwrap().run());
+    let b = tokio::spawn(second.refresher().unwrap().run());
+    wait_for(async || calls(&server, "/api/v4/circles", None).await == 3).await;
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    for id in ids {
+        assert_eq!(
+            calls(&server, "/api/v4/circles", Some(format!("circle_id={id}"))).await,
+            1
+        );
+        let due = first.next_refresh(id).await.unwrap();
+        assert!(due > chrono::DateTime::<chrono::Utc>::from(SystemTime::now()));
+    }
+    a.abort();
+    b.abort();
+}
+
+#[tokio::test]
+async fn clubs_loaded_by_another_instance_join_the_shared_schedule() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let ids = [unique_id(), unique_id()];
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(listed_clubs(&[(ids[0], 10_000_000), (ids[1], 20_000_000)]))
+        .mount(&server)
+        .await;
+    mount_details(&server, &ids).await;
+    let config = ScanConfig {
+        max_details: 1,
+        ..scan_config()
+    };
+    let first = refreshing(&server, config, first_shared);
+    let second = refreshing(&server, config, redis().await.unwrap());
+    scan(&client(&server), &first, &config).await.unwrap();
+    scan(&client(&server), &second, &config).await.unwrap();
+    assert_eq!(first.scheduled().await, 1);
+
+    let unscheduled = if first.next_refresh(ids[0]).await.is_some() {
+        ids[1]
+    } else {
+        ids[0]
+    };
+    second
+        .get(unscheduled, Priority::Interactive)
+        .await
+        .unwrap();
+    assert!(first.next_refresh(unscheduled).await.is_some());
+    assert_eq!(first.scheduled().await, 2);
+}
+
+#[tokio::test]
+async fn the_refresher_skips_clubs_another_instance_already_loaded() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let id = unique_id();
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(listed_clubs(&[(id, 10_000_000)]))
+        .mount(&server)
+        .await;
+    mount_details(&server, &[id]).await;
+    let config = scan_config();
+    let first = refreshing(&server, config, first_shared);
+    let second = refreshing(&server, config, redis().await.unwrap());
+    scan(&client(&server), &first, &config).await.unwrap();
+    scan(&client(&server), &second, &config).await.unwrap();
+    second.get(id, Priority::Interactive).await.unwrap();
+
+    let refresher = tokio::spawn(first.refresher().unwrap().run());
+    let loaded = first.next_refresh(id).await;
+    wait_for(async || first.next_refresh(id).await != loaded).await;
+    assert_eq!(calls(&server, "/api/v4/circles", None).await, 1);
+    refresher.abort();
+}
+
+#[tokio::test]
+async fn a_shared_scan_with_a_refresher_lasts_until_uma_moes_next_update() {
+    let Some(shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let id = unique_id();
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(listed_club(id))
+        .mount(&server)
+        .await;
+    let config = scan_config();
+    let cache = Cache::new();
+    let details = refreshing(&server, config, shared);
+    let (stop, stopped) = watch::channel(false);
+    let handle = tokio::spawn(run_scheduler(
+        client(&server),
+        details.clone(),
+        config,
+        None,
+        cache.clone(),
+        stopped,
+    ));
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while cache.snapshot().is_none() {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+
+    let fresh = format!(
+        "usm:v1:scan:{}-{}-{}:fresh",
+        config.rank_from, config.rank_to, config.max_details
+    );
+    let ttl = Duration::from_millis(ttl_millis(&fresh).await as u64);
+    assert!(
+        ttl > Duration::from_secs(3500) && ttl <= Duration::from_secs(3600),
+        "{ttl:?}"
+    );
+    assert_eq!(details.scheduled().await, 1);
+    stop.send(true).unwrap();
+    handle.await.unwrap();
 }

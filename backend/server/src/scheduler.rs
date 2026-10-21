@@ -131,9 +131,15 @@ pub async fn run_scheduler(
                         (Err(error), Err(message))
                     }
                 };
-                lease.publish(&PublishedScan { outcome }, interval).await;
+                let fresh_for = if daily {
+                    let updated_at = result.as_ref().ok().and_then(|scan| scan.updated_at);
+                    until_next_update(updated_at, utc_now())
+                } else {
+                    interval
+                };
+                lease.publish(&PublishedScan { outcome }, fresh_for).await;
                 finish(&cache, result, "lead", started);
-                interval
+                fresh_for
             }
             ScanTurn::Wait { progress } => {
                 count_turn("wait");

@@ -5,9 +5,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use chrono::{DateTime, Utc};
 use hmac::{Hmac, KeyInit, Mac};
 use redis::aio::ConnectionManager;
-use redis::{AsyncCommands, FromRedisValue, Script, ScriptInvocation};
+use redis::{AsyncCommands, Cmd, FromRedisValue, Script, ScriptInvocation};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sha2::Sha256;
@@ -22,6 +23,7 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const OP_TIMEOUT: Duration = Duration::from_millis(500);
 const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(5);
 const SCAN_LEASE: Duration = Duration::from_secs(60);
+const RANK_SLOTS: u64 = 1 << 21;
 
 /// A `redis://` or `rediss://` URL. `Debug` output hides it, since it can hold a password.
 #[derive(Clone, PartialEq, Eq)]
@@ -125,6 +127,27 @@ impl RedisBackend {
         let started = Instant::now();
         let reply = timeout(limit, invocation.invoke_async(&mut conn)).await;
         observe("script", started);
+        match reply {
+            Ok(Ok(value)) => {
+                self.up();
+                Some(value)
+            }
+            Ok(Err(error)) => {
+                self.down(&kind(&error));
+                None
+            }
+            Err(_) => {
+                self.down("timed out");
+                None
+            }
+        }
+    }
+
+    async fn query<T: FromRedisValue>(&self, cmd: &Cmd, limit: Duration) -> Option<T> {
+        let mut conn = self.conn.clone();
+        let started = Instant::now();
+        let reply = timeout(limit, cmd.query_async(&mut conn)).await;
+        observe("schedule", started);
         match reply {
             Ok(Ok(value)) => {
                 self.up();
@@ -282,7 +305,18 @@ impl SharedCache {
         }
     }
 
-    /// The last scan published for this scan window.
+    pub(crate) fn schedule(&self, config: &ScanConfig) -> Option<SharedSchedule> {
+        let Backend::Redis(redis) = &self.backend else {
+            return None;
+        };
+        let keys = ScanKeys::new(config);
+        Some(SharedSchedule {
+            redis: redis.clone(),
+            key: keys.schedule,
+            lease: keys.refresher,
+        })
+    }
+
     /// The club list saved by the scan in progress for this scan window.
     pub(crate) async fn scan_in_progress<T: DeserializeOwned>(
         &self,
@@ -396,12 +430,178 @@ impl ScanLease {
     }
 }
 
+pub(crate) struct SharedSchedule {
+    redis: RedisBackend,
+    key: String,
+    lease: String,
+}
+
+impl SharedSchedule {
+    pub(crate) async fn replace(
+        &self,
+        clubs: Vec<(u64, u32)>,
+        keep: impl Fn(u64) -> bool,
+        now: DateTime<Utc>,
+    ) {
+        let mut members = redis::cmd("ZRANGE");
+        members.arg(&self.key).arg(0).arg(-1);
+        let Some(members) = self
+            .redis
+            .query::<Vec<String>>(&members, SNAPSHOT_TIMEOUT)
+            .await
+        else {
+            return;
+        };
+        let dropped: Vec<&String> = members
+            .iter()
+            .filter(|m| m.parse().map_or(true, |id| !keep(id)))
+            .collect();
+        if !dropped.is_empty() {
+            let mut remove = redis::cmd("ZREM");
+            remove.arg(&self.key).arg(dropped);
+            self.redis.query::<i64>(&remove, SNAPSHOT_TIMEOUT).await;
+        }
+        if clubs.is_empty() {
+            return;
+        }
+        let script = Script::new(SCHEDULE_SCRIPT);
+        let mut invocation = script.prepare_invoke();
+        invocation
+            .key(&self.key)
+            .arg(due_seconds(now))
+            .arg(RANK_SLOTS);
+        for (circle_id, rank) in clubs {
+            invocation.arg(circle_id).arg(rank_slot(rank));
+        }
+        self.redis
+            .invoke::<i64>(&invocation, SNAPSHOT_TIMEOUT)
+            .await;
+    }
+
+    pub(crate) async fn insert_new(&self, circle_id: u64, rank: u32, due: DateTime<Utc>) -> bool {
+        let mut add = redis::cmd("ZADD");
+        add.arg(&self.key)
+            .arg("NX")
+            .arg(score(due, rank))
+            .arg(circle_id);
+        self.redis.query::<i64>(&add, OP_TIMEOUT).await == Some(1)
+    }
+
+    pub(crate) async fn reschedule(&self, circle_id: u64, due: DateTime<Utc>) {
+        let script = Script::new(RESCHEDULE_SCRIPT);
+        let mut invocation = script.prepare_invoke();
+        invocation
+            .key(&self.key)
+            .arg(circle_id)
+            .arg(due_seconds(due))
+            .arg(RANK_SLOTS);
+        self.redis.invoke::<i64>(&invocation, OP_TIMEOUT).await;
+    }
+
+    pub(crate) async fn next(&self) -> Option<(DateTime<Utc>, u32, u64)> {
+        let mut first = redis::cmd("ZRANGE");
+        first.arg(&self.key).arg(0).arg(0).arg("WITHSCORES");
+        let reply = self
+            .redis
+            .query::<Vec<(String, f64)>>(&first, OP_TIMEOUT)
+            .await?;
+        let (member, score) = reply.into_iter().next()?;
+        let (due, rank) = decode(score);
+        Some((due, rank, member.parse().ok()?))
+    }
+
+    pub(crate) async fn due_at(&self, circle_id: u64) -> Option<DateTime<Utc>> {
+        let mut get = redis::cmd("ZSCORE");
+        get.arg(&self.key).arg(circle_id);
+        let score = self.redis.query::<Option<f64>>(&get, OP_TIMEOUT).await??;
+        Some(decode(score).0)
+    }
+
+    pub(crate) async fn len(&self) -> usize {
+        let mut count = redis::cmd("ZCARD");
+        count.arg(&self.key);
+        self.redis
+            .query::<usize>(&count, OP_TIMEOUT)
+            .await
+            .unwrap_or(0)
+    }
+
+    pub(crate) async fn lease(&self) -> Option<RefreshLease> {
+        let token = format!("{:016x}{:016x}", fastrand::u64(..), fastrand::u64(..));
+        let mut take = redis::cmd("SET");
+        take.arg(&self.lease)
+            .arg(&token)
+            .arg("NX")
+            .arg("PX")
+            .arg(millis(SCAN_LEASE));
+        self.redis
+            .query::<Option<String>>(&take, OP_TIMEOUT)
+            .await??;
+        Some(RefreshLease {
+            redis: self.redis.clone(),
+            key: self.lease.clone(),
+            token,
+        })
+    }
+}
+
+pub(crate) struct RefreshLease {
+    redis: RedisBackend,
+    key: String,
+    token: String,
+}
+
+impl RefreshLease {
+    pub(crate) const RENEW_EVERY: Duration = ScanLease::RENEW_EVERY;
+
+    pub(crate) async fn renew(&self) -> bool {
+        let script = Script::new(RENEW_SCRIPT);
+        let mut invocation = script.prepare_invoke();
+        invocation
+            .key(&self.key)
+            .arg(&self.token)
+            .arg(millis(SCAN_LEASE));
+        self.redis.invoke::<i64>(&invocation, OP_TIMEOUT).await == Some(1)
+    }
+}
+
+fn due_seconds(due: DateTime<Utc>) -> u64 {
+    u64::try_from(due.timestamp_millis().max(0))
+        .unwrap_or(0)
+        .div_ceil(1000)
+}
+
+fn rank_slot(rank: u32) -> u64 {
+    u64::from(rank).min(RANK_SLOTS - 1)
+}
+
+pub(crate) fn score(due: DateTime<Utc>, rank: u32) -> u64 {
+    due_seconds(due) * RANK_SLOTS + rank_slot(rank)
+}
+
+pub(crate) fn decode(score: f64) -> (DateTime<Utc>, u32) {
+    let score = score as u64;
+    let due = i64::try_from(score / RANK_SLOTS).unwrap_or(i64::MAX);
+    let rank = u32::try_from(score % RANK_SLOTS).unwrap_or(u32::MAX);
+    let rank = if u64::from(rank) == RANK_SLOTS - 1 {
+        u32::MAX
+    } else {
+        rank
+    };
+    (
+        DateTime::from_timestamp(due, 0).unwrap_or(DateTime::<Utc>::MAX_UTC),
+        rank,
+    )
+}
+
 struct ScanKeys {
     lock: String,
     fresh: String,
     latest: String,
     progress: String,
     progress_id: String,
+    schedule: String,
+    refresher: String,
 }
 
 impl ScanKeys {
@@ -416,6 +616,8 @@ impl ScanKeys {
             latest: format!("{base}:latest"),
             progress: format!("{base}:progress"),
             progress_id: format!("{base}:progress-id"),
+            schedule: format!("{base}:schedule"),
+            refresher: format!("{base}:refresher"),
         }
     }
 }
@@ -463,6 +665,32 @@ if redis.call('GET', KEYS[1]) == ARGV[1] then
   return redis.call('DEL', KEYS[1])
 end
 return 0
+";
+
+const SCHEDULE_SCRIPT: &str = r"
+local slots = tonumber(ARGV[2])
+for i = 3, #ARGV, 2 do
+  local due = tonumber(ARGV[1])
+  local old = redis.call('ZSCORE', KEYS[1], ARGV[i])
+  if old then
+    due = math.floor(tonumber(old) / slots)
+  end
+  local score = due * slots + tonumber(ARGV[i + 1])
+  redis.call('ZADD', KEYS[1], string.format('%.0f', score), ARGV[i])
+end
+return 1
+";
+
+const RESCHEDULE_SCRIPT: &str = r"
+local old = redis.call('ZSCORE', KEYS[1], ARGV[1])
+if not old then
+  return 0
+end
+local slots = tonumber(ARGV[3])
+local rank = tonumber(old) % slots
+local score = tonumber(ARGV[2]) * slots + rank
+redis.call('ZADD', KEYS[1], 'XX', string.format('%.0f', score), ARGV[1])
+return 1
 ";
 
 fn observe(op: &'static str, started: Instant) {

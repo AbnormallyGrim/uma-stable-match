@@ -53,16 +53,6 @@ fn a_fixed_interval_overrides_the_daily_update() {
         config.next_refresh(Some(updated), now),
         at("2026-03-19T19:30:00Z")
     );
-    assert!(!config.is_current(Some(updated), now));
-}
-
-#[test]
-fn details_are_current_until_their_next_refresh() {
-    let config = RefreshConfig::default();
-    let updated = Some(at("2026-03-19T15:00:00Z"));
-    assert!(config.is_current(updated, at("2026-03-20T15:29:00Z")));
-    assert!(!config.is_current(updated, at("2026-03-20T15:30:00Z")));
-    assert!(!config.is_current(None, at("2026-03-19T16:00:00Z")));
 }
 
 #[test]

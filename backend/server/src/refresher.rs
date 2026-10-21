@@ -9,8 +9,11 @@ use tokio::sync::Notify;
 use uma_stable_match_umamoe_client::Priority;
 
 use crate::details::ClubDetails;
+use crate::shared::{RefreshLease, SharedSchedule};
 
 const DAY: Duration = Duration::from_secs(24 * 60 * 60);
+const POLL: Duration = Duration::from_secs(5);
+const LEASE_RETRY: Duration = Duration::from_secs(10);
 
 /// When the [`Refresher`] refreshes clubs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,49 +57,81 @@ impl RefreshConfig {
             _ => now + self.recheck,
         }
     }
-
-    fn is_current(&self, last_updated: Option<DateTime<Utc>>, now: DateTime<Utc>) -> bool {
-        self.every.is_none() && last_updated.is_some_and(|at| at + DAY + self.margin > now)
-    }
 }
 
 pub(crate) struct Refreshing {
     pub(crate) config: RefreshConfig,
-    schedule: Mutex<Schedule>,
+    store: Store,
     wake: Notify,
 }
 
+enum Store {
+    Local(Mutex<Schedule>),
+    Shared(SharedSchedule),
+}
+
 impl Refreshing {
-    pub(crate) fn new(config: RefreshConfig) -> Self {
+    pub(crate) fn new(config: RefreshConfig, shared: Option<SharedSchedule>) -> Self {
+        let store = match shared {
+            Some(schedule) => Store::Shared(schedule),
+            None => Store::Local(Mutex::new(Schedule::default())),
+        };
         Self {
             config,
-            schedule: Mutex::new(Schedule::default()),
+            store,
             wake: Notify::new(),
         }
     }
 
-    pub(crate) fn replace(
+    pub(crate) async fn replace(
         &self,
-        clubs: impl IntoIterator<Item = (u64, u32)>,
+        clubs: Vec<(u64, u32)>,
         keep: impl Fn(u64) -> bool,
         now: DateTime<Utc>,
     ) {
-        lock(&self.schedule).replace(clubs, keep, now);
+        match &self.store {
+            Store::Local(schedule) => lock(schedule).replace(clubs, keep, now),
+            Store::Shared(schedule) => schedule.replace(clubs, keep, now).await,
+        }
         self.wake.notify_one();
     }
 
-    pub(crate) fn loaded(&self, circle_id: u64, rank: u32, due: DateTime<Utc>) {
-        if lock(&self.schedule).insert_new(circle_id, rank, due) {
+    pub(crate) async fn loaded(&self, circle_id: u64, rank: u32, due: DateTime<Utc>) {
+        let added = match &self.store {
+            Store::Local(schedule) => lock(schedule).insert_new(circle_id, rank, due),
+            Store::Shared(schedule) => schedule.insert_new(circle_id, rank, due).await,
+        };
+        if added {
             self.wake.notify_one();
         }
     }
 
-    pub(crate) fn due_at(&self, circle_id: u64) -> Option<DateTime<Utc>> {
-        lock(&self.schedule).due_at(circle_id)
+    pub(crate) async fn due_at(&self, circle_id: u64) -> Option<DateTime<Utc>> {
+        match &self.store {
+            Store::Local(schedule) => lock(schedule).due_at(circle_id),
+            Store::Shared(schedule) => schedule.due_at(circle_id).await,
+        }
     }
 
-    pub(crate) fn len(&self) -> usize {
-        lock(&self.schedule).len()
+    pub(crate) async fn len(&self) -> usize {
+        match &self.store {
+            Store::Local(schedule) => lock(schedule).len(),
+            Store::Shared(schedule) => schedule.len().await,
+        }
+    }
+
+    async fn next(&self) -> Option<(DateTime<Utc>, u32, u64)> {
+        match &self.store {
+            Store::Local(schedule) => lock(schedule).next(),
+            Store::Shared(schedule) => schedule.next().await,
+        }
+    }
+
+    async fn reschedule(&self, circle_id: u64, due: DateTime<Utc>) {
+        match &self.store {
+            Store::Local(schedule) => lock(schedule).reschedule(circle_id, due),
+            Store::Shared(schedule) => schedule.reschedule(circle_id, due).await,
+        }
     }
 }
 
@@ -180,33 +215,68 @@ impl Refresher {
     /// retried.
     pub async fn run(self) {
         loop {
-            let now = utc_now();
-            let next = lock(&self.refreshing.schedule).next();
-            match next {
-                None => self.refreshing.wake.notified().await,
-                Some((due, _, _)) if due > now => {
-                    let wait = due.signed_duration_since(now).to_std().unwrap_or_default();
-                    tokio::select! {
-                        _ = tokio::time::sleep(wait) => {}
-                        _ = self.refreshing.wake.notified() => {}
+            match &self.refreshing.store {
+                Store::Local(_) => self.refresh_while(None).await,
+                Store::Shared(schedule) => match schedule.lease().await {
+                    Some(lease) => {
+                        tracing::info!("running the club refresher");
+                        self.refresh_while(Some(&lease)).await;
+                        tracing::warn!("lost the refresher lease");
                     }
-                }
-                Some((_, rank, circle_id)) => {
-                    let took = self.refresh(circle_id, now).await;
-                    if let Some(took) = took.filter(|_| rank > self.refreshing.config.fast_ranks) {
-                        tokio::time::sleep(took).await;
+                    None => tokio::time::sleep(LEASE_RETRY).await,
+                },
+            }
+        }
+    }
+
+    async fn refresh_while(&self, lease: Option<&RefreshLease>) {
+        let work = async {
+            loop {
+                self.step().await;
+            }
+        };
+        tokio::pin!(work);
+        let Some(lease) = lease else {
+            return work.await;
+        };
+        loop {
+            tokio::select! {
+                () = &mut work => return,
+                () = tokio::time::sleep(RefreshLease::RENEW_EVERY) => {
+                    if !lease.renew().await {
+                        return;
                     }
                 }
             }
         }
     }
 
+    async fn step(&self) {
+        let now = utc_now();
+        let next = self.refreshing.next().await;
+        if let Some((_, rank, circle_id)) = next.filter(|(due, _, _)| *due <= now) {
+            let took = self.refresh(circle_id, now).await;
+            if let Some(took) = took.filter(|_| rank > self.refreshing.config.fast_ranks) {
+                tokio::time::sleep(took).await;
+            }
+            return;
+        }
+        let wait = next.map_or(POLL, |(due, _, _)| {
+            due.signed_duration_since(now)
+                .to_std()
+                .unwrap_or_default()
+                .min(POLL)
+        });
+        tokio::select! {
+            () = tokio::time::sleep(wait) => {}
+            () = self.refreshing.wake.notified() => {}
+        }
+    }
+
     async fn refresh(&self, circle_id: u64, now: DateTime<Utc>) -> Option<Duration> {
         let config = self.refreshing.config;
-        let cached = self.details.last_updated(circle_id).await;
-        if config.is_current(cached, now) {
-            let due = config.next_refresh(cached, now);
-            lock(&self.refreshing.schedule).reschedule(circle_id, due);
+        if let Some(due) = self.details.due(circle_id).await.filter(|due| *due > now) {
+            self.refreshing.reschedule(circle_id, due).await;
             return None;
         }
         let started = Instant::now();
@@ -214,13 +284,17 @@ impl Refresher {
         let took = started.elapsed();
         let now = utc_now();
         let due = match result {
-            Ok(_) => config.next_refresh(self.details.last_updated(circle_id).await, now),
+            Ok(_) => self
+                .details
+                .due(circle_id)
+                .await
+                .unwrap_or(now + config.recheck),
             Err(error) => {
                 tracing::warn!(circle_id, %error, "club refresh failed; retrying later");
                 now + config.retry
             }
         };
-        lock(&self.refreshing.schedule).reschedule(circle_id, due);
+        self.refreshing.reschedule(circle_id, due).await;
         Some(took)
     }
 }
