@@ -29,19 +29,55 @@ fn window_is_the_rank_range() {
     assert!(!in_window(&circle(Some(-1)), &config));
 }
 
-#[test]
-fn prefetch_takes_everything_that_fits() {
-    let pool = ClubPool::new((1..=3).map(|id| listed(id, 100.0 * id as f64)));
-    assert_eq!(prefetch_ids(&pool, 3), vec![1, 2, 3]);
-    assert_eq!(prefetch_ids(&pool, 10), vec![1, 2, 3]);
+fn ranked(circle_id: u64, monthly_rank: Option<i32>) -> Circle {
+    Circle {
+        circle_id,
+        monthly_rank,
+        ..Default::default()
+    }
 }
 
 #[test]
-fn prefetch_spreads_across_the_estimates() {
+fn prefetch_takes_everything_that_fits() {
+    let pool = ClubPool::new((1..=3).map(|id| listed(id, 100.0 * id as f64)));
+    let rows: Vec<Circle> = (1..=3).map(|id| ranked(id, Some(id as i32 + 10))).collect();
+    assert_eq!(
+        prefetch_ids(&rows, &pool, 3),
+        vec![(1, 11), (2, 12), (3, 13)]
+    );
+    assert_eq!(
+        prefetch_ids(&rows, &pool, 10),
+        vec![(1, 11), (2, 12), (3, 13)]
+    );
+}
+
+#[test]
+fn prefetch_takes_the_best_ranks_first() {
     let pool = ClubPool::new((1..=10).map(|id| listed(id, 100.0 * id as f64)));
-    assert_eq!(prefetch_ids(&pool, 5), vec![1, 3, 5, 7, 9]);
-    assert_eq!(prefetch_ids(&pool, 3), vec![1, 4, 7]);
-    assert!(prefetch_ids(&pool, 0).is_empty());
+    let rows: Vec<Circle> = (1..=10)
+        .map(|id| ranked(id, Some(100 - id as i32)))
+        .collect();
+    assert_eq!(
+        prefetch_ids(&rows, &pool, 3),
+        vec![(10, 90), (9, 91), (8, 92)]
+    );
+    assert!(prefetch_ids(&rows, &pool, 0).is_empty());
+}
+
+#[test]
+fn prefetch_skips_clubs_outside_the_pool_and_repeats() {
+    let pool = ClubPool::new([listed(1, 100.0), listed(2, 200.0), listed(3, 300.0)]);
+    let rows = vec![
+        ranked(4, Some(1)),
+        ranked(2, Some(5)),
+        ranked(2, Some(6)),
+        ranked(3, None),
+        ranked(1, Some(9)),
+    ];
+    assert_eq!(
+        prefetch_ids(&rows, &pool, 10),
+        vec![(2, 5), (1, 9), (3, u32::MAX)]
+    );
 }
 
 #[test]

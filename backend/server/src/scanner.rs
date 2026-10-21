@@ -1,5 +1,6 @@
 //! Finds candidate clubs and fetches their member data.
 
+use std::collections::HashSet;
 use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
@@ -18,7 +19,7 @@ pub struct ScanConfig {
     pub rank_from: u32,
     /// Worst monthly rank to include.
     pub rank_to: u32,
-    /// Most clubs to fetch details for.
+    /// Most clubs to keep details for, best rank first.
     pub max_details: u32,
     /// Clubs per list page.
     pub page_size: u32,
@@ -78,8 +79,8 @@ fn upstream_summary(error: &Error) -> String {
     }
 }
 
-/// Lists the rank window into a new club pool, swaps it into `details`, and prefetches club
-/// details in the background lane.
+/// Lists the rank window into a new club pool and swaps it into `details`. Then, if `details` has a
+/// refresher, schedules the clubs for it; otherwise prefetches club details in the background lane.
 pub async fn scan(
     client: &Client,
     details: &ClubDetails,
@@ -106,6 +107,17 @@ pub(crate) async fn load(
 ) -> Scan {
     let listed = rows.len();
     let (candidates, ids, month) = install(details, rows, config);
+    if details.refreshes() {
+        details.schedule(ids);
+        let prefetched = details.cached_in_pool().len();
+        tracing::info!(candidates, prefetched, "scan listed the clubs");
+        return Scan {
+            candidates,
+            prefetched,
+            failed: 0,
+            month,
+        };
+    }
 
     cache.update_progress(|p| {
         p.phase = ScanPhase::Loading;
@@ -116,7 +128,7 @@ pub(crate) async fn load(
     });
     let mut prefetched = 0;
     let mut failed = 0;
-    for circle_id in ids {
+    for (circle_id, _) in ids {
         match details.get(circle_id, Priority::Background).await {
             Ok(_) => {
                 prefetched += 1;
@@ -143,7 +155,7 @@ pub(crate) fn install(
     details: &ClubDetails,
     rows: Vec<Circle>,
     config: &ScanConfig,
-) -> (usize, Vec<u64>, Option<String>) {
+) -> (usize, Vec<(u64, u32)>, Option<String>) {
     let snapshot = rows
         .iter()
         .filter_map(|c| c.last_updated.as_deref())
@@ -161,11 +173,11 @@ pub(crate) fn install(
         ListedClub::from_circle
     };
     let mut pool = ClubPool::new(rows.iter().filter_map(listed));
+    let ids = prefetch_ids(&rows, &pool, config.max_details as usize);
     details.set_period(period);
     details.set_listed(rows.into_iter().map(|c| (c.circle_id, c)));
     details.restore_exact_medians(&mut pool);
     let candidates = pool.len();
-    let ids = prefetch_ids(&pool, config.max_details as usize);
     details.replace_pool(pool);
     details.set_listing(SystemTime::now(), month.clone());
     (candidates, ids, month)
@@ -179,12 +191,24 @@ pub(crate) fn scan_period(at: DateTime<Utc>) -> Period {
     }
 }
 
-fn prefetch_ids(pool: &ClubPool, max: usize) -> Vec<u64> {
-    let ids: Vec<u64> = pool.clubs().map(|c| c.circle_id).collect();
-    if ids.len() <= max {
-        return ids;
-    }
-    (0..max).map(|i| ids[i * ids.len() / max]).collect()
+fn prefetch_ids(rows: &[Circle], pool: &ClubPool, max: usize) -> Vec<(u64, u32)> {
+    let mut ranked: Vec<(u64, u32)> = rows
+        .iter()
+        .filter(|c| pool.contains(c.circle_id))
+        .map(|c| (c.circle_id, rank(c)))
+        .collect();
+    ranked.sort_by_key(|&(id, rank)| (rank, id));
+    let mut seen = HashSet::new();
+    ranked.retain(|&(id, _)| seen.insert(id));
+    ranked.truncate(max);
+    ranked
+}
+
+fn rank(circle: &Circle) -> u32 {
+    circle
+        .monthly_rank
+        .and_then(|r| u32::try_from(r).ok())
+        .unwrap_or(u32::MAX)
 }
 
 fn month_label((year, month): Period) -> String {

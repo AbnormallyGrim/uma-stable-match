@@ -11,6 +11,7 @@ mod limits;
 mod pace;
 mod pool;
 mod recommendations;
+mod refresher;
 mod scanner;
 mod scheduler;
 mod shared;
@@ -33,6 +34,7 @@ pub use pool::{
     DEFAULT_SHORTLIST_SIZE, EARLY_MONTH_DAYS, TARGET_MEDIAN_RATIO,
 };
 pub use recommendations::{MatchSettings, DEFAULT_FETCH_BUDGET};
+pub use refresher::{RefreshConfig, Refresher};
 pub use scanner::{scan, Scan, ScanConfig, ScanError};
 pub use scheduler::run_scheduler;
 pub use shared::{club_key, KeySecret, RedisUrl, SharedCache, SharedCacheError};

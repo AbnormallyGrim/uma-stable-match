@@ -18,7 +18,7 @@ fn defaults() {
     assert_eq!(config.base_url, None);
     assert_eq!(config.scan, ScanConfig::default());
     assert_eq!(config.scan_interval, Duration::from_secs(180 * 60));
-    assert_eq!(config.detail_cache, Duration::from_secs(180 * 60));
+    assert_eq!(config.detail_cache, None);
     assert_eq!(config.matching, MatchSettings::default());
     assert_eq!(config.trainer_cache, Duration::from_secs(10 * 60));
     assert_eq!(config.rate_limit_per_minute, 30);
@@ -271,13 +271,13 @@ fn rejects_a_frontend_dir_without_index_html() {
 }
 
 #[test]
-fn detail_cache_follows_the_scan_interval() {
+fn detail_cache_is_unset_by_default_whatever_the_scan_interval() {
     let config = Config::from_lookup(lookup(&[
         ("UMAMOE_API_KEY", "test-key"),
         ("SCAN_INTERVAL_MINUTES", "45"),
     ]))
     .unwrap();
-    assert_eq!(config.detail_cache, Duration::from_secs(45 * 60));
+    assert_eq!(config.detail_cache, None);
 }
 
 #[test]
@@ -288,7 +288,7 @@ fn reads_detail_cache() {
         ("DETAIL_CACHE_MINUTES", "90"),
     ]))
     .unwrap();
-    assert_eq!(config.detail_cache, Duration::from_secs(90 * 60));
+    assert_eq!(config.detail_cache, Some(Duration::from_secs(90 * 60)));
 }
 
 #[test]

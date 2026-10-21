@@ -8,7 +8,7 @@ use tokio::sync::watch;
 use tracing_subscriber::EnvFilter;
 use uma_stable_match_server::{
     app, install_metrics, metrics_router, run_scheduler, AppState, Cache, ClubDetails, Config,
-    DetailConfig, PaceLookup, RateLimits, SharedCache, SharedPool,
+    DetailConfig, PaceLookup, RateLimits, RefreshConfig, SharedCache, SharedPool,
 };
 use uma_stable_match_umamoe_client::{Client, ClientConfig};
 
@@ -95,17 +95,25 @@ async fn main() -> ExitCode {
         config.trust_forwarded_for,
     );
     let window = u64::from(config.scan.rank_to - config.scan.rank_from + 1);
+    let refresh = (!shared.is_enabled()).then(|| RefreshConfig {
+        every: config.detail_cache,
+        ..RefreshConfig::default()
+    });
     let (details, loader) = ClubDetails::with_shared(
         &client,
         SharedPool::default(),
         DetailConfig {
-            ttl: config.detail_cache,
+            ttl: config.detail_cache.unwrap_or(config.scan_interval),
             max_clubs: window * 2,
             queue_size: window as usize,
+            refresh,
         },
         shared,
     );
     tokio::spawn(loader.run());
+    if let Some(refresher) = details.refresher() {
+        tokio::spawn(refresher.run());
+    }
     let scheduler = tokio::spawn(run_scheduler(
         client,
         details.clone(),
