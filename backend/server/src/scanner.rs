@@ -7,15 +7,12 @@ use uma_stable_match_umamoe_client::{
     Circle, CircleSort, Client, Error, ListCirclesRequest, Priority, SortDir,
 };
 
+use crate::cache::{Cache, ScanPhase};
 use crate::details::ClubDetails;
 use crate::pool::{game_month, is_early_month, previous_game_month, ClubPool, ListedClub, Period};
 
 // Safety stop in case the API never returns a short page.
 const MAX_PAGES: u32 = 100;
-
-pub(crate) const PHASE_IDLE: f64 = 0.0;
-const PHASE_LISTING: f64 = 1.0;
-const PHASE_LOADING: f64 = 2.0;
 
 /// Which clubs a scan looks at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,33 +88,50 @@ pub async fn scan(
     details: &ClubDetails,
     config: &ScanConfig,
 ) -> Result<Scan, ScanError> {
-    let rows = list_candidates(client, config).await?;
-    Ok(load(details, rows, config).await)
+    scan_with(client, details, config, &Cache::new()).await
 }
 
-pub(crate) async fn load(details: &ClubDetails, rows: Vec<Circle>, config: &ScanConfig) -> Scan {
+pub(crate) async fn scan_with(
+    client: &Client,
+    details: &ClubDetails,
+    config: &ScanConfig,
+    cache: &Cache,
+) -> Result<Scan, ScanError> {
+    let rows = list_candidates(client, config, cache).await?;
+    Ok(load(details, rows, config, cache).await)
+}
+
+pub(crate) async fn load(
+    details: &ClubDetails,
+    rows: Vec<Circle>,
+    config: &ScanConfig,
+    cache: &Cache,
+) -> Scan {
+    let listed = rows.len();
     let (candidates, ids, month) = install(details, rows, config);
 
-    metrics::gauge!("scan_phase").set(PHASE_LOADING);
-    metrics::gauge!("scan_clubs_to_load").set(ids.len() as f64);
-    metrics::gauge!("scan_clubs_loaded").set(0.0);
-    metrics::gauge!("scan_clubs_failed").set(0.0);
+    cache.update_progress(|p| {
+        p.phase = ScanPhase::Loading;
+        p.listed = listed;
+        p.to_load = ids.len();
+        p.loaded = 0;
+        p.failed = 0;
+    });
     let mut prefetched = 0;
     let mut failed = 0;
     for circle_id in ids {
         match details.get(circle_id, Priority::Background).await {
             Ok(_) => {
                 prefetched += 1;
-                metrics::gauge!("scan_clubs_loaded").set(prefetched as f64);
+                cache.update_progress(|p| p.loaded = prefetched);
             }
             Err(error) => {
                 failed += 1;
-                metrics::gauge!("scan_clubs_failed").set(failed as f64);
+                cache.update_progress(|p| p.failed = failed);
                 tracing::warn!(circle_id, %error, "skipping club that failed to load");
             }
         }
     }
-    metrics::gauge!("scan_phase").set(PHASE_IDLE);
 
     tracing::info!(candidates, prefetched, failed, "scan finished");
     Scan {
@@ -183,6 +197,7 @@ fn month_label((year, month): Period) -> String {
 pub(crate) async fn list_candidates(
     client: &Client,
     config: &ScanConfig,
+    cache: &Cache,
 ) -> Result<Vec<Circle>, ScanError> {
     let request = ListCirclesRequest {
         limit: Some(config.page_size),
@@ -192,24 +207,19 @@ pub(crate) async fn list_candidates(
         ..Default::default()
     };
 
-    metrics::gauge!("scan_phase").set(PHASE_LISTING);
-    metrics::gauge!("scan_listed_clubs").set(0.0);
     let mut candidates = Vec::new();
     for page in 0..MAX_PAGES {
         let rows = client
             .list_circles(&request.page(page))
             .await
-            .map_err(|e| {
-                metrics::gauge!("scan_phase").set(PHASE_IDLE);
-                ScanError::List(e)
-            })?
+            .map_err(ScanError::List)?
             .circles;
         let Some(last) = rows.last() else { break };
         let done = last.monthly_rank.unwrap_or(0) >= config.rank_to as i32
             || rows.len() < config.page_size as usize;
 
         candidates.extend(rows.into_iter().filter(|c| in_window(c, config)));
-        metrics::gauge!("scan_listed_clubs").set(candidates.len() as f64);
+        cache.update_progress(|p| p.listed = candidates.len());
         if done {
             break;
         }

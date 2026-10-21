@@ -38,6 +38,37 @@ pub struct CacheStatus {
     pub snapshot: Option<Arc<Snapshot>>,
     /// Failure since the last successful scan, if any.
     pub last_error: Option<ScanFailure>,
+    pub progress: Option<ScanProgress>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScanPhase {
+    Listing,
+    Loading,
+    Waiting,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScanProgress {
+    pub phase: ScanPhase,
+    pub started_at: Option<SystemTime>,
+    pub listed: usize,
+    pub to_load: usize,
+    pub loaded: usize,
+    pub failed: usize,
+}
+
+impl ScanProgress {
+    fn new(phase: ScanPhase, started_at: Option<SystemTime>) -> Self {
+        Self {
+            phase,
+            started_at,
+            listed: 0,
+            to_load: 0,
+            loaded: 0,
+            failed: 0,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -45,6 +76,7 @@ struct State {
     scanning: bool,
     snapshot: Option<Arc<Snapshot>>,
     last_error: Option<ScanFailure>,
+    progress: Option<ScanProgress>,
 }
 
 /// Shared in-memory scan results. Clones share the same state.
@@ -71,6 +103,21 @@ impl Cache {
             scanning: state.scanning,
             snapshot: state.snapshot.clone(),
             last_error: state.last_error.clone(),
+            progress: state.progress.clone(),
+        }
+    }
+
+    pub(crate) fn start_progress(&self, phase: ScanPhase, started_at: Option<SystemTime>) {
+        let progress = ScanProgress::new(phase, started_at);
+        record(Some(&progress));
+        self.write().progress = Some(progress);
+    }
+
+    pub(crate) fn update_progress(&self, change: impl FnOnce(&mut ScanProgress)) {
+        let mut state = self.write();
+        if let Some(progress) = state.progress.as_mut() {
+            change(progress);
+            record(Some(progress));
         }
     }
 
@@ -86,6 +133,8 @@ impl Cache {
     pub(crate) fn finish_scan(&self, result: Result<Scan, ScanError>, at: SystemTime) {
         let mut state = self.write();
         state.scanning = false;
+        state.progress = None;
+        record(None);
         match result {
             Ok(scan) => {
                 state.snapshot = Some(Arc::new(Snapshot {
@@ -107,7 +156,10 @@ impl Cache {
     }
 
     pub(crate) fn cancel_scan(&self) {
-        self.write().scanning = false;
+        let mut state = self.write();
+        state.scanning = false;
+        state.progress = None;
+        record(None);
     }
 
     fn read(&self) -> RwLockReadGuard<'_, State> {
@@ -116,6 +168,21 @@ impl Cache {
 
     fn write(&self) -> RwLockWriteGuard<'_, State> {
         self.state.write().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
+fn record(progress: Option<&ScanProgress>) {
+    let phase = match progress.map(|p| p.phase) {
+        Some(ScanPhase::Listing) => 1.0,
+        Some(ScanPhase::Loading) => 2.0,
+        Some(ScanPhase::Waiting) | None => 0.0,
+    };
+    metrics::gauge!("scan_phase").set(phase);
+    if let Some(progress) = progress {
+        metrics::gauge!("scan_listed_clubs").set(progress.listed as f64);
+        metrics::gauge!("scan_clubs_to_load").set(progress.to_load as f64);
+        metrics::gauge!("scan_clubs_loaded").set(progress.loaded as f64);
+        metrics::gauge!("scan_clubs_failed").set(progress.failed as f64);
     }
 }
 

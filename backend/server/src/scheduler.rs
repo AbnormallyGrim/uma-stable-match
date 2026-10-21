@@ -1,7 +1,7 @@
 //! Runs scans on a schedule.
 
 use std::future::Future;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -9,9 +9,10 @@ use tokio::sync::watch;
 use uma_stable_match_umamoe_client::{Circle, Client};
 
 use crate::cache::Cache;
+use crate::cache::ScanPhase;
 use crate::details::ClubDetails;
 use crate::scanner::{
-    install, list_candidates, load, scan, scan_period, Scan, ScanConfig, ScanError, PHASE_IDLE,
+    install, list_candidates, load, scan_period, scan_with, Scan, ScanConfig, ScanError,
 };
 use crate::shared::{ScanLease, ScanTurn, SharedCache};
 
@@ -25,15 +26,26 @@ struct PublishedScan {
 #[derive(Serialize, Deserialize)]
 struct InProgress {
     listed_at_ms: u64,
+    #[serde(default)]
+    started_at_ms: u64,
     rows: Vec<Circle>,
 }
 
 impl InProgress {
-    fn new(rows: Vec<Circle>, at: SystemTime) -> Self {
+    fn new(rows: Vec<Circle>, started: SystemTime, at: SystemTime) -> Self {
         Self {
             listed_at_ms: unix_millis(at),
+            started_at_ms: unix_millis(started),
             rows,
         }
+    }
+
+    fn started(&self) -> SystemTime {
+        let millis = match self.started_at_ms {
+            0 => self.listed_at_ms,
+            started => started,
+        };
+        UNIX_EPOCH + Duration::from_millis(millis)
     }
 
     fn is_current(&self, now: SystemTime, interval: Duration) -> bool {
@@ -67,8 +79,9 @@ pub async fn run_scheduler(
                 count_turn("alone");
                 cache.begin_scan();
                 tracing::info!("scan started");
-                let started = Instant::now();
-                let work = scan(&client, &details, &config);
+                let started = SystemTime::now();
+                cache.start_progress(ScanPhase::Listing, Some(started));
+                let work = scan_with(&client, &details, &config, &cache);
                 let Some(result) = until_stopped(work, &mut shutdown).await else {
                     return cancelled(&cache);
                 };
@@ -79,13 +92,21 @@ pub async fn run_scheduler(
                 count_turn("lead");
                 cache.begin_scan();
                 tracing::info!("scan started");
-                let started = Instant::now();
                 applied = Some(lease.id().to_owned());
                 let resumed = match progress {
                     Some(_) => resumable(&shared, &config, interval).await,
                     None => None,
                 };
-                let work = lead(&client, &details, &config, &lease, resumed, interval);
+                let plan = match resumed {
+                    Some(saved) => Plan::Resume(saved),
+                    None => Plan::List {
+                        started: SystemTime::now(),
+                        keep_for: interval,
+                    },
+                };
+                let started = plan.started();
+                cache.start_progress(ScanPhase::Listing, Some(started));
+                let work = lead(&client, &details, &config, &cache, &lease, plan);
                 let Some(result) = until_stopped(work, &mut shutdown).await else {
                     lease.release().await;
                     return cancelled(&cache);
@@ -104,9 +125,18 @@ pub async fn run_scheduler(
             ScanTurn::Wait { progress } => {
                 count_turn("wait");
                 cache.begin_scan();
+                if cache.status().progress.map(|p| p.phase) != Some(ScanPhase::Waiting) {
+                    cache.start_progress(ScanPhase::Waiting, None);
+                }
                 if let Some(id) = progress.filter(|id| pooled.as_ref() != Some(id)) {
-                    if let Some(rows) = resumable(&shared, &config, interval).await {
-                        install(&details, rows, &config);
+                    if let Some(saved) = resumable(&shared, &config, interval).await {
+                        let started = saved.started();
+                        let listed = saved.rows.len();
+                        install(&details, saved.rows, &config);
+                        cache.update_progress(|p| {
+                            p.started_at = Some(started);
+                            p.listed = listed;
+                        });
                         tracing::info!("built the pool from the scan in progress");
                         pooled = Some(id);
                     }
@@ -117,8 +147,9 @@ pub async fn run_scheduler(
                 count_turn("fresh");
                 if applied.as_deref() != Some(id.as_str()) {
                     cache.begin_scan();
-                    let started = Instant::now();
-                    let work = sync(&client, &details, &config);
+                    let started = SystemTime::now();
+                    cache.start_progress(ScanPhase::Loading, Some(started));
+                    let work = sync(&client, &details, &config, &cache);
                     let Some(result) = until_stopped(work, &mut shutdown).await else {
                         return cancelled(&cache);
                     };
@@ -136,28 +167,45 @@ pub async fn run_scheduler(
     }
 }
 
+enum Plan {
+    Resume(InProgress),
+    List {
+        started: SystemTime,
+        keep_for: Duration,
+    },
+}
+
+impl Plan {
+    fn started(&self) -> SystemTime {
+        match self {
+            Self::Resume(saved) => saved.started(),
+            Self::List { started, .. } => *started,
+        }
+    }
+}
+
 async fn lead(
     client: &Client,
     details: &ClubDetails,
     config: &ScanConfig,
+    cache: &Cache,
     lease: &ScanLease,
-    resumed: Option<Vec<Circle>>,
-    interval: Duration,
+    plan: Plan,
 ) -> Result<(Scan, Vec<Circle>), ScanError> {
     let work = async {
-        let rows = match resumed {
-            Some(rows) => {
+        let rows = match plan {
+            Plan::Resume(saved) => {
                 tracing::info!("resuming the scan in progress");
-                rows
+                saved.rows
             }
-            None => {
-                let rows = list_candidates(client, config).await?;
-                let progress = InProgress::new(rows.clone(), SystemTime::now());
-                lease.save_progress(&progress, interval).await;
+            Plan::List { started, keep_for } => {
+                let rows = list_candidates(client, config, cache).await?;
+                let progress = InProgress::new(rows.clone(), started, SystemTime::now());
+                lease.save_progress(&progress, keep_for).await;
                 rows
             }
         };
-        Ok((load(details, rows.clone(), config).await, rows))
+        Ok((load(details, rows.clone(), config, cache).await, rows))
     };
     tokio::pin!(work);
     loop {
@@ -172,18 +220,20 @@ async fn sync(
     client: &Client,
     details: &ClubDetails,
     config: &ScanConfig,
+    cache: &Cache,
 ) -> Result<Scan, ScanError> {
     match details.shared().published_scan(config).await {
         Some(PublishedScan { outcome: Ok(rows) }) => {
             tracing::info!("loading the scan published by another instance");
-            Ok(load(details, rows, config).await)
+            Ok(load(details, rows, config, cache).await)
         }
         Some(PublishedScan {
             outcome: Err(message),
         }) => Err(ScanError::Shared(message)),
         None => {
             tracing::warn!("the published scan is missing; scanning here");
-            scan(client, details, config).await
+            cache.update_progress(|p| p.phase = ScanPhase::Listing);
+            scan_with(client, details, config, cache).await
         }
     }
 }
@@ -198,11 +248,18 @@ async fn until_stopped<T>(
     }
 }
 
-fn finish(cache: &Cache, result: Result<Scan, ScanError>, source: &'static str, started: Instant) {
+fn finish(
+    cache: &Cache,
+    result: Result<Scan, ScanError>,
+    source: &'static str,
+    started: SystemTime,
+) {
     let outcome = if result.is_ok() { "ok" } else { "error" };
     metrics::counter!("scans_total", "source" => source, "result" => outcome).increment(1);
-    metrics::histogram!("scan_duration_seconds", "source" => source)
-        .record(started.elapsed().as_secs_f64());
+    let took = SystemTime::now()
+        .duration_since(started)
+        .unwrap_or_default();
+    metrics::histogram!("scan_duration_seconds", "source" => source).record(took.as_secs_f64());
     if let Err(error) = &result {
         tracing::error!(%error, "scan failed; keeping the last results");
     }
@@ -210,7 +267,6 @@ fn finish(cache: &Cache, result: Result<Scan, ScanError>, source: &'static str, 
 }
 
 fn cancelled(cache: &Cache) {
-    metrics::gauge!("scan_phase").set(PHASE_IDLE);
     cache.cancel_scan();
     tracing::info!("scan cancelled for shutdown");
 }
@@ -219,11 +275,11 @@ async fn resumable(
     shared: &SharedCache,
     config: &ScanConfig,
     interval: Duration,
-) -> Option<Vec<Circle>> {
+) -> Option<InProgress> {
     let progress = shared.scan_in_progress::<InProgress>(config).await?;
     progress
         .is_current(SystemTime::now(), interval)
-        .then_some(progress.rows)
+        .then_some(progress)
 }
 
 fn unix_millis(at: SystemTime) -> u64 {
