@@ -1,3 +1,6 @@
+//! Metrics tests. They share one global recorder, so counts add up across tests. All data is made
+//! up.
+
 use std::sync::OnceLock;
 use std::time::Duration;
 

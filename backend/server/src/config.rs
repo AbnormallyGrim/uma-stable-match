@@ -59,6 +59,7 @@ pub struct Config {
     /// Secret for hashing trainer IDs in Redis keys, from `REDIS_KEY_SECRET`. Set whenever
     /// `redis_url` is.
     pub redis_key_secret: Option<KeySecret>,
+    /// Address to serve Prometheus metrics on, from `METRICS_ADDR`. `None` records no metrics.
     pub metrics_addr: Option<SocketAddr>,
 }
 
@@ -87,6 +88,7 @@ pub enum ConfigError {
     /// `REDIS_KEY_SECRET` is shorter than 32 characters. The value isn't shown.
     #[error("REDIS_KEY_SECRET must be at least 32 characters")]
     InvalidRedisKeySecret,
+    /// `METRICS_ADDR` isn't an IP address with a port from 1 to 65535.
     #[error("METRICS_ADDR must be an IP address and port, such as 127.0.0.1:9464, got {0:?}")]
     InvalidMetricsAddr(String),
     /// A true-or-false setting is something else.

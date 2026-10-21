@@ -1,3 +1,5 @@
+//! Optional Prometheus metrics, served apart from the app.
+
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::extract::{MatchedPath, Request};
@@ -15,6 +17,8 @@ const BUCKETS: &[f64] = &[
 ];
 const UPKEEP_EVERY: Duration = Duration::from_secs(5);
 
+/// Installs the global metrics recorder and returns the handle that renders it. Call it once,
+/// inside a Tokio runtime.
 pub fn install_metrics() -> Result<PrometheusHandle, BuildError> {
     let handle = PrometheusBuilder::new()
         .set_buckets(BUCKETS)?
@@ -31,6 +35,7 @@ pub fn install_metrics() -> Result<PrometheusHandle, BuildError> {
     Ok(handle)
 }
 
+/// Serves `GET /metrics`, refreshing the scan and pool values from `state` on each request.
 pub fn metrics_router(handle: PrometheusHandle, state: AppState) -> Router {
     Router::new().route(
         "/metrics",
