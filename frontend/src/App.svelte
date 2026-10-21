@@ -26,7 +26,7 @@
   const initial: SearchState =
     fromUrl ?? (remembered ? { ...DEFAULT_SEARCH, trainerId: remembered } : DEFAULT_SEARCH);
 
-  // Above the most clubs a scan can hold (821 in the default rank window), so the table lists them all.
+  // The table lists the best fits only; the summary still counts every scored club.
   const RESULT_LIMIT = 100;
 
   let search = $state<RunnerState>({ status: { phase: 'idle' }, result: null });

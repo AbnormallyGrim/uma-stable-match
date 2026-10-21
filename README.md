@@ -123,14 +123,14 @@ docker compose up -d
 3. Optionally turn on **Balance scoring** and adjust its strength (0–1). Higher values push clubs with many low contributors further down.
 4. Optionally tick **Include closed clubs** to also see clubs that aren't recruiting.
 5. Select **Find clubs**. The search is saved in the page's address, so you can bookmark or share it.
-6. Browse **Top picks**, or use **All results** to search and sort every club.
+6. Browse **Top picks**, or use **All results** to search and sort the 100 best fits.
 7. Select a club's name to open its uma.moe page in a new tab, then contact the leader.
 
 Club data refreshes automatically every 3 hours by default, and the line under the title shows when it last did. If some clubs are still loading, or it's the first two days of a game month and results use last month's data, a note under the summary says so.
 
 ## Understanding your results
 
-![All results table listing every analysed club with its tier, rank, last month's rank, open spots, join style, median daily gain, your place, balance score, passengers, top-3 share and score, with a search box and sortable columns](docs/images/demo-results-table.png)
+![All results table listing the best-fitting clubs with its tier, rank, last month's rank, open spots, join style, median daily gain, your place, balance score, passengers, top-3 share and score, with a search box and sortable columns](docs/images/demo-results-table.png)
 
 <sub>The All results table, shown with made-up clubs. Search by name, or select a column to sort. With closed clubs included, a filter can hide them again.</sub>
 
