@@ -3,7 +3,7 @@
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use hmac::{Hmac, KeyInit, Mac};
 use redis::aio::ConnectionManager;
@@ -102,12 +102,15 @@ impl fmt::Debug for RedisBackend {
 
 impl RedisBackend {
     fn up(&self) {
+        metrics::gauge!("redis_up").set(1.0);
         if !self.healthy.swap(true, Ordering::Relaxed) {
             tracing::info!("Redis is available again");
         }
     }
 
     fn down(&self, reason: &str) {
+        metrics::gauge!("redis_up").set(0.0);
+        metrics::counter!("redis_errors_total", "reason" => reason.to_owned()).increment(1);
         if self.healthy.swap(false, Ordering::Relaxed) {
             tracing::warn!(reason, "Redis is unavailable; using the local cache only");
         }
@@ -119,7 +122,10 @@ impl RedisBackend {
         limit: Duration,
     ) -> Option<T> {
         let mut conn = self.conn.clone();
-        match timeout(limit, invocation.invoke_async(&mut conn)).await {
+        let started = Instant::now();
+        let reply = timeout(limit, invocation.invoke_async(&mut conn)).await;
+        observe("script", started);
+        match reply {
             Ok(Ok(value)) => {
                 self.up();
                 Some(value)
@@ -158,6 +164,7 @@ impl SharedCache {
         .await
         .map_err(|_| SharedCacheError::Connect("timed out".into()))?
         .map_err(|e| SharedCacheError::Connect(kind(&e)))?;
+        metrics::gauge!("redis_up").set(1.0);
         Ok(Self {
             backend: Backend::Redis(RedisBackend {
                 conn,
@@ -195,7 +202,10 @@ impl SharedCache {
             return None;
         };
         let mut conn = redis.conn.clone();
-        match timeout(limit, conn.get::<_, Option<Vec<u8>>>(key)).await {
+        let started = Instant::now();
+        let reply = timeout(limit, conn.get::<_, Option<Vec<u8>>>(key)).await;
+        observe("get", started);
+        match reply {
             Ok(Ok(value)) => {
                 redis.up();
                 serde_json::from_slice(&value?).ok()
@@ -220,12 +230,14 @@ impl SharedCache {
             return;
         };
         let mut conn = redis.conn.clone();
-        match timeout(
+        let started = Instant::now();
+        let reply = timeout(
             OP_TIMEOUT,
             conn.pset_ex::<_, _, ()>(key, bytes, millis(ttl)),
         )
-        .await
-        {
+        .await;
+        observe("set", started);
+        match reply {
             Ok(Ok(())) => redis.up(),
             Ok(Err(error)) => redis.down(&kind(&error)),
             Err(_) => redis.down("timed out"),
@@ -393,6 +405,11 @@ if redis.call('GET', KEYS[1]) == ARGV[1] then
 end
 return 0
 ";
+
+fn observe(op: &'static str, started: Instant) {
+    metrics::histogram!("redis_op_duration_seconds", "op" => op)
+        .record(started.elapsed().as_secs_f64());
+}
 
 fn millis(duration: Duration) -> u64 {
     u64::try_from(duration.as_millis())
