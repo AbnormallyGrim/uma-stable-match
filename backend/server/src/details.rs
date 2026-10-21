@@ -33,8 +33,10 @@ pub struct DetailConfig {
     /// When each club is next refreshed. Details expire from memory then, and stay in the shared
     /// cache a day longer.
     pub refresh: RefreshConfig,
-    /// Whether a [`Refresher`] runs. Details then stay in memory until it replaces them.
+    /// Whether a [`Refresher`] runs. Without a shared cache, details then stay in memory until it
+    /// replaces them; with one, the schedule is shared and they expire when due.
     pub refresher: bool,
+    /// The scan window whose clubs are refreshed. Names the shared schedule.
     pub scan: ScanConfig,
 }
 
@@ -266,13 +268,14 @@ impl ClubDetails {
         DateTime::from_timestamp(entry.last_updated?, 0)
     }
 
-    /// The refresher for this cache, if it has refresh settings. Run only one.
+    /// The refresher for this cache, if it has one. Run one per instance; with a shared cache, only
+    /// the instance holding the refresher lease refreshes.
     pub fn refresher(&self) -> Option<Refresher> {
         let refreshing = self.inner.refreshing.clone()?;
         Some(Refresher::new(self.clone(), refreshing))
     }
 
-    /// Whether this cache has refresh settings.
+    /// Whether this cache has a refresher.
     pub fn refreshes(&self) -> bool {
         self.inner.refreshing.is_some()
     }

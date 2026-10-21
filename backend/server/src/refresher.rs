@@ -212,7 +212,7 @@ impl Refresher {
     }
 
     /// Refreshes clubs as they come due, for as long as the cache exists. Failures are logged and
-    /// retried.
+    /// retried. With a shared cache, refreshes only while holding the refresher lease.
     pub async fn run(self) {
         loop {
             match &self.refreshing.store {

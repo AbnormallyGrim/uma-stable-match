@@ -40,8 +40,7 @@ flowchart TB
     recs -- "load clubs" --> details
     recs -- "score" --> scoring
     scanner -- "new pool each scan" --> pool
-    scanner -- "prefetch, with Redis" --> details
-    scanner -- "schedule, without Redis" --> refresher
+    scanner -- "schedule" --> refresher
     refresher -- "refresh" --> details
     details -- "exact medians" --> pool
     paces -- "interactive" --> api
@@ -51,9 +50,10 @@ flowchart TB
     paces -. "shared paces" .-> redis
     details -. "shared club details" .-> redis
     scanner -. "scan lock and published scan" .-> redis
+    refresher -. "schedule and lease" .-> redis
 ```
 
-The scanner fills the pool in the background, and the refresher keeps the detail cache current (with Redis, the scanner fills it). A visitor's request reads both, fetches a few missing clubs if it must, and scores everything it has. The server also serves the built web page, so one process runs the whole tool.
+The scanner fills the pool in the background, and the refresher keeps the detail cache current. A visitor's request reads both, fetches a few missing clubs if it must, and scores everything it has. The server also serves the built web page, so one process runs the whole tool.
 
 ## Project layout
 
@@ -78,12 +78,12 @@ The scoring crate has no network or storage code: club and member data go in, sc
 
 ## How club data is loaded
 
-Once at start-up, then 30 minutes after each of uma.moe's daily updates (15:00 UTC), the scanner runs. If uma.moe hasn't updated yet, it tries again an hour later. `SCAN_INTERVAL_MINUTES` replaces this with a fixed interval; with Redis it defaults to 180 minutes. The scanner:
+Once at start-up, then 30 minutes after each of uma.moe's daily updates (15:00 UTC), the scanner runs. If uma.moe hasn't updated yet, it tries again an hour later. `SCAN_INTERVAL_MINUTES` replaces this with a fixed interval. The scanner:
 
 1. Lists clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO` (80 to 900) from uma.moe, 100 per page.
 2. Builds a new **club pool** from the list rows alone. Archived, full and unscorable clubs are left out; closed clubs stay, so each request can include them. Each club gets a pace estimate from its monthly points.
 3. Copies in the exact medians of clubs still in the detail cache, then swaps the new pool in.
-4. Picks up to `SCAN_MAX_DETAILS` clubs (200), best rank first. Today's pool (about 150 clubs) fits whole. Without Redis, it hands them to the **refresher**; with Redis, it prefetches their member data in the **background lane**.
+4. Picks up to `SCAN_MAX_DETAILS` clubs (200), best rank first. Today's pool (about 150 clubs) fits whole. It hands them to the **refresher**.
 
 The refresher loads each club's member data in the background lane, then refreshes it once a day, 30 minutes after uma.moe's daily update (15:00 UTC), best rank first. Clubs ranked below 5,000 refresh at half speed. A failed refresh is retried after 5 minutes, and the old data is served meanwhile. Clubs that searches load join the schedule too. `DETAIL_CACHE_MINUTES` replaces the daily timing with a fixed interval.
 
@@ -113,7 +113,7 @@ Everything lives in memory; nothing is written to disk. Without Redis, restartin
 
 Concurrent requests for the same club share one fetch, and failed fetches aren't cached.
 
-With `REDIS_URL` set, club details and trainer paces also go to Redis, as a second layer shared by every instance: a local miss checks Redis before uma.moe. Looked-up trainer IDs are replaced by a keyed hash, so Redis never holds them. Scans are shared too: one instance takes a lock in Redis, scans, and publishes the listed clubs, and the others build their pool from them. The club list is saved as soon as it's listed, so after a restart or crash the next instance resumes the scan instead of listing again. If Redis stops answering, each instance carries on with its own cache and scans. Rate limits are still per instance. See the [server README](backend/server/README.md#shared-cache).
+With `REDIS_URL` set, club details and trainer paces also go to Redis, as a second layer shared by every instance: a local miss checks Redis before uma.moe. Looked-up trainer IDs are replaced by a keyed hash, so Redis never holds them. Scans are shared too: one instance takes a lock in Redis, scans, and publishes the listed clubs, and the others build their pool from them. The refresh schedule is a sorted set in Redis, and one instance at a time, holding a lease, refreshes. The club list is saved as soon as it's listed, so after a restart or crash the next instance resumes the scan instead of listing again. If Redis stops answering, each instance carries on with its own cache and scans. Rate limits are still per instance. See the [server README](backend/server/README.md#shared-cache).
 
 ## Talking to uma.moe
 
