@@ -424,8 +424,13 @@ Keep the address private: `127.0.0.1:<port>` on its own, or in Docker `0.0.0.0:<
 | `pool_clubs`, `pool_exact_medians` | gauge | | Clubs in the pool, and how many have an exact median |
 | `pool_calibration_factor`, `pool_calibration_samples` | gauge | | The mean-to-median factor and how many clubs it's based on |
 | `build_info` | gauge | `version` | Always `1`; the label holds the server version |
+| `umamoe_requests_total` | counter | `endpoint`, `lane`, `status` | uma.moe calls by HTTP status code, or `timeout`, `connect_error` or `transport_error` |
+| `umamoe_request_duration_seconds` | histogram | `endpoint`, `lane` | uma.moe response time |
+| `umamoe_queue_wait_seconds` | histogram | `lane` | Time waiting for the client's 500 ms spacing |
+| `umamoe_retries_total` | counter | `endpoint`, `status` | uma.moe retries, by the status that caused them |
+| `umamoe_decode_errors_total` | counter | `endpoint` | uma.moe responses that couldn't be read |
 
-The `scan_last_*`, `last_scan_*`, `scan_running` and `pool_*` values are read from the server each time `/metrics` is requested. Histograms use buckets from 1 ms to 1 hour.
+The `scan_last_*`, `last_scan_*`, `scan_running` and `pool_*` values are read from the server each time `/metrics` is requested. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
 
 ## Shutdown
 
