@@ -24,7 +24,7 @@ pub const DEFAULT_RATE_LIMIT_PER_MINUTE: u32 = 30;
 pub const DEFAULT_TRAINER_LOOKUPS_PER_MINUTE: u32 = 10;
 
 // TODO(#51): adjust the default once uma.moe agrees how often we may scan.
-/// Minutes between scans when `SCAN_INTERVAL_MINUTES` isn't set.
+/// Minutes between scans with Redis when `SCAN_INTERVAL_MINUTES` isn't set.
 pub const DEFAULT_SCAN_INTERVAL_MINUTES: u32 = 180;
 
 /// Server settings. `Debug` output redacts the API key.
@@ -38,8 +38,9 @@ pub struct Config {
     pub bind_addr: SocketAddr,
     /// Scan settings, from `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `SCAN_MAX_DETAILS`.
     pub scan: ScanConfig,
-    /// Time between scans, from `SCAN_INTERVAL_MINUTES`.
-    pub scan_interval: Duration,
+    /// Time between scans, from `SCAN_INTERVAL_MINUTES`. `None` follows uma.moe's daily update, or
+    /// [`DEFAULT_SCAN_INTERVAL_MINUTES`] with Redis.
+    pub scan_interval: Option<Duration>,
     /// How often club details are refreshed, from `DETAIL_CACHE_MINUTES`. `None` follows uma.moe's
     /// daily update, or the scan interval with Redis.
     pub detail_cache: Option<Duration>,
@@ -164,8 +165,12 @@ impl Config {
             max_details: number("SCAN_MAX_DETAILS", defaults.max_details)?,
             ..defaults
         };
-        let scan_interval_minutes = number("SCAN_INTERVAL_MINUTES", DEFAULT_SCAN_INTERVAL_MINUTES)?;
-        let scan_interval = Duration::from_secs(u64::from(scan_interval_minutes) * 60);
+        let scan_interval = match get("SCAN_INTERVAL_MINUTES") {
+            None => None,
+            Some(_) => Some(Duration::from_secs(
+                u64::from(number("SCAN_INTERVAL_MINUTES", 0)?) * 60,
+            )),
+        };
         let detail_cache = match get("DETAIL_CACHE_MINUTES") {
             None => None,
             Some(_) => Some(Duration::from_secs(

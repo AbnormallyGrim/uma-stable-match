@@ -78,7 +78,7 @@ The scoring crate has no network or storage code: club and member data go in, sc
 
 ## How club data is loaded
 
-Every `SCAN_INTERVAL_MINUTES` (180 by default), and once at start-up, the scanner:
+Once at start-up, then 30 minutes after each of uma.moe's daily updates (15:00 UTC), the scanner runs. If uma.moe hasn't updated yet, it tries again an hour later. `SCAN_INTERVAL_MINUTES` replaces this with a fixed interval; with Redis it defaults to 180 minutes. The scanner:
 
 1. Lists clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO` (80 to 900) from uma.moe, 100 per page.
 2. Builds a new **club pool** from the list rows alone. Archived, full and unscorable clubs are left out; closed clubs stay, so each request can include them. Each club gets a pace estimate from its monthly points.

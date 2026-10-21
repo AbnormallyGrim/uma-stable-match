@@ -337,7 +337,12 @@ async fn reports_the_game_month() {
     mount_detail(&server, 1, detail(1), 1).await;
 
     let (scan, _) = run(&server, &config()).await;
-    assert_eq!(scan.unwrap().month.as_deref(), Some("2026-03"));
+    let scan = scan.unwrap();
+    assert_eq!(scan.month.as_deref(), Some("2026-03"));
+    assert_eq!(
+        scan.updated_at.map(|t| t.to_rfc3339()).as_deref(),
+        Some("2026-03-19T15:00:00+00:00")
+    );
 }
 
 #[tokio::test]

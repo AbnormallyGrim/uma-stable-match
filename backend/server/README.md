@@ -25,7 +25,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to scan |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to scan |
 | `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is kept loaded, best rank first. Clubs past it load when a search needs them |
-| `SCAN_INTERVAL_MINUTES` | `180` | Minutes between scans. The default may change once uma.moe agrees how often scans can run |
+| `SCAN_INTERVAL_MINUTES` | none | Minutes between scans. Unset, the server scans again 30 minutes after uma.moe's next daily update; see [Cache and schedule](#cache-and-schedule). With Redis, `180` when unset |
 | `DETAIL_CACHE_MINUTES` | none | Minutes between refreshes of a club's member data. Unset, each club refreshes after uma.moe's daily update; see [Refresher](#refresher). With Redis, minutes a club's member data is reused, `SCAN_INTERVAL_MINUTES` when unset |
 | `SHORTLIST_SIZE` | `120` | Clubs nearest your pace considered for each request |
 | `REQUEST_FETCH_BUDGET` | `10` | Most uncached clubs fetched while a visitor waits. At 500 ms spacing, 10 take about 5 seconds |
@@ -61,7 +61,7 @@ The API key, `REDIS_URL` (which can hold a password) and `REDIS_KEY_SECRET` are 
    - **With a [refresher](#refresher)** (without Redis): put them on its schedule and finish. The refresher loads them.
    - **Without one** (with Redis): prefetch their member data in the background lane, so visitors' requests go first.
 
-While prefetching, a club whose details fail to load is logged and skipped. A failed list request fails the whole scan and leaves the previous pool in place. `Scan` returns the number of candidates (the pool size), how many clubs were prefetched (with a refresher, how many were already loaded), how many failed, and the game month of the listed data.
+While prefetching, a club whose details fail to load is logged and skipped. A failed list request fails the whole scan and leaves the previous pool in place. `Scan` returns the number of candidates (the pool size), how many clubs were prefetched (with a refresher, how many were already loaded), how many failed, the game month of the listed data, and when uma.moe last updated it (`updated_at`, the latest `last_updated` listed).
 
 With the client's default 500 ms rate limit, a default scan with a prefetch takes about 80 seconds: around 9 list pages plus one lookup per candidate, about 150 at the time of writing. Clubs still cached from the previous scan aren't fetched again. Without the prefetch, a scan takes a few seconds.
 
@@ -228,7 +228,7 @@ $env:REDIS_TEST_URL="redis://127.0.0.1:6379"; cargo test
 
 ## Cache and schedule
 
-Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan has listed the clubs there are no results; with the defaults that takes a few seconds. From then on, searches score the clubs loaded so far, fetch up to `REQUEST_FETCH_BUDGET` more, and report the rest as still loading, while the [refresher](#refresher), or the scan with Redis, finishes loading details (about 80 seconds with the defaults). With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule; one that starts during a scan resumes it from the saved club list. See [Shared scans](#shared-scans).
+Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away. It scans again 30 minutes after uma.moe's next daily update: 24 hours after the scan's `updated_at`, plus the refresher's `margin`. If uma.moe hasn't updated yet, or the scan failed, it tries again an hour later. With `SCAN_INTERVAL_MINUTES` set, or with Redis (180 minutes when unset), it scans again that long after each scan finishes instead. Until the first scan has listed the clubs there are no results; with the defaults that takes a few seconds. From then on, searches score the clubs loaded so far, fetch up to `REQUEST_FETCH_BUDGET` more, and report the rest as still loading, while the [refresher](#refresher), or the scan with Redis, finishes loading details (about 80 seconds with the defaults). With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule; one that starts during a scan resumes it from the saved club list. See [Shared scans](#shared-scans).
 
 - **No overlapping scans.** A new scan won't start while one is running.
 - **One scan for all instances.** With Redis, one instance scans and the others load its result; see [Shared scans](#shared-scans).

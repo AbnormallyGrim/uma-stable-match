@@ -110,7 +110,7 @@ async fn scanned(server: &MockServer) -> (Cache, ClubDetails) {
         client(server),
         details.clone(),
         ScanConfig::default(),
-        Duration::from_secs(3600),
+        Some(Duration::from_secs(3600)),
         cache.clone(),
         stopped,
     ));
@@ -443,7 +443,7 @@ async fn early_month_recommendations_use_last_month() {
         client(&server),
         details.clone(),
         ScanConfig::default(),
-        Duration::from_secs(3600),
+        Some(Duration::from_secs(3600)),
         cache.clone(),
         stopped,
     ));
