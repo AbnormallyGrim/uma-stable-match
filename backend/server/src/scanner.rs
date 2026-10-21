@@ -96,30 +96,7 @@ pub async fn scan(
 }
 
 pub(crate) async fn load(details: &ClubDetails, rows: Vec<Circle>, config: &ScanConfig) -> Scan {
-    let snapshot = rows
-        .iter()
-        .filter_map(|c| c.last_updated.as_deref())
-        .filter_map(|t| DateTime::parse_from_rfc3339(t).ok())
-        .map(|t| t.with_timezone(&Utc))
-        .max();
-    let period = snapshot
-        .filter(|at| is_early_month(*at))
-        .map(previous_game_month);
-    let month = snapshot.map(|at| month_label(period.unwrap_or_else(|| game_month(at))));
-
-    let listed = if period.is_some() {
-        ListedClub::from_circle_last_month
-    } else {
-        ListedClub::from_circle
-    };
-    let mut pool = ClubPool::new(rows.iter().filter_map(listed));
-    details.set_period(period);
-    details.set_listed(rows.into_iter().map(|c| (c.circle_id, c)));
-    details.restore_exact_medians(&mut pool);
-    let candidates = pool.len();
-    let ids = prefetch_ids(&pool, config.max_details as usize);
-    details.replace_pool(pool);
-    details.set_listing(SystemTime::now(), month.clone());
+    let (candidates, ids, month) = install(details, rows, config);
 
     metrics::gauge!("scan_phase").set(PHASE_LOADING);
     metrics::gauge!("scan_clubs_to_load").set(ids.len() as f64);
@@ -148,6 +125,46 @@ pub(crate) async fn load(details: &ClubDetails, rows: Vec<Circle>, config: &Scan
         prefetched,
         failed,
         month,
+    }
+}
+
+pub(crate) fn install(
+    details: &ClubDetails,
+    rows: Vec<Circle>,
+    config: &ScanConfig,
+) -> (usize, Vec<u64>, Option<String>) {
+    let snapshot = rows
+        .iter()
+        .filter_map(|c| c.last_updated.as_deref())
+        .filter_map(|t| DateTime::parse_from_rfc3339(t).ok())
+        .map(|t| t.with_timezone(&Utc))
+        .max();
+    let period = snapshot
+        .filter(|at| is_early_month(*at))
+        .map(previous_game_month);
+    let month = snapshot.map(|at| month_label(period.unwrap_or_else(|| game_month(at))));
+
+    let listed = if period.is_some() {
+        ListedClub::from_circle_last_month
+    } else {
+        ListedClub::from_circle
+    };
+    let mut pool = ClubPool::new(rows.iter().filter_map(listed));
+    details.set_period(period);
+    details.set_listed(rows.into_iter().map(|c| (c.circle_id, c)));
+    details.restore_exact_medians(&mut pool);
+    let candidates = pool.len();
+    let ids = prefetch_ids(&pool, config.max_details as usize);
+    details.replace_pool(pool);
+    details.set_listing(SystemTime::now(), month.clone());
+    (candidates, ids, month)
+}
+
+pub(crate) fn scan_period(at: DateTime<Utc>) -> Period {
+    if is_early_month(at) {
+        previous_game_month(at)
+    } else {
+        game_month(at)
     }
 }
 

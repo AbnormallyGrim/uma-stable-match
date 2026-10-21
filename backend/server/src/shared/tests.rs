@@ -76,6 +76,8 @@ fn scan_keys_depend_on_the_scan_window() {
     assert_eq!(keys.lock, "usm:v1:scan:80-900-200:lock");
     assert_eq!(keys.fresh, "usm:v1:scan:80-900-200:fresh");
     assert_eq!(keys.latest, "usm:v1:scan:80-900-200:latest");
+    assert_eq!(keys.progress, "usm:v1:scan:80-900-200:progress");
+    assert_eq!(keys.progress_id, "usm:v1:scan:80-900-200:progress-id");
     let other = ScanKeys::new(&ScanConfig {
         rank_to: 500,
         ..ScanConfig::default()
