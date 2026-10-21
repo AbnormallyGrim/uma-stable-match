@@ -46,7 +46,16 @@ Enter your trainer ID and you'll get a ranked list of clubs, each with its tier,
 
 - A free [uma.moe](https://uma.moe) account and API key ([how to get one](#1-get-a-umamoe-api-key))
 - Your 12-digit trainer ID (in-game: **Menu → Profile**)
-- To run it yourself: [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- To run it yourself: Git and Docker
+
+### Installing Git and Docker
+
+| Tool | macOS | Windows | Linux |
+|---|---|---|---|
+| Git | `xcode-select --install` (comes with Apple's command line tools) | `winget install Git.Git`, or the installer from [git-scm.com](https://git-scm.com/downloads/win) | `sudo apt install git` (Debian, Ubuntu) or `sudo dnf install git` (Fedora) |
+| Docker | [Docker Desktop](https://www.docker.com/products/docker-desktop/), or `brew install --cask docker` | [Docker Desktop](https://www.docker.com/products/docker-desktop/), or `winget install Docker.DockerDesktop`. It runs on WSL 2, which the installer sets up | [Docker Engine](https://docs.docker.com/engine/install/) with the Compose plugin, or [Docker Desktop for Linux](https://docs.docker.com/desktop/setup/install/linux/) |
+
+`brew` commands need [Homebrew](https://brew.sh). Start Docker Desktop once after installing it, so the `docker` command works.
 
 ## Installation
 
@@ -61,13 +70,15 @@ Enter your trainer ID and you'll get a ranked list of clubs, each with its tier,
 
 ### 2. Download and configure
 
+On Windows, run these commands in PowerShell.
+
 ```bash
 git clone https://github.com/AbnormallyGrim/uma-stable-match.git
 cd uma-stable-match
 cp .env.example .env
 ```
 
-Open `.env` in a text editor and paste your key.
+Open `.env` in a text editor, such as `open -e .env` on macOS, `notepad .env` on Windows or `nano .env` on Linux, and paste your key.
 
 ```env
 UMAMOE_API_KEY=your-key-here
@@ -274,10 +285,16 @@ These rules can change, so check in-game if something doesn't match.
 
 ### Prerequisites
 
-- [Rust](https://rustup.rs) (latest stable)
-- [Node.js](https://nodejs.org) 22.22.2 or newer, 24.15 or newer, or 26 or newer
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (optional, to build and run the image)
-- [Redis](https://redis.io) (optional, to run the Redis tests; see [Shared cache](backend/server/README.md#shared-cache))
+| Tool | macOS | Windows | Linux |
+|---|---|---|---|
+| [Rust](https://rustup.rs), stable. `rust-toolchain.toml` picks the version and adds rustfmt and clippy | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` | `winget install Rustlang.Rustup`, or `rustup-init.exe` from [rustup.rs](https://rustup.rs) | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
+| A C compiler. Building the server compiles C code for TLS | `xcode-select --install` | Visual Studio Build Tools with **Desktop development with C++**; the Rust installer offers to install them. Also run `setx AWS_LC_SYS_PREBUILT_NASM 1` once and open a new terminal, or install [NASM](https://www.nasm.us) | `sudo apt install build-essential` (Debian, Ubuntu) or `sudo dnf install gcc gcc-c++ make` (Fedora) |
+| [Node.js](https://nodejs.org) 22.22.2 or newer, 24.15 or newer, or 26 or newer | `brew install node` | `winget install OpenJS.NodeJS.LTS`, or the installer from [nodejs.org](https://nodejs.org/en/download) | [nvm](https://github.com/nvm-sh/nvm#installing-and-updating), then `nvm install --lts`. Distribution packages are often too old |
+You also need Git, and optionally Docker to build and run the image; see [Installing Git and Docker](#installing-git-and-docker). To run the Redis tests you need Redis too; the server README shows [how to run it on each platform](backend/server/README.md#redis-tests). For the optional metrics dashboard, [observability/README.md](observability/README.md) covers installing Prometheus and Grafana.
+
+Check the versions with `rustc --version` and `node --version`.
+
+The commands in this section are for macOS and Linux shells. On Windows, use PowerShell, and set environment variables before the command rather than in front of it: `$env:FRONTEND_DIR="frontend/dist"; cargo run -p uma-stable-match-server`.
 
 ### Architecture
 
