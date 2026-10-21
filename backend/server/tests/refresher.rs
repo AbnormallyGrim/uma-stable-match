@@ -5,7 +5,7 @@ use std::time::{Duration, Instant, SystemTime};
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{json, Value};
 use uma_stable_match_server::{
-    scan, ClubDetails, DetailConfig, RefreshConfig, ScanConfig, SharedPool,
+    scan, ClubDetails, DetailConfig, RefreshConfig, RefreshStatus, ScanConfig, SharedPool,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -396,4 +396,36 @@ async fn ranks_past_the_fast_ranks_refresh_at_half_pace() {
     })
     .await;
     assert!(started.elapsed() >= Duration::from_millis(450));
+}
+
+#[tokio::test]
+async fn reports_scheduled_loaded_and_due_clubs() {
+    let server = MockServer::start().await;
+    mount_list(&server, vec![listed(1, 10), listed(2, 11), listed(3, 12)]).await;
+    for id in 1..=3 {
+        mount_detail(&server, id, detail(id, "Counted", Some(now()))).await;
+    }
+    let details = refreshing(&server, RefreshConfig::default());
+    assert_eq!(details.refresh_status().await, RefreshStatus::default());
+    let before = now();
+    scan(&client(&server), &details, &scan_config(10))
+        .await
+        .unwrap();
+
+    let status = details.refresh_status().await;
+    assert_eq!((status.scheduled, status.loaded, status.due), (3, 0, 3));
+    assert!(status.oldest_due.is_some_and(|due| due >= before));
+    details.get(2, Priority::Interactive).await.unwrap();
+    assert_eq!(details.refresh_status().await.loaded, 1);
+
+    start(&details);
+    wait_until("every club loads", async || {
+        details.refresh_status().await.loaded == 3
+    })
+    .await;
+    let status = details.refresh_status().await;
+    assert_eq!(
+        (status.scheduled, status.due, status.oldest_due),
+        (3, 0, None)
+    );
 }

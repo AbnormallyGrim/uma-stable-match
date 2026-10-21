@@ -14,7 +14,7 @@ use uma_stable_match_umamoe_client::{Circle, CircleRequest, Client, Error, Prior
 
 use crate::calibration::club_median;
 use crate::pool::{ClubPool, Period};
-use crate::refresher::{utc_now, RefreshConfig, Refresher, Refreshing};
+use crate::refresher::{utc_now, RefreshConfig, RefreshStatus, Refresher, Refreshing};
 use crate::scanner::ScanConfig;
 use crate::shared::{club_key, SharedCache};
 
@@ -291,6 +291,17 @@ impl ClubDetails {
             Some(refreshing) => refreshing.len().await,
             None => 0,
         }
+    }
+
+    pub async fn refresh_status(&self) -> RefreshStatus {
+        let Some(refreshing) = &self.inner.refreshing else {
+            return RefreshStatus::default();
+        };
+        let period = self.period();
+        let cache = &self.inner.cache;
+        refreshing
+            .status(period, |id| cache.contains_key(&(id, period)), utc_now())
+            .await
     }
 
     pub(crate) async fn schedule(&self, clubs: Vec<(u64, u32)>) {

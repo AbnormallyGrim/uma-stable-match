@@ -158,6 +158,7 @@ async fn status_before_first_scan() {
             "last_error": null,
             "pool": { "clubs": 0, "exact_medians": 0, "calibration": { "factor": 1.0, "samples": 0 } },
             "details": { "cached": 0, "queued": 0 },
+            "refresh": { "scheduled": 0, "loaded": 0, "due": 0, "oldest_due_at": null },
         })
     );
 }

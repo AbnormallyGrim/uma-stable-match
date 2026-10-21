@@ -942,3 +942,43 @@ async fn a_shared_scan_with_a_refresher_lasts_until_uma_moes_next_update() {
     stop.send(true).unwrap();
     handle.await.unwrap();
 }
+
+#[tokio::test]
+async fn coverage_counts_scheduled_clubs_stored_in_redis() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let ids = [unique_id(), unique_id(), unique_id()];
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(listed_clubs(&[
+            (ids[0], 10_000_000),
+            (ids[1], 20_000_000),
+            (ids[2], 30_000_000),
+        ]))
+        .mount(&server)
+        .await;
+    mount_details(&server, &ids).await;
+    let config = scan_config();
+    let first = refreshing(&server, config, first_shared);
+    let second = refreshing(&server, config, redis().await.unwrap());
+    scan(&client(&server), &first, &config).await.unwrap();
+    first.get(ids[0], Priority::Interactive).await.unwrap();
+    first.get(ids[1], Priority::Interactive).await.unwrap();
+
+    let status = second.refresh_status().await;
+    assert_eq!((status.scheduled, status.loaded, status.due), (3, 2, 3));
+
+    let url = std::env::var("REDIS_TEST_URL").unwrap();
+    let mut conn = redis::Client::open(url)
+        .unwrap()
+        .get_multiplexed_async_connection()
+        .await
+        .unwrap();
+    redis::cmd("DEL")
+        .arg(club_key(ids[0], None))
+        .query_async::<i64>(&mut conn)
+        .await
+        .unwrap();
+    assert_eq!(second.refresh_status().await.loaded, 1);
+}
