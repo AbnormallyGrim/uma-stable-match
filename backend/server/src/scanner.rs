@@ -224,6 +224,8 @@ pub(crate) async fn list_candidates(
     Ok(candidates)
 }
 
+// Safety stop in case the API never returns a short page: enough pages to reach `rank_to`, plus
+// one.
 fn max_pages(config: &ScanConfig) -> u32 {
     config
         .rank_to

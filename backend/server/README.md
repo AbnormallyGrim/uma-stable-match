@@ -53,7 +53,7 @@ The API key, `REDIS_URL` (which can hold a password) and `REDIS_KEY_SECRET` are 
 
 `scan` builds a new [club pool](#club-pool) and fills the [detail cache](#club-details):
 
-1. List clubs by monthly rank, best first, 100 per page and up to `SCAN_RANK_TO`. Stop after a page whose last club is ranked `SCAN_RANK_TO` or worse, after a short or empty page, or after 100 pages.
+1. List clubs by monthly rank, best first, 100 per page and up to `SCAN_RANK_TO`. Stop after a page whose last club is ranked `SCAN_RANK_TO` or worse, or after a short or empty page. As a safety stop, never list more than enough pages to reach `SCAN_RANK_TO`, plus one (10 pages with the defaults), so any window can be listed in full.
 2. Decide which month to use. Early in a game month the previous month is used instead; see [Early in the month](#early-in-the-month).
 3. Build a `ClubPool` from the clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO`. `ListedClub::from_circle` drops archived clubs, full clubs, clubs with fewer than 8 members, and rows missing points, a member count or `last_updated`. Closed clubs are kept, so each request can include or exclude them.
 4. Copy in the exact medians of clubs that are still cached for that month, then swap the new pool in.
