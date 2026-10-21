@@ -26,7 +26,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to scan |
 | `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is kept loaded, best rank first. Clubs past it load when a search needs them |
 | `SCAN_INTERVAL_MINUTES` | none | Minutes between scans. Unset, the server scans again 30 minutes after uma.moe's next daily update; see [Cache and schedule](#cache-and-schedule). With Redis, `180` when unset |
-| `DETAIL_CACHE_MINUTES` | none | Minutes between refreshes of a club's member data. Unset, each club refreshes after uma.moe's daily update; see [Refresher](#refresher). With Redis, minutes a club's member data is reused, `SCAN_INTERVAL_MINUTES` when unset |
+| `DETAIL_CACHE_MINUTES` | none | Minutes between refreshes of a club's member data. Unset, each club refreshes after uma.moe's daily update; see [Refresher](#refresher) and [Club details](#club-details) |
 | `SHORTLIST_SIZE` | `120` | Clubs nearest your pace considered for each request |
 | `REQUEST_FETCH_BUDGET` | `10` | Most uncached clubs fetched while a visitor waits. At 500 ms spacing, 10 take about 5 seconds |
 | `TRAINER_CACHE_MINUTES` | `10` | Minutes a trainer's looked-up pace is reused |
@@ -140,7 +140,7 @@ Exact medians help most when many clubs have them. With an exact median for ever
 - **Single flight.** `get(circle_id, priority)` fetches a club only if it isn't cached. Concurrent calls for the same club share one request to uma.moe. Failed fetches aren't cached, so the next call tries again.
 - **Refresh.** `refresh(circle_id, priority)` fetches a club from uma.moe even if it's cached, then replaces the cached copy in memory and in the shared cache, and the pool's exact median. If the fetch fails, the cached copy stays.
 - **Update time.** Each entry keeps the club's `last_updated` from uma.moe, which `last_updated(circle_id)` returns for a cached club.
-- **Expiry.** With `DetailConfig::refresh` set, entries stay until they're replaced. Otherwise they expire after `DetailConfig::ttl` (180 minutes by default, one scan interval). Either way the cache holds at most `max_clubs` (2,000 by default).
+- **Expiry.** Each entry is due for its next refresh at the time the [refresher](#refresher) would use: `last_updated` + 24 hours + 30 minutes, an hour from now if uma.moe hasn't updated the club yet, or `DETAIL_CACHE_MINUTES` from now when set (`DetailConfig::refresh`). With `DetailConfig::refresher` set, entries stay in memory until they're replaced; otherwise they expire when due. Either way the cache holds at most `max_clubs` (2,000 by default).
 - **Exact medians.** Each successful load writes the club's exact median into the shared `ClubPool`. After a scan builds a new pool, `restore_exact_medians` copies in the medians of clubs that are still cached.
 - **Background loading.** `queue(circle_id)` adds a club for `BackgroundLoader::run` to fetch in the background lane. Clubs that are already cached or queued are skipped, and once `queue_size` clubs are waiting (1,000 by default), `queue` returns `false`. A failed background load is logged, and the club leaves the queue.
 - **Lanes.** Visitors' fetches use the interactive lane, so they go ahead of queued background loads. If a background load for a club is already running, a visitor asking for that club waits for it rather than starting a second fetch.
@@ -170,7 +170,10 @@ uma.moe updates club data once a day, at 15:00 UTC, and each club's `last_update
 
 ## Shared cache
 
-`SharedCache` is a second cache layer for running several server instances against one store. On a local miss, `ClubDetails` and `PaceLookup` check it before calling uma.moe, and store what they load in it with the same expiry, under keys such as `usm:v1:club:<id>:<month>`. A club found there still gives the pool its exact median. Club values hold the club and its `last_updated`; a value stored without it, by an older version, counts as a miss.
+`SharedCache` is a second cache layer for running several server instances against one store. On a local miss, `ClubDetails` and `PaceLookup` check it before calling uma.moe, and store what they load in it, under keys such as `usm:v1:club:<id>:<month>`. Paces expire as they do in memory. Club values hold the club, its `last_updated` and when it's due for its next refresh, and stay in Redis a day past that, so they're there until replaced. A club found there still gives the pool its exact median.
+
+- **Due clubs.** A club past its next refresh is fetched from uma.moe again. If that fails, the copy in Redis is served and kept in memory for `RefreshConfig::retry` (5 minutes).
+- **Older values.** A value stored by an older version, without a due time, counts as due.
 
 Without `REDIS_URL`, the shared cache stores nothing (`SharedCache::none()`) and each instance works alone. With it, the server uses Redis:
 
@@ -484,7 +487,7 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `umamoe_request_duration_seconds` | histogram | `endpoint`, `lane` | uma.moe response time |
 | `umamoe_queue_wait_seconds` | histogram | `lane` | Time waiting for the client's 500 ms spacing |
 | `umamoe_allowed_rate` | gauge | | uma.moe calls per second currently allowed: 2 normally, lower while backing off after 429s |
-| `club_detail_lookups_total` | counter | `source`: `memory`, `redis`, `umamoe` or `error` | Where each club's details came from; `error` means the uma.moe fetch failed |
+| `club_detail_lookups_total` | counter | `source`: `memory`, `redis`, `umamoe`, `error` or `stale` | Where each club's details came from; `error` means the uma.moe fetch failed, and `stale` that a due copy from Redis was served instead |
 | `pace_lookups_total` | counter | `source`: `memory`, `redis`, `umamoe` or `error` | Where each trainer's pace came from |
 | `detail_cache_clubs` | gauge | | Clubs in this instance's detail cache |
 | `detail_queue_clubs` | gauge | | Clubs waiting for a background load |

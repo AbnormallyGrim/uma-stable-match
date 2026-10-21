@@ -29,7 +29,10 @@ pub struct DetailConfig {
     pub max_clubs: u64,
     /// Most clubs waiting for a background load.
     pub queue_size: usize,
+    /// When each club is next refreshed. Details expire from memory then, and stay in the shared
+    /// cache a day longer.
     pub refresh: RefreshConfig,
+    /// Whether a [`Refresher`] runs. Details then stay in memory until it replaces them.
     pub refresher: bool,
 }
 
@@ -197,7 +200,8 @@ impl ClubDetails {
     }
 
     /// A club's details, fetched in the given lane if they aren't cached. Concurrent calls for one
-    /// club share a single fetch. Failed fetches aren't cached.
+    /// club share a single fetch. Failed fetches aren't cached. A shared copy past its next refresh
+    /// is fetched again, but still served if that fetch fails.
     pub async fn get(&self, circle_id: u64, priority: Priority) -> Result<Arc<Club>, Arc<Error>> {
         let inner = &self.inner;
         let period = self.period();
