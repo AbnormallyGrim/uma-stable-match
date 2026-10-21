@@ -9,7 +9,7 @@ mod retry;
 mod types;
 
 pub use client::Client;
-pub use config::{ApiKey, ClientConfig, RetryConfig, DEFAULT_BASE_URL};
+pub use config::{ApiKey, BackoffConfig, ClientConfig, RetryConfig, DEFAULT_BASE_URL};
 pub use error::{ApiErrorBody, Error};
 pub use rate_limit::Priority;
 pub use requests::{
