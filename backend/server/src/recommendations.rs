@@ -168,10 +168,13 @@ pub(crate) async fn recommendations(
 
     let mut options = ScoringOptions::default().with_include_closed(include_closed);
     options.balance_weight = balance_weight;
-    let snapshot = state.cache.snapshot().ok_or(ApiError::new(
-        StatusCode::SERVICE_UNAVAILABLE,
-        "no scan results yet; try again shortly",
-    ))?;
+    let (updated_at, month) = match state.cache.snapshot() {
+        Some(snapshot) => (snapshot.scanned_at, snapshot.month.clone()),
+        None => state.details.listing().ok_or(ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "no scan results yet; try again shortly",
+        ))?,
+    };
     let (pace, trainer_id) = match source {
         PaceSource::Given(pace) => (pace, None),
         PaceSource::Trainer(id) => {
@@ -198,8 +201,8 @@ pub(crate) async fn recommendations(
             include_closed,
             limit,
         },
-        updated_at: timestamp(snapshot.scanned_at),
-        month: snapshot.month.clone(),
+        updated_at: timestamp(updated_at),
+        month,
         coverage,
         total: scored.len(),
         clubs: scored

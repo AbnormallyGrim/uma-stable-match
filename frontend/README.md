@@ -232,7 +232,7 @@ Two axe rules are adjusted. The colour-contrast rule is off, because jsdom doesn
 | Situation | What the visitor sees | Retry |
 |---|---|---|
 | Loading | "Finding clubs…". Previous results stay, dimmed and marked `aria-busy` | – |
-| First scan still running (503) | "Club data is still loading", with a countdown | Automatic after 5, 10, 20, 30, 30 and 30 seconds (about 2 minutes), or **Try now** |
+| First scan still listing clubs (503) | "Club data is still loading", with a countdown | Automatic after 5, 10, 20, 30, 30 and 30 seconds (about 2 minutes), or **Try now** |
 | Still loading after every retry | "Club data still isn't ready" | **Try again** |
 | Rate limited (429) | "Too many searches", counting down from `Retry-After` (10 seconds without it) | **Try again**, enabled when the countdown ends. Never automatic |
 | Trainer not found (404) | Where to find the trainer ID in-game | None; the search needs changing |
