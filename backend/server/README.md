@@ -166,16 +166,17 @@ With Redis, instances that have the same `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `S
 | Situation | What the instance does |
 |---|---|
 | A scan was published less than one interval ago | Loads it unless it already has, then waits until the next scan is due |
-| No recent scan, and the scan lock is free | Takes the lock, scans, and publishes the result |
-| Another instance holds the lock | Reports `scanning: true` and checks again every second |
+| No recent scan, and the scan lock is free | Takes the lock, scans, and publishes the result. If a scan in progress was saved, it resumes that scan instead of listing again |
+| Another instance holds the lock | Builds its pool from that scan's saved club list once there is one, so it can answer searches, then reports `scanning: true` and checks again every second |
 | Redis doesn't answer | Scans on its own |
 
 - **Lock.** It lasts 60 seconds and is renewed every 20 seconds while scanning. Shutdown releases it; if an instance crashes, another takes over within 60 seconds.
 - **Publishing.** After prefetching, the leader publishes the listed clubs, marks them current for one `SCAN_INTERVAL_MINUTES`, and keeps them for two. The others build their pool from those rows and load club details from Redis, so they barely call uma.moe. An instance that starts later loads the published scan straight away.
+- **Resuming.** As soon as the leader has listed the clubs, it saves the list in Redis with when it was listed. An instance that takes the lock later, after a restart, redeploy or crash, continues that scan instead of listing again, if the list is less than one interval old and from the current game month (counting the [early-month](#early-in-the-month) switch). Clubs already loaded are read from Redis, so only the rest are fetched from uma.moe. Publishing the finished scan deletes the saved list.
 - **Failures.** A failed scan is published too: every instance records the same error, keeps its last results, and waits for the next interval.
 - **Missing data.** If a scan is marked current but its rows are gone from Redis, the instance scans on its own.
 
-The keys are `usm:v1:scan:<from>-<to>-<max>:lock`, `:fresh` and `:latest`, so instances with different scan windows don't share.
+The keys are `usm:v1:scan:<from>-<to>-<max>:lock`, `:fresh`, `:latest`, `:progress` and `:progress-id`, so instances with different scan windows don't share.
 
 ### Redis tests
 
@@ -202,7 +203,7 @@ $env:REDIS_TEST_URL="redis://127.0.0.1:6379"; cargo test
 
 ## Cache and schedule
 
-Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan has listed the clubs there are no results; with the defaults that takes a few seconds. From then on, searches score the clubs loaded so far, fetch up to `REQUEST_FETCH_BUDGET` more, and report the rest as still loading, while the scan finishes loading details (about 80 seconds with the defaults). With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule.
+Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan has listed the clubs there are no results; with the defaults that takes a few seconds. From then on, searches score the clubs loaded so far, fetch up to `REQUEST_FETCH_BUDGET` more, and report the rest as still loading, while the scan finishes loading details (about 80 seconds with the defaults). With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule; one that starts during a scan resumes it from the saved club list. See [Shared scans](#shared-scans).
 
 - **No overlapping scans.** A new scan won't start while one is running.
 - **One scan for all instances.** With Redis, one instance scans and the others load its result; see [Shared scans](#shared-scans).

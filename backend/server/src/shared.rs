@@ -283,6 +283,7 @@ impl SharedCache {
     }
 
     /// The last scan published for this scan window.
+    /// The club list saved by the scan in progress for this scan window.
     pub(crate) async fn scan_in_progress<T: DeserializeOwned>(
         &self,
         config: &ScanConfig,
@@ -304,12 +305,14 @@ impl SharedCache {
 pub(crate) enum ScanTurn {
     /// No Redis, or it didn't answer: scan without sharing.
     Alone,
-    /// This instance holds the scan lock: scan, then publish.
+    /// This instance holds the scan lock: scan, or resume the saved scan named by `progress`, then
+    /// publish.
     Lead {
         lease: ScanLease,
         progress: Option<String>,
     },
-    /// Another instance is scanning: check again shortly.
+    /// Another instance is scanning: check again shortly. `progress` names its saved club list
+    /// once it has one.
     Wait { progress: Option<String> },
     /// A scan was published less than an interval ago: load it if it's new.
     Fresh { id: String, remaining: Duration },
@@ -341,7 +344,8 @@ impl ScanLease {
         }
     }
 
-    /// Stores `value` for two intervals, marks it current for one, and releases the lock.
+    /// Saves the scan's club list so a restarted or replacement instance can resume it, for
+    /// `keep_for`. Does nothing once another instance holds the lock.
     pub(crate) async fn save_progress<T: Serialize>(&self, value: &T, keep_for: Duration) {
         let Ok(bytes) = serde_json::to_vec(value) else {
             return;
@@ -360,6 +364,8 @@ impl ScanLease {
             .await;
     }
 
+    /// Stores `value` for two intervals, marks it current for one, clears the saved scan in
+    /// progress, and releases the lock.
     pub(crate) async fn publish<T: Serialize>(self, value: &T, fresh_for: Duration) {
         let Ok(bytes) = serde_json::to_vec(value) else {
             self.release().await;
