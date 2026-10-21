@@ -256,26 +256,42 @@ impl SharedCache {
         invocation
             .key(&keys.fresh)
             .key(&keys.lock)
+            .key(&keys.progress_id)
             .arg(&token)
             .arg(millis(SCAN_LEASE));
         let Some(reply) = redis.invoke::<Vec<String>>(&invocation, OP_TIMEOUT).await else {
             return ScanTurn::Alone;
         };
         match reply.as_slice() {
-            [state] if state == "lead" => ScanTurn::Lead(ScanLease {
-                redis: redis.clone(),
-                keys,
-                token,
-            }),
+            [state, progress] if state == "lead" => ScanTurn::Lead {
+                lease: ScanLease {
+                    redis: redis.clone(),
+                    keys,
+                    token,
+                },
+                progress: non_empty(progress),
+            },
             [state, ttl, id] if state == "fresh" => ScanTurn::Fresh {
                 id: id.clone(),
                 remaining: Duration::from_millis(ttl.parse().unwrap_or(0)),
             },
-            _ => ScanTurn::Wait,
+            [state, progress] if state == "wait" => ScanTurn::Wait {
+                progress: non_empty(progress),
+            },
+            _ => ScanTurn::Wait { progress: None },
         }
     }
 
     /// The last scan published for this scan window.
+    /// The club list saved by the scan in progress for this scan window.
+    pub(crate) async fn scan_in_progress<T: DeserializeOwned>(
+        &self,
+        config: &ScanConfig,
+    ) -> Option<T> {
+        self.get_within(&ScanKeys::new(config).progress, SNAPSHOT_TIMEOUT)
+            .await
+    }
+
     pub(crate) async fn published_scan<T: DeserializeOwned>(
         &self,
         config: &ScanConfig,
@@ -289,10 +305,15 @@ impl SharedCache {
 pub(crate) enum ScanTurn {
     /// No Redis, or it didn't answer: scan without sharing.
     Alone,
-    /// This instance holds the scan lock: scan, then publish.
-    Lead(ScanLease),
-    /// Another instance is scanning: check again shortly.
-    Wait,
+    /// This instance holds the scan lock: scan, or resume the saved scan named by `progress`, then
+    /// publish.
+    Lead {
+        lease: ScanLease,
+        progress: Option<String>,
+    },
+    /// Another instance is scanning: check again shortly. `progress` names its saved club list
+    /// once it has one.
+    Wait { progress: Option<String> },
     /// A scan was published less than an interval ago: load it if it's new.
     Fresh { id: String, remaining: Duration },
 }
@@ -323,7 +344,28 @@ impl ScanLease {
         }
     }
 
-    /// Stores `value` for two intervals, marks it current for one, and releases the lock.
+    /// Saves the scan's club list so a restarted or replacement instance can resume it, for
+    /// `keep_for`. Does nothing once another instance holds the lock.
+    pub(crate) async fn save_progress<T: Serialize>(&self, value: &T, keep_for: Duration) {
+        let Ok(bytes) = serde_json::to_vec(value) else {
+            return;
+        };
+        let script = Script::new(PROGRESS_SCRIPT);
+        let mut invocation = script.prepare_invoke();
+        invocation
+            .key(&self.keys.lock)
+            .key(&self.keys.progress)
+            .key(&self.keys.progress_id)
+            .arg(&self.token)
+            .arg(bytes)
+            .arg(millis(keep_for));
+        self.redis
+            .invoke::<i64>(&invocation, SNAPSHOT_TIMEOUT)
+            .await;
+    }
+
+    /// Stores `value` for two intervals, marks it current for one, clears the saved scan in
+    /// progress, and releases the lock.
     pub(crate) async fn publish<T: Serialize>(self, value: &T, fresh_for: Duration) {
         let Ok(bytes) = serde_json::to_vec(value) else {
             self.release().await;
@@ -335,6 +377,8 @@ impl ScanLease {
             .key(&self.keys.latest)
             .key(&self.keys.fresh)
             .key(&self.keys.lock)
+            .key(&self.keys.progress)
+            .key(&self.keys.progress_id)
             .arg(bytes)
             .arg(millis(fresh_for * 2))
             .arg(&self.token)
@@ -356,6 +400,8 @@ struct ScanKeys {
     lock: String,
     fresh: String,
     latest: String,
+    progress: String,
+    progress_id: String,
 }
 
 impl ScanKeys {
@@ -368,6 +414,8 @@ impl ScanKeys {
             lock: format!("{base}:lock"),
             fresh: format!("{base}:fresh"),
             latest: format!("{base}:latest"),
+            progress: format!("{base}:progress"),
+            progress_id: format!("{base}:progress-id"),
         }
     }
 }
@@ -377,10 +425,20 @@ local ttl = redis.call('PTTL', KEYS[1])
 if ttl > 0 then
   return {'fresh', tostring(ttl), redis.call('GET', KEYS[1])}
 end
+local progress = redis.call('GET', KEYS[3]) or ''
 if redis.call('SET', KEYS[2], ARGV[1], 'NX', 'PX', ARGV[2]) then
-  return {'lead'}
+  return {'lead', progress}
 end
-return {'wait'}
+return {'wait', progress}
+";
+
+const PROGRESS_SCRIPT: &str = r"
+if redis.call('GET', KEYS[1]) ~= ARGV[1] then
+  return 0
+end
+redis.call('SET', KEYS[2], ARGV[2], 'PX', ARGV[3])
+redis.call('SET', KEYS[3], ARGV[1], 'PX', ARGV[3])
+return 1
 ";
 
 const RENEW_SCRIPT: &str = r"
@@ -396,6 +454,7 @@ redis.call('SET', KEYS[2], ARGV[3], 'PX', ARGV[4])
 if redis.call('GET', KEYS[3]) == ARGV[3] then
   redis.call('DEL', KEYS[3])
 end
+redis.call('DEL', KEYS[4], KEYS[5])
 return 1
 ";
 
@@ -409,6 +468,10 @@ return 0
 fn observe(op: &'static str, started: Instant) {
     metrics::histogram!("redis_op_duration_seconds", "op" => op)
         .record(started.elapsed().as_secs_f64());
+}
+
+fn non_empty(value: &str) -> Option<String> {
+    (!value.is_empty()).then(|| value.to_owned())
 }
 
 fn millis(duration: Duration) -> u64 {

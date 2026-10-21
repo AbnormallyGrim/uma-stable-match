@@ -422,3 +422,141 @@ async fn a_failed_shared_scan_is_reported_by_every_instance() {
         running.stop().await;
     }
 }
+
+fn listed_clubs(clubs: &[(u64, i64)]) -> ResponseTemplate {
+    let circles: Vec<_> = clubs
+        .iter()
+        .enumerate()
+        .map(|(i, (id, points))| {
+            json!({
+                "circle_id": id,
+                "name": "Resumed Club",
+                "monthly_rank": 100 + i,
+                "member_count": 9,
+                "monthly_point": points,
+                "last_updated": "2026-03-19T15:00:00Z",
+            })
+        })
+        .collect();
+    ResponseTemplate::new(200).set_body_json(json!({ "circles": circles }))
+}
+
+async fn mount_slow_scan(server: &MockServer, fast: u64, slow: u64, delay: Duration) {
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(listed_clubs(&[(fast, 10_000_000), (slow, 20_000_000)]))
+        .mount(server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", fast.to_string()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(detail(fast)))
+        .mount(server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", slow.to_string()))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(detail(slow))
+                .set_delay(delay),
+        )
+        .mount(server)
+        .await;
+}
+
+async fn calls(server: &MockServer, path: &str, query: Option<String>) -> usize {
+    server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .filter(|r| r.url.path() == path && (query.is_none() || r.url.query() == query.as_deref()))
+        .count()
+}
+
+async fn wait_for(done: impl AsyncFn() -> bool) {
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while !done().await {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("condition not reached in time");
+}
+
+async fn key_exists(key: &str) -> bool {
+    let url = std::env::var("REDIS_TEST_URL").unwrap();
+    let mut conn = redis::Client::open(url)
+        .unwrap()
+        .get_multiplexed_async_connection()
+        .await
+        .unwrap();
+    redis::cmd("EXISTS")
+        .arg(key)
+        .query_async::<i64>(&mut conn)
+        .await
+        .unwrap()
+        == 1
+}
+
+#[tokio::test]
+async fn a_restarted_leader_resumes_the_scan_without_listing_again() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let (fast, slow) = (unique_id(), unique_id());
+    mount_slow_scan(&server, fast, slow, Duration::from_secs(2)).await;
+    let config = scan_config();
+    let progress = format!(
+        "usm:v1:scan:{}-{}-{}:progress",
+        config.rank_from, config.rank_to, config.max_details
+    );
+
+    let first = instance(&server, config, first_shared);
+    wait_for(async || key_exists(&club_key(fast, None)).await).await;
+    assert!(key_exists(&progress).await);
+    first.stop().await;
+
+    let second = instance(&server, config, redis().await.unwrap());
+    second.wait_until(|s| s.snapshot.is_some()).await;
+    let snapshot = second.cache.snapshot().unwrap();
+    assert_eq!(snapshot.candidates, 2);
+    assert_eq!(snapshot.prefetched, 2);
+
+    assert_eq!(calls(&server, "/api/v4/circles/list", None).await, 1);
+    assert_eq!(
+        calls(
+            &server,
+            "/api/v4/circles",
+            Some(format!("circle_id={fast}"))
+        )
+        .await,
+        1
+    );
+    assert!(!key_exists(&progress).await);
+    second.stop().await;
+}
+
+#[tokio::test]
+async fn waiting_instances_build_their_pool_from_the_scan_in_progress() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let (fast, slow) = (unique_id(), unique_id());
+    mount_slow_scan(&server, fast, slow, Duration::from_secs(5)).await;
+    let config = scan_config();
+
+    let first = instance(&server, config, first_shared);
+    wait_for(async || calls(&server, "/api/v4/circles/list", None).await == 1).await;
+    let second = instance(&server, config, redis().await.unwrap());
+    wait_for(async || second.details.pool().read().unwrap().len() == 2).await;
+
+    assert!(first.cache.snapshot().is_none());
+    assert!(second.cache.snapshot().is_none());
+    assert!(second.cache.status().scanning);
+    assert_eq!(calls(&server, "/api/v4/circles/list", None).await, 1);
+
+    for running in [first, second] {
+        running.stop().await;
+    }
+}
