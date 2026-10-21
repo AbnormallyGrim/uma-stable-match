@@ -128,17 +128,13 @@ impl Client {
             };
             metrics::histogram!("umamoe_request_duration_seconds", "endpoint" => path.to_owned(), "lane" => lane)
                 .record(started.elapsed().as_secs_f64());
-            metrics::counter!("umamoe_requests_total", "endpoint" => path.to_owned(), "lane" => lane, "status" => status.clone())
+            metrics::counter!("umamoe_requests_total", "endpoint" => path.to_owned(), "lane" => lane, "status" => status)
                 .increment(1);
 
             let (error, retry_after) = match result {
                 Ok(response) if response.status().is_success() => {
                     let body = response.bytes().await.map_err(Error::Transport)?;
-                    return serde_json::from_slice(&body).map_err(|e| {
-                        metrics::counter!("umamoe_decode_errors_total", "endpoint" => path.to_owned())
-                            .increment(1);
-                        Error::Decode(e)
-                    });
+                    return serde_json::from_slice(&body).map_err(Error::Decode);
                 }
                 Ok(response) => {
                     let status = response.status();
@@ -161,8 +157,6 @@ impl Client {
             if retries >= self.retry.max_retries {
                 return Err(error);
             }
-            metrics::counter!("umamoe_retries_total", "endpoint" => path.to_owned(), "status" => status)
-                .increment(1);
             let delay = retry::delay(&self.retry, retries, retry_after, fastrand::f64());
             tokio::time::sleep(delay).await;
             retries += 1;

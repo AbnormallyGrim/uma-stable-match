@@ -163,11 +163,9 @@ Each call records metrics through the [`metrics`](https://docs.rs/metrics) facad
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `umamoe_requests_total` | counter | `endpoint`, `lane`, `status` | Attempts, retries included. `status` is the HTTP status code, or `timeout`, `connect_error` or `transport_error` when no response came back |
+| `umamoe_requests_total` | counter | `endpoint`, `lane`, `status` | Attempts, so each retry counts as another one. `status` is the HTTP status code, or `timeout`, `connect_error` or `transport_error` when no response came back |
 | `umamoe_request_duration_seconds` | histogram | `endpoint`, `lane` | Time from sending an attempt to its response or error |
 | `umamoe_queue_wait_seconds` | histogram | `lane` | Time an attempt waited for its slot under `min_interval` |
-| `umamoe_retries_total` | counter | `endpoint`, `status` | Retries, by the status that caused them |
-| `umamoe_decode_errors_total` | counter | `endpoint` | Successful responses whose body didn't match the expected shape |
 
 `endpoint` is the API path, such as `/api/v4/circles`, never the full URL, so trainer IDs and other query values don't appear in labels. `lane` is `interactive` or `background`.
 
