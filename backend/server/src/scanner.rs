@@ -19,7 +19,7 @@ pub struct ScanConfig {
     pub rank_from: u32,
     /// Worst monthly rank to include.
     pub rank_to: u32,
-    /// Most clubs to fetch details for.
+    /// Most clubs to keep details for, best rank first.
     pub max_details: u32,
     /// Clubs per list page.
     pub page_size: u32,
@@ -79,8 +79,8 @@ fn upstream_summary(error: &Error) -> String {
     }
 }
 
-/// Lists the rank window into a new club pool, swaps it into `details`, and prefetches club
-/// details in the background lane.
+/// Lists the rank window into a new club pool and swaps it into `details`. Then, if `details` has a
+/// refresher, schedules the clubs for it; otherwise prefetches club details in the background lane.
 pub async fn scan(
     client: &Client,
     details: &ClubDetails,

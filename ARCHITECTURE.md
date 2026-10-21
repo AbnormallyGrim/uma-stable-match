@@ -21,6 +21,7 @@ flowchart TB
             scanner[Scheduler and scanner]
             pool[ClubPool<br/>estimates, calibration and shortlist]
             details[ClubDetails<br/>detail cache and background loader]
+            refresher[Refresher<br/>daily refresh schedule]
         end
     end
 
@@ -39,7 +40,9 @@ flowchart TB
     recs -- "load clubs" --> details
     recs -- "score" --> scoring
     scanner -- "new pool each scan" --> pool
-    scanner -- "prefetch" --> details
+    scanner -- "prefetch, with Redis" --> details
+    scanner -- "schedule, without Redis" --> refresher
+    refresher -- "refresh" --> details
     details -- "exact medians" --> pool
     paces -- "interactive" --> api
     details -- "interactive or background" --> api
@@ -50,7 +53,7 @@ flowchart TB
     scanner -. "scan lock and published scan" .-> redis
 ```
 
-The scanner fills the pool and the detail cache in the background. A visitor's request reads both, fetches a few missing clubs if it must, and scores everything it has. The server also serves the built web page, so one process runs the whole tool.
+The scanner fills the pool in the background, and the refresher keeps the detail cache current (with Redis, the scanner fills it). A visitor's request reads both, fetches a few missing clubs if it must, and scores everything it has. The server also serves the built web page, so one process runs the whole tool.
 
 ## Project layout
 
@@ -80,9 +83,11 @@ Every `SCAN_INTERVAL_MINUTES` (180 by default), and once at start-up, the scanne
 1. Lists clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO` (80 to 900) from uma.moe, 100 per page.
 2. Builds a new **club pool** from the list rows alone. Archived, full and unscorable clubs are left out; closed clubs stay, so each request can include them. Each club gets a pace estimate from its monthly points.
 3. Copies in the exact medians of clubs still in the detail cache, then swaps the new pool in.
-4. Prefetches member data for up to `SCAN_MAX_DETAILS` clubs (200) in the **background lane**, spread evenly across the estimates. Today's pool (about 150 clubs) is prefetched whole.
+4. Picks up to `SCAN_MAX_DETAILS` clubs (200), best rank first. Today's pool (about 150 clubs) fits whole. Without Redis, it hands them to the **refresher**; with Redis, it prefetches their member data in the **background lane**.
 
-`/api/v1/status` reports the running scan's phase and how many clubs it has listed and loaded. Requests are answered from step 3 on, even during the first scan; until the prefetch catches up, they score the clubs loaded so far and report the rest as still loading. Every club whose details load gives the pool its **exact median**, and the pool recalibrates its estimates for the rest. A failed list request keeps the previous pool and results. With Redis, one instance scans for all of them; see [Caches](#caches).
+The refresher loads each club's member data in the background lane, then refreshes it once a day, 30 minutes after uma.moe's daily update (15:00 UTC), best rank first. Clubs ranked below 5,000 refresh at half speed. A failed refresh is retried after 5 minutes, and the old data is served meanwhile. Clubs that searches load join the schedule too. `DETAIL_CACHE_MINUTES` replaces the daily timing with a fixed interval.
+
+`/api/v1/status` reports the running scan's phase and how many clubs it has listed and loaded. Requests are answered from step 3 on, even during the first scan; until the details catch up, they score the clubs loaded so far and report the rest as still loading. Every club whose details load gives the pool its **exact median**, and the pool recalibrates its estimates for the rest. A failed list request keeps the previous pool and results. With Redis, one instance scans for all of them; see [Caches](#caches).
 
 ## How a request is answered
 
@@ -102,7 +107,7 @@ Everything lives in memory; nothing is written to disk. Without Redis, restartin
 |---|---|---|---|
 | Last scan result and error | – | Until the next scan | `cache.rs` |
 | Club pool | Club ID | Until the next scan | `pool.rs` |
-| Club details | Club ID and month | `DETAIL_CACHE_MINUTES` (the scan interval) | `details.rs` |
+| Club details | Club ID and month | Until refreshed (with Redis, `DETAIL_CACHE_MINUTES`, by default the scan interval) | `details.rs`, `refresher.rs` |
 | Trainer paces | Trainer ID and month | `TRAINER_CACHE_MINUTES` (10) | `pace.rs` |
 | Rate limits | Visitor IP | Per-minute quotas | `limits.rs` |
 

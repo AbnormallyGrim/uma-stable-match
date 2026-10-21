@@ -1,3 +1,5 @@
+//! Refresher tests against a mock server. All data is made up.
+
 use std::time::{Duration, Instant, SystemTime};
 
 use chrono::{DateTime, SecondsFormat, Utc};

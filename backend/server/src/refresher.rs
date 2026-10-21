@@ -1,3 +1,5 @@
+//! Keeps club details current, refreshing each club after uma.moe's daily update.
+
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant, SystemTime};
@@ -10,12 +12,18 @@ use crate::details::ClubDetails;
 
 const DAY: Duration = Duration::from_secs(24 * 60 * 60);
 
+/// When the [`Refresher`] refreshes clubs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RefreshConfig {
+    /// Refresh every club this often instead of after uma.moe's daily update.
     pub every: Option<Duration>,
+    /// Wait after uma.moe's daily update before refreshing.
     pub margin: Duration,
+    /// Wait before checking again a club that uma.moe hasn't updated yet.
     pub recheck: Duration,
+    /// Wait before retrying a failed refresh.
     pub retry: Duration,
+    /// Clubs ranked up to this refresh at full speed; the rest at half.
     pub fast_ranks: u32,
 }
 
@@ -32,6 +40,7 @@ impl Default for RefreshConfig {
 }
 
 impl RefreshConfig {
+    /// When to next refresh a club last updated at `last_updated`.
     pub fn next_refresh(
         &self,
         last_updated: Option<DateTime<Utc>>,
@@ -152,6 +161,8 @@ impl Schedule {
     }
 }
 
+/// Refreshes scheduled clubs in the background lane. Get it from [`ClubDetails::refresher`] and
+/// run it once with [`Refresher::run`].
 pub struct Refresher {
     details: ClubDetails,
     refreshing: Arc<Refreshing>,
@@ -165,6 +176,8 @@ impl Refresher {
         }
     }
 
+    /// Refreshes clubs as they come due, for as long as the cache exists. Failures are logged and
+    /// retried.
     pub async fn run(self) {
         loop {
             let now = utc_now();

@@ -22,12 +22,13 @@ pub type SharedPool = Arc<RwLock<ClubPool>>;
 /// Detail cache settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DetailConfig {
-    /// How long a club's details are reused.
+    /// How long a club's details are reused without a refresher, and kept in the shared cache.
     pub ttl: Duration,
     /// Most clubs kept in the cache.
     pub max_clubs: u64,
     /// Most clubs waiting for a background load.
     pub queue_size: usize,
+    /// Refresh settings. `Some` keeps details until they're replaced, by a [`Refresher`].
     pub refresh: Option<RefreshConfig>,
 }
 
@@ -192,19 +193,23 @@ impl ClubDetails {
         DateTime::from_timestamp(entry.last_updated?, 0)
     }
 
+    /// The refresher for this cache, if it has refresh settings. Run only one.
     pub fn refresher(&self) -> Option<Refresher> {
         let refreshing = self.inner.refreshing.clone()?;
         Some(Refresher::new(self.clone(), refreshing))
     }
 
+    /// Whether this cache has refresh settings.
     pub fn refreshes(&self) -> bool {
         self.inner.refreshing.is_some()
     }
 
+    /// When a scheduled club is next refreshed.
     pub fn next_refresh(&self, circle_id: u64) -> Option<DateTime<Utc>> {
         self.inner.refreshing.as_ref()?.due_at(circle_id)
     }
 
+    /// Clubs on the refresh schedule.
     pub fn scheduled(&self) -> usize {
         self.inner.refreshing.as_ref().map_or(0, |r| r.len())
     }

@@ -40,7 +40,8 @@ pub struct Config {
     pub scan: ScanConfig,
     /// Time between scans, from `SCAN_INTERVAL_MINUTES`.
     pub scan_interval: Duration,
-    /// How long a club's details are reused, from `DETAIL_CACHE_MINUTES`.
+    /// How often club details are refreshed, from `DETAIL_CACHE_MINUTES`. `None` follows uma.moe's
+    /// daily update, or the scan interval with Redis.
     pub detail_cache: Option<Duration>,
     /// Shortlist and fetch settings, from `SHORTLIST_SIZE` and `REQUEST_FETCH_BUDGET`.
     pub matching: MatchSettings,

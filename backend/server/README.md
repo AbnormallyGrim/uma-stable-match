@@ -24,9 +24,9 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `RUST_LOG` | `info` | Log filter, such as `debug` or `uma_stable_match_server=debug`. At `debug`, the HTTP libraries can log request URLs, which include trainer IDs |
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to scan |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to scan |
-| `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is prefetched in each scan |
+| `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is kept loaded, best rank first. Clubs past it load when a search needs them |
 | `SCAN_INTERVAL_MINUTES` | `180` | Minutes between scans. The default may change once uma.moe agrees how often scans can run |
-| `DETAIL_CACHE_MINUTES` | `SCAN_INTERVAL_MINUTES` | Minutes a club's member data is reused |
+| `DETAIL_CACHE_MINUTES` | none | Minutes between refreshes of a club's member data. Unset, each club refreshes after uma.moe's daily update; see [Refresher](#refresher). With Redis, minutes a club's member data is reused, `SCAN_INTERVAL_MINUTES` when unset |
 | `SHORTLIST_SIZE` | `120` | Clubs nearest your pace considered for each request |
 | `REQUEST_FETCH_BUDGET` | `10` | Most uncached clubs fetched while a visitor waits. At 500 ms spacing, 10 take about 5 seconds |
 | `TRAINER_CACHE_MINUTES` | `10` | Minutes a trainer's looked-up pace is reused |
@@ -51,17 +51,19 @@ The API key, `REDIS_URL` (which can hold a password) and `REDIS_KEY_SECRET` are 
 
 ## Scanner
 
-`scan` builds a new [club pool](#club-pool) and fills the [detail cache](#club-details):
+`scan` builds a new [club pool](#club-pool) and decides which clubs' details to keep loaded:
 
 1. List clubs by monthly rank, best first, 100 per page and up to `SCAN_RANK_TO`. Stop after a page whose last club is ranked `SCAN_RANK_TO` or worse, or after a short or empty page. As a safety stop, never list more than enough pages to reach `SCAN_RANK_TO`, plus one (10 pages with the defaults), so any window can be listed in full.
 2. Decide which month to use. Early in a game month the previous month is used instead; see [Early in the month](#early-in-the-month).
 3. Build a `ClubPool` from the clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO`. `ListedClub::from_circle` drops archived clubs, full clubs, clubs with fewer than 8 members, and rows missing points, a member count or `last_updated`. Closed clubs are kept, so each request can include or exclude them.
 4. Copy in the exact medians of clubs that are still cached for that month, then swap the new pool in.
-5. Prefetch member data for up to `SCAN_MAX_DETAILS` clubs in the background lane, so visitors' requests go first. If the pool is larger, the clubs are spread evenly across the estimates, from slowest to fastest. If a club's details come back without club information, the listed details are used.
+5. Take up to `SCAN_MAX_DETAILS` clubs from the pool, best rank first. If a club's details come back without club information, the listed details are used.
+   - **With a [refresher](#refresher)** (without Redis): put them on its schedule and finish. The refresher loads them.
+   - **Without one** (with Redis): prefetch their member data in the background lane, so visitors' requests go first.
 
-A club whose details fail to load is logged and skipped. A failed list request fails the whole scan and leaves the previous pool in place. `Scan` returns the number of candidates (the pool size), how many were prefetched, how many failed, and the game month of the listed data.
+While prefetching, a club whose details fail to load is logged and skipped. A failed list request fails the whole scan and leaves the previous pool in place. `Scan` returns the number of candidates (the pool size), how many clubs were prefetched (with a refresher, how many were already loaded), how many failed, and the game month of the listed data.
 
-With the client's default 500 ms rate limit, a default scan takes about 80 seconds: around 9 list pages plus one lookup per candidate, about 150 at the time of writing. Clubs still cached from the previous scan aren't fetched again.
+With the client's default 500 ms rate limit, a default scan with a prefetch takes about 80 seconds: around 9 list pages plus one lookup per candidate, about 150 at the time of writing. Clubs still cached from the previous scan aren't fetched again. Without the prefetch, a scan takes a few seconds.
 
 ## Club pool
 
@@ -138,12 +140,33 @@ Exact medians help most when many clubs have them. With an exact median for ever
 - **Single flight.** `get(circle_id, priority)` fetches a club only if it isn't cached. Concurrent calls for the same club share one request to uma.moe. Failed fetches aren't cached, so the next call tries again.
 - **Refresh.** `refresh(circle_id, priority)` fetches a club from uma.moe even if it's cached, then replaces the cached copy in memory and in the shared cache, and the pool's exact median. If the fetch fails, the cached copy stays.
 - **Update time.** Each entry keeps the club's `last_updated` from uma.moe, which `last_updated(circle_id)` returns for a cached club.
-- **Expiry.** Entries expire after `DetailConfig::ttl` (180 minutes by default, one scan interval). The cache holds at most `max_clubs` (2,000 by default).
+- **Expiry.** With `DetailConfig::refresh` set, entries stay until they're replaced. Otherwise they expire after `DetailConfig::ttl` (180 minutes by default, one scan interval). Either way the cache holds at most `max_clubs` (2,000 by default).
 - **Exact medians.** Each successful load writes the club's exact median into the shared `ClubPool`. After a scan builds a new pool, `restore_exact_medians` copies in the medians of clubs that are still cached.
 - **Background loading.** `queue(circle_id)` adds a club for `BackgroundLoader::run` to fetch in the background lane. Clubs that are already cached or queued are skipped, and once `queue_size` clubs are waiting (1,000 by default), `queue` returns `false`. A failed background load is logged, and the club leaves the queue.
 - **Lanes.** Visitors' fetches use the interactive lane, so they go ahead of queued background loads. If a background load for a club is already running, a visitor asking for that club waits for it rather than starting a second fetch.
 
 `queued()` and `cached_clubs()` report the queue length and the approximate cache size.
+
+## Refresher
+
+Without Redis, a `Refresher` keeps club details current, so a scan only lists clubs. `ClubDetails::refresher` returns it when `DetailConfig::refresh` is set, and the server runs it in the background. With Redis, the [shared scan](#shared-scans) still prefetches details instead.
+
+uma.moe updates club data once a day, at 15:00 UTC, and each club's `last_updated` shows when. The refresher keeps a schedule of clubs, ordered by when each is due, then by rank:
+
+| Event | Next refresh |
+|---|---|
+| A scan lists a club among its `SCAN_MAX_DETAILS` | Straight away. Clubs already scheduled keep their time |
+| A search loads a club in the pool | After uma.moe's next update |
+| A refresh brings a new `last_updated` | `last_updated` + 24 hours + `margin` (30 minutes) |
+| uma.moe hasn't updated the club yet | After `recheck` (1 hour) |
+| The refresh fails | After `retry` (5 minutes). The old details are served meanwhile |
+| A scan no longer lists the club | Dropped from the schedule |
+
+- **Refreshing.** `refresh` fetches the club in the background lane and replaces its details and exact median. A club whose cached details are still current isn't fetched again, only rescheduled.
+- **Speed.** Clubs ranked up to `fast_ranks` (5,000) refresh as fast as the client allows. After each club ranked lower, the refresher waits as long as the fetch took, which halves the pace and leaves room for visitors. The client's [backoff](../umamoe-client/README.md#backing-off) slows both.
+- **Override.** With `DETAIL_CACHE_MINUTES` set (`RefreshConfig::every`), each club is refreshed that many minutes after its last refresh, whatever uma.moe's update time.
+
+`scheduled()` returns how many clubs are on the schedule, and `next_refresh(circle_id)` when a club is next due.
 
 ## Shared cache
 
@@ -205,7 +228,7 @@ $env:REDIS_TEST_URL="redis://127.0.0.1:6379"; cargo test
 
 ## Cache and schedule
 
-Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan has listed the clubs there are no results; with the defaults that takes a few seconds. From then on, searches score the clubs loaded so far, fetch up to `REQUEST_FETCH_BUDGET` more, and report the rest as still loading, while the scan finishes loading details (about 80 seconds with the defaults). With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule; one that starts during a scan resumes it from the saved club list. See [Shared scans](#shared-scans).
+Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan has listed the clubs there are no results; with the defaults that takes a few seconds. From then on, searches score the clubs loaded so far, fetch up to `REQUEST_FETCH_BUDGET` more, and report the rest as still loading, while the [refresher](#refresher), or the scan with Redis, finishes loading details (about 80 seconds with the defaults). With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule; one that starts during a scan resumes it from the saved club list. See [Shared scans](#shared-scans).
 
 - **No overlapping scans.** A new scan won't start while one is running.
 - **One scan for all instances.** With Redis, one instance scans and the others load its result; see [Shared scans](#shared-scans).
@@ -276,7 +299,7 @@ All endpoints are under `/api/v1`.
 |---|---|
 | `scanning` | Whether a scan is running. With Redis, also while waiting for another instance's scan |
 | `scan` | The running scan's progress, or `null` when no scan is running. See below |
-| `last_scan.clubs` | Clubs whose member data the scan prefetched |
+| `last_scan.clubs` | Clubs whose member data the scan prefetched. Without Redis, clubs already loaded when the scan finished listing |
 | `last_scan.candidates` | Clubs in the pool after the scan's filters |
 | `last_scan.month` | Game month of the listed data, `YYYY-MM` |
 | `pool.clubs` | Clubs in the current pool |
@@ -450,7 +473,7 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `rate_limited_total` | counter | `limit`: `requests` or `trainer_lookups` | Requests turned away by a [rate limit](#rate-limits) |
 | `scan_phase` | gauge | | `0` idle or waiting for another instance's scan, `1` listing clubs, `2` loading club details |
 | `scan_listed_clubs` | gauge | | Clubs in the rank window listed so far in this scan |
-| `scan_clubs_to_load`, `scan_clubs_loaded`, `scan_clubs_failed` | gauge | | Progress of the current scan's prefetch |
+| `scan_clubs_to_load`, `scan_clubs_loaded`, `scan_clubs_failed` | gauge | | Progress of the current scan's prefetch, with Redis |
 | `scans_total` | counter | `source`: `alone`, `lead` or `published`; `result`: `ok` or `error` | Scans finished, whether run here or loaded from another instance |
 | `scan_duration_seconds` | histogram | `source` | Time from a scan's start to its end. A resumed scan counts from its original start, before the restart |
 | `scan_turns_total` | counter | `turn`: `alone`, `lead`, `wait` or `fresh` | What the instance did when a scan was due; see [Shared scans](#shared-scans) |

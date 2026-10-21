@@ -181,13 +181,13 @@ Set these in `.env`. Only `UMAMOE_API_KEY` is required; [`.env.example`](.env.ex
 | `UMAMOE_API_KEY` | *(required)* | Your uma.moe API key |
 | `HOST` | `127.0.0.1` | IP address the web page and API listen on. Ignored by the Docker setup, which always uses `0.0.0.0` inside the container |
 | `PORT` | `8080` | Port the web page and API run on. With Docker, the port on your computer |
-| `SCAN_INTERVAL_MINUTES` | `180` | How often club data refreshes, in minutes |
-| `DETAIL_CACHE_MINUTES` | Same as `SCAN_INTERVAL_MINUTES` | How long a club's member data is reused, in minutes |
+| `SCAN_INTERVAL_MINUTES` | `180` | How often the club list refreshes, in minutes |
+| `DETAIL_CACHE_MINUTES` | *(none)* | Minutes between refreshes of a club's member data. Unset, each club refreshes once a day after uma.moe updates its data |
 | `SHORTLIST_SIZE` | `120` | Clubs nearest your pace considered for each search |
 | `REQUEST_FETCH_BUDGET` | `10` | Most clubs loaded from uma.moe while you wait. The rest load in the background |
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to include |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to include |
-| `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is loaded in each refresh |
+| `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is kept loaded, best rank first. The rest load when a search needs them |
 | `TRAINER_CACHE_MINUTES` | `10` | How long a trainer's pace is reused before refreshing |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests allowed per visitor per minute |
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer ID lookups allowed per visitor per minute, not counting cached ones |
