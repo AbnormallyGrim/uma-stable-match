@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 use uma_stable_match_server::{
-    BackgroundLoader, ClubDetails, ClubPool, DetailConfig, ListedClub, SharedPool,
+    BackgroundLoader, ClubDetails, ClubPool, DetailConfig, ListedClub, RefreshConfig, SharedPool,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -103,7 +103,10 @@ async fn expired_clubs_are_fetched_again() {
     let server = MockServer::start().await;
     mount(&server, 1, ok(1), 2).await;
     let config = DetailConfig {
-        ttl: Duration::from_millis(100),
+        refresh: RefreshConfig {
+            every: Some(Duration::from_millis(100)),
+            ..RefreshConfig::default()
+        },
         ..DetailConfig::default()
     };
     let (details, _loader) = details(&server, config, &[1]);
@@ -447,4 +450,50 @@ async fn remembers_when_uma_moe_last_updated_a_club() {
         Some("2026-03-19T15:00:00Z".parse().unwrap())
     );
     assert_eq!(details.last_updated(900000404).await, None);
+}
+
+fn recheck(millis: u64) -> DetailConfig {
+    DetailConfig {
+        refresh: RefreshConfig {
+            recheck: Duration::from_millis(millis),
+            ..RefreshConfig::default()
+        },
+        ..DetailConfig::default()
+    }
+}
+
+#[tokio::test]
+async fn details_uma_moe_has_not_updated_are_checked_again() {
+    let server = MockServer::start().await;
+    mount(
+        &server,
+        1,
+        detail_with(1, "Stale", 1000, Some("2026-03-19T15:00:00Z")),
+        2,
+    )
+    .await;
+    let (details, _loader) = details(&server, recheck(100), &[1]);
+
+    details.get(1, Priority::Interactive).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    details.get(1, Priority::Interactive).await.unwrap();
+}
+
+#[tokio::test]
+async fn details_stay_cached_until_uma_moes_next_update() {
+    let server = MockServer::start().await;
+    let now: chrono::DateTime<chrono::Utc> = std::time::SystemTime::now().into();
+    let last_updated = (now - Duration::from_secs(3600)).to_rfc3339();
+    mount(
+        &server,
+        1,
+        detail_with(1, "Fresh", 1000, Some(&last_updated)),
+        1,
+    )
+    .await;
+    let (details, _loader) = details(&server, recheck(100), &[1]);
+
+    details.get(1, Priority::Interactive).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    details.get(1, Priority::Interactive).await.unwrap();
 }

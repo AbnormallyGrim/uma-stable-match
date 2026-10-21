@@ -107,7 +107,7 @@ Everything lives in memory; nothing is written to disk. Without Redis, restartin
 |---|---|---|---|
 | Last scan result and error | – | Until the next scan | `cache.rs` |
 | Club pool | Club ID | Until the next scan | `pool.rs` |
-| Club details | Club ID and month | Until refreshed (with Redis, `DETAIL_CACHE_MINUTES`, by default the scan interval) | `details.rs`, `refresher.rs` |
+| Club details | Club ID and month | Until refreshed. With Redis, in memory until due for refresh, and in Redis a day longer | `details.rs`, `refresher.rs` |
 | Trainer paces | Trainer ID and month | `TRAINER_CACHE_MINUTES` (10) | `pace.rs` |
 | Rate limits | Visitor IP | Per-minute quotas | `limits.rs` |
 
