@@ -107,3 +107,13 @@ fn rescheduling_a_dropped_club_does_nothing() {
     assert_eq!(schedule.len(), 0);
     assert_eq!(schedule.next(), None);
 }
+
+#[test]
+fn coverage_counts_loaded_and_due_clubs() {
+    let now = at("2026-03-19T18:00:00Z");
+    let mut schedule = Schedule::default();
+    schedule.replace([(1, 10), (2, 20), (3, 30)], |_| true, now);
+    schedule.reschedule(3, now + minutes(5));
+    assert_eq!(schedule.coverage(|id| id != 2, now), (3, 2, 2));
+    assert_eq!(schedule.coverage(|_| false, now + minutes(5)), (3, 0, 3));
+}

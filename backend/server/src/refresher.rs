@@ -9,6 +9,7 @@ use tokio::sync::Notify;
 use uma_stable_match_umamoe_client::Priority;
 
 use crate::details::ClubDetails;
+use crate::pool::Period;
 use crate::shared::{RefreshLease, SharedSchedule};
 
 const DAY: Duration = Duration::from_secs(24 * 60 * 60);
@@ -57,6 +58,20 @@ impl RefreshConfig {
             _ => now + self.recheck,
         }
     }
+}
+
+/// How current the scheduled clubs' details are.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RefreshStatus {
+    /// Clubs on the refresh schedule.
+    pub scheduled: usize,
+    /// Scheduled clubs whose details are stored: in the shared cache with Redis, otherwise in
+    /// memory.
+    pub loaded: usize,
+    /// Scheduled clubs due for a refresh now.
+    pub due: usize,
+    /// When the longest-waiting due club became due, if any are due.
+    pub oldest_due: Option<DateTime<Utc>>,
 }
 
 pub(crate) struct Refreshing {
@@ -117,6 +132,32 @@ impl Refreshing {
         match &self.store {
             Store::Local(schedule) => lock(schedule).len(),
             Store::Shared(schedule) => schedule.len().await,
+        }
+    }
+
+    pub(crate) async fn status(
+        &self,
+        period: Option<Period>,
+        loaded: impl Fn(u64) -> bool,
+        now: DateTime<Utc>,
+    ) -> RefreshStatus {
+        let counts = match &self.store {
+            Store::Local(schedule) => Some(lock(schedule).coverage(loaded, now)),
+            Store::Shared(schedule) => schedule.coverage(period, now).await,
+        };
+        let Some((scheduled, loaded, due)) = counts else {
+            return RefreshStatus::default();
+        };
+        let oldest_due = self
+            .next()
+            .await
+            .map(|(due, _, _)| due)
+            .filter(|due| *due <= now);
+        RefreshStatus {
+            scheduled,
+            loaded,
+            due,
+            oldest_due,
         }
     }
 
@@ -182,6 +223,20 @@ impl Schedule {
 
     pub(crate) fn len(&self) -> usize {
         self.slots.len()
+    }
+
+    pub(crate) fn coverage(
+        &self,
+        loaded: impl Fn(u64) -> bool,
+        now: DateTime<Utc>,
+    ) -> (usize, usize, usize) {
+        let present = self.slots.keys().filter(|id| loaded(**id)).count();
+        let due = self
+            .order
+            .iter()
+            .take_while(|(due, _, _)| *due <= now)
+            .count();
+        (self.slots.len(), present, due)
     }
 
     fn insert(&mut self, circle_id: u64, rank: u32, due: DateTime<Utc>) {

@@ -68,6 +68,7 @@ async fn health() -> Json<Value> {
 
 async fn status(State(state): State<AppState>) -> Json<Value> {
     let status = state.cache.status();
+    let refresh = state.details.refresh_status().await;
     let (pool_clubs, exact_medians, calibration) = {
         let pool = state
             .details
@@ -111,6 +112,12 @@ async fn status(State(state): State<AppState>) -> Json<Value> {
         "details": {
             "cached": state.details.cached_clubs(),
             "queued": state.details.queued(),
+        },
+        "refresh": {
+            "scheduled": refresh.scheduled,
+            "loaded": refresh.loaded,
+            "due": refresh.due,
+            "oldest_due_at": refresh.oldest_due.map(|due| timestamp(due.into())),
         },
         "last_error": status.last_error.map(|e| json!({
             "at": timestamp(e.at),

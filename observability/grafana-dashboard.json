@@ -138,7 +138,7 @@
     {
       "id": 4,
       "type": "stat",
-      "title": "Loaded / to load / failed",
+      "title": "Refresh: loaded / scheduled / due",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -156,7 +156,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "scan_clubs_loaded",
+          "expr": "refresh_loaded_clubs",
           "legendFormat": "loaded",
           "instant": true,
           "range": false
@@ -167,8 +167,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "scan_clubs_to_load",
-          "legendFormat": "to load",
+          "expr": "refresh_scheduled_clubs",
+          "legendFormat": "scheduled",
           "instant": true,
           "range": false
         },
@@ -178,8 +178,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "scan_clubs_failed",
-          "legendFormat": "failed",
+          "expr": "refresh_due_clubs",
+          "legendFormat": "due",
           "instant": true,
           "range": false
         }
@@ -563,7 +563,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "100 * scan_clubs_loaded / clamp_min(scan_clubs_to_load, 1)",
+          "expr": "100 * refresh_loaded_clubs / clamp_min(refresh_scheduled_clubs, 1)",
           "legendFormat": "",
           "instant": true,
           "range": false
@@ -629,7 +629,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 14
       },
@@ -712,6 +712,105 @@
               "mode": "off"
             }
           }
+        },
+        "overrides": []
+      },
+      "description": "alone: no Redis; lead: this instance scanned; wait: another instance is scanning; fresh: a published scan is current."
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Oldest due refresh: overdue by",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "refresh_overdue_seconds",
+          "legendFormat": "overdue"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 80,
+                "color": "red"
+              }
+            ]
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "unit": "s"
         },
         "overrides": []
       },
