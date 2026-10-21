@@ -60,6 +60,7 @@ backend/
   umamoe-client/   uma.moe API client
   server/          API server, scheduled club scanner and cache
 frontend/          Web interface (Svelte + TypeScript)
+observability/     Prometheus config and Grafana dashboard for local metrics
 docs/images/       README screenshots
 ```
 
@@ -135,6 +136,6 @@ The page is a single Svelte app, built by Vite into static files that the server
 ## Build and deployment
 
 - **Docker:** a multi-stage build. Node builds the page, Rust builds the server, and the result runs on a distroless, non-root base with only the binary and the built page. Compose runs it read-only, with no capabilities, on `127.0.0.1`, and an optional `redis` profile adds a memory-only Redis for the shared cache.
-- **Metrics:** with `METRICS_ADDR` set, the server serves Prometheus metrics on that address, apart from the app: requests by route and status code, uma.moe calls by status code with retries and wait times, rate limits, scan progress, where club details and paces come from, Redis health and the club pool. See the [server README](backend/server/README.md#metrics).
+- **Metrics:** with `METRICS_ADDR` set, the server serves Prometheus metrics on that address, apart from the app: requests by route and status code, uma.moe calls by status code with retries and wait times, rate limits, scan progress, where club details and paces come from, Redis health and the club pool. See the [server README](backend/server/README.md#metrics), and [observability/README.md](observability/README.md) for a local Prometheus and Grafana dashboard.
 - **Configuration:** environment variables only, read once at start-up and validated; see [Configuration](README.md#configuration). The API key is never logged or baked into the image.
 - **CI:** formatting, clippy and tests for the Rust workspace, with a Redis service container for the Redis tests; docs, minimum Rust version and a publish dry run for the scoring crate; type check, lint, tests and build for the page; and a Docker image build.

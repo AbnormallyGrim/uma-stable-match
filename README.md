@@ -102,6 +102,7 @@ docker compose up -d
 - **`PORT` in `.env` picks the port on your computer.** Inside the container the server always listens on `0.0.0.0:8080`, so Compose ignores `HOST` and `FRONTEND_DIR` from `.env`.
 - **Logs:** `docker compose logs -f`.
 - **Locked down:** the container runs as a non-root user, on a read-only file system, with no Linux capabilities. The image holds only the server and the built web page, in a minimal [distroless](https://github.com/GoogleContainerTools/distroless) base. Your `.env` is never copied into it; Compose passes the settings in when the container starts.
+- **Optional metrics:** add `METRICS_PORT=9464` to `.env` to serve metrics to this computer only, for a local Prometheus and Grafana; see the [metrics dashboard guide](observability/README.md).
 - **Optional Redis:** to try the [shared cache](backend/server/README.md#shared-cache), add `REDIS_URL=redis://redis:6379` and a `REDIS_KEY_SECRET` of at least 32 characters to `.env`, then start with `docker compose --profile redis up -d` (and stop with `docker compose --profile redis down`). Redis keeps everything in memory, isn't reachable from outside Compose, and is locked down like the server. Without the profile it doesn't run; if `REDIS_URL` is set without it, the server stops because it can't reach Redis.
 
 ## Usage
@@ -184,6 +185,7 @@ Set these in `.env`. Only `UMAMOE_API_KEY` is required; [`.env.example`](.env.ex
 | `REDIS_URL` | *(none)* | Optional. A `redis://` or `rediss://` URL to share club data, trainer paces and scans between several servers. The server won't start if it can't reach it |
 | `REDIS_KEY_SECRET` | *(none)* | Required with `REDIS_URL`: at least 32 characters, the same on every server. Looked-up trainer IDs are stored in Redis only as a hash keyed with it |
 | `METRICS_ADDR` | *(none)* | Optional. An address such as `127.0.0.1:9464` to serve Prometheus metrics on, apart from the web page. See the [server README](backend/server/README.md#metrics) |
+| `METRICS_PORT` | *(none)* | Docker only. Turns metrics on and publishes them on this port of your computer, such as `9464`. Compose ignores `METRICS_ADDR` |
 
 ## API
 
@@ -311,6 +313,10 @@ To check the Docker image builds, as CI does:
 ```bash
 docker build -t uma-stable-match .
 ```
+
+### Metrics dashboard
+
+To see what a running server is doing, such as scan progress, uma.moe calls by status code, caches and Redis, set up Prometheus and Grafana locally and import the dashboard. [observability/README.md](observability/README.md) walks through it step by step.
 
 ### Test
 

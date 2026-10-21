@@ -45,5 +45,5 @@ If you run Uma Stable Match yourself:
 - Rate limiting is always on. Behind a reverse proxy, set `TRUST_FORWARDED_FOR=true` so each visitor gets their own limit; otherwise everyone shares the proxy's.
 - Only set `TRUST_FORWARDED_FOR=true` behind a proxy that sets `X-Forwarded-For`, or visitors could pick their own address.
 - If your key leaks, revoke it at [uma.moe/settings](https://uma.moe/settings) and create a new one.
-- If you turn on metrics, keep `METRICS_ADDR` on `127.0.0.1` or a private network. Metrics hold no trainer IDs or IP addresses, but they show traffic and scan activity.
+- If you turn on metrics, keep `METRICS_ADDR` on `127.0.0.1` or a private network, and the same for Prometheus and Grafana. Metrics hold no trainer IDs or IP addresses, but they show traffic and scan activity.
 - With Redis, keep `REDIS_KEY_SECRET` as secret as the API key, give Redis a password or keep it on a private network, and run it without persistence so cached paces aren't written to disk.
