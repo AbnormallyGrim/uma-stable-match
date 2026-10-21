@@ -2,7 +2,7 @@
 
 The Uma Stable Match web interface, built with [Svelte 5](https://svelte.dev) and TypeScript on [Vite](https://vite.dev). It's a single-page app; the Rust server will serve the built files (#40).
 
-It has the search form, a summary of each search, the top ten picks as cards, and every scored club in a sortable table.
+It has the search form, a summary of each search, the top ten picks as cards, and the 100 best fits in a sortable table.
 
 ## Requirements
 
@@ -62,7 +62,7 @@ src/lib/api.ts                Typed API client
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
 src/lib/Results.svelte        Results view: summary, top picks and all results
-src/lib/ResultsTable.svelte   Sortable, searchable table of every scored club
+src/lib/ResultsTable.svelte   Sortable, searchable table of the best fits
 src/lib/ResultsSummary.svelte Pace, clubs analysed, data age and balance setting
 src/lib/ClubCard.svelte       One top pick
 src/lib/TierBadge.svelte      Tier icon, with a fallback for unknown tiers
@@ -122,7 +122,7 @@ Tiers are shown with the game's own icons, D to SS, from [`src/assets/tiers/`](s
 
 ### All results table
 
-Below the cards, every scored club is listed in a table. The app asks the API for up to 1000 clubs, more than the default rank window (80 to 900) can hold, so nothing is cut off.
+Below the cards, the 100 best-fitting clubs are listed in a table, best fit first. The app asks the API for 100 clubs (`RESULT_LIMIT` in `App.svelte`), as clubs further down fit poorly. Searching and sorting work within those 100, while **Clubs analysed** in the summary still counts every scored club.
 
 | Column | Sorts first by |
 |---|---|
