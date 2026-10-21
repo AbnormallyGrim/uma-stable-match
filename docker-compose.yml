@@ -29,20 +29,24 @@ services:
   redis:
     image: redis:7.4-alpine
     profiles: [redis]
-    # Memory only: no snapshots or append-only file, so nothing reaches the disk.
+    # Keeps its data in the redis-data volume as an append-only file, so club data and the refresh
+    # schedule survive restarts.
     command:
       - redis-server
       - --save
       - ""
       - --appendonly
-      - "no"
+      - "yes"
+      - --appendfsync
+      - everysec
       - --maxmemory
       - 512mb
       - --maxmemory-policy
       - volatile-lru
     # Not published: only the server can reach it, over the Compose network.
     user: redis
-    tmpfs: [/data]
+    volumes:
+      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -52,3 +56,6 @@ services:
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
+
+volumes:
+  redis-data:
