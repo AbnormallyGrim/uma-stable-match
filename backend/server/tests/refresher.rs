@@ -214,7 +214,7 @@ async fn rechecks_a_club_uma_moe_has_not_updated_yet() {
         details
             .next_refresh(1)
             .await
-            .is_some_and(|due| due >= before + Duration::from_secs(60 * 60))
+            .is_some_and(|due| due >= before + Duration::from_secs(60 * 60 - 1))
     })
     .await;
     assert!(details.next_refresh(1).await.unwrap() <= now() + Duration::from_secs(60 * 60));

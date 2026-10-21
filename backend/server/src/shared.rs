@@ -468,7 +468,7 @@ impl SharedSchedule {
         let mut invocation = script.prepare_invoke();
         invocation
             .key(&self.key)
-            .arg(due_seconds(now))
+            .arg(now.timestamp().max(0))
             .arg(RANK_SLOTS);
         for (circle_id, rank) in clubs {
             invocation.arg(circle_id).arg(rank_slot(rank));
