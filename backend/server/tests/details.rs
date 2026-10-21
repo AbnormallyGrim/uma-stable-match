@@ -333,3 +333,118 @@ async fn loads_from_an_old_month_leave_the_pool_alone() {
 
     assert_eq!(details.pool().read().unwrap().exact_medians(), 0);
 }
+
+fn detail_with(id: u64, name: &str, gain: i64, last_updated: Option<&str>) -> ResponseTemplate {
+    let members: Vec<Value> = (0..9)
+        .map(|i| {
+            let fans: Vec<i64> = (0..4).map(|day| 100_000_000 + gain * day).collect();
+            json!({ "viewer_id": 7001 + i as u64, "year": 2026, "month": 3, "daily_fans": fans })
+        })
+        .collect();
+    ResponseTemplate::new(200).set_body_json(json!({
+        "circle": {
+            "circle_id": id,
+            "name": name,
+            "member_count": 9,
+            "last_updated": last_updated,
+        },
+        "members": members,
+    }))
+}
+
+#[tokio::test]
+async fn refresh_replaces_a_cached_club() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "900000401"))
+        .respond_with(detail_with(900000401, "Before", 1_000, None))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "900000401"))
+        .respond_with(detail_with(900000401, "After", 2_000, None))
+        .mount(&server)
+        .await;
+    let (details, _loader) = details(&server, DetailConfig::default(), &[900000401]);
+
+    assert_eq!(
+        details
+            .get(900000401, Priority::Interactive)
+            .await
+            .unwrap()
+            .name,
+        "Before"
+    );
+    let refreshed = details
+        .refresh(900000401, Priority::Background)
+        .await
+        .unwrap();
+    assert_eq!(refreshed.name, "After");
+    assert_eq!(
+        details
+            .get(900000401, Priority::Interactive)
+            .await
+            .unwrap()
+            .name,
+        "After"
+    );
+    assert_eq!(
+        details.pool().read().unwrap().estimated_median(900000401),
+        Some(2_000.0)
+    );
+    assert_eq!(server.received_requests().await.unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn a_failed_refresh_keeps_the_cached_club() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "900000402"))
+        .respond_with(detail_with(900000402, "Kept", 1_000, None))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "900000402"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&server)
+        .await;
+    let (details, _loader) = details(&server, DetailConfig::default(), &[900000402]);
+
+    details.get(900000402, Priority::Interactive).await.unwrap();
+    details
+        .refresh(900000402, Priority::Background)
+        .await
+        .unwrap_err();
+    assert_eq!(details.cached(900000402).await.unwrap().name, "Kept");
+}
+
+#[tokio::test]
+async fn remembers_when_uma_moe_last_updated_a_club() {
+    let server = MockServer::start().await;
+    mount(
+        &server,
+        900000403,
+        detail_with(900000403, "Dated", 1_000, Some("2026-03-19T15:00:00Z")),
+        1,
+    )
+    .await;
+    mount(
+        &server,
+        900000404,
+        detail_with(900000404, "Undated", 1_000, None),
+        1,
+    )
+    .await;
+    let (details, _loader) = details(&server, DetailConfig::default(), &[900000403, 900000404]);
+
+    assert_eq!(details.last_updated(900000403).await, None);
+    details.get(900000403, Priority::Interactive).await.unwrap();
+    details.get(900000404, Priority::Interactive).await.unwrap();
+    assert_eq!(
+        details.last_updated(900000403).await,
+        Some("2026-03-19T15:00:00Z".parse().unwrap())
+    );
+    assert_eq!(details.last_updated(900000404).await, None);
+}

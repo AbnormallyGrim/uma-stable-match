@@ -583,3 +583,46 @@ async fn waiting_instances_build_their_pool_from_the_scan_in_progress() {
         running.stop().await;
     }
 }
+
+#[tokio::test]
+async fn a_refresh_reaches_other_instances_with_its_update_time() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let id = unique_id();
+    let respond = |name: &str| {
+        let mut body = detail(id);
+        body["circle"]["name"] = json!(name);
+        body["circle"]["last_updated"] = json!("2026-03-19T15:00:00Z");
+        ResponseTemplate::new(200).set_body_json(body)
+    };
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", id.to_string()))
+        .respond_with(respond("Before"))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", id.to_string()))
+        .respond_with(respond("After"))
+        .mount(&server)
+        .await;
+    let config = DetailConfig {
+        ttl: Duration::from_secs(60),
+        ..DetailConfig::default()
+    };
+    let (first, _a) = ClubDetails::with_shared(&client(&server), pool(id), config, first_shared);
+    let (second, _b) =
+        ClubDetails::with_shared(&client(&server), pool(id), config, redis().await.unwrap());
+
+    first.get(id, Priority::Interactive).await.unwrap();
+    first.refresh(id, Priority::Background).await.unwrap();
+    let club = second.get(id, Priority::Interactive).await.unwrap();
+    assert_eq!(club.name, "After");
+    assert_eq!(
+        second.last_updated(id).await,
+        Some("2026-03-19T15:00:00Z".parse().unwrap())
+    );
+    assert_eq!(server.received_requests().await.unwrap().len(), 2);
+}
