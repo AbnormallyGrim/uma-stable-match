@@ -186,7 +186,7 @@ async fn skips_full_clubs_and_unknown_sizes() {
 }
 
 #[tokio::test]
-async fn prefetches_evenly_across_the_estimates() {
+async fn prefetches_the_best_ranks_first() {
     let server = MockServer::start().await;
     mount_page(
         &server,
@@ -196,8 +196,8 @@ async fn prefetches_evenly_across_the_estimates() {
     .await;
     mount_page(&server, 1, vec![listed(4, 15, 20), listed(5, 16, 20)]).await;
     mount_detail(&server, 1, detail(1), 1).await;
-    mount_detail(&server, 3, detail(3), 1).await;
-    for id in [2, 4, 5] {
+    mount_detail(&server, 2, detail(2), 1).await;
+    for id in [3, 4, 5] {
         mount_detail(&server, id, detail(id), 0).await;
     }
 
@@ -207,7 +207,7 @@ async fn prefetches_evenly_across_the_estimates() {
     let scan = scan.unwrap();
     assert_eq!(scan.candidates, 5);
     assert_eq!(scan.prefetched, 2);
-    assert_eq!(ids(&details), vec![1, 3]);
+    assert_eq!(ids(&details), vec![1, 2]);
 }
 
 #[tokio::test]

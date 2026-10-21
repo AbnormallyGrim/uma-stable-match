@@ -41,7 +41,7 @@ pub struct Config {
     /// Time between scans, from `SCAN_INTERVAL_MINUTES`.
     pub scan_interval: Duration,
     /// How long a club's details are reused, from `DETAIL_CACHE_MINUTES`.
-    pub detail_cache: Duration,
+    pub detail_cache: Option<Duration>,
     /// Shortlist and fetch settings, from `SHORTLIST_SIZE` and `REQUEST_FETCH_BUDGET`.
     pub matching: MatchSettings,
     /// How long a trainer's pace is reused, from `TRAINER_CACHE_MINUTES`.
@@ -165,9 +165,12 @@ impl Config {
         };
         let scan_interval_minutes = number("SCAN_INTERVAL_MINUTES", DEFAULT_SCAN_INTERVAL_MINUTES)?;
         let scan_interval = Duration::from_secs(u64::from(scan_interval_minutes) * 60);
-        let detail_cache = Duration::from_secs(
-            u64::from(number("DETAIL_CACHE_MINUTES", scan_interval_minutes)?) * 60,
-        );
+        let detail_cache = match get("DETAIL_CACHE_MINUTES") {
+            None => None,
+            Some(_) => Some(Duration::from_secs(
+                u64::from(number("DETAIL_CACHE_MINUTES", 0)?) * 60,
+            )),
+        };
         let match_defaults = MatchSettings::default();
         let matching = MatchSettings {
             shortlist_size: number("SHORTLIST_SIZE", match_defaults.shortlist_size as u32)?

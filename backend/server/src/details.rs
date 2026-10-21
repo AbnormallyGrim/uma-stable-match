@@ -13,6 +13,7 @@ use uma_stable_match_umamoe_client::{Circle, CircleRequest, Client, Error, Prior
 
 use crate::calibration::club_median;
 use crate::pool::{ClubPool, Period};
+use crate::refresher::{utc_now, RefreshConfig, Refresher, Refreshing};
 use crate::shared::{club_key, SharedCache};
 
 /// The club pool, shared between requests and the detail cache.
@@ -27,6 +28,7 @@ pub struct DetailConfig {
     pub max_clubs: u64,
     /// Most clubs waiting for a background load.
     pub queue_size: usize,
+    pub refresh: Option<RefreshConfig>,
 }
 
 impl Default for DetailConfig {
@@ -35,6 +37,7 @@ impl Default for DetailConfig {
             ttl: Duration::from_secs(180 * 60),
             max_clubs: 2_000,
             queue_size: 1_000,
+            refresh: None,
         }
     }
 }
@@ -57,6 +60,7 @@ struct Inner {
     sender: mpsc::Sender<u64>,
     shared: SharedCache,
     ttl: Duration,
+    refreshing: Option<Arc<Refreshing>>,
 }
 
 #[derive(Clone)]
@@ -113,10 +117,11 @@ impl ClubDetails {
         config: DetailConfig,
         shared: SharedCache,
     ) -> (Self, BackgroundLoader) {
-        let cache = Cache::builder()
-            .time_to_live(config.ttl)
-            .max_capacity(config.max_clubs)
-            .build();
+        let mut builder = Cache::builder().max_capacity(config.max_clubs);
+        if config.refresh.is_none() {
+            builder = builder.time_to_live(config.ttl);
+        }
+        let cache = builder.build();
         let (sender, receiver) = mpsc::channel(config.queue_size.max(1));
         let details = Self {
             inner: Arc::new(Inner {
@@ -130,6 +135,7 @@ impl ClubDetails {
                 queued: Mutex::new(HashSet::new()),
                 shared,
                 ttl: config.ttl,
+                refreshing: config.refresh.map(|c| Arc::new(Refreshing::new(c))),
                 sender,
             }),
         };
@@ -184,6 +190,30 @@ impl ClubDetails {
     pub async fn last_updated(&self, circle_id: u64) -> Option<DateTime<Utc>> {
         let entry = self.inner.cache.get(&(circle_id, self.period())).await?;
         DateTime::from_timestamp(entry.last_updated?, 0)
+    }
+
+    pub fn refresher(&self) -> Option<Refresher> {
+        let refreshing = self.inner.refreshing.clone()?;
+        Some(Refresher::new(self.clone(), refreshing))
+    }
+
+    pub fn refreshes(&self) -> bool {
+        self.inner.refreshing.is_some()
+    }
+
+    pub fn next_refresh(&self, circle_id: u64) -> Option<DateTime<Utc>> {
+        self.inner.refreshing.as_ref()?.due_at(circle_id)
+    }
+
+    pub fn scheduled(&self) -> usize {
+        self.inner.refreshing.as_ref().map_or(0, |r| r.len())
+    }
+
+    pub(crate) fn schedule(&self, clubs: impl IntoIterator<Item = (u64, u32)>) {
+        if let Some(refreshing) = &self.inner.refreshing {
+            let pool = read(&self.inner.pool);
+            refreshing.replace(clubs, |id| pool.contains(id), utc_now());
+        }
     }
 
     /// A club's details, only if they're cached.
@@ -338,12 +368,33 @@ async fn fetch(
         club.circle_id = circle_id;
     }
     record_median(inner, &club, circle_id, period);
+    track(inner, circle_id, last_updated);
     let stored = Stored { club, last_updated };
     inner
         .shared
         .set(&club_key(circle_id, period), &stored, inner.ttl)
         .await;
     Ok(Entry::from(stored))
+}
+
+fn track(inner: &Inner, circle_id: u64, last_updated: Option<i64>) {
+    let Some(refreshing) = &inner.refreshing else {
+        return;
+    };
+    if !read(&inner.pool).contains(circle_id) {
+        return;
+    }
+    let rank = read(&inner.listed)
+        .get(&circle_id)
+        .and_then(|c| c.monthly_rank)
+        .and_then(|r| u32::try_from(r).ok())
+        .unwrap_or(u32::MAX);
+    let last_updated = last_updated.and_then(|t| DateTime::from_timestamp(t, 0));
+    refreshing.loaded(
+        circle_id,
+        rank,
+        refreshing.config.next_refresh(last_updated, utc_now()),
+    );
 }
 
 fn count_detail(source: &'static str) {
