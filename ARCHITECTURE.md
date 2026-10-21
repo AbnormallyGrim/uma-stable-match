@@ -82,7 +82,7 @@ Every `SCAN_INTERVAL_MINUTES` (180 by default), and once at start-up, the scanne
 3. Copies in the exact medians of clubs still in the detail cache, then swaps the new pool in.
 4. Prefetches member data for up to `SCAN_MAX_DETAILS` clubs (200) in the **background lane**, spread evenly across the estimates. Today's pool (about 150 clubs) is prefetched whole.
 
-Every club whose details load gives the pool its **exact median**, and the pool recalibrates its estimates for the rest. A failed list request keeps the previous pool and results. With Redis, one instance scans for all of them; see [Caches](#caches).
+Requests are answered from step 3 on, even during the first scan; until the prefetch catches up, they score the clubs loaded so far and report the rest as still loading. Every club whose details load gives the pool its **exact median**, and the pool recalibrates its estimates for the rest. A failed list request keeps the previous pool and results. With Redis, one instance scans for all of them; see [Caches](#caches).
 
 ## How a request is answered
 
