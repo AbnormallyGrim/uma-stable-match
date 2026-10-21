@@ -164,6 +164,8 @@ impl ClubDetails {
             .map(|entry| entry.club)
     }
 
+    /// Fetches a club's details in the given lane, even if cached, and replaces the cached copy.
+    /// On failure the cached copy stays.
     pub async fn refresh(
         &self,
         circle_id: u64,
@@ -178,6 +180,7 @@ impl ClubDetails {
         Ok(entry.club)
     }
 
+    /// When uma.moe last updated a cached club, if it said.
     pub async fn last_updated(&self, circle_id: u64) -> Option<DateTime<Utc>> {
         let entry = self.inner.cache.get(&(circle_id, self.period())).await?;
         DateTime::from_timestamp(entry.last_updated?, 0)

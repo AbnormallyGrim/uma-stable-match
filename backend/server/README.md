@@ -136,6 +136,8 @@ Exact medians help most when many clubs have them. With an exact median for ever
 `ClubDetails` is a shared cache of club details (`Club` with members), built on [`moka`](https://crates.io/crates/moka). Clones share one cache.
 
 - **Single flight.** `get(circle_id, priority)` fetches a club only if it isn't cached. Concurrent calls for the same club share one request to uma.moe. Failed fetches aren't cached, so the next call tries again.
+- **Refresh.** `refresh(circle_id, priority)` fetches a club from uma.moe even if it's cached, then replaces the cached copy in memory and in the shared cache, and the pool's exact median. If the fetch fails, the cached copy stays.
+- **Update time.** Each entry keeps the club's `last_updated` from uma.moe, which `last_updated(circle_id)` returns for a cached club.
 - **Expiry.** Entries expire after `DetailConfig::ttl` (180 minutes by default, one scan interval). The cache holds at most `max_clubs` (2,000 by default).
 - **Exact medians.** Each successful load writes the club's exact median into the shared `ClubPool`. After a scan builds a new pool, `restore_exact_medians` copies in the medians of clubs that are still cached.
 - **Background loading.** `queue(circle_id)` adds a club for `BackgroundLoader::run` to fetch in the background lane. Clubs that are already cached or queued are skipped, and once `queue_size` clubs are waiting (1,000 by default), `queue` returns `false`. A failed background load is logged, and the club leaves the queue.
@@ -145,7 +147,7 @@ Exact medians help most when many clubs have them. With an exact median for ever
 
 ## Shared cache
 
-`SharedCache` is a second cache layer for running several server instances against one store. On a local miss, `ClubDetails` and `PaceLookup` check it before calling uma.moe, and store what they load in it with the same expiry, under keys such as `usm:v1:club:<id>:<month>`. A club found there still gives the pool its exact median.
+`SharedCache` is a second cache layer for running several server instances against one store. On a local miss, `ClubDetails` and `PaceLookup` check it before calling uma.moe, and store what they load in it with the same expiry, under keys such as `usm:v1:club:<id>:<month>`. A club found there still gives the pool its exact median. Club values hold the club and its `last_updated`; a value stored without it, by an older version, counts as a miss.
 
 Without `REDIS_URL`, the shared cache stores nothing (`SharedCache::none()`) and each instance works alone. With it, the server uses Redis:
 
