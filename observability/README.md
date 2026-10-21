@@ -133,7 +133,7 @@ Go to **Dashboards → New → Import**, upload `observability/grafana-dashboard
 
 | Row | Panels |
 |---|---|
-| Scan | Phase, clubs loaded / to load / failed, clubs listed, time since the last successful scan, scans finished, scan duration, details loaded as a percentage, and what the instance did when a scan was due |
+| Scan | Phase, refresh counts (clubs loaded, scheduled and due), clubs listed, time since the last successful scan, scans finished, scan duration, club details loaded as a percentage of the scheduled clubs (in Redis with Redis), what the instance did when a scan was due, and how long the longest-waiting due club has waited |
 | uma.moe calls | Calls per second by status code and by endpoint and lane, response times, errors per minute by status, and time waiting for the 500 ms spacing |
 | Web traffic | Requests per second by route and status code, error responses, response times, rate-limited visitors and a count of each status code in the last hour |
 | Caches | Where trainer paces and club details came from (memory, Redis, uma.moe or an error), and the detail cache and background queue |

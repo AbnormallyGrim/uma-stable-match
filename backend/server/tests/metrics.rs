@@ -167,6 +167,10 @@ async fn the_metrics_route_reports_the_pool_and_caches() {
         "pool_calibration_factor",
         "detail_cache_clubs",
         "detail_queue_clubs",
+        "refresh_scheduled_clubs",
+        "refresh_loaded_clubs",
+        "refresh_due_clubs",
+        "refresh_overdue_seconds",
     ] {
         assert!(
             rendered.lines().any(|l| l.starts_with(&format!("{name} "))),

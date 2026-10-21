@@ -10,6 +10,7 @@ use axum::Router;
 use metrics_exporter_prometheus::{BuildError, PrometheusBuilder, PrometheusHandle};
 
 use crate::app::AppState;
+use crate::refresher::utc_now;
 
 const BUCKETS: &[f64] = &[
     0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 300.0, 900.0,
@@ -101,6 +102,19 @@ async fn record_state(state: &AppState) {
     state.details.settle().await;
     metrics::gauge!("detail_cache_clubs").set(state.details.cached_clubs() as f64);
     metrics::gauge!("detail_queue_clubs").set(state.details.queued() as f64);
+
+    let refresh = state.details.refresh_status().await;
+    metrics::gauge!("refresh_scheduled_clubs").set(refresh.scheduled as f64);
+    metrics::gauge!("refresh_loaded_clubs").set(refresh.loaded as f64);
+    metrics::gauge!("refresh_due_clubs").set(refresh.due as f64);
+    let overdue = refresh.oldest_due.map_or(0.0, |due| {
+        utc_now()
+            .signed_duration_since(due)
+            .to_std()
+            .unwrap_or_default()
+            .as_secs_f64()
+    });
+    metrics::gauge!("refresh_overdue_seconds").set(overdue);
 }
 
 fn unix_seconds(time: SystemTime) -> f64 {

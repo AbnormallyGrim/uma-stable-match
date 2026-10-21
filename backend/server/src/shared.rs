@@ -526,6 +526,28 @@ impl SharedSchedule {
             .unwrap_or(0)
     }
 
+    pub(crate) async fn coverage(
+        &self,
+        period: Option<Period>,
+        now: DateTime<Utc>,
+    ) -> Option<(usize, usize, usize)> {
+        let script = Script::new(COVERAGE_SCRIPT);
+        let mut invocation = script.prepare_invoke();
+        invocation
+            .key(&self.key)
+            .arg(format!("{KEY_PREFIX}:club:"))
+            .arg(format!(":{}", period_part(period)))
+            .arg(due_by(now));
+        let reply = self
+            .redis
+            .invoke::<Vec<usize>>(&invocation, SNAPSHOT_TIMEOUT)
+            .await?;
+        match reply.as_slice() {
+            [scheduled, loaded, due] => Some((*scheduled, *loaded, *due)),
+            _ => None,
+        }
+    }
+
     pub(crate) async fn lease(&self) -> Option<RefreshLease> {
         let token = format!("{:016x}{:016x}", fastrand::u64(..), fastrand::u64(..));
         let mut take = redis::cmd("SET");
@@ -569,6 +591,11 @@ fn due_seconds(due: DateTime<Utc>) -> u64 {
     u64::try_from(due.timestamp_millis().max(0))
         .unwrap_or(0)
         .div_ceil(1000)
+}
+
+fn due_by(now: DateTime<Utc>) -> u64 {
+    let seconds = u64::try_from(now.timestamp().max(0)).unwrap_or(0);
+    seconds * RANK_SLOTS + RANK_SLOTS - 1
 }
 
 fn rank_slot(rank: u32) -> u64 {
@@ -679,6 +706,18 @@ for i = 3, #ARGV, 2 do
   redis.call('ZADD', KEYS[1], string.format('%.0f', score), ARGV[i])
 end
 return 1
+";
+
+const COVERAGE_SCRIPT: &str = r"
+local ids = redis.call('ZRANGE', KEYS[1], 0, -1)
+local loaded = 0
+for _, id in ipairs(ids) do
+  if redis.call('EXISTS', ARGV[1] .. id .. ARGV[2]) == 1 then
+    loaded = loaded + 1
+  end
+end
+local due = redis.call('ZCOUNT', KEYS[1], '-inf', ARGV[3])
+return {#ids, loaded, due}
 ";
 
 const RESCHEDULE_SCRIPT: &str = r"
