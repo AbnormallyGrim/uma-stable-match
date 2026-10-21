@@ -6,7 +6,7 @@ It has the search form, a summary of each search, the top ten picks as cards, an
 
 ## Requirements
 
-Node.js 22.22.2 or newer on the 22 line, 24.15 or newer on the 24 line, or 26 and later. Some of the tooling (jsdom and ESLint) needs these versions.
+Node.js 22.22.2 or newer on the 22 line, 24.15 or newer on the 24 line, or 26 and later. Some of the tooling (jsdom and ESLint) needs these versions. The main README shows [how to install Node.js](../README.md#prerequisites) on macOS, Windows and Linux.
 
 ## Run
 
@@ -22,6 +22,12 @@ Vite serves the page at <http://localhost:5173> and forwards every `/api` reques
 
 ```bash
 API_TARGET=http://127.0.0.1:3000 npm run dev
+```
+
+In PowerShell on Windows:
+
+```powershell
+$env:API_TARGET="http://127.0.0.1:3000"; npm run dev
 ```
 
 ## Scripts

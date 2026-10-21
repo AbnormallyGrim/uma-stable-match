@@ -53,6 +53,8 @@ Example: `feat: add balance weight option (#12)`
 
 ## Checks before you push
 
+These need the tools in the README's [Prerequisites](README.md#prerequisites), with install steps for macOS, Windows and Linux.
+
 ### Rust
 
 ```bash
@@ -61,7 +63,7 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
 ```
 
-The Redis tests are skipped unless `REDIS_TEST_URL` points at a Redis server, for example `REDIS_TEST_URL=redis://127.0.0.1:6379`. CI always runs them.
+The Redis tests are skipped unless `REDIS_TEST_URL` points at a Redis server, for example `REDIS_TEST_URL=redis://127.0.0.1:6379`. CI always runs them. The server README shows [how to run Redis for them](backend/server/README.md#redis-tests) on each platform.
 
 ### Web frontend
 
