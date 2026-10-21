@@ -17,7 +17,7 @@ mod shared;
 mod telemetry;
 
 pub use app::{app, router, AppState};
-pub use cache::{Cache, CacheStatus, ScanFailure, Snapshot};
+pub use cache::{Cache, CacheStatus, ScanFailure, ScanPhase, ScanProgress, Snapshot};
 pub use calibration::{club_median, Calibration, MIN_CALIBRATION_SAMPLES};
 pub use config::{
     Config, ConfigError, DEFAULT_HOST, DEFAULT_PORT, DEFAULT_RATE_LIMIT_PER_MINUTE,

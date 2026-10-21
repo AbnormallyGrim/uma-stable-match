@@ -14,7 +14,7 @@ use uma_stable_match_server::{
     PaceLookup, RateLimits, ScanConfig, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
-use wiremock::matchers::path;
+use wiremock::matchers::{path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> Client {
@@ -150,6 +150,7 @@ async fn status_before_first_scan() {
         status,
         json!({
             "scanning": false,
+            "scan": null,
             "last_scan": null,
             "last_error": null,
             "pool": { "clubs": 0, "exact_medians": 0, "calibration": { "factor": 1.0, "samples": 0 } },
@@ -283,4 +284,58 @@ async fn unreachable_api_error_hides_the_url() {
     assert_eq!(message, "listing clubs failed: could not reach uma.moe");
     assert!(!message.contains("http"));
     assert!(!message.contains("127.0.0.1"));
+}
+
+#[tokio::test]
+async fn status_reports_the_running_scan() {
+    let server = MockServer::start().await;
+    let circles: Vec<Value> = [1, 2]
+        .iter()
+        .map(|id| {
+            json!({
+                "circle_id": id,
+                "name": "Progress Club",
+                "monthly_rank": 100 + id,
+                "member_count": 20,
+                "monthly_point": 20_000_000 * id,
+                "last_updated": "2026-03-19T15:00:00Z",
+            })
+        })
+        .collect();
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "circles": circles })))
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "1"))
+        .respond_with(detail())
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "2"))
+        .respond_with(detail().set_delay(Duration::from_secs(30)))
+        .mount(&server)
+        .await;
+
+    let running = start(&server, Duration::from_secs(3600));
+    wait_until(&running.cache, |s| {
+        s.progress.as_ref().is_some_and(|p| p.loaded == 1)
+    })
+    .await;
+
+    let status = status_json(&running.cache, &running.details).await;
+    assert_eq!(status["scanning"], true);
+    assert_eq!(status["scan"]["phase"], "loading");
+    assert_eq!(status["scan"]["listed"], 2);
+    assert_eq!(status["scan"]["to_load"], 2);
+    assert_eq!(status["scan"]["loaded"], 1);
+    assert_eq!(status["scan"]["failed"], 0);
+    assert!(status["scan"]["started_at"]
+        .as_str()
+        .unwrap()
+        .ends_with('Z'));
+
+    let cache = running.cache.clone();
+    stop(running).await;
+    assert_eq!(cache.status().progress, None);
 }

@@ -4,7 +4,7 @@
 //! `REDIS_TEST_URL=redis://127.0.0.1:6379 cargo test`; CI sets it. The others use a fake server.
 
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use serde_json::json;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
@@ -13,7 +13,8 @@ use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use uma_stable_match_server::{
     club_key, run_scheduler, Cache, CacheStatus, ClubDetails, ClubPool, DetailConfig, KeySecret,
-    ListedClub, PaceLookup, RedisUrl, ScanConfig, SharedCache, SharedPool, DEFAULT_PACE_TTL,
+    ListedClub, PaceLookup, RedisUrl, ScanConfig, ScanPhase, SharedCache, SharedPool,
+    DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -511,12 +512,23 @@ async fn a_restarted_leader_resumes_the_scan_without_listing_again() {
         config.rank_from, config.rank_to, config.max_details
     );
 
+    let before_first = SystemTime::now();
     let first = instance(&server, config, first_shared);
     wait_for(async || key_exists(&club_key(fast, None)).await).await;
     assert!(key_exists(&progress).await);
     first.stop().await;
 
+    let before_second = SystemTime::now();
     let second = instance(&server, config, redis().await.unwrap());
+    second
+        .wait_until(|s| {
+            s.progress
+                .as_ref()
+                .is_some_and(|p| p.phase == ScanPhase::Loading)
+        })
+        .await;
+    let started = second.cache.status().progress.unwrap().started_at.unwrap();
+    assert!(before_first - Duration::from_millis(1) <= started && started < before_second);
     second.wait_until(|s| s.snapshot.is_some()).await;
     let snapshot = second.cache.snapshot().unwrap();
     assert_eq!(snapshot.candidates, 2);
@@ -554,6 +566,17 @@ async fn waiting_instances_build_their_pool_from_the_scan_in_progress() {
     assert!(first.cache.snapshot().is_none());
     assert!(second.cache.snapshot().is_none());
     assert!(second.cache.status().scanning);
+    let waiting = second.cache.status().progress.unwrap();
+    assert_eq!(waiting.phase, ScanPhase::Waiting);
+    assert_eq!(waiting.listed, 2);
+    let leader_started = first.cache.status().progress.unwrap().started_at.unwrap();
+    let waiting_started = waiting.started_at.unwrap();
+    assert!(
+        leader_started
+            .duration_since(waiting_started)
+            .unwrap_or_default()
+            < Duration::from_millis(1)
+    );
     assert_eq!(calls(&server, "/api/v4/circles/list", None).await, 1);
 
     for running in [first, second] {

@@ -28,7 +28,8 @@ fn starts_empty() {
         CacheStatus {
             scanning: false,
             snapshot: None,
-            last_error: None
+            last_error: None,
+            progress: None,
         }
     );
 }
@@ -92,4 +93,39 @@ fn clones_share_state() {
     clone.begin_scan();
     clone.finish_scan(Ok(scan(&[7])), at(5));
     assert_eq!(cache.snapshot().unwrap().prefetched, 1);
+}
+
+#[test]
+fn progress_is_reported_while_scanning_and_cleared_after() {
+    let cache = Cache::new();
+    cache.update_progress(|p| p.loaded = 5);
+    assert_eq!(cache.status().progress, None);
+
+    cache.begin_scan();
+    cache.start_progress(ScanPhase::Listing, Some(at(100)));
+    cache.update_progress(|p| {
+        p.phase = ScanPhase::Loading;
+        p.listed = 3;
+        p.to_load = 2;
+        p.loaded = 1;
+    });
+    assert_eq!(
+        cache.status().progress,
+        Some(ScanProgress {
+            phase: ScanPhase::Loading,
+            started_at: Some(at(100)),
+            listed: 3,
+            to_load: 2,
+            loaded: 1,
+            failed: 0,
+        })
+    );
+
+    cache.finish_scan(Ok(scan(&[1])), at(200));
+    assert_eq!(cache.status().progress, None);
+
+    cache.begin_scan();
+    cache.start_progress(ScanPhase::Waiting, None);
+    cache.cancel_scan();
+    assert_eq!(cache.status().progress, None);
 }
