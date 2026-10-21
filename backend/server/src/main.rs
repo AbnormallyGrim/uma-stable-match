@@ -7,8 +7,8 @@ use tokio::net::TcpListener;
 use tokio::sync::watch;
 use tracing_subscriber::EnvFilter;
 use uma_stable_match_server::{
-    app, run_scheduler, AppState, Cache, ClubDetails, Config, DetailConfig, PaceLookup, RateLimits,
-    SharedCache, SharedPool,
+    app, install_metrics, metrics_router, run_scheduler, AppState, Cache, ClubDetails, Config,
+    DetailConfig, PaceLookup, RateLimits, SharedCache, SharedPool,
 };
 use uma_stable_match_umamoe_client::{Client, ClientConfig};
 
@@ -26,6 +26,28 @@ async fn main() -> ExitCode {
         Err(error) => {
             tracing::error!("{error}");
             return ExitCode::FAILURE;
+        }
+    };
+
+    let metrics = match config.metrics_addr {
+        None => None,
+        Some(addr) => {
+            let handle = match install_metrics() {
+                Ok(handle) => handle,
+                Err(error) => {
+                    tracing::error!("could not start metrics: {error}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            let listener = match TcpListener::bind(addr).await {
+                Ok(listener) => listener,
+                Err(error) => {
+                    tracing::error!("could not serve metrics on {addr}: {error}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            tracing::info!("serving metrics on {addr}");
+            Some((handle, listener))
         }
     };
 
@@ -96,16 +118,26 @@ async fn main() -> ExitCode {
     if let Some(dir) = &config.frontend_dir {
         tracing::info!("serving the frontend from {}", dir.display());
     }
-    let app = app(
-        AppState {
-            cache,
-            paces,
-            limits,
-            details,
-            matching: config.matching,
-        },
-        config.frontend_dir.as_deref(),
-    );
+    let state = AppState {
+        cache,
+        paces,
+        limits,
+        details,
+        matching: config.matching,
+    };
+    if let Some((handle, listener)) = metrics {
+        let mut stopped = stop.subscribe();
+        let router = metrics_router(handle, state.clone());
+        tokio::spawn(async move {
+            axum::serve(listener, router)
+                .with_graceful_shutdown(async move {
+                    stopped.wait_for(|stop| *stop).await.ok();
+                })
+                .await
+                .ok();
+        });
+    }
+    let app = app(state, config.frontend_dir.as_deref());
     let served = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

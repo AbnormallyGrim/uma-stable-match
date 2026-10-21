@@ -59,6 +59,7 @@ pub struct Config {
     /// Secret for hashing trainer IDs in Redis keys, from `REDIS_KEY_SECRET`. Set whenever
     /// `redis_url` is.
     pub redis_key_secret: Option<KeySecret>,
+    pub metrics_addr: Option<SocketAddr>,
 }
 
 /// Invalid or missing settings.
@@ -86,6 +87,8 @@ pub enum ConfigError {
     /// `REDIS_KEY_SECRET` is shorter than 32 characters. The value isn't shown.
     #[error("REDIS_KEY_SECRET must be at least 32 characters")]
     InvalidRedisKeySecret,
+    #[error("METRICS_ADDR must be an IP address and port, such as 127.0.0.1:9464, got {0:?}")]
+    InvalidMetricsAddr(String),
     /// A true-or-false setting is something else.
     #[error("{name} must be true or false, got {value:?}")]
     InvalidBool {
@@ -212,6 +215,16 @@ impl Config {
                 Some(KeySecret::parse(&value).ok_or(ConfigError::InvalidRedisKeySecret)?)
             }
         };
+        let metrics_addr = match get("METRICS_ADDR") {
+            None => None,
+            Some(value) => Some(
+                value
+                    .parse::<SocketAddr>()
+                    .ok()
+                    .filter(|a| a.port() > 0)
+                    .ok_or(ConfigError::InvalidMetricsAddr(value))?,
+            ),
+        };
         if scan.rank_from > scan.rank_to {
             return Err(ConfigError::InvalidRankWindow {
                 from: scan.rank_from,
@@ -234,6 +247,7 @@ impl Config {
             frontend_dir,
             redis_url,
             redis_key_secret,
+            metrics_addr,
         })
     }
 }
