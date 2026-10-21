@@ -88,3 +88,17 @@ fn shared_failures_keep_their_public_message() {
         "listing clubs failed: could not reach uma.moe"
     );
 }
+
+#[test]
+fn the_page_cap_follows_the_rank_window() {
+    let config = |rank_to, page_size| ScanConfig {
+        rank_from: 1,
+        rank_to,
+        max_details: 10,
+        page_size,
+    };
+    assert_eq!(max_pages(&config(900, 100)), 10);
+    assert_eq!(max_pages(&config(10_000, 100)), 101);
+    assert_eq!(max_pages(&config(64_036, 100)), 642);
+    assert_eq!(max_pages(&config(5, 0)), 6);
+}
