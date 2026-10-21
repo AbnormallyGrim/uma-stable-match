@@ -48,6 +48,23 @@ impl Default for RetryConfig {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct BackoffConfig {
+    pub max_interval: Duration,
+    pub recovery_step: f64,
+    pub recovery_every: Duration,
+}
+
+impl Default for BackoffConfig {
+    fn default() -> Self {
+        Self {
+            max_interval: Duration::from_secs(30),
+            recovery_step: 0.05,
+            recovery_every: Duration::from_secs(10),
+        }
+    }
+}
+
 /// Settings for [`Client`](crate::Client).
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
@@ -61,6 +78,7 @@ pub struct ClientConfig {
     pub min_interval: Duration,
     /// Retry settings.
     pub retry: RetryConfig,
+    pub backoff: BackoffConfig,
     /// `User-Agent` header value.
     pub user_agent: String,
 }
@@ -74,6 +92,7 @@ impl ClientConfig {
             timeout: Duration::from_secs(15),
             min_interval: Duration::from_millis(500),
             retry: RetryConfig::default(),
+            backoff: BackoffConfig::default(),
             user_agent: concat!(
                 "uma-stable-match/",
                 env!("CARGO_PKG_VERSION"),

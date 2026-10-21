@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use reqwest::header::{HeaderValue, ACCEPT};
-use reqwest::Url;
+use reqwest::{StatusCode, Url};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -59,7 +59,10 @@ impl Client {
             base_url,
             api_key,
             retry: config.retry,
-            limiter: Arc::new(RateLimiter::new(config.min_interval)),
+            limiter: Arc::new(RateLimiter::with_backoff(
+                config.min_interval,
+                config.backoff,
+            )),
             priority: Priority::default(),
         })
     }
@@ -139,6 +142,10 @@ impl Client {
                 Ok(response) => {
                     let status = response.status();
                     let retry_after = retry::retry_after(response.headers());
+                    if status == StatusCode::TOO_MANY_REQUESTS {
+                        self.limiter
+                            .throttled(retry_after.map(|wait| wait.min(self.retry.max_delay)));
+                    }
                     let body = response
                         .bytes()
                         .await

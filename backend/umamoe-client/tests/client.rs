@@ -474,3 +474,47 @@ fn clients_default_to_interactive() {
     let background = client.with_priority(Priority::Background);
     assert!(format!("{background:?}").contains("Background"));
 }
+
+#[tokio::test]
+async fn retry_after_pauses_other_requests_too() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "1"))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(json(CIRCLE_LIST))
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(json(CIRCLE))
+        .mount(&server)
+        .await;
+    let interactive = Client::new(ClientConfig {
+        retry: RetryConfig {
+            max_retries: 2,
+            base_delay: Duration::from_millis(1),
+            max_delay: Duration::from_secs(2),
+        },
+        ..config(&server)
+    })
+    .unwrap();
+    let background = interactive.with_priority(Priority::Background);
+
+    let started = Instant::now();
+    let listing = tokio::spawn(async move {
+        interactive
+            .list_circles(&ListCirclesRequest::default())
+            .await
+    });
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    background
+        .circle(&CircleRequest::by_circle_id(900001))
+        .await
+        .unwrap();
+    let waited = started.elapsed();
+    listing.await.unwrap().unwrap();
+
+    assert!(waited >= Duration::from_millis(900), "waited {waited:?}");
+}
