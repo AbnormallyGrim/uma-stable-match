@@ -2475,6 +2475,7 @@ name = "uma-stable-match-umamoe-client"
 version = "0.1.0"
 dependencies = [
  "fastrand",
+ "metrics",
  "reqwest",
  "serde",
  "serde_json",

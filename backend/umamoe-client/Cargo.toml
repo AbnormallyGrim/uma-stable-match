@@ -11,6 +11,7 @@ name = "uma_stable_match_umamoe_client"
 
 [dependencies]
 fastrand = "2"
+metrics = "0.24"
 reqwest = { version = "0.13", default-features = false, features = ["json", "query", "rustls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

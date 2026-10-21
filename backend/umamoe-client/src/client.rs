@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::sync::Arc;
+use std::time::Instant;
 
 use reqwest::header::{HeaderValue, ACCEPT};
 use reqwest::Url;
@@ -105,9 +106,14 @@ impl Client {
         Q: Serialize + ?Sized,
     {
         let url = format!("{}{path}", self.base_url);
+        let lane = lane_label(self.priority);
         let mut retries = 0;
         loop {
+            let waiting = Instant::now();
             self.limiter.acquire(self.priority).await;
+            metrics::histogram!("umamoe_queue_wait_seconds", "lane" => lane)
+                .record(waiting.elapsed().as_secs_f64());
+            let started = Instant::now();
             let result = self
                 .http
                 .get(&url)
@@ -116,11 +122,23 @@ impl Client {
                 .header(ACCEPT, "application/json")
                 .send()
                 .await;
+            let status = match &result {
+                Ok(response) => response.status().as_u16().to_string(),
+                Err(e) => transport_label(e).to_owned(),
+            };
+            metrics::histogram!("umamoe_request_duration_seconds", "endpoint" => path.to_owned(), "lane" => lane)
+                .record(started.elapsed().as_secs_f64());
+            metrics::counter!("umamoe_requests_total", "endpoint" => path.to_owned(), "lane" => lane, "status" => status.clone())
+                .increment(1);
 
             let (error, retry_after) = match result {
                 Ok(response) if response.status().is_success() => {
                     let body = response.bytes().await.map_err(Error::Transport)?;
-                    return serde_json::from_slice(&body).map_err(Error::Decode);
+                    return serde_json::from_slice(&body).map_err(|e| {
+                        metrics::counter!("umamoe_decode_errors_total", "endpoint" => path.to_owned())
+                            .increment(1);
+                        Error::Decode(e)
+                    });
                 }
                 Ok(response) => {
                     let status = response.status();
@@ -143,9 +161,28 @@ impl Client {
             if retries >= self.retry.max_retries {
                 return Err(error);
             }
+            metrics::counter!("umamoe_retries_total", "endpoint" => path.to_owned(), "status" => status)
+                .increment(1);
             let delay = retry::delay(&self.retry, retries, retry_after, fastrand::f64());
             tokio::time::sleep(delay).await;
             retries += 1;
         }
+    }
+}
+
+fn lane_label(priority: Priority) -> &'static str {
+    match priority {
+        Priority::Interactive => "interactive",
+        Priority::Background => "background",
+    }
+}
+
+fn transport_label(error: &reqwest::Error) -> &'static str {
+    if error.is_timeout() {
+        "timeout"
+    } else if error.is_connect() {
+        "connect_error"
+    } else {
+        "transport_error"
     }
 }
