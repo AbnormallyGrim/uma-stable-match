@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://abnormallygrim.github.io/uma-stable-match/sitemap.xml
