@@ -35,7 +35,8 @@ fn scan_config(max_details: u32) -> ScanConfig {
 
 fn refreshing(server: &MockServer, refresh: RefreshConfig) -> ClubDetails {
     let config = DetailConfig {
-        refresh: Some(refresh),
+        refresh,
+        refresher: true,
         ..DetailConfig::default()
     };
     ClubDetails::new(&client(server), SharedPool::default(), config).0
@@ -354,8 +355,11 @@ async fn refreshed_details_do_not_expire() {
     let server = MockServer::start().await;
     mount_detail(&server, 1, detail(1, "Kept", Some(now()))).await;
     let config = DetailConfig {
-        ttl: Duration::from_millis(50),
-        refresh: Some(RefreshConfig::default()),
+        refresh: RefreshConfig {
+            every: Some(Duration::from_millis(50)),
+            ..RefreshConfig::default()
+        },
+        refresher: true,
         ..DetailConfig::default()
     };
     let (details, _) = ClubDetails::new(&client(&server), SharedPool::default(), config);

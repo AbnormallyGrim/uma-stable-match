@@ -13,8 +13,8 @@ use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use uma_stable_match_server::{
     club_key, run_scheduler, Cache, CacheStatus, ClubDetails, ClubPool, DetailConfig, KeySecret,
-    ListedClub, PaceLookup, RedisUrl, ScanConfig, ScanPhase, SharedCache, SharedPool,
-    DEFAULT_PACE_TTL,
+    ListedClub, PaceLookup, RedisUrl, RefreshConfig, ScanConfig, ScanPhase, SharedCache,
+    SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -193,10 +193,7 @@ async fn instances_share_club_details() {
         .mount(&server)
         .await;
 
-    let config = DetailConfig {
-        ttl: Duration::from_secs(60),
-        ..DetailConfig::default()
-    };
+    let config = DetailConfig::default();
     let (first, _a) = ClubDetails::with_shared(&client(&server), pool(id), config, first_shared);
     let (second, _b) =
         ClubDetails::with_shared(&client(&server), pool(id), config, second_shared.clone());
@@ -304,10 +301,7 @@ fn instance(server: &MockServer, config: ScanConfig, shared: SharedCache) -> Ins
     let (details, _loader) = ClubDetails::with_shared(
         &client(server),
         SharedPool::default(),
-        DetailConfig {
-            ttl: Duration::from_secs(60),
-            ..DetailConfig::default()
-        },
+        DetailConfig::default(),
         shared,
     );
     let (stop, stopped) = watch::channel(false);
@@ -608,10 +602,7 @@ async fn a_refresh_reaches_other_instances_with_its_update_time() {
         .respond_with(respond("After"))
         .mount(&server)
         .await;
-    let config = DetailConfig {
-        ttl: Duration::from_secs(60),
-        ..DetailConfig::default()
-    };
+    let config = DetailConfig::default();
     let (first, _a) = ClubDetails::with_shared(&client(&server), pool(id), config, first_shared);
     let (second, _b) =
         ClubDetails::with_shared(&client(&server), pool(id), config, redis().await.unwrap());
@@ -623,6 +614,143 @@ async fn a_refresh_reaches_other_instances_with_its_update_time() {
     assert_eq!(
         second.last_updated(id).await,
         Some("2026-03-19T15:00:00Z".parse().unwrap())
+    );
+    assert_eq!(server.received_requests().await.unwrap().len(), 2);
+}
+
+async fn ttl_millis(key: &str) -> i64 {
+    let url = std::env::var("REDIS_TEST_URL").unwrap();
+    let mut conn = redis::Client::open(url)
+        .unwrap()
+        .get_multiplexed_async_connection()
+        .await
+        .unwrap();
+    redis::cmd("PTTL")
+        .arg(key)
+        .query_async::<i64>(&mut conn)
+        .await
+        .unwrap()
+}
+
+fn updated(id: u64, name: &str, last_updated: &str) -> ResponseTemplate {
+    let mut body = detail(id);
+    body["circle"]["name"] = json!(name);
+    body["circle"]["last_updated"] = json!(last_updated);
+    ResponseTemplate::new(200).set_body_json(body)
+}
+
+fn every(millis: u64) -> DetailConfig {
+    DetailConfig {
+        refresh: RefreshConfig {
+            every: Some(Duration::from_millis(millis)),
+            ..RefreshConfig::default()
+        },
+        ..DetailConfig::default()
+    }
+}
+
+#[tokio::test]
+async fn club_details_stay_in_redis_a_day_past_their_next_refresh() {
+    let Some(shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let id = unique_id();
+    let now: chrono::DateTime<chrono::Utc> = SystemTime::now().into();
+    let last_updated = (now - Duration::from_secs(3600)).to_rfc3339();
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", id.to_string()))
+        .respond_with(updated(id, "Kept", &last_updated))
+        .mount(&server)
+        .await;
+    let (details, _) =
+        ClubDetails::with_shared(&client(&server), pool(id), DetailConfig::default(), shared);
+
+    details.get(id, Priority::Interactive).await.unwrap();
+    let ttl = Duration::from_millis(ttl_millis(&club_key(id, None)).await as u64);
+    let expected = Duration::from_secs(23 * 3600 + 30 * 60 + 24 * 3600);
+    assert!(ttl <= expected, "{ttl:?}");
+    assert!(ttl > expected - Duration::from_secs(60), "{ttl:?}");
+}
+
+#[tokio::test]
+async fn a_club_past_its_next_refresh_is_fetched_again_through_redis() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let id = unique_id();
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", id.to_string()))
+        .respond_with(updated(id, "Before", "2026-03-19T15:00:00Z"))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", id.to_string()))
+        .respond_with(updated(id, "After", "2026-03-20T15:00:00Z"))
+        .mount(&server)
+        .await;
+    let (first, _a) =
+        ClubDetails::with_shared(&client(&server), pool(id), every(100), first_shared);
+    let (second, _b) = ClubDetails::with_shared(
+        &client(&server),
+        pool(id),
+        every(100),
+        redis().await.unwrap(),
+    );
+
+    assert_eq!(
+        first.get(id, Priority::Interactive).await.unwrap().name,
+        "Before"
+    );
+    assert_eq!(
+        second.get(id, Priority::Interactive).await.unwrap().name,
+        "Before"
+    );
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(
+        second.get(id, Priority::Interactive).await.unwrap().name,
+        "After"
+    );
+    assert_eq!(server.received_requests().await.unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn the_last_copy_in_redis_is_served_when_uma_moe_fails() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let id = unique_id();
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", id.to_string()))
+        .respond_with(updated(id, "Kept", "2026-03-19T15:00:00Z"))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", id.to_string()))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&server)
+        .await;
+    let (first, _a) = ClubDetails::with_shared(&client(&server), pool(id), every(50), first_shared);
+    let (second, _b) = ClubDetails::with_shared(
+        &client(&server),
+        pool(id),
+        every(50),
+        redis().await.unwrap(),
+    );
+
+    first.get(id, Priority::Interactive).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(
+        second.get(id, Priority::Interactive).await.unwrap().name,
+        "Kept"
+    );
+    assert_eq!(
+        second.get(id, Priority::Interactive).await.unwrap().name,
+        "Kept"
     );
     assert_eq!(server.received_requests().await.unwrap().len(), 2);
 }

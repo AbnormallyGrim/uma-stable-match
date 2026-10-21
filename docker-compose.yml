@@ -37,7 +37,7 @@ services:
       - --appendonly
       - "no"
       - --maxmemory
-      - 128mb
+      - 512mb
       - --maxmemory-policy
       - volatile-lru
     # Not published: only the server can reach it, over the Compose network.
