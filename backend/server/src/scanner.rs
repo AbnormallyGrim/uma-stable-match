@@ -115,7 +115,7 @@ pub(crate) async fn load(
         updated_at,
     } = install(details, rows, config);
     if details.refreshes() {
-        details.schedule(ids);
+        details.schedule(ids).await;
         let prefetched = details.cached_in_pool().len();
         tracing::info!(candidates, prefetched, "scan listed the clubs");
         return Scan {

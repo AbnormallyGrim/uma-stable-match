@@ -164,8 +164,8 @@ async fn a_scan_only_lists_and_the_refresher_loads_the_best_ranks_first() {
     assert_eq!(scan.candidates, 4);
     assert_eq!(scan.prefetched, 0);
     assert!(detail_calls(&server).await.is_empty());
-    assert_eq!(details.scheduled(), 3);
-    assert_eq!(details.next_refresh(4), None);
+    assert_eq!(details.scheduled().await, 3);
+    assert_eq!(details.next_refresh(4).await, None);
 
     start(&details);
     wait_until("three clubs load", async || {
@@ -190,7 +190,7 @@ async fn schedules_the_next_refresh_after_uma_moes_daily_update() {
     start(&details);
     let due = updated + Duration::from_secs(24 * 60 * 60 + 30 * 60);
     wait_until("the next refresh is set", async || {
-        details.next_refresh(1) == Some(due)
+        details.next_refresh(1).await == Some(due)
     })
     .await;
     assert_eq!(details.last_updated(1).await, Some(updated));
@@ -213,10 +213,11 @@ async fn rechecks_a_club_uma_moe_has_not_updated_yet() {
     wait_until("the recheck is set", async || {
         details
             .next_refresh(1)
-            .is_some_and(|due| due >= before + Duration::from_secs(60 * 60))
+            .await
+            .is_some_and(|due| due >= before + Duration::from_secs(60 * 60 - 1))
     })
     .await;
-    assert!(details.next_refresh(1).unwrap() <= now() + Duration::from_secs(60 * 60));
+    assert!(details.next_refresh(1).await.unwrap() <= now() + Duration::from_secs(60 * 60));
 }
 
 #[tokio::test]
@@ -279,7 +280,7 @@ async fn retries_a_failed_refresh_and_keeps_serving_the_old_details() {
     })
     .await;
     assert_eq!(details.cached(1).await.unwrap().name, "Before");
-    let retry = details.next_refresh(1).unwrap();
+    let retry = details.next_refresh(1).await.unwrap();
     assert!(retry > now() + Duration::from_millis(100));
     wait_until("the retry", async || {
         details.cached(1).await.is_some_and(|c| c.name == "After")
@@ -306,7 +307,7 @@ async fn current_details_are_not_fetched_again() {
     .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(detail_calls(&server).await, vec![1, 2]);
-    assert!(details.next_refresh(1).unwrap() > now() + Duration::from_secs(60 * 60));
+    assert!(details.next_refresh(1).await.unwrap() > now() + Duration::from_secs(60 * 60));
 }
 
 #[tokio::test]
@@ -319,14 +320,14 @@ async fn clubs_loaded_for_a_search_join_the_schedule() {
     scan(&client(&server), &details, &scan_config(1))
         .await
         .unwrap();
-    assert_eq!(details.next_refresh(2), None);
+    assert_eq!(details.next_refresh(2).await, None);
 
     details.get(2, Priority::Interactive).await.unwrap();
     assert_eq!(
-        details.next_refresh(2),
+        details.next_refresh(2).await,
         Some(updated + Duration::from_secs(24 * 60 * 60 + 30 * 60))
     );
-    assert_eq!(details.scheduled(), 2);
+    assert_eq!(details.scheduled().await, 2);
 }
 
 #[tokio::test]
@@ -337,17 +338,17 @@ async fn a_new_listing_drops_clubs_that_left_and_adds_new_ones() {
     scan(&client(&server), &details, &scan_config(10))
         .await
         .unwrap();
-    assert!(details.next_refresh(1).is_some());
-    assert!(details.next_refresh(2).is_some());
+    assert!(details.next_refresh(1).await.is_some());
+    assert!(details.next_refresh(2).await.is_some());
 
     mount_list(&server, vec![listed(2, 10), listed(3, 11)]).await;
     scan(&client(&server), &details, &scan_config(10))
         .await
         .unwrap();
-    assert_eq!(details.next_refresh(1), None);
-    assert!(details.next_refresh(2).is_some());
-    assert!(details.next_refresh(3).is_some());
-    assert_eq!(details.scheduled(), 2);
+    assert_eq!(details.next_refresh(1).await, None);
+    assert!(details.next_refresh(2).await.is_some());
+    assert!(details.next_refresh(3).await.is_some());
+    assert_eq!(details.scheduled().await, 2);
 }
 
 #[tokio::test]

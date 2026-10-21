@@ -24,7 +24,8 @@ pub const DEFAULT_RATE_LIMIT_PER_MINUTE: u32 = 30;
 pub const DEFAULT_TRAINER_LOOKUPS_PER_MINUTE: u32 = 10;
 
 // TODO(#51): adjust the default once uma.moe agrees how often we may scan.
-/// Minutes between scans with Redis when `SCAN_INTERVAL_MINUTES` isn't set.
+/// Minutes between scans for a detail cache without a refresher, and how long a saved scan in
+/// progress can be resumed, when `SCAN_INTERVAL_MINUTES` isn't set.
 pub const DEFAULT_SCAN_INTERVAL_MINUTES: u32 = 180;
 
 /// Server settings. `Debug` output redacts the API key.
@@ -38,8 +39,7 @@ pub struct Config {
     pub bind_addr: SocketAddr,
     /// Scan settings, from `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `SCAN_MAX_DETAILS`.
     pub scan: ScanConfig,
-    /// Time between scans, from `SCAN_INTERVAL_MINUTES`. `None` follows uma.moe's daily update, or
-    /// [`DEFAULT_SCAN_INTERVAL_MINUTES`] with Redis.
+    /// Time between scans, from `SCAN_INTERVAL_MINUTES`. `None` follows uma.moe's daily update.
     pub scan_interval: Option<Duration>,
     /// How often club details are refreshed, from `DETAIL_CACHE_MINUTES`. `None` follows uma.moe's
     /// daily update.

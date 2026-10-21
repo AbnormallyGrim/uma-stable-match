@@ -15,6 +15,7 @@ use uma_stable_match_umamoe_client::{Circle, CircleRequest, Client, Error, Prior
 use crate::calibration::club_median;
 use crate::pool::{ClubPool, Period};
 use crate::refresher::{utc_now, RefreshConfig, Refresher, Refreshing};
+use crate::scanner::ScanConfig;
 use crate::shared::{club_key, SharedCache};
 
 /// The club pool, shared between requests and the detail cache.
@@ -32,8 +33,11 @@ pub struct DetailConfig {
     /// When each club is next refreshed. Details expire from memory then, and stay in the shared
     /// cache a day longer.
     pub refresh: RefreshConfig,
-    /// Whether a [`Refresher`] runs. Details then stay in memory until it replaces them.
+    /// Whether a [`Refresher`] runs. Without a shared cache, details then stay in memory until it
+    /// replaces them; with one, the schedule is shared and they expire when due.
     pub refresher: bool,
+    /// The scan window whose clubs are refreshed. Names the shared schedule.
+    pub scan: ScanConfig,
 }
 
 impl Default for DetailConfig {
@@ -43,6 +47,7 @@ impl Default for DetailConfig {
             queue_size: 1_000,
             refresh: RefreshConfig::default(),
             refresher: false,
+            scan: ScanConfig::default(),
         }
     }
 }
@@ -170,7 +175,7 @@ impl ClubDetails {
         let cache = Cache::builder()
             .max_capacity(config.max_clubs)
             .expire_after(UntilDue {
-                keep: config.refresher,
+                keep: config.refresher && !shared.is_enabled(),
             })
             .build();
         let (sender, receiver) = mpsc::channel(config.queue_size.max(1));
@@ -184,11 +189,14 @@ impl ClubDetails {
                 listed: RwLock::new(HashMap::new()),
                 listing: RwLock::new(None),
                 queued: Mutex::new(HashSet::new()),
-                shared,
                 timing: config.refresh,
-                refreshing: config
-                    .refresher
-                    .then(|| Arc::new(Refreshing::new(config.refresh))),
+                refreshing: config.refresher.then(|| {
+                    Arc::new(Refreshing::new(
+                        config.refresh,
+                        shared.schedule(&config.scan),
+                    ))
+                }),
+                shared,
                 sender,
             }),
         };
@@ -260,32 +268,50 @@ impl ClubDetails {
         DateTime::from_timestamp(entry.last_updated?, 0)
     }
 
-    /// The refresher for this cache, if it has refresh settings. Run only one.
+    /// The refresher for this cache, if it has one. Run one per instance; with a shared cache, only
+    /// the instance holding the refresher lease refreshes.
     pub fn refresher(&self) -> Option<Refresher> {
         let refreshing = self.inner.refreshing.clone()?;
         Some(Refresher::new(self.clone(), refreshing))
     }
 
-    /// Whether this cache has refresh settings.
+    /// Whether this cache has a refresher.
     pub fn refreshes(&self) -> bool {
         self.inner.refreshing.is_some()
     }
 
     /// When a scheduled club is next refreshed.
-    pub fn next_refresh(&self, circle_id: u64) -> Option<DateTime<Utc>> {
-        self.inner.refreshing.as_ref()?.due_at(circle_id)
+    pub async fn next_refresh(&self, circle_id: u64) -> Option<DateTime<Utc>> {
+        self.inner.refreshing.as_ref()?.due_at(circle_id).await
     }
 
     /// Clubs on the refresh schedule.
-    pub fn scheduled(&self) -> usize {
-        self.inner.refreshing.as_ref().map_or(0, |r| r.len())
+    pub async fn scheduled(&self) -> usize {
+        match &self.inner.refreshing {
+            Some(refreshing) => refreshing.len().await,
+            None => 0,
+        }
     }
 
-    pub(crate) fn schedule(&self, clubs: impl IntoIterator<Item = (u64, u32)>) {
+    pub(crate) async fn schedule(&self, clubs: Vec<(u64, u32)>) {
         if let Some(refreshing) = &self.inner.refreshing {
-            let pool = read(&self.inner.pool);
-            refreshing.replace(clubs, |id| pool.contains(id), utc_now());
+            let pool = &self.inner.pool;
+            refreshing
+                .replace(clubs, |id| read(pool).contains(id), utc_now())
+                .await;
         }
+    }
+
+    pub(crate) async fn due(&self, circle_id: u64) -> Option<DateTime<Utc>> {
+        let period = self.period();
+        let due_ms = match self.inner.cache.get(&(circle_id, period)).await {
+            Some(entry) => entry.due_ms,
+            None => {
+                let key = club_key(circle_id, period);
+                self.inner.shared.get::<Stored>(&key).await?.due_ms?
+            }
+        };
+        DateTime::from_timestamp_millis(due_ms)
     }
 
     /// A club's details, only if they're cached.
@@ -440,12 +466,12 @@ async fn fetch(
         club.circle_id = circle_id;
     }
     record_median(inner, &club, circle_id, period);
-    track(inner, circle_id, last_updated);
     let now = utc_now();
     let due = inner.timing.next_refresh(
         last_updated.and_then(|t| DateTime::from_timestamp(t, 0)),
         now,
     );
+    track(inner, circle_id, due).await;
     let keep = due.signed_duration_since(now).to_std().unwrap_or_default() + KEEP_AFTER_DUE;
     let stored = Stored {
         club,
@@ -459,7 +485,7 @@ async fn fetch(
     Ok(Entry::from(stored))
 }
 
-fn track(inner: &Inner, circle_id: u64, last_updated: Option<i64>) {
+async fn track(inner: &Inner, circle_id: u64, due: DateTime<Utc>) {
     let Some(refreshing) = &inner.refreshing else {
         return;
     };
@@ -471,12 +497,7 @@ fn track(inner: &Inner, circle_id: u64, last_updated: Option<i64>) {
         .and_then(|c| c.monthly_rank)
         .and_then(|r| u32::try_from(r).ok())
         .unwrap_or(u32::MAX);
-    let last_updated = last_updated.and_then(|t| DateTime::from_timestamp(t, 0));
-    refreshing.loaded(
-        circle_id,
-        rank,
-        refreshing.config.next_refresh(last_updated, utc_now()),
-    );
+    refreshing.loaded(circle_id, rank, due).await;
 }
 
 fn count_detail(source: &'static str) {
