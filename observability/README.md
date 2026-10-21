@@ -15,33 +15,51 @@ The metrics themselves are described in the [server README](../backend/server/RE
 
 ## 1. Install Prometheus and Grafana
 
-On macOS with [Homebrew](https://brew.sh):
+| Platform | Prometheus | Grafana |
+|---|---|---|
+| macOS | `brew install prometheus` | `brew install grafana` |
+| Windows | Download the `windows-amd64` zip from [prometheus.io/download](https://prometheus.io/download/) and extract it so `prometheus.exe` is at, for example, `C:\prometheus\prometheus.exe` | Download and run the installer from [grafana.com](https://grafana.com/grafana/download?platform=windows). It runs Grafana as a Windows service |
+| Linux | Download the `linux-amd64` archive from [prometheus.io/download](https://prometheus.io/download/) and extract it, for example with `tar xzf prometheus-*.linux-amd64.tar.gz -C ~` | Add Grafana's package repository and install it, following Grafana's guide for [Debian and Ubuntu](https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/) or [Red Hat and Fedora](https://grafana.com/docs/grafana/latest/setup-grafana/installation/redhat-rhel-fedora/) |
 
-```bash
-brew install prometheus grafana
-```
-
-On other systems, use the downloads from [prometheus.io](https://prometheus.io/download/) and [grafana.com](https://grafana.com/grafana/download).
+`brew` commands need [Homebrew](https://brew.sh). On Linux, a distribution's own Prometheus package also works, but it starts its own service on port 9090; stop that service, or use another port in step 5.
 
 ## 2. Keep Grafana on this computer
 
-Grafana listens on every network interface by default. Restrict it to your computer before starting it:
+Grafana listens on every network interface by default. Restrict it to your computer before starting it.
+
+macOS:
 
 ```bash
 sed -i '' 's/^;http_addr =.*/http_addr = 127.0.0.1/' "$(brew --prefix)/etc/grafana/grafana.ini"
-```
-
-```bash
 grep -n '^http_addr' "$(brew --prefix)/etc/grafana/grafana.ini"
 ```
 
-The second command should print `http_addr = 127.0.0.1`. On Linux, `sed -i` takes no `''`, and the file is usually `/etc/grafana/grafana.ini`.
+Linux:
+
+```bash
+sudo sed -i 's/^;http_addr =.*/http_addr = 127.0.0.1/' /etc/grafana/grafana.ini
+grep -n '^http_addr' /etc/grafana/grafana.ini
+```
+
+Both should print `http_addr = 127.0.0.1`.
+
+Windows, in PowerShell run as administrator:
+
+```powershell
+Set-Content "C:\Program Files\GrafanaLabs\grafana\conf\custom.ini" "[server]`nhttp_addr = 127.0.0.1"
+```
+
+If Grafana is installed somewhere else, put `custom.ini` in the `conf` folder of that installation.
 
 ## 3. Start Grafana
 
-```bash
-brew services start grafana
-```
+| Platform | Start | Stop |
+|---|---|---|
+| macOS | `brew services start grafana` | `brew services stop grafana` |
+| Windows (PowerShell as administrator) | `Restart-Service Grafana` | `Stop-Service Grafana` |
+| Linux | `sudo systemctl restart grafana-server` | `sudo systemctl stop grafana-server` |
+
+On Windows and Linux, the restart also picks up the setting from step 2.
 
 Open <http://localhost:3000>, sign in as `admin` with the password `admin`, and choose a new password when asked.
 
@@ -71,14 +89,34 @@ Check that metrics are coming out:
 curl -s http://127.0.0.1:9464/metrics | grep scan_phase
 ```
 
+In PowerShell on Windows:
+
+```powershell
+curl.exe -s http://127.0.0.1:9464/metrics | Select-String scan_phase
+```
+
 If you pick a port other than 9464, change the target in `prometheus.yml` to match.
 
 ## 5. Start Prometheus
 
-From the repository root, in its own terminal:
+From the repository root, in its own terminal.
+
+macOS:
 
 ```bash
 prometheus --config.file=observability/prometheus.yml --storage.tsdb.path=observability/data --web.listen-address=127.0.0.1:9090
+```
+
+Linux, using the folder you extracted Prometheus into:
+
+```bash
+~/prometheus-*/prometheus --config.file=observability/prometheus.yml --storage.tsdb.path=observability/data --web.listen-address=127.0.0.1:9090
+```
+
+Windows, in PowerShell, using the folder you extracted Prometheus into:
+
+```powershell
+C:\prometheus\prometheus.exe --config.file=observability/prometheus.yml --storage.tsdb.path=observability/data --web.listen-address=127.0.0.1:9090
 ```
 
 Prometheus keeps its data in `observability/data/`, which git ignores. At <http://localhost:9090/targets>, the `uma-stable-match` target should be `UP`.
@@ -107,12 +145,7 @@ Some panels stay empty until something happens: the Redis row needs `REDIS_URL`,
 ## Stopping
 
 1. Press Ctrl+C in the Prometheus terminal.
-2. Stop Grafana:
-
-   ```bash
-   brew services stop grafana
-   ```
-
+2. Stop Grafana with the command for your platform from [step 3](#3-start-grafana).
 3. Remove `METRICS_PORT` or `METRICS_ADDR` from `.env` and restart the server.
 
 To start again with no history, delete `observability/data/`.

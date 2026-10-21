@@ -9,7 +9,7 @@ cp .env.example .env    # then add your uma.moe API key after UMAMOE_API_KEY=
 cargo run -p uma-stable-match-server
 ```
 
-Run these from the repository root. The server reads the first `.env` it finds in the directory it's started in or a parent directory. Real environment variables take precedence over `.env`.
+Run these from the repository root; on Windows, use PowerShell. Building needs Rust and a C compiler; the main README's [Prerequisites](../../README.md#prerequisites) show how to install them on macOS, Windows and Linux. The server reads the first `.env` it finds in the directory it's started in or a parent directory. Real environment variables take precedence over `.env`.
 
 To run it in Docker instead, see [Installation](../../README.md#installation) in the main README.
 
@@ -177,7 +177,28 @@ With Redis, instances that have the same `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `S
 
 The keys are `usm:v1:scan:<from>-<to>-<max>:lock`, `:fresh` and `:latest`, so instances with different scan windows don't share.
 
-The Redis tests in `tests/redis.rs` need a Redis server: set `REDIS_TEST_URL`, for example `REDIS_TEST_URL=redis://127.0.0.1:6379 cargo test`. Without it they're skipped. CI runs them against a Redis service container.
+### Redis tests
+
+The Redis tests in `tests/redis.rs` need a Redis server. Without `REDIS_TEST_URL` they're skipped; CI runs them against a Redis service container. To run them locally, start a Redis that keeps nothing on disk:
+
+| Platform | Install and start Redis |
+|---|---|
+| macOS | `brew install redis`, then `redis-server --save "" --appendonly no` in its own terminal |
+| Linux | `sudo apt install redis-server` (Debian, Ubuntu) or `sudo dnf install redis` then `sudo systemctl start redis` (Fedora). The package runs Redis as a service on port 6379 |
+| Windows | Redis has no Windows build. Use Docker, below, or install it in [WSL](https://learn.microsoft.com/windows/wsl/install) as on Linux |
+| Any, with Docker | `docker run -d --rm --name redis-test -p 127.0.0.1:6379:6379 redis:7.4-alpine --save "" --appendonly no`, and `docker stop redis-test` afterwards |
+
+Then run the tests with the URL set:
+
+```bash
+REDIS_TEST_URL=redis://127.0.0.1:6379 cargo test
+```
+
+In PowerShell on Windows:
+
+```powershell
+$env:REDIS_TEST_URL="redis://127.0.0.1:6379"; cargo test
+```
 
 ## Cache and schedule
 
