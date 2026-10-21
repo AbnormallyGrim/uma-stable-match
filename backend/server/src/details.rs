@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use moka::future::Cache;
 use tokio::sync::mpsc;
@@ -50,6 +50,7 @@ struct Inner {
     period: RwLock<Option<Period>>,
     pool: SharedPool,
     listed: RwLock<HashMap<u64, Circle>>,
+    listing: RwLock<Option<(SystemTime, Option<String>)>>,
     queued: Mutex<HashSet<u64>>,
     sender: mpsc::Sender<u64>,
     shared: SharedCache,
@@ -102,6 +103,7 @@ impl ClubDetails {
                 period: RwLock::new(None),
                 pool,
                 listed: RwLock::new(HashMap::new()),
+                listing: RwLock::new(None),
                 queued: Mutex::new(HashSet::new()),
                 shared,
                 ttl: config.ttl,
@@ -219,6 +221,14 @@ impl ClubDetails {
     /// Replaces the shared pool, such as after a scan.
     pub fn replace_pool(&self, pool: ClubPool) {
         *write(&self.inner.pool) = pool;
+    }
+
+    pub(crate) fn listing(&self) -> Option<(SystemTime, Option<String>)> {
+        read(&self.inner.listing).clone()
+    }
+
+    pub(crate) fn set_listing(&self, at: SystemTime, month: Option<String>) {
+        *write(&self.inner.listing) = Some((at, month));
     }
 
     /// Replaces the listed rows used when a club's details come back without club information.

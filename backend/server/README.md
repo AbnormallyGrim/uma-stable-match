@@ -202,7 +202,7 @@ $env:REDIS_TEST_URL="redis://127.0.0.1:6379"; cargo test
 
 ## Cache and schedule
 
-Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan finishes there are no results; with the defaults that takes about 80 seconds. With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule.
+Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away, then scans again `SCAN_INTERVAL_MINUTES` after each scan finishes. Until the first scan has listed the clubs there are no results; with the defaults that takes a few seconds. From then on, searches score the clubs loaded so far, fetch up to `REQUEST_FETCH_BUDGET` more, and report the rest as still loading, while the scan finishes loading details (about 80 seconds with the defaults). With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule.
 
 - **No overlapping scans.** A new scan won't start while one is running.
 - **One scan for all instances.** With Redis, one instance scans and the others load its result; see [Shared scans](#shared-scans).
@@ -322,7 +322,7 @@ With `trainer_id`, the server fetches that trainer's club from uma.moe and finds
 
 - **Cached for `TRAINER_CACHE_MINUTES`** (10 by default). A found pace, and a "not found" or "not enough data" answer, is reused for that long, so repeat requests don't call uma.moe again. Failed uma.moe requests aren't cached.
 - **IDs stay out of logs.** Trainer IDs never appear in log messages or error responses, only in the response to the trainer's own request. Failed lookups log only the HTTP status.
-- **No lookup without results.** Before the first scan finishes, the endpoint returns `503` without contacting uma.moe.
+- **No lookup without results.** Before the first scan has listed the clubs, the endpoint returns `503` without contacting uma.moe.
 
 #### Response
 
@@ -373,7 +373,7 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
 | `trainer.trainer_id` | The trainer ID you asked about, or `null` when you gave a `pace` |
 | `trainer.pace_per_day` | The pace used: yours from uma.moe, or the `pace` you gave |
 | `options` | The settings used, after defaults: `balance_weight` is `null` when balance scoring is off |
-| `updated_at` | When the clubs were scanned |
+| `updated_at` | When the clubs were scanned. Before the first scan finishes, when its club list was fetched |
 | `month` | Game month of the club data, `YYYY-MM` |
 | `coverage.shortlisted` | Clubs on the shortlist for your pace |
 | `coverage.scored` | Clubs with member data that were scored, including cached clubs outside the shortlist |
@@ -400,7 +400,7 @@ Errors come back as `{"error": "..."}`:
 | `422` | The trainer has too little fan data this month to work out a pace |
 | `502` | uma.moe couldn't be reached for the trainer lookup |
 | `429` | Too many requests from this visitor. The `Retry-After` header says how many seconds to wait |
-| `503` | No scan has finished yet. Try again shortly |
+| `503` | The first scan hasn't listed the clubs yet. Try again shortly |
 
 ### Rate limits
 

@@ -290,3 +290,71 @@ async fn reports_the_data_month() {
     let (_, body) = flow.get(MatchSettings::default(), NEAR_3M).await;
     assert_eq!(body["month"], "2026-03");
 }
+
+#[tokio::test]
+async fn serves_results_while_the_first_scan_loads() {
+    let server = MockServer::start().await;
+    let rows: Vec<Value> = (1..=CLUBS).map(|id| circle(id, 1)).collect();
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "circles": rows })))
+        .mount(&server)
+        .await;
+    for id in 1..=CLUBS {
+        Mock::given(path("/api/v4/circles"))
+            .and(query_param("circle_id", id.to_string()))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(detail(id, 1))
+                    .set_delay(Duration::from_secs(if id == 1 { 0 } else { 30 })),
+            )
+            .mount(&server)
+            .await;
+    }
+    let (details, _loader) = ClubDetails::new(
+        &client(&server),
+        SharedPool::default(),
+        DetailConfig::default(),
+    );
+    let cache = Cache::new();
+    let (stop, stopped) = watch::channel(false);
+    let handle = tokio::spawn(run_scheduler(
+        client(&server),
+        details.clone(),
+        ScanConfig {
+            rank_from: 1,
+            rank_to: 900,
+            max_details: 10,
+            page_size: 100,
+        },
+        Duration::from_secs(3600),
+        cache.clone(),
+        stopped,
+    ));
+    let flow = Flow {
+        server,
+        cache: cache.clone(),
+        details,
+        loader: None,
+    };
+
+    let body = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let (status, body) = flow.get(settings(120, 0), NEAR_3M).await;
+            if status == StatusCode::OK && body["total"] == 1 {
+                return body;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("no results while the scan was loading");
+
+    assert!(cache.snapshot().is_none());
+    assert_eq!(body["month"], "2026-03");
+    assert_eq!(ids(&body), vec![1]);
+    assert!(body["coverage"]["pending"].as_u64().unwrap() > 0);
+    assert!(body["updated_at"].as_str().unwrap().ends_with('Z'));
+
+    stop.send(true).unwrap();
+    handle.await.unwrap();
+}

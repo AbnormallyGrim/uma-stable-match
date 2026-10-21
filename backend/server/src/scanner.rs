@@ -1,5 +1,7 @@
 //! Finds candidate clubs and fetches their member data.
 
+use std::time::SystemTime;
+
 use chrono::{DateTime, Utc};
 use uma_stable_match_umamoe_client::{
     Circle, CircleSort, Client, Error, ListCirclesRequest, Priority, SortDir,
@@ -117,6 +119,7 @@ pub(crate) async fn load(details: &ClubDetails, rows: Vec<Circle>, config: &Scan
     let candidates = pool.len();
     let ids = prefetch_ids(&pool, config.max_details as usize);
     details.replace_pool(pool);
+    details.set_listing(SystemTime::now(), month.clone());
 
     metrics::gauge!("scan_phase").set(PHASE_LOADING);
     metrics::gauge!("scan_clubs_to_load").set(ids.len() as f64);

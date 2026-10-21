@@ -90,7 +90,7 @@ UMAMOE_API_KEY=your-key-here
 docker compose up -d
 ```
 
-The first build takes a few minutes. Club data appears about 80 seconds after the server starts, once the first scan finishes.
+The first build takes a few minutes. Searches work a few seconds after the server starts, once the first scan has listed the clubs. Results fill in over about 80 seconds as club details load; until then, they say how many clubs are still loading.
 
 Open **<http://localhost:8080>** in your browser.
 
