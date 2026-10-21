@@ -31,7 +31,6 @@ pub fn install_metrics() -> Result<PrometheusHandle, BuildError> {
             upkeep.run_upkeep();
         }
     });
-    metrics::gauge!("build_info", "version" => env!("CARGO_PKG_VERSION")).set(1.0);
     Ok(handle)
 }
 
@@ -75,16 +74,10 @@ fn route_label(request: &Request) -> String {
 }
 
 async fn record_state(state: &AppState) {
-    let status = state.cache.status();
-    metrics::gauge!("scan_running").set(f64::from(u8::from(status.scanning)));
-    if let Some(snapshot) = &status.snapshot {
+    if let Some(snapshot) = state.cache.snapshot() {
         metrics::gauge!("scan_last_success_timestamp_seconds")
             .set(unix_seconds(snapshot.scanned_at));
-        metrics::gauge!("last_scan_candidates").set(snapshot.candidates as f64);
-        metrics::gauge!("last_scan_clubs_loaded").set(snapshot.prefetched as f64);
-        metrics::gauge!("last_scan_clubs_failed").set(snapshot.failed as f64);
     }
-    metrics::gauge!("scan_last_error").set(f64::from(u8::from(status.last_error.is_some())));
 
     let (clubs, exact, factor, samples) = {
         let pool = state

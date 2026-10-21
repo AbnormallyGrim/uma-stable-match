@@ -1,0 +1,130 @@
+# Local metrics dashboard
+
+A Prometheus config and a Grafana dashboard for watching a server you run yourself: scan progress, uma.moe calls by status code, the server's own requests, caches, Redis and the club pool. Everything runs on your computer and listens on `127.0.0.1` only.
+
+```text
+server (/metrics on 127.0.0.1:9464)  ←  Prometheus (127.0.0.1:9090)  ←  Grafana (127.0.0.1:3000)
+```
+
+| File | What it is |
+|---|---|
+| `prometheus.yml` | Scrapes the server's metrics from `127.0.0.1:9464` every 5 seconds |
+| `grafana-dashboard.json` | The dashboard to import. It asks which Prometheus data source to use |
+
+The metrics themselves are described in the [server README](../backend/server/README.md#metrics).
+
+## 1. Install Prometheus and Grafana
+
+On macOS with [Homebrew](https://brew.sh):
+
+```bash
+brew install prometheus grafana
+```
+
+On other systems, use the downloads from [prometheus.io](https://prometheus.io/download/) and [grafana.com](https://grafana.com/grafana/download).
+
+## 2. Keep Grafana on this computer
+
+Grafana listens on every network interface by default. Restrict it to your computer before starting it:
+
+```bash
+sed -i '' 's/^;http_addr =.*/http_addr = 127.0.0.1/' "$(brew --prefix)/etc/grafana/grafana.ini"
+```
+
+```bash
+grep -n '^http_addr' "$(brew --prefix)/etc/grafana/grafana.ini"
+```
+
+The second command should print `http_addr = 127.0.0.1`. On Linux, `sed -i` takes no `''`, and the file is usually `/etc/grafana/grafana.ini`.
+
+## 3. Start Grafana
+
+```bash
+brew services start grafana
+```
+
+Open <http://localhost:3000>, sign in as `admin` with the password `admin`, and choose a new password when asked.
+
+## 4. Turn on the server's metrics
+
+Metrics are off by default. Turn them on in `.env`, then restart the server.
+
+With Docker Compose, set the port to publish on your computer:
+
+```
+METRICS_PORT=9464
+```
+
+```bash
+docker compose up -d
+```
+
+Running the server with `cargo run` instead, set the address it listens on:
+
+```
+METRICS_ADDR=127.0.0.1:9464
+```
+
+Check that metrics are coming out:
+
+```bash
+curl -s http://127.0.0.1:9464/metrics | grep scan_phase
+```
+
+If you pick a port other than 9464, change the target in `prometheus.yml` to match.
+
+## 5. Start Prometheus
+
+From the repository root, in its own terminal:
+
+```bash
+prometheus --config.file=observability/prometheus.yml --storage.tsdb.path=observability/data --web.listen-address=127.0.0.1:9090
+```
+
+Prometheus keeps its data in `observability/data/`, which git ignores. At <http://localhost:9090/targets>, the `uma-stable-match` target should be `UP`.
+
+## 6. Add Prometheus to Grafana
+
+In Grafana, go to **Connections → Data sources → Add data source → Prometheus**. Set the URL to `http://localhost:9090`, then click **Save & test**.
+
+## 7. Import the dashboard
+
+Go to **Dashboards → New → Import**, upload `observability/grafana-dashboard.json`, choose the Prometheus data source from step 6, and click **Import**. Importing it again later replaces the dashboard rather than adding a copy.
+
+## What the dashboard shows
+
+| Row | Panels |
+|---|---|
+| Scan | Phase, clubs loaded / to load / failed, clubs listed, time since the last successful scan, scans finished, scan duration, details loaded as a percentage, and what the instance did when a scan was due |
+| uma.moe calls | Calls per second by status code and by endpoint and lane, response times, errors per minute by status, and time waiting for the 500 ms spacing |
+| Web traffic | Requests per second by route and status code, error responses, response times, rate-limited visitors and a count of each status code in the last hour |
+| Caches | Where trainer paces and club details came from (memory, Redis, uma.moe or an error), and the detail cache and background queue |
+| Redis | Up or down, operation times and errors |
+| Club pool | Clubs in the pool, clubs with an exact median, and the calibration factor and samples |
+
+Some panels stay empty until something happens: the Redis row needs `REDIS_URL`, error panels need errors, and rates need about a minute of data.
+
+## Stopping
+
+1. Press Ctrl+C in the Prometheus terminal.
+2. Stop Grafana:
+
+   ```bash
+   brew services stop grafana
+   ```
+
+3. Remove `METRICS_PORT` or `METRICS_ADDR` from `.env` and restart the server.
+
+To start again with no history, delete `observability/data/`.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| The target is `DOWN` | The server isn't running, or metrics are off. Check the `curl` command from step 4 |
+| `address already in use` | Another program uses that port. Pick another `METRICS_PORT`, or another `--web.listen-address`, and update `prometheus.yml` or the Grafana data source to match |
+| The dashboard shows "No data" everywhere | The Grafana data source points somewhere else, or Prometheus isn't running. Use **Save & test** on the data source |
+
+## Changing the dashboard
+
+Edit it in Grafana, then export it with **Export → Export as JSON**, turning on the option to export for sharing externally. That keeps the data source as a choice made on import, rather than your own data source's ID. Check the file holds nothing from your own instance, such as user IDs, before replacing `grafana-dashboard.json`.

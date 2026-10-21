@@ -402,7 +402,7 @@ IP addresses are kept in memory only while they're being limited, and they're ne
 
 With `METRICS_ADDR` set, the server records metrics and serves them in the Prometheus text format at `GET /metrics`, on that address only. The app's port never serves them. Unset, nothing is recorded.
 
-Keep the address private: `127.0.0.1:<port>` on its own, or in Docker `0.0.0.0:<port>` inside the container with the port published to `127.0.0.1` only. Labels never include trainer IDs or IP addresses. Routes are labelled by their pattern, such as `/api/v1/recommendations`; paths that match no route are labelled `/api (unknown)` or `frontend`.
+Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, set `METRICS_PORT` in `.env` instead: the container listens on `0.0.0.0:9464` and Compose publishes it to `127.0.0.1:<METRICS_PORT>` only. Labels never include trainer IDs or IP addresses. Routes are labelled by their pattern, such as `/api/v1/recommendations`; paths that match no route are labelled `/api (unknown)` or `frontend`.
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
@@ -410,25 +410,17 @@ Keep the address private: `127.0.0.1:<port>` on its own, or in Docker `0.0.0.0:<
 | `http_request_duration_seconds` | histogram | `route`, `method` | Time to answer a request |
 | `rate_limited_total` | counter | `limit`: `requests` or `trainer_lookups` | Requests turned away by a [rate limit](#rate-limits) |
 | `scan_phase` | gauge | | `0` idle, `1` listing clubs, `2` loading club details |
-| `scan_list_pages_total` | counter | | List pages fetched |
 | `scan_listed_clubs` | gauge | | Clubs in the rank window listed so far in this scan |
-| `scan_candidates` | gauge | | Clubs in the pool being loaded |
 | `scan_clubs_to_load`, `scan_clubs_loaded`, `scan_clubs_failed` | gauge | | Progress of the current scan's prefetch |
 | `scans_total` | counter | `source`: `alone`, `lead` or `published`; `result`: `ok` or `error` | Scans finished, whether run here or loaded from another instance |
 | `scan_duration_seconds` | histogram | `source` | Time from a scan's start to its end |
 | `scan_turns_total` | counter | `turn`: `alone`, `lead`, `wait` or `fresh` | What the instance did when a scan was due; see [Shared scans](#shared-scans) |
-| `scan_running` | gauge | | `1` while a scan runs or the instance waits for another's |
 | `scan_last_success_timestamp_seconds` | gauge | | Unix time of the last successful scan |
-| `scan_last_error` | gauge | | `1` if the last scan failed |
-| `last_scan_candidates`, `last_scan_clubs_loaded`, `last_scan_clubs_failed` | gauge | | Counts from the last successful scan |
 | `pool_clubs`, `pool_exact_medians` | gauge | | Clubs in the pool, and how many have an exact median |
 | `pool_calibration_factor`, `pool_calibration_samples` | gauge | | The mean-to-median factor and how many clubs it's based on |
-| `build_info` | gauge | `version` | Always `1`; the label holds the server version |
-| `umamoe_requests_total` | counter | `endpoint`, `lane`, `status` | uma.moe calls by HTTP status code, or `timeout`, `connect_error` or `transport_error` |
+| `umamoe_requests_total` | counter | `endpoint`, `lane`, `status` | uma.moe calls by HTTP status code, or `timeout`, `connect_error` or `transport_error`. Each retry counts as another call |
 | `umamoe_request_duration_seconds` | histogram | `endpoint`, `lane` | uma.moe response time |
 | `umamoe_queue_wait_seconds` | histogram | `lane` | Time waiting for the client's 500 ms spacing |
-| `umamoe_retries_total` | counter | `endpoint`, `status` | uma.moe retries, by the status that caused them |
-| `umamoe_decode_errors_total` | counter | `endpoint` | uma.moe responses that couldn't be read |
 | `club_detail_lookups_total` | counter | `source`: `memory`, `redis`, `umamoe` or `error` | Where each club's details came from; `error` means the uma.moe fetch failed |
 | `pace_lookups_total` | counter | `source`: `memory`, `redis`, `umamoe` or `error` | Where each trainer's pace came from |
 | `detail_cache_clubs` | gauge | | Clubs in this instance's detail cache |
@@ -437,7 +429,9 @@ Keep the address private: `127.0.0.1:<port>` on its own, or in Docker `0.0.0.0:<
 | `redis_errors_total` | counter | `reason` | Failed or timed-out Redis operations, by the kind of failure |
 | `redis_op_duration_seconds` | histogram | `op`: `get`, `set` or `script` | Time per Redis operation, failures included |
 
-The `scan_last_*`, `last_scan_*`, `scan_running`, `pool_*` and `detail_*` values are read from the server each time `/metrics` is requested; the detail cache settles its pending work first, so `detail_cache_clubs` is exact. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
+`scan_last_success_timestamp_seconds` and the `pool_*` and `detail_*` values are read from the server each time `/metrics` is requested; the detail cache settles its pending work first, so `detail_cache_clubs` is exact. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
+
+To watch these on a dashboard, [observability/README.md](../../observability/README.md) sets up Prometheus and Grafana locally, with a ready-made dashboard.
 
 ## Shutdown
 

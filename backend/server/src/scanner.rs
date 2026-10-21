@@ -119,7 +119,6 @@ pub(crate) async fn load(details: &ClubDetails, rows: Vec<Circle>, config: &Scan
     details.replace_pool(pool);
 
     metrics::gauge!("scan_phase").set(PHASE_LOADING);
-    metrics::gauge!("scan_candidates").set(candidates as f64);
     metrics::gauge!("scan_clubs_to_load").set(ids.len() as f64);
     metrics::gauge!("scan_clubs_loaded").set(0.0);
     metrics::gauge!("scan_clubs_failed").set(0.0);
@@ -185,7 +184,6 @@ pub(crate) async fn list_candidates(
                 ScanError::List(e)
             })?
             .circles;
-        metrics::counter!("scan_list_pages_total").increment(1);
         let Some(last) = rows.last() else { break };
         let done = last.monthly_rank.unwrap_or(0) >= config.rank_to as i32
             || rows.len() < config.page_size as usize;
