@@ -8,10 +8,10 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# Builds the server. aws-lc-sys, used by rustls, compiles C code and needs cmake.
+# Builds the server. aws-lc-sys, used by rustls, compiles C code with the system C compiler.
 FROM rust:1-bookworm AS server
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential cmake \
+    && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
