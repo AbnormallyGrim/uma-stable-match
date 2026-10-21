@@ -304,7 +304,8 @@ All endpoints are under `/api/v1`.
   },
   "last_error": null,
   "pool": { "clubs": 152, "exact_medians": 152, "calibration": { "factor": 0.86, "samples": 152 } },
-  "details": { "cached": 152, "queued": 0 }
+  "details": { "cached": 152, "queued": 0 },
+  "refresh": { "scheduled": 152, "loaded": 152, "due": 0, "oldest_due_at": null }
 }
 ```
 
@@ -320,6 +321,10 @@ All endpoints are under `/api/v1`.
 | `pool.calibration` | The mean-to-median factor and how many clubs it's based on |
 | `details.cached` | Clubs in the detail cache (approximate) |
 | `details.queued` | Clubs waiting for a background load |
+| `refresh.scheduled` | Clubs on the [refresh](#refresher) schedule |
+| `refresh.loaded` | Scheduled clubs whose details are stored: in Redis with Redis, otherwise in this instance's memory |
+| `refresh.due` | Scheduled clubs due for a refresh now. It jumps after uma.moe's daily update, then falls as the refresher catches up |
+| `refresh.oldest_due_at` | When the longest-waiting due club became due, or `null` when none are due |
 
 While a scan runs, `scan` looks like this:
 
@@ -501,11 +506,15 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `pace_lookups_total` | counter | `source`: `memory`, `redis`, `umamoe` or `error` | Where each trainer's pace came from |
 | `detail_cache_clubs` | gauge | | Clubs in this instance's detail cache |
 | `detail_queue_clubs` | gauge | | Clubs waiting for a background load |
+| `refresh_scheduled_clubs` | gauge | | Clubs on the refresh schedule |
+| `refresh_loaded_clubs` | gauge | | Scheduled clubs whose details are stored: in Redis with Redis, otherwise in memory. Divided by `refresh_scheduled_clubs`, it's how complete the stored data is |
+| `refresh_due_clubs` | gauge | | Scheduled clubs due for a refresh now |
+| `refresh_overdue_seconds` | gauge | | How long the longest-waiting due club has waited, `0` when none are due |
 | `redis_up` | gauge | | `1` while Redis answers, `0` after a failure. Absent without Redis |
 | `redis_errors_total` | counter | `reason` | Failed or timed-out Redis operations, by the kind of failure |
 | `redis_op_duration_seconds` | histogram | `op`: `get`, `set`, `script` or `schedule` | Time per Redis operation, failures included |
 
-`scan_last_success_timestamp_seconds` and the `pool_*` and `detail_*` values are read from the server each time `/metrics` is requested; the detail cache settles its pending work first, so `detail_cache_clubs` is exact. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
+`scan_last_success_timestamp_seconds` and the `pool_*`, `detail_*` and `refresh_*` values are read from the server each time `/metrics` is requested. With Redis, the `refresh_*` values come from one script over the shared schedule, so every instance reports the same; the detail cache settles its pending work first, so `detail_cache_clubs` is exact. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
 
 To watch these on a dashboard, [observability/README.md](../../observability/README.md) sets up Prometheus and Grafana locally, with a ready-made dashboard.
 

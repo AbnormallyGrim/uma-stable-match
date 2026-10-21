@@ -293,6 +293,7 @@ impl ClubDetails {
         }
     }
 
+    /// How current the scheduled clubs' details are. All zero without a refresher.
     pub async fn refresh_status(&self) -> RefreshStatus {
         let Some(refreshing) = &self.inner.refreshing else {
             return RefreshStatus::default();

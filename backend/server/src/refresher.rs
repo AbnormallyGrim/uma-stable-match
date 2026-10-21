@@ -60,11 +60,17 @@ impl RefreshConfig {
     }
 }
 
+/// How current the scheduled clubs' details are.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RefreshStatus {
+    /// Clubs on the refresh schedule.
     pub scheduled: usize,
+    /// Scheduled clubs whose details are stored: in the shared cache with Redis, otherwise in
+    /// memory.
     pub loaded: usize,
+    /// Scheduled clubs due for a refresh now.
     pub due: usize,
+    /// When the longest-waiting due club became due, if any are due.
     pub oldest_due: Option<DateTime<Utc>>,
 }
 
