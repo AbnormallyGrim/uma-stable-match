@@ -11,9 +11,6 @@ use crate::cache::{Cache, ScanPhase};
 use crate::details::ClubDetails;
 use crate::pool::{game_month, is_early_month, previous_game_month, ClubPool, ListedClub, Period};
 
-// Safety stop in case the API never returns a short page.
-const MAX_PAGES: u32 = 100;
-
 /// Which clubs a scan looks at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScanConfig {
@@ -208,7 +205,7 @@ pub(crate) async fn list_candidates(
     };
 
     let mut candidates = Vec::new();
-    for page in 0..MAX_PAGES {
+    for page in 0..max_pages(config) {
         let rows = client
             .list_circles(&request.page(page))
             .await
@@ -225,6 +222,15 @@ pub(crate) async fn list_candidates(
         }
     }
     Ok(candidates)
+}
+
+// Safety stop in case the API never returns a short page: enough pages to reach `rank_to`, plus
+// one.
+fn max_pages(config: &ScanConfig) -> u32 {
+    config
+        .rank_to
+        .div_ceil(config.page_size.max(1))
+        .saturating_add(1)
 }
 
 fn in_window(circle: &Circle, config: &ScanConfig) -> bool {

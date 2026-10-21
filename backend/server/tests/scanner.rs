@@ -424,3 +424,76 @@ async fn later_in_the_month_uses_the_current_month() {
     assert_eq!(scan.unwrap().month.as_deref(), Some("2026-03"));
     assert_eq!(details.period(), None);
 }
+
+fn ranked_page(rank_for: impl Fn(u32) -> i32 + Send + Sync + 'static) -> impl wiremock::Respond {
+    move |request: &wiremock::Request| {
+        let page: u32 = request
+            .url
+            .query_pairs()
+            .find(|(k, _)| k == "page")
+            .and_then(|(_, v)| v.parse().ok())
+            .unwrap_or(0);
+        let rank = rank_for(page);
+        page_of(vec![listed(u64::from(page) + 1, rank, 20)], 1)
+    }
+}
+
+fn page_of(circles: Vec<Value>, limit: u32) -> ResponseTemplate {
+    ResponseTemplate::new(200).set_body_json(json!({
+        "circles": circles,
+        "total": 0,
+        "page": 0,
+        "limit": limit,
+        "total_pages": 0,
+    }))
+}
+
+async fn list_calls(server: &MockServer) -> usize {
+    server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .filter(|r| r.url.path() == "/api/v4/circles/list")
+        .count()
+}
+
+#[tokio::test]
+async fn lists_past_a_hundred_pages_when_the_window_needs_it() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ranked_page(|page| page as i32 + 1))
+        .mount(&server)
+        .await;
+    let config = ScanConfig {
+        rank_from: 1,
+        rank_to: 150,
+        max_details: 0,
+        page_size: 1,
+    };
+
+    let (result, details) = run(&server, &config).await;
+
+    assert_eq!(result.unwrap().candidates, 150);
+    assert_eq!(details.pool().read().unwrap().len(), 150);
+    assert_eq!(list_calls(&server).await, 150);
+}
+
+#[tokio::test]
+async fn stops_at_the_page_cap_when_pages_never_end() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ranked_page(|_| 1))
+        .mount(&server)
+        .await;
+    let config = ScanConfig {
+        rank_from: 1,
+        rank_to: 5,
+        max_details: 0,
+        page_size: 1,
+    };
+
+    run(&server, &config).await.0.unwrap();
+
+    assert_eq!(list_calls(&server).await, 6);
+}
