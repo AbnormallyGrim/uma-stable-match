@@ -458,6 +458,7 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `umamoe_requests_total` | counter | `endpoint`, `lane`, `status` | uma.moe calls by HTTP status code, or `timeout`, `connect_error` or `transport_error`. Each retry counts as another call |
 | `umamoe_request_duration_seconds` | histogram | `endpoint`, `lane` | uma.moe response time |
 | `umamoe_queue_wait_seconds` | histogram | `lane` | Time waiting for the client's 500 ms spacing |
+| `umamoe_allowed_rate` | gauge | | uma.moe calls per second currently allowed: 2 normally, lower while backing off after 429s |
 | `club_detail_lookups_total` | counter | `source`: `memory`, `redis`, `umamoe` or `error` | Where each club's details came from; `error` means the uma.moe fetch failed |
 | `pace_lookups_total` | counter | `source`: `memory`, `redis`, `umamoe` or `error` | Where each trainer's pace came from |
 | `detail_cache_clubs` | gauge | | Clubs in this instance's detail cache |

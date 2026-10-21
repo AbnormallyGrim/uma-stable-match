@@ -48,10 +48,15 @@ impl Default for RetryConfig {
     }
 }
 
+/// How the client slows down when uma.moe answers 429, and speeds up again. Has no effect when
+/// `min_interval` is zero.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BackoffConfig {
+    /// Longest gap between requests the client slows down to.
     pub max_interval: Duration,
+    /// Requests per second added back after each quiet period.
     pub recovery_step: f64,
+    /// Length of a quiet period: time without a 429, after any `Retry-After` pause.
     pub recovery_every: Duration,
 }
 
@@ -78,6 +83,7 @@ pub struct ClientConfig {
     pub min_interval: Duration,
     /// Retry settings.
     pub retry: RetryConfig,
+    /// Backoff settings for 429 responses.
     pub backoff: BackoffConfig,
     /// `User-Agent` header value.
     pub user_agent: String,
