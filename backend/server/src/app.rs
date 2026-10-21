@@ -11,7 +11,7 @@ use axum::routing::{any, get};
 use axum::{Json, Router};
 use serde_json::{json, Value};
 
-use crate::cache::Cache;
+use crate::cache::{Cache, ScanPhase};
 use crate::details::ClubDetails;
 use crate::frontend;
 use crate::limits::{limit_requests, RateLimits};
@@ -76,8 +76,23 @@ async fn status(State(state): State<AppState>) -> Json<Value> {
             .unwrap_or_else(|e| e.into_inner());
         (pool.len(), pool.exact_medians(), pool.calibration())
     };
+    let scan = status.progress.map(|p| {
+        json!({
+            "phase": match p.phase {
+                ScanPhase::Listing => "listing",
+                ScanPhase::Loading => "loading",
+                ScanPhase::Waiting => "waiting",
+            },
+            "started_at": p.started_at.map(timestamp),
+            "listed": p.listed,
+            "to_load": p.to_load,
+            "loaded": p.loaded,
+            "failed": p.failed,
+        })
+    });
     Json(json!({
         "scanning": status.scanning,
+        "scan": scan,
         "last_scan": status.snapshot.map(|s| json!({
             "finished_at": timestamp(s.scanned_at),
             "clubs": s.prefetched,
