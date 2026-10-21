@@ -100,7 +100,7 @@ async fn flow(closed: &[u64], failing: &[u64], max_details: u32) -> Flow {
         client(&server),
         details.clone(),
         config,
-        Duration::from_secs(3600),
+        Some(Duration::from_secs(3600)),
         cache.clone(),
         stopped,
     ));
@@ -326,7 +326,7 @@ async fn serves_results_while_the_first_scan_loads() {
             max_details: 10,
             page_size: 100,
         },
-        Duration::from_secs(3600),
+        Some(Duration::from_secs(3600)),
         cache.clone(),
         stopped,
     ));

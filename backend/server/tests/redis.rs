@@ -315,7 +315,7 @@ fn instance(server: &MockServer, config: ScanConfig, shared: SharedCache) -> Ins
         client(server),
         details.clone(),
         config,
-        Duration::from_secs(3600),
+        Some(Duration::from_secs(3600)),
         cache.clone(),
         stopped,
     ));

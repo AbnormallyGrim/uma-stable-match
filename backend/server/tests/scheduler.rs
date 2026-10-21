@@ -11,7 +11,7 @@ use tokio::task::JoinHandle;
 use tower::ServiceExt;
 use uma_stable_match_server::{
     router, run_scheduler, AppState, Cache, CacheStatus, ClubDetails, DetailConfig, MatchSettings,
-    PaceLookup, RateLimits, ScanConfig, SharedPool, DEFAULT_PACE_TTL,
+    PaceLookup, RateLimits, RefreshConfig, ScanConfig, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -87,14 +87,17 @@ struct Running {
 }
 
 fn start(server: &MockServer, interval: Duration) -> Running {
+    start_with(server, details(&client(server)), Some(interval))
+}
+
+fn start_with(server: &MockServer, details: ClubDetails, every: Option<Duration>) -> Running {
     let cache = Cache::new();
-    let details = details(&client(server));
     let (stop, stopped) = watch::channel(false);
     let handle = tokio::spawn(run_scheduler(
         client(server),
         details.clone(),
         ScanConfig::default(),
-        interval,
+        every,
         cache.clone(),
         stopped,
     ));
@@ -208,6 +211,64 @@ async fn rescans_on_the_interval() {
     stop(running).await;
 }
 
+fn refreshing(server: &MockServer) -> ClubDetails {
+    let config = DetailConfig {
+        refresh: Some(RefreshConfig::default()),
+        ..DetailConfig::default()
+    };
+    ClubDetails::new(&client(server), SharedPool::default(), config).0
+}
+
+async fn mount_list(server: &MockServer) {
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(list())
+        .mount(server)
+        .await;
+}
+
+#[tokio::test]
+async fn with_a_refresher_lists_once_until_uma_moes_next_update() {
+    let server = MockServer::start().await;
+    mount_list(&server).await;
+    let running = start_with(&server, refreshing(&server), None);
+    wait_until(&running.cache, |s| s.snapshot.is_some()).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(list_calls(&server).await, 1);
+    assert_eq!(running.details.scheduled(), 1);
+    stop(running).await;
+}
+
+#[tokio::test]
+async fn with_a_refresher_a_set_interval_overrides_the_daily_update() {
+    let server = MockServer::start().await;
+    mount_list(&server).await;
+    let running = start_with(
+        &server,
+        refreshing(&server),
+        Some(Duration::from_millis(50)),
+    );
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while list_calls(&server).await < 3 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("expected repeated scans");
+    stop(running).await;
+}
+
+#[tokio::test]
+async fn without_a_refresher_or_interval_scans_on_the_default_interval() {
+    let server = MockServer::start().await;
+    mount_list(&server).await;
+    mount_detail(&server).await;
+    let running = start_with(&server, details(&client(&server)), None);
+    wait_until(&running.cache, |s| s.snapshot.is_some()).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(list_calls(&server).await, 1);
+    stop(running).await;
+}
+
 #[tokio::test]
 async fn failed_scan_keeps_last_results() {
     let server = MockServer::start().await;
@@ -271,7 +332,7 @@ async fn unreachable_api_error_hides_the_url() {
         unreachable,
         unreachable_details.clone(),
         ScanConfig::default(),
-        Duration::from_secs(3600),
+        Some(Duration::from_secs(3600)),
         cache.clone(),
         stopped,
     ));

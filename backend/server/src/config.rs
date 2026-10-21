@@ -39,7 +39,7 @@ pub struct Config {
     /// Scan settings, from `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `SCAN_MAX_DETAILS`.
     pub scan: ScanConfig,
     /// Time between scans, from `SCAN_INTERVAL_MINUTES`.
-    pub scan_interval: Duration,
+    pub scan_interval: Option<Duration>,
     /// How often club details are refreshed, from `DETAIL_CACHE_MINUTES`. `None` follows uma.moe's
     /// daily update, or the scan interval with Redis.
     pub detail_cache: Option<Duration>,
@@ -164,8 +164,12 @@ impl Config {
             max_details: number("SCAN_MAX_DETAILS", defaults.max_details)?,
             ..defaults
         };
-        let scan_interval_minutes = number("SCAN_INTERVAL_MINUTES", DEFAULT_SCAN_INTERVAL_MINUTES)?;
-        let scan_interval = Duration::from_secs(u64::from(scan_interval_minutes) * 60);
+        let scan_interval = match get("SCAN_INTERVAL_MINUTES") {
+            None => None,
+            Some(_) => Some(Duration::from_secs(
+                u64::from(number("SCAN_INTERVAL_MINUTES", 0)?) * 60,
+            )),
+        };
         let detail_cache = match get("DETAIL_CACHE_MINUTES") {
             None => None,
             Some(_) => Some(Duration::from_secs(

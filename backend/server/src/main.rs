@@ -2,6 +2,7 @@
 
 use std::net::SocketAddr;
 use std::process::ExitCode;
+use std::time::Duration;
 
 use tokio::net::TcpListener;
 use tokio::sync::watch;
@@ -9,6 +10,7 @@ use tracing_subscriber::EnvFilter;
 use uma_stable_match_server::{
     app, install_metrics, metrics_router, run_scheduler, AppState, Cache, ClubDetails, Config,
     DetailConfig, PaceLookup, RateLimits, RefreshConfig, SharedCache, SharedPool,
+    DEFAULT_SCAN_INTERVAL_MINUTES,
 };
 use uma_stable_match_umamoe_client::{Client, ClientConfig};
 
@@ -95,6 +97,7 @@ async fn main() -> ExitCode {
         config.trust_forwarded_for,
     );
     let window = u64::from(config.scan.rank_to - config.scan.rank_from + 1);
+    let shared_interval = Duration::from_secs(u64::from(DEFAULT_SCAN_INTERVAL_MINUTES) * 60);
     let refresh = (!shared.is_enabled()).then(|| RefreshConfig {
         every: config.detail_cache,
         ..RefreshConfig::default()
@@ -103,7 +106,10 @@ async fn main() -> ExitCode {
         &client,
         SharedPool::default(),
         DetailConfig {
-            ttl: config.detail_cache.unwrap_or(config.scan_interval),
+            ttl: config
+                .detail_cache
+                .or(config.scan_interval)
+                .unwrap_or(shared_interval),
             max_clubs: window * 2,
             queue_size: window as usize,
             refresh,

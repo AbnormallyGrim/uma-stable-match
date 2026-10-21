@@ -136,7 +136,7 @@ async fn scanned_cache() -> Scanned {
         client,
         details.clone(),
         ScanConfig::default(),
-        Duration::from_secs(3600),
+        Some(Duration::from_secs(3600)),
         cache.clone(),
         stopped,
     ));

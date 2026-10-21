@@ -8,6 +8,7 @@ fn scan(ids: &[u64]) -> Scan {
         prefetched: ids.len(),
         failed: 1,
         month: Some("2026-03".into()),
+        updated_at: None,
     }
 }
 
