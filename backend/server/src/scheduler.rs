@@ -60,7 +60,9 @@ impl InProgress {
     }
 }
 
-/// Scans now, then every `interval`, until `shutdown` turns true.
+/// Scans now, then again until `shutdown` turns true: every `every` if set; with `None`, after
+/// uma.moe's next daily update if `details` has a refresher, otherwise every
+/// [`DEFAULT_SCAN_INTERVAL_MINUTES`](crate::DEFAULT_SCAN_INTERVAL_MINUTES).
 ///
 /// With Redis, instances share one scan: one scans and publishes, the others load it. A scan in
 /// progress at shutdown is cancelled.

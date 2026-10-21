@@ -47,6 +47,7 @@ pub struct Scan {
     pub failed: usize,
     /// Game month of the listed data, as `YYYY-MM`.
     pub month: Option<String>,
+    /// When uma.moe last updated the listed data.
     pub updated_at: Option<DateTime<Utc>>,
 }
 
