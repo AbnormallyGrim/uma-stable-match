@@ -10,9 +10,12 @@ services:
       HOST: 0.0.0.0
       PORT: "8080"
       FRONTEND_DIR: /app/frontend
-    # Reachable only from this computer. PORT in .env picks the port.
+      # Metrics stay off unless METRICS_PORT is set in .env.
+      METRICS_ADDR: ${METRICS_PORT:+0.0.0.0:9464}
+    # Reachable only from this computer. PORT and METRICS_PORT in .env pick the ports.
     ports:
       - "127.0.0.1:${PORT:-8080}:8080"
+      - "127.0.0.1:${METRICS_PORT:-9464}:9464"
     depends_on:
       redis:
         condition: service_healthy

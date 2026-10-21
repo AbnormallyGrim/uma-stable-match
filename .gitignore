@@ -59,6 +59,7 @@ pnpm-debug.log*
 # Local runtime data (Docker volumes, Redis dumps, logs)
 # ---------------------------------------------------------------------------
 /data/
+/observability/data/
 dump.rdb
 *.log
 

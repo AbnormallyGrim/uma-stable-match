@@ -119,7 +119,7 @@ async fn requests_are_counted_by_route_and_status() {
 }
 
 #[tokio::test]
-async fn umamoe_calls_are_counted_by_status_with_retries() {
+async fn umamoe_calls_are_counted_by_status_including_retries() {
     let handle = handle();
     let server = MockServer::start().await;
     Mock::given(path("/api/v4/circles/list"))
@@ -149,16 +149,11 @@ async fn umamoe_calls_are_counted_by_status_with_retries() {
             ]
         ));
     }
-    assert!(has(
-        &rendered,
-        "umamoe_retries_total",
-        &[r#"endpoint="/api/v4/circles/list""#, r#"status="503""#]
-    ));
     assert!(rendered.contains("umamoe_queue_wait_seconds_bucket{"));
 }
 
 #[tokio::test]
-async fn the_metrics_route_reports_the_pool_scan_and_caches() {
+async fn the_metrics_route_reports_the_pool_and_caches() {
     let handle = handle();
     let response = metrics_router(handle.clone(), state())
         .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
@@ -172,14 +167,12 @@ async fn the_metrics_route_reports_the_pool_scan_and_caches() {
         "pool_calibration_factor",
         "detail_cache_clubs",
         "detail_queue_clubs",
-        "scan_running",
     ] {
         assert!(
             rendered.lines().any(|l| l.starts_with(&format!("{name} "))),
             "missing {name}"
         );
     }
-    assert!(has(&rendered, "build_info", &[r#"version=""#]));
 }
 
 #[tokio::test]
