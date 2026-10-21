@@ -17,7 +17,7 @@ fn defaults() {
     assert_eq!(config.bind_addr, "127.0.0.1:8080".parse().unwrap());
     assert_eq!(config.base_url, None);
     assert_eq!(config.scan, ScanConfig::default());
-    assert_eq!(config.scan_interval, Duration::from_secs(180 * 60));
+    assert_eq!(config.scan_interval, None);
     assert_eq!(config.detail_cache, None);
     assert_eq!(config.matching, MatchSettings::default());
     assert_eq!(config.trainer_cache, Duration::from_secs(10 * 60));
@@ -176,7 +176,7 @@ fn reads_scan_interval() {
         ("SCAN_INTERVAL_MINUTES", "15"),
     ]))
     .unwrap();
-    assert_eq!(config.scan_interval, Duration::from_secs(15 * 60));
+    assert_eq!(config.scan_interval, Some(Duration::from_secs(15 * 60)));
 
     let error = Config::from_lookup(lookup(&[
         ("UMAMOE_API_KEY", "test-key"),

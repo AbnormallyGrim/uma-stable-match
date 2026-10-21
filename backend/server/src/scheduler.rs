@@ -10,7 +10,9 @@ use uma_stable_match_umamoe_client::{Circle, Client};
 
 use crate::cache::Cache;
 use crate::cache::ScanPhase;
+use crate::config::DEFAULT_SCAN_INTERVAL_MINUTES;
 use crate::details::ClubDetails;
+use crate::refresher::{utc_now, RefreshConfig};
 use crate::scanner::{
     install, list_candidates, load, scan_period, scan_with, Scan, ScanConfig, ScanError,
 };
@@ -58,7 +60,9 @@ impl InProgress {
     }
 }
 
-/// Scans now, then every `interval`, until `shutdown` turns true.
+/// Scans now, then again until `shutdown` turns true: every `every` if set; with `None`, after
+/// uma.moe's next daily update if `details` has a refresher, otherwise every
+/// [`DEFAULT_SCAN_INTERVAL_MINUTES`](crate::DEFAULT_SCAN_INTERVAL_MINUTES).
 ///
 /// With Redis, instances share one scan: one scans and publishes, the others load it. A scan in
 /// progress at shutdown is cancelled.
@@ -66,11 +70,15 @@ pub async fn run_scheduler(
     client: Client,
     details: ClubDetails,
     config: ScanConfig,
-    interval: Duration,
+    every: Option<Duration>,
     cache: Cache,
     mut shutdown: watch::Receiver<bool>,
 ) {
     let shared = details.shared().clone();
+    let daily = every.is_none() && details.refreshes();
+    let interval = every.unwrap_or(Duration::from_secs(
+        u64::from(DEFAULT_SCAN_INTERVAL_MINUTES) * 60,
+    ));
     let mut applied: Option<String> = None;
     let mut pooled: Option<String> = None;
     loop {
@@ -85,8 +93,13 @@ pub async fn run_scheduler(
                 let Some(result) = until_stopped(work, &mut shutdown).await else {
                     return cancelled(&cache);
                 };
+                let updated_at = result.as_ref().ok().and_then(|scan| scan.updated_at);
                 finish(&cache, result, "alone", started);
-                interval
+                if daily {
+                    until_next_update(updated_at, utc_now())
+                } else {
+                    interval
+                }
             }
             ScanTurn::Lead { lease, progress } => {
                 count_turn("lead");
@@ -236,6 +249,14 @@ async fn sync(
             scan_with(client, details, config, cache).await
         }
     }
+}
+
+fn until_next_update(updated_at: Option<DateTime<Utc>>, now: DateTime<Utc>) -> Duration {
+    RefreshConfig::default()
+        .next_refresh(updated_at, now)
+        .signed_duration_since(now)
+        .to_std()
+        .unwrap_or_default()
 }
 
 async fn until_stopped<T>(

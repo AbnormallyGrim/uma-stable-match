@@ -9,6 +9,36 @@ fn at(year: i32, month: u32, day: u32, hour: u32) -> SystemTime {
 
 const INTERVAL: Duration = Duration::from_secs(3 * 3600);
 
+fn utc(text: &str) -> DateTime<Utc> {
+    DateTime::parse_from_rfc3339(text).unwrap().into()
+}
+
+#[test]
+fn lists_again_after_uma_moes_next_update() {
+    let updated = utc("2026-03-19T15:00:00Z");
+    assert_eq!(
+        until_next_update(Some(updated), utc("2026-03-19T16:00:00Z")),
+        Duration::from_secs(23 * 3600 + 30 * 60)
+    );
+    assert_eq!(
+        until_next_update(Some(updated), utc("2026-03-20T15:29:00Z")),
+        Duration::from_secs(60)
+    );
+}
+
+#[test]
+fn lists_again_an_hour_later_when_uma_moe_has_not_updated() {
+    let updated = utc("2026-03-19T15:00:00Z");
+    assert_eq!(
+        until_next_update(Some(updated), utc("2026-03-20T15:30:00Z")),
+        Duration::from_secs(3600)
+    );
+    assert_eq!(
+        until_next_update(None, utc("2026-03-20T15:30:00Z")),
+        Duration::from_secs(3600)
+    );
+}
+
 #[test]
 fn a_recent_scan_in_the_same_month_is_resumed() {
     let progress = InProgress::new(Vec::new(), at(2026, 3, 18, 9), at(2026, 3, 18, 9));

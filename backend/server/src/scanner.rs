@@ -47,6 +47,8 @@ pub struct Scan {
     pub failed: usize,
     /// Game month of the listed data, as `YYYY-MM`.
     pub month: Option<String>,
+    /// When uma.moe last updated the listed data.
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 /// Why a scan failed.
@@ -106,7 +108,12 @@ pub(crate) async fn load(
     cache: &Cache,
 ) -> Scan {
     let listed = rows.len();
-    let (candidates, ids, month) = install(details, rows, config);
+    let Installed {
+        candidates,
+        ids,
+        month,
+        updated_at,
+    } = install(details, rows, config);
     if details.refreshes() {
         details.schedule(ids);
         let prefetched = details.cached_in_pool().len();
@@ -116,6 +123,7 @@ pub(crate) async fn load(
             prefetched,
             failed: 0,
             month,
+            updated_at,
         };
     }
 
@@ -148,14 +156,18 @@ pub(crate) async fn load(
         prefetched,
         failed,
         month,
+        updated_at,
     }
 }
 
-pub(crate) fn install(
-    details: &ClubDetails,
-    rows: Vec<Circle>,
-    config: &ScanConfig,
-) -> (usize, Vec<(u64, u32)>, Option<String>) {
+pub(crate) struct Installed {
+    candidates: usize,
+    ids: Vec<(u64, u32)>,
+    month: Option<String>,
+    updated_at: Option<DateTime<Utc>>,
+}
+
+pub(crate) fn install(details: &ClubDetails, rows: Vec<Circle>, config: &ScanConfig) -> Installed {
     let snapshot = rows
         .iter()
         .filter_map(|c| c.last_updated.as_deref())
@@ -180,7 +192,12 @@ pub(crate) fn install(
     let candidates = pool.len();
     details.replace_pool(pool);
     details.set_listing(SystemTime::now(), month.clone());
-    (candidates, ids, month)
+    Installed {
+        candidates,
+        ids,
+        month,
+        updated_at: snapshot,
+    }
 }
 
 pub(crate) fn scan_period(at: DateTime<Utc>) -> Period {
