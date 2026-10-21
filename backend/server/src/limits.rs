@@ -55,15 +55,20 @@ impl RateLimits {
     }
 
     pub(crate) fn check_lookup(&self, visitor: Visitor) -> Result<(), ApiError> {
-        check(&self.lookups, visitor)
+        check(&self.lookups, visitor, "trainer_lookups")
     }
 }
 
-fn check(limiter: &DefaultKeyedRateLimiter<IpAddr>, visitor: Visitor) -> Result<(), ApiError> {
+fn check(
+    limiter: &DefaultKeyedRateLimiter<IpAddr>,
+    visitor: Visitor,
+    limit: &'static str,
+) -> Result<(), ApiError> {
     if limiter.len() > PRUNE_ABOVE {
         limiter.retain_recent();
     }
     limiter.check_key(&visitor.0).map_err(|not_until| {
+        metrics::counter!("rate_limited_total", "limit" => limit).increment(1);
         ApiError::rate_limited(not_until.wait_time_from(limiter.clock().now()))
     })
 }
@@ -74,7 +79,7 @@ pub(crate) async fn limit_requests(
     next: Next,
 ) -> Response {
     let visitor = visitor(&request, state.limits.trust_forwarded_for);
-    if let Err(error) = check(&state.limits.requests, visitor) {
+    if let Err(error) = check(&state.limits.requests, visitor, "requests") {
         return error.into_response();
     }
     request.extensions_mut().insert(visitor);

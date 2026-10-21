@@ -1,7 +1,7 @@
 //! Runs scans on a schedule.
 
 use std::future::Future;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
@@ -9,7 +9,7 @@ use uma_stable_match_umamoe_client::{Circle, Client};
 
 use crate::cache::Cache;
 use crate::details::ClubDetails;
-use crate::scanner::{list_candidates, load, scan, Scan, ScanConfig, ScanError};
+use crate::scanner::{list_candidates, load, scan, Scan, ScanConfig, ScanError, PHASE_IDLE};
 use crate::shared::{ScanLease, ScanTurn};
 
 const WAIT_POLL: Duration = Duration::from_secs(1);
@@ -36,18 +36,22 @@ pub async fn run_scheduler(
     loop {
         let pause = match shared.scan_turn(&config).await {
             ScanTurn::Alone => {
+                count_turn("alone");
                 cache.begin_scan();
                 tracing::info!("scan started");
+                let started = Instant::now();
                 let work = scan(&client, &details, &config);
                 let Some(result) = until_stopped(work, &mut shutdown).await else {
                     return cancelled(&cache);
                 };
-                finish(&cache, result);
+                finish(&cache, result, "alone", started);
                 interval
             }
             ScanTurn::Lead(lease) => {
+                count_turn("lead");
                 cache.begin_scan();
                 tracing::info!("scan started");
+                let started = Instant::now();
                 applied = Some(lease.id().to_owned());
                 let work = lead(&client, &details, &config, &lease);
                 let Some(result) = until_stopped(work, &mut shutdown).await else {
@@ -62,21 +66,24 @@ pub async fn run_scheduler(
                     }
                 };
                 lease.publish(&PublishedScan { outcome }, interval).await;
-                finish(&cache, result);
+                finish(&cache, result, "lead", started);
                 interval
             }
             ScanTurn::Wait => {
+                count_turn("wait");
                 cache.begin_scan();
                 WAIT_POLL
             }
             ScanTurn::Fresh { id, remaining } => {
+                count_turn("fresh");
                 if applied.as_deref() != Some(id.as_str()) {
                     cache.begin_scan();
+                    let started = Instant::now();
                     let work = sync(&client, &details, &config);
                     let Some(result) = until_stopped(work, &mut shutdown).await else {
                         return cancelled(&cache);
                     };
-                    finish(&cache, result);
+                    finish(&cache, result, "published", started);
                     applied = Some(id);
                 }
                 remaining
@@ -139,7 +146,11 @@ async fn until_stopped<T>(
     }
 }
 
-fn finish(cache: &Cache, result: Result<Scan, ScanError>) {
+fn finish(cache: &Cache, result: Result<Scan, ScanError>, source: &'static str, started: Instant) {
+    let outcome = if result.is_ok() { "ok" } else { "error" };
+    metrics::counter!("scans_total", "source" => source, "result" => outcome).increment(1);
+    metrics::histogram!("scan_duration_seconds", "source" => source)
+        .record(started.elapsed().as_secs_f64());
     if let Err(error) = &result {
         tracing::error!(%error, "scan failed; keeping the last results");
     }
@@ -147,6 +158,11 @@ fn finish(cache: &Cache, result: Result<Scan, ScanError>) {
 }
 
 fn cancelled(cache: &Cache) {
+    metrics::gauge!("scan_phase").set(PHASE_IDLE);
     cache.cancel_scan();
     tracing::info!("scan cancelled for shutdown");
+}
+
+fn count_turn(turn: &'static str) {
+    metrics::counter!("scan_turns_total", "turn" => turn).increment(1);
 }

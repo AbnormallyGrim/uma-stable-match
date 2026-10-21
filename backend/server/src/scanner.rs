@@ -11,6 +11,10 @@ use crate::pool::{game_month, is_early_month, previous_game_month, ClubPool, Lis
 // Safety stop in case the API never returns a short page.
 const MAX_PAGES: u32 = 100;
 
+pub(crate) const PHASE_IDLE: f64 = 0.0;
+const PHASE_LISTING: f64 = 1.0;
+const PHASE_LOADING: f64 = 2.0;
+
 /// Which clubs a scan looks at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScanConfig {
@@ -114,17 +118,27 @@ pub(crate) async fn load(details: &ClubDetails, rows: Vec<Circle>, config: &Scan
     let ids = prefetch_ids(&pool, config.max_details as usize);
     details.replace_pool(pool);
 
+    metrics::gauge!("scan_phase").set(PHASE_LOADING);
+    metrics::gauge!("scan_candidates").set(candidates as f64);
+    metrics::gauge!("scan_clubs_to_load").set(ids.len() as f64);
+    metrics::gauge!("scan_clubs_loaded").set(0.0);
+    metrics::gauge!("scan_clubs_failed").set(0.0);
     let mut prefetched = 0;
     let mut failed = 0;
     for circle_id in ids {
         match details.get(circle_id, Priority::Background).await {
-            Ok(_) => prefetched += 1,
+            Ok(_) => {
+                prefetched += 1;
+                metrics::gauge!("scan_clubs_loaded").set(prefetched as f64);
+            }
             Err(error) => {
                 failed += 1;
+                metrics::gauge!("scan_clubs_failed").set(failed as f64);
                 tracing::warn!(circle_id, %error, "skipping club that failed to load");
             }
         }
     }
+    metrics::gauge!("scan_phase").set(PHASE_IDLE);
 
     tracing::info!(candidates, prefetched, failed, "scan finished");
     Scan {
@@ -159,18 +173,25 @@ pub(crate) async fn list_candidates(
         ..Default::default()
     };
 
+    metrics::gauge!("scan_phase").set(PHASE_LISTING);
+    metrics::gauge!("scan_listed_clubs").set(0.0);
     let mut candidates = Vec::new();
     for page in 0..MAX_PAGES {
         let rows = client
             .list_circles(&request.page(page))
             .await
-            .map_err(ScanError::List)?
+            .map_err(|e| {
+                metrics::gauge!("scan_phase").set(PHASE_IDLE);
+                ScanError::List(e)
+            })?
             .circles;
+        metrics::counter!("scan_list_pages_total").increment(1);
         let Some(last) = rows.last() else { break };
         let done = last.monthly_rank.unwrap_or(0) >= config.rank_to as i32
             || rows.len() < config.page_size as usize;
 
         candidates.extend(rows.into_iter().filter(|c| in_window(c, config)));
+        metrics::gauge!("scan_listed_clubs").set(candidates.len() as f64);
         if done {
             break;
         }
