@@ -17,6 +17,7 @@ use crate::frontend;
 use crate::limits::{limit_requests, RateLimits};
 use crate::pace::PaceLookup;
 use crate::recommendations::{recommendations, MatchSettings};
+use crate::telemetry::track_requests;
 
 /// Shared state for request handlers.
 #[derive(Debug, Clone)]
@@ -53,7 +54,8 @@ pub fn app(state: AppState, frontend_dir: Option<&Path>) -> Router {
     if let Some(dir) = frontend_dir {
         app = app.fallback_service(frontend::service(dir));
     }
-    app.layer(from_fn(frontend::security_headers))
+    app.layer(from_fn(track_requests))
+        .layer(from_fn(frontend::security_headers))
 }
 
 async fn api_not_found() -> impl IntoResponse {

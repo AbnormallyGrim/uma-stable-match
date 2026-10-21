@@ -418,3 +418,28 @@ fn key_secret_is_ignored_without_redis() {
     .unwrap();
     assert!(config.redis_key_secret.is_none());
 }
+
+#[test]
+fn metrics_are_off_unless_an_address_is_set() {
+    let config = Config::from_lookup(lookup(&[("UMAMOE_API_KEY", "test-key")])).unwrap();
+    assert_eq!(config.metrics_addr, None);
+
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("METRICS_ADDR", "127.0.0.1:9464"),
+    ]))
+    .unwrap();
+    assert_eq!(config.metrics_addr, Some("127.0.0.1:9464".parse().unwrap()));
+}
+
+#[test]
+fn metrics_address_needs_an_ip_and_port() {
+    for value in ["localhost:9464", "127.0.0.1", "127.0.0.1:0", "9464"] {
+        let error = Config::from_lookup(lookup(&[
+            ("UMAMOE_API_KEY", "test-key"),
+            ("METRICS_ADDR", value),
+        ]))
+        .unwrap_err();
+        assert_eq!(error, ConfigError::InvalidMetricsAddr(value.into()));
+    }
+}
