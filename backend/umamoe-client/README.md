@@ -157,6 +157,20 @@ When the response has a `Retry-After` header in seconds, that value is used inst
 | `Transport` | The request couldn't be sent or timed out, or the response couldn't be read |
 | `Decode` | The response body didn't match the expected shape |
 
+## Metrics
+
+Each call records metrics through the [`metrics`](https://docs.rs/metrics) facade. They cost nothing unless the application installs a recorder, such as the server's Prometheus exporter.
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `umamoe_requests_total` | counter | `endpoint`, `lane`, `status` | Attempts, retries included. `status` is the HTTP status code, or `timeout`, `connect_error` or `transport_error` when no response came back |
+| `umamoe_request_duration_seconds` | histogram | `endpoint`, `lane` | Time from sending an attempt to its response or error |
+| `umamoe_queue_wait_seconds` | histogram | `lane` | Time an attempt waited for its slot under `min_interval` |
+| `umamoe_retries_total` | counter | `endpoint`, `status` | Retries, by the status that caused them |
+| `umamoe_decode_errors_total` | counter | `endpoint` | Successful responses whose body didn't match the expected shape |
+
+`endpoint` is the API path, such as `/api/v4/circles`, never the full URL, so trainer IDs and other query values don't appear in labels. `lane` is `interactive` or `background`.
+
 ## Parity tests
 
 `tests/parity.rs` checks that the scoring crate gives the same results as the original prototype, the Python script this project grew from. It loads `tests/fixtures/parity/clubs.json` through `CircleResponse`, converts it to `Club` and compares the results with `expected.json`:

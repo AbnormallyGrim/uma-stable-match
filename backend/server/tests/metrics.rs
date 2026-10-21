@@ -8,12 +8,17 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use metrics_exporter_prometheus::PrometheusHandle;
+use serde_json::json;
 use tower::ServiceExt;
 use uma_stable_match_server::{
     app, install_metrics, metrics_router, AppState, Cache, ClubDetails, DetailConfig,
     MatchSettings, PaceLookup, RateLimits, SharedPool, DEFAULT_PACE_TTL,
 };
-use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
+use uma_stable_match_umamoe_client::{
+    ApiKey, Client, ClientConfig, ListCirclesRequest, RetryConfig,
+};
+use wiremock::matchers::path;
+use wiremock::{Mock, MockServer, ResponseTemplate};
 
 static HANDLE: OnceLock<PrometheusHandle> = OnceLock::new();
 
@@ -109,6 +114,45 @@ async fn requests_are_counted_by_route_and_status() {
         &[r#"limit="requests""#]
     ));
     assert!(rendered.contains("http_request_duration_seconds_bucket{"));
+}
+
+#[tokio::test]
+async fn umamoe_calls_are_counted_by_status_with_retries() {
+    let handle = handle();
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ResponseTemplate::new(503))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "circles": [] })))
+        .mount(&server)
+        .await;
+
+    client(server.uri())
+        .list_circles(&ListCirclesRequest::default())
+        .await
+        .unwrap();
+
+    let rendered = handle.render();
+    for status in ["503", "200"] {
+        assert!(has(
+            &rendered,
+            "umamoe_requests_total",
+            &[
+                r#"endpoint="/api/v4/circles/list""#,
+                r#"lane="interactive""#,
+                &format!(r#"status="{status}""#),
+            ]
+        ));
+    }
+    assert!(has(
+        &rendered,
+        "umamoe_retries_total",
+        &[r#"endpoint="/api/v4/circles/list""#, r#"status="503""#]
+    ));
+    assert!(rendered.contains("umamoe_queue_wait_seconds_bucket{"));
 }
 
 #[tokio::test]
