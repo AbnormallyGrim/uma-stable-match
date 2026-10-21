@@ -106,7 +106,8 @@ async fn main() -> ExitCode {
             max_clubs: window * 2,
             queue_size: window as usize,
             refresh,
-            refresher: !shared.is_enabled(),
+            refresher: true,
+            scan: config.scan,
         },
         shared,
     );

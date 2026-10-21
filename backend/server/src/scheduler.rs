@@ -64,7 +64,8 @@ impl InProgress {
 /// uma.moe's next daily update if `details` has a refresher, otherwise every
 /// [`DEFAULT_SCAN_INTERVAL_MINUTES`](crate::DEFAULT_SCAN_INTERVAL_MINUTES).
 ///
-/// With Redis, instances share one scan: one scans and publishes, the others load it. A scan in
+/// With Redis, instances share one scan: one scans and publishes, the others load it. A published
+/// scan stays current until the next scan is due. A scan in
 /// progress at shutdown is cancelled.
 pub async fn run_scheduler(
     client: Client,
@@ -131,9 +132,15 @@ pub async fn run_scheduler(
                         (Err(error), Err(message))
                     }
                 };
-                lease.publish(&PublishedScan { outcome }, interval).await;
+                let fresh_for = if daily {
+                    let updated_at = result.as_ref().ok().and_then(|scan| scan.updated_at);
+                    until_next_update(updated_at, utc_now())
+                } else {
+                    interval
+                };
+                lease.publish(&PublishedScan { outcome }, fresh_for).await;
                 finish(&cache, result, "lead", started);
-                interval
+                fresh_for
             }
             ScanTurn::Wait { progress } => {
                 count_turn("wait");

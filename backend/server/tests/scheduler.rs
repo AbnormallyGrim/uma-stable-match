@@ -235,7 +235,7 @@ async fn with_a_refresher_lists_once_until_uma_moes_next_update() {
     wait_until(&running.cache, |s| s.snapshot.is_some()).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert_eq!(list_calls(&server).await, 1);
-    assert_eq!(running.details.scheduled(), 1);
+    assert_eq!(running.details.scheduled().await, 1);
     stop(running).await;
 }
 

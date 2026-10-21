@@ -25,7 +25,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to scan |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to scan |
 | `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is kept loaded, best rank first. Clubs past it load when a search needs them |
-| `SCAN_INTERVAL_MINUTES` | none | Minutes between scans. Unset, the server scans again 30 minutes after uma.moe's next daily update; see [Cache and schedule](#cache-and-schedule). With Redis, `180` when unset |
+| `SCAN_INTERVAL_MINUTES` | none | Minutes between scans. Unset, the server scans again 30 minutes after uma.moe's next daily update; see [Cache and schedule](#cache-and-schedule) |
 | `DETAIL_CACHE_MINUTES` | none | Minutes between refreshes of a club's member data. Unset, each club refreshes after uma.moe's daily update; see [Refresher](#refresher) and [Club details](#club-details) |
 | `SHORTLIST_SIZE` | `120` | Clubs nearest your pace considered for each request |
 | `REQUEST_FETCH_BUDGET` | `10` | Most uncached clubs fetched while a visitor waits. At 500 ms spacing, 10 take about 5 seconds |
@@ -58,12 +58,12 @@ The API key, `REDIS_URL` (which can hold a password) and `REDIS_KEY_SECRET` are 
 3. Build a `ClubPool` from the clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO`. `ListedClub::from_circle` drops archived clubs, full clubs, clubs with fewer than 8 members, and rows missing points, a member count or `last_updated`. Closed clubs are kept, so each request can include or exclude them.
 4. Copy in the exact medians of clubs that are still cached for that month, then swap the new pool in.
 5. Take up to `SCAN_MAX_DETAILS` clubs from the pool, best rank first. If a club's details come back without club information, the listed details are used.
-   - **With a [refresher](#refresher)** (without Redis): put them on its schedule and finish. The refresher loads them.
-   - **Without one** (with Redis): prefetch their member data in the background lane, so visitors' requests go first.
+   - **With a [refresher](#refresher)**, as the server always has: put them on its schedule and finish. The refresher loads them.
+   - **Without one**: prefetch their member data in the background lane, so visitors' requests go first.
 
 While prefetching, a club whose details fail to load is logged and skipped. A failed list request fails the whole scan and leaves the previous pool in place. `Scan` returns the number of candidates (the pool size), how many clubs were prefetched (with a refresher, how many were already loaded), how many failed, the game month of the listed data, and when uma.moe last updated it (`updated_at`, the latest `last_updated` listed).
 
-With the client's default 500 ms rate limit, a default scan with a prefetch takes about 80 seconds: around 9 list pages plus one lookup per candidate, about 150 at the time of writing. Clubs still cached from the previous scan aren't fetched again. Without the prefetch, a scan takes a few seconds.
+With the client's default 500 ms rate limit, a default scan with a prefetch (without a refresher) takes about 80 seconds: around 9 list pages plus one lookup per candidate, about 150 at the time of writing. Clubs still cached from the previous scan aren't fetched again. Without the prefetch, a scan takes a few seconds.
 
 ## Club pool
 
@@ -149,7 +149,7 @@ Exact medians help most when many clubs have them. With an exact median for ever
 
 ## Refresher
 
-Without Redis, a `Refresher` keeps club details current, so a scan only lists clubs. `ClubDetails::refresher` returns it when `DetailConfig::refresh` is set, and the server runs it in the background. With Redis, the [shared scan](#shared-scans) still prefetches details instead.
+A `Refresher` keeps club details current, so a scan only lists clubs. `ClubDetails::refresher` returns it when `DetailConfig::refresher` is set, and the server runs it in the background.
 
 uma.moe updates club data once a day, at 15:00 UTC, and each club's `last_updated` shows when. The refresher keeps a schedule of clubs, ordered by when each is due, then by rank:
 
@@ -168,6 +168,16 @@ uma.moe updates club data once a day, at 15:00 UTC, and each club's `last_update
 
 `scheduled()` returns how many clubs are on the schedule, and `next_refresh(circle_id)` when a club is next due.
 
+### With Redis
+
+Every instance shares one schedule, and one instance at a time refreshes:
+
+- **Schedule.** A sorted set at `usm:v1:scan:<from>-<to>-<max>:schedule`, with no expiry. Each score holds the due time, rounded up to the second, then the rank, so clubs due at the same time come out best rank first. A listing on any instance updates it, and clubs loaded on any instance join it.
+- **Lease.** Each instance's refresher tries to take `usm:v1:scan:<from>-<to>-<max>:refresher` every 10 seconds. The holder refreshes and renews it every 20 seconds; it lasts 60 seconds, so another instance takes over within about 70 seconds after a crash or redeploy.
+- **Already refreshed.** Before fetching a due club, the refresher checks the club's due time in memory and then in Redis. A club another instance has loaded since is only rescheduled.
+- **In memory.** Each instance's copies expire when due, as in [Club details](#club-details), so they're read again from Redis once the holder has refreshed them.
+- **Redis down.** No instance can take the lease, so nothing is refreshed in the background. Searches still load due clubs from uma.moe when they need them.
+
 ## Shared cache
 
 `SharedCache` is a second cache layer for running several server instances against one store. On a local miss, `ClubDetails` and `PaceLookup` check it before calling uma.moe, and store what they load in it, under keys such as `usm:v1:club:<id>:<month>`. Paces expire as they do in memory. Club values hold the club, its `last_updated` and when it's due for its next refresh, and stay in Redis a day past that, so they're there until replaced. A club found there still gives the pool its exact median.
@@ -185,26 +195,26 @@ Without `REDIS_URL`, the shared cache stores nothing (`SharedCache::none()`) and
 
 **Looked-up trainer IDs never reach Redis.** Pace keys use the first 32 hex characters of HMAC-SHA256(`REDIS_KEY_SECRET`, trainer ID), so every instance needs the same secret. Club keys keep the club ID, which isn't personal, and club data is stored as uma.moe publishes it. Run Redis without persistence (for example `--save "" --appendonly no`), so paces stay in memory as they do without Redis. The `redis` profile in `docker-compose.yml` runs it this way; see [Docker details](../../README.md#docker-details).
 
-Still per instance: rate limits and the background queue.
+Still per instance: rate limits and the background queue. The refresh schedule is shared; see [Refresher](#with-redis).
 
 ### Shared scans
 
-With Redis, instances that have the same `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `SCAN_MAX_DETAILS` share one scan, so uma.moe is scanned once per interval however many instances run. Whenever a scan is due, one Redis script decides what the instance does:
+With Redis, instances that have the same `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `SCAN_MAX_DETAILS` share one scan, so uma.moe is listed once per scan however many instances run. Whenever a scan is due, one Redis script decides what the instance does:
 
 | Situation | What the instance does |
 |---|---|
-| A scan was published less than one interval ago | Loads it unless it already has, then waits until the next scan is due |
+| A published scan is still current | Loads it unless it already has, then waits until the next scan is due |
 | No recent scan, and the scan lock is free | Takes the lock, scans, and publishes the result. If a scan in progress was saved, it resumes that scan instead of listing again |
 | Another instance holds the lock | Builds its pool from that scan's saved club list once there is one, so it can answer searches, then reports `scanning: true` and checks again every second |
 | Redis doesn't answer | Scans on its own |
 
 - **Lock.** It lasts 60 seconds and is renewed every 20 seconds while scanning. Shutdown releases it; if an instance crashes, another takes over within 60 seconds.
-- **Publishing.** After prefetching, the leader publishes the listed clubs, marks them current for one `SCAN_INTERVAL_MINUTES`, and keeps them for two. The others build their pool from those rows and load club details from Redis, so they barely call uma.moe. An instance that starts later loads the published scan straight away.
-- **Resuming.** As soon as the leader has listed the clubs, it saves the list in Redis with when it was listed. An instance that takes the lock later, after a restart, redeploy or crash, continues that scan instead of listing again, if the list is less than one interval old and from the current game month (counting the [early-month](#early-in-the-month) switch). Clubs already loaded are read from Redis, so only the rest are fetched from uma.moe. The resumed scan keeps its original start time in `/api/v1/status` and the metrics. Publishing the finished scan deletes the saved list.
-- **Failures.** A failed scan is published too: every instance records the same error, keeps its last results, and waits for the next interval.
+- **Publishing.** After listing and scheduling the clubs, the leader publishes them and marks them current until the next scan is due: 30 minutes after uma.moe's next update, or for one `SCAN_INTERVAL_MINUTES` when set. It keeps them for twice that. The others build their pool from those rows and load club details from Redis, so they barely call uma.moe. An instance that starts later loads the published scan straight away.
+- **Resuming.** As soon as the leader has listed the clubs, it saves the list in Redis with when it was listed. An instance that takes the lock later, after a restart, redeploy or crash, continues that scan instead of listing again, if the list is less than `SCAN_INTERVAL_MINUTES` old (180 minutes when unset) and from the current game month (counting the [early-month](#early-in-the-month) switch). The resumed scan keeps its original start time in `/api/v1/status` and the metrics. Publishing the finished scan deletes the saved list.
+- **Failures.** A failed scan is published too: every instance records the same error, keeps its last results, and waits until the next scan is due.
 - **Missing data.** If a scan is marked current but its rows are gone from Redis, the instance scans on its own.
 
-The keys are `usm:v1:scan:<from>-<to>-<max>:lock`, `:fresh`, `:latest`, `:progress` and `:progress-id`, so instances with different scan windows don't share.
+The keys are `usm:v1:scan:<from>-<to>-<max>:lock`, `:fresh`, `:latest`, `:progress`, `:progress-id`, `:schedule` and `:refresher`, so instances with different scan windows don't share.
 
 ### Redis tests
 
@@ -231,7 +241,7 @@ $env:REDIS_TEST_URL="redis://127.0.0.1:6379"; cargo test
 
 ## Cache and schedule
 
-Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away. It scans again 30 minutes after uma.moe's next daily update: 24 hours after the scan's `updated_at`, plus the refresher's `margin`. If uma.moe hasn't updated yet, or the scan failed, it tries again an hour later. With `SCAN_INTERVAL_MINUTES` set, or with Redis (180 minutes when unset), it scans again that long after each scan finishes instead. Until the first scan has listed the clubs there are no results; with the defaults that takes a few seconds. From then on, searches score the clubs loaded so far, fetch up to `REQUEST_FETCH_BUDGET` more, and report the rest as still loading, while the [refresher](#refresher), or the scan with Redis, finishes loading details (about 80 seconds with the defaults). With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule; one that starts during a scan resumes it from the saved club list. See [Shared scans](#shared-scans).
+Scan results, the club pool and club details live in memory only, so nothing is written to disk. When the server starts it scans straight away. It scans again 30 minutes after uma.moe's next daily update: 24 hours after the scan's `updated_at`, plus the refresher's `margin`. If uma.moe hasn't updated yet, or the scan failed, it tries again an hour later. With `SCAN_INTERVAL_MINUTES` set, it scans again that long after each scan finishes instead. Until the first scan has listed the clubs there are no results; with the defaults that takes a few seconds. From then on, searches score the clubs loaded so far, fetch up to `REQUEST_FETCH_BUDGET` more, and report the rest as still loading, while the [refresher](#refresher) finishes loading details (about 80 seconds with the defaults). With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule; one that starts during a scan resumes it from the saved club list. See [Shared scans](#shared-scans).
 
 - **No overlapping scans.** A new scan won't start while one is running.
 - **One scan for all instances.** With Redis, one instance scans and the others load its result; see [Shared scans](#shared-scans).
@@ -302,7 +312,7 @@ All endpoints are under `/api/v1`.
 |---|---|
 | `scanning` | Whether a scan is running. With Redis, also while waiting for another instance's scan |
 | `scan` | The running scan's progress, or `null` when no scan is running. See below |
-| `last_scan.clubs` | Clubs whose member data the scan prefetched. Without Redis, clubs already loaded when the scan finished listing |
+| `last_scan.clubs` | Clubs whose member data was already loaded when the scan finished listing |
 | `last_scan.candidates` | Clubs in the pool after the scan's filters |
 | `last_scan.month` | Game month of the listed data, `YYYY-MM` |
 | `pool.clubs` | Clubs in the current pool |
@@ -476,7 +486,7 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `rate_limited_total` | counter | `limit`: `requests` or `trainer_lookups` | Requests turned away by a [rate limit](#rate-limits) |
 | `scan_phase` | gauge | | `0` idle or waiting for another instance's scan, `1` listing clubs, `2` loading club details |
 | `scan_listed_clubs` | gauge | | Clubs in the rank window listed so far in this scan |
-| `scan_clubs_to_load`, `scan_clubs_loaded`, `scan_clubs_failed` | gauge | | Progress of the current scan's prefetch, with Redis |
+| `scan_clubs_to_load`, `scan_clubs_loaded`, `scan_clubs_failed` | gauge | | Progress of a scan's prefetch. The server's scans don't prefetch, as the refresher loads details |
 | `scans_total` | counter | `source`: `alone`, `lead` or `published`; `result`: `ok` or `error` | Scans finished, whether run here or loaded from another instance |
 | `scan_duration_seconds` | histogram | `source` | Time from a scan's start to its end. A resumed scan counts from its original start, before the restart |
 | `scan_turns_total` | counter | `turn`: `alone`, `lead`, `wait` or `fresh` | What the instance did when a scan was due; see [Shared scans](#shared-scans) |
@@ -493,7 +503,7 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `detail_queue_clubs` | gauge | | Clubs waiting for a background load |
 | `redis_up` | gauge | | `1` while Redis answers, `0` after a failure. Absent without Redis |
 | `redis_errors_total` | counter | `reason` | Failed or timed-out Redis operations, by the kind of failure |
-| `redis_op_duration_seconds` | histogram | `op`: `get`, `set` or `script` | Time per Redis operation, failures included |
+| `redis_op_duration_seconds` | histogram | `op`: `get`, `set`, `script` or `schedule` | Time per Redis operation, failures included |
 
 `scan_last_success_timestamp_seconds` and the `pool_*` and `detail_*` values are read from the server each time `/metrics` is requested; the detail cache settles its pending work first, so `detail_cache_clubs` is exact. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
 

@@ -97,3 +97,36 @@ async fn without_redis_every_instance_scans_alone() {
         None
     );
 }
+
+fn utc(text: &str) -> DateTime<Utc> {
+    DateTime::parse_from_rfc3339(text).unwrap().into()
+}
+
+#[test]
+fn schedule_scores_hold_the_due_time_and_rank() {
+    let due = utc("2026-03-19T15:30:00Z");
+    assert_eq!(decode(score(due, 42) as f64), (due, 42));
+    assert_eq!(decode(score(due, u32::MAX) as f64), (due, u32::MAX));
+}
+
+#[test]
+fn schedule_scores_order_by_due_time_then_rank() {
+    let due = utc("2026-03-19T15:30:00Z");
+    let later = utc("2026-03-19T15:30:01Z");
+    assert!(score(due, 1) < score(due, 2));
+    assert!(score(due, u32::MAX) < score(later, 1));
+}
+
+#[test]
+fn schedule_scores_round_due_times_up_to_the_second() {
+    let due = utc("2026-03-19T15:30:00.250Z");
+    assert_eq!(decode(score(due, 7) as f64).0, utc("2026-03-19T15:30:01Z"));
+}
+
+#[test]
+fn schedule_scores_stay_exact_as_floats() {
+    let due = utc("2099-12-31T23:59:59Z");
+    let value = score(due, 2_000_000);
+    assert!(value < 1 << 53);
+    assert_eq!(value as f64 as u64, value);
+}
