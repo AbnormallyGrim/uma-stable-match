@@ -178,3 +178,107 @@ async fn concurrent_requests_are_all_spaced() {
     let expected: Vec<_> = (0..6).map(|i| Duration::from_millis(100 * i)).collect();
     assert_eq!(times, expected);
 }
+
+fn backoff(max_interval_ms: u64, step: f64, every_secs: u64) -> BackoffConfig {
+    BackoffConfig {
+        max_interval: Duration::from_millis(max_interval_ms),
+        recovery_step: step,
+        recovery_every: Duration::from_secs(every_secs),
+    }
+}
+
+fn gap(limiter: &RateLimiter) -> Duration {
+    limiter.lock().gap
+}
+
+#[tokio::test(start_paused = true)]
+async fn retry_after_pauses_every_request() {
+    let limiter = RateLimiter::new(Duration::from_millis(100));
+    limiter.acquire(Priority::Interactive).await;
+    let start = Instant::now();
+    limiter.throttled(Some(Duration::from_secs(5)));
+    limiter.acquire(Priority::Background).await;
+    assert_eq!(start.elapsed(), Duration::from_secs(5));
+}
+
+#[tokio::test(start_paused = true)]
+async fn each_throttle_halves_the_rate_down_to_the_floor() {
+    let limiter = RateLimiter::with_backoff(Duration::from_millis(100), backoff(400, 0.05, 3600));
+    limiter.throttled(None);
+    assert_eq!(gap(&limiter), Duration::from_millis(200));
+
+    let start = Instant::now();
+    limiter.acquire(Priority::Interactive).await;
+    limiter.acquire(Priority::Interactive).await;
+    assert_eq!(start.elapsed(), Duration::from_millis(200));
+
+    limiter.throttled(None);
+    limiter.throttled(None);
+    assert_eq!(gap(&limiter), Duration::from_millis(400));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_throttle_during_a_pause_does_not_slow_down_again() {
+    let limiter = RateLimiter::new(Duration::from_millis(100));
+    limiter.throttled(Some(Duration::from_secs(10)));
+    limiter.throttled(Some(Duration::from_secs(10)));
+    assert_eq!(gap(&limiter), Duration::from_millis(200));
+
+    tokio::time::advance(Duration::from_secs(11)).await;
+    limiter.throttled(Some(Duration::from_secs(10)));
+    assert_eq!(gap(&limiter), Duration::from_millis(400));
+}
+
+#[tokio::test(start_paused = true)]
+async fn quiet_periods_recover_the_rate_gradually() {
+    let limiter = RateLimiter::with_backoff(Duration::from_millis(100), backoff(30_000, 1.0, 10));
+    limiter.throttled(None);
+    assert_eq!(gap(&limiter), Duration::from_millis(200));
+
+    tokio::time::advance(Duration::from_secs(9)).await;
+    limiter.acquire(Priority::Interactive).await;
+    assert_eq!(gap(&limiter), Duration::from_millis(200));
+
+    tokio::time::advance(Duration::from_secs(1)).await;
+    limiter.acquire(Priority::Interactive).await;
+    let one_step = 1.0 / gap(&limiter).as_secs_f64();
+    assert!(
+        (one_step - 6.0).abs() < 1e-6,
+        "rate after one step: {one_step}"
+    );
+
+    tokio::time::advance(Duration::from_secs(60)).await;
+    limiter.acquire(Priority::Interactive).await;
+    assert_eq!(gap(&limiter), Duration::from_millis(100));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_new_throttle_restarts_the_quiet_period() {
+    let limiter = RateLimiter::with_backoff(Duration::from_millis(100), backoff(30_000, 1.0, 10));
+    limiter.throttled(None);
+    tokio::time::advance(Duration::from_secs(8)).await;
+    limiter.throttled(None);
+    tokio::time::advance(Duration::from_secs(8)).await;
+    limiter.acquire(Priority::Interactive).await;
+    assert_eq!(gap(&limiter), Duration::from_millis(400));
+}
+
+#[tokio::test(start_paused = true)]
+async fn zero_interval_only_honours_pauses() {
+    let limiter = RateLimiter::new(Duration::ZERO);
+    limiter.throttled(Some(Duration::from_secs(1)));
+    assert_eq!(gap(&limiter), Duration::ZERO);
+    let start = Instant::now();
+    limiter.acquire(Priority::Interactive).await;
+    limiter.acquire(Priority::Interactive).await;
+    assert_eq!(start.elapsed(), Duration::from_secs(1));
+}
+
+#[tokio::test(start_paused = true)]
+async fn recovery_waits_for_the_pause_to_end() {
+    let limiter = RateLimiter::with_backoff(Duration::from_millis(100), backoff(30_000, 1.0, 10));
+    limiter.throttled(Some(Duration::from_secs(30)));
+    tokio::time::advance(Duration::from_secs(35)).await;
+    limiter.acquire(Priority::Interactive).await;
+    assert_eq!(gap(&limiter), Duration::from_millis(200));
+}

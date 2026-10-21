@@ -48,6 +48,28 @@ impl Default for RetryConfig {
     }
 }
 
+/// How the client slows down when uma.moe answers 429, and speeds up again. Has no effect when
+/// `min_interval` is zero.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BackoffConfig {
+    /// Longest gap between requests the client slows down to.
+    pub max_interval: Duration,
+    /// Requests per second added back after each quiet period.
+    pub recovery_step: f64,
+    /// Length of a quiet period: time without a 429, after any `Retry-After` pause.
+    pub recovery_every: Duration,
+}
+
+impl Default for BackoffConfig {
+    fn default() -> Self {
+        Self {
+            max_interval: Duration::from_secs(30),
+            recovery_step: 0.05,
+            recovery_every: Duration::from_secs(10),
+        }
+    }
+}
+
 /// Settings for [`Client`](crate::Client).
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
@@ -61,6 +83,8 @@ pub struct ClientConfig {
     pub min_interval: Duration,
     /// Retry settings.
     pub retry: RetryConfig,
+    /// Backoff settings for 429 responses.
+    pub backoff: BackoffConfig,
     /// `User-Agent` header value.
     pub user_agent: String,
 }
@@ -74,6 +98,7 @@ impl ClientConfig {
             timeout: Duration::from_secs(15),
             min_interval: Duration::from_millis(500),
             retry: RetryConfig::default(),
+            backoff: BackoffConfig::default(),
             user_agent: concat!(
                 "uma-stable-match/",
                 env!("CARGO_PKG_VERSION"),

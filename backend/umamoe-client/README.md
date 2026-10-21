@@ -123,6 +123,24 @@ let prefetch = client.with_priority(Priority::Background);
 
 A steady stream of interactive requests can hold background ones back indefinitely. That's intended: prefetching should never slow down a visitor.
 
+### Backing off
+
+When uma.moe answers 429, the whole client slows down, not just the refused request:
+
+- **`Retry-After` pauses every request.** No request in either lane is sent until it has passed (capped at `RetryConfig::max_delay`).
+- **The rate halves on each 429**, down to one request per `max_interval`. Further 429s during the same pause don't halve it again, so one episode of throttling counts once.
+- **It recovers additively.** After each `recovery_every` without a 429, counted from the end of any pause, the rate goes up by `recovery_step` requests per second, back up to one per `min_interval`.
+
+This is additive increase, multiplicative decrease (AIMD), the same scheme TCP uses for congestion: a one-off 429 dips the rate briefly, while repeated 429s settle it just below what the API accepts. The settings are in `ClientConfig::backoff`:
+
+| `BackoffConfig` | Default | Meaning |
+|---|---|---|
+| `max_interval` | 30 s | Slowest pace: one request this often |
+| `recovery_step` | 0.05 | Requests per second added after each quiet period |
+| `recovery_every` | 10 s | Length of a quiet period |
+
+With the defaults, recovering from a quarter of the normal rate takes about 5 minutes. With `min_interval` set to zero, only the `Retry-After` pause applies.
+
 ## Retries
 
 These are retried:
@@ -145,7 +163,7 @@ exp  = min(base_delay × 2ⁿ, max_delay)
 wait = exp ÷ 2 + random(0, exp ÷ 2)
 ```
 
-When the response has a `Retry-After` header in seconds, that value is used instead, capped at `max_delay`. HTTP-date values are ignored. `timeout` applies to each attempt, not to the whole call.
+When the response has a `Retry-After` header in seconds, that value is used instead, capped at `max_delay`. A 429 also slows the whole client down; see [Backing off](#backing-off). HTTP-date values are ignored. `timeout` applies to each attempt, not to the whole call.
 
 ## Errors
 
@@ -166,6 +184,7 @@ Each call records metrics through the [`metrics`](https://docs.rs/metrics) facad
 | `umamoe_requests_total` | counter | `endpoint`, `lane`, `status` | Attempts, so each retry counts as another one. `status` is the HTTP status code, or `timeout`, `connect_error` or `transport_error` when no response came back |
 | `umamoe_request_duration_seconds` | histogram | `endpoint`, `lane` | Time from sending an attempt to its response or error |
 | `umamoe_queue_wait_seconds` | histogram | `lane` | Time an attempt waited for its slot under `min_interval` |
+| `umamoe_allowed_rate` | gauge | | Requests per second the client currently allows, lowered by [backing off](#backing-off). Absent when `min_interval` is zero |
 
 `endpoint` is the API path, such as `/api/v4/circles`, never the full URL, so trainer IDs and other query values don't appear in labels. `lane` is `interactive` or `background`.
 
