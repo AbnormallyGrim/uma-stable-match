@@ -79,10 +79,12 @@ impl PaceLookup {
     /// Found and not-found results are cached per month; uma.moe failures aren't.
     pub async fn pace(&self, viewer_id: u64, period: Option<Period>) -> Result<f64, PaceError> {
         if let Some(outcome) = self.cached(viewer_id, period) {
+            count_pace("memory");
             return outcome.into_result();
         }
         let key = self.shared.pace_key(viewer_id, period);
         if let Some(outcome) = self.shared.get::<Outcome>(&key).await {
+            count_pace("redis");
             self.store(viewer_id, period, outcome);
             return outcome.into_result();
         }
@@ -90,10 +92,12 @@ impl PaceLookup {
         let outcome = match period {
             None => {
                 self.lookup_club(CircleRequest::by_viewer_id(viewer_id), viewer_id)
-                    .await?
+                    .await
             }
-            Some(period) => self.lookup_last_month(viewer_id, period).await?,
+            Some(period) => self.lookup_last_month(viewer_id, period).await,
         };
+        count_pace(if outcome.is_ok() { "umamoe" } else { "error" });
+        let outcome = outcome?;
         self.store(viewer_id, period, outcome);
         self.shared.set(&key, &outcome, self.ttl).await;
         outcome.into_result()
@@ -160,6 +164,10 @@ impl PaceLookup {
         entries.retain(|_, (at, _)| at.elapsed() < self.ttl);
         entries.insert((viewer_id, period), (Instant::now(), outcome));
     }
+}
+
+fn count_pace(source: &'static str) {
+    metrics::counter!("pace_lookups_total", "source" => source).increment(1);
 }
 
 fn pace_from_response(response: &CircleResponse, viewer_id: u64) -> Outcome {

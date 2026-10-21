@@ -120,11 +120,16 @@ impl ClubDetails {
     pub async fn get(&self, circle_id: u64, priority: Priority) -> Result<Arc<Club>, Arc<Error>> {
         let inner = &self.inner;
         let period = self.period();
+        if let Some(club) = inner.cache.get(&(circle_id, period)).await {
+            count_detail("memory");
+            return Ok(club);
+        }
         inner
             .cache
             .try_get_with((circle_id, period), async {
                 let key = club_key(circle_id, period);
                 if let Some(club) = inner.shared.get::<Club>(&key).await {
+                    count_detail("redis");
                     record_median(inner, &club, circle_id, period);
                     return Ok(Arc::new(club));
                 }
@@ -136,7 +141,10 @@ impl ClubDetails {
                 if let Some((year, month)) = period {
                     request = request.for_month(year, month);
                 }
-                let mut response = client.circle(&request).await?;
+                let mut response = client.circle(&request).await.inspect_err(|_| {
+                    count_detail("error");
+                })?;
+                count_detail("umamoe");
                 if response.circle.circle_id == 0 {
                     if let Some(listed) = read(&inner.listed).get(&circle_id) {
                         response.circle = listed.clone();
@@ -183,6 +191,10 @@ impl ClubDetails {
             return false;
         }
         true
+    }
+
+    pub(crate) async fn settle(&self) {
+        self.inner.cache.run_pending_tasks().await;
     }
 
     /// Clubs queued or loading in the background.
@@ -253,6 +265,10 @@ impl BackgroundLoader {
             lock(&self.details.inner.queued).remove(&circle_id);
         }
     }
+}
+
+fn count_detail(source: &'static str) {
+    metrics::counter!("club_detail_lookups_total", "source" => source).increment(1);
 }
 
 fn record_median(inner: &Inner, club: &Club, circle_id: u64, period: Option<Period>) {

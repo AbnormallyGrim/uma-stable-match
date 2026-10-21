@@ -104,6 +104,10 @@ async fn record_state(state: &AppState) {
     metrics::gauge!("pool_exact_medians").set(exact as f64);
     metrics::gauge!("pool_calibration_factor").set(factor);
     metrics::gauge!("pool_calibration_samples").set(samples as f64);
+
+    state.details.settle().await;
+    metrics::gauge!("detail_cache_clubs").set(state.details.cached_clubs() as f64);
+    metrics::gauge!("detail_queue_clubs").set(state.details.queued() as f64);
 }
 
 fn unix_seconds(time: SystemTime) -> f64 {
