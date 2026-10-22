@@ -46,4 +46,4 @@ If you run Uma Stable Match yourself:
 - Only set `TRUST_FORWARDED_FOR=true` behind a proxy that sets `X-Forwarded-For`, or visitors could pick their own address.
 - If your key leaks, revoke it at [uma.moe/settings](https://uma.moe/settings) and create a new one.
 - If you turn on metrics, keep `METRICS_ADDR` on `127.0.0.1` or a private network, and the same for Prometheus and Grafana. Metrics hold no trainer IDs or IP addresses, but they show traffic and scan activity.
-- With Redis, keep `REDIS_KEY_SECRET` as secret as the API key, and give Redis a password or keep it on a private network.
+- With Redis, keep `REDIS_KEY_SECRET` as secret as the API key, and give Redis a password or keep it on a private network. The Fly.io setup in `deploy/redis` does both.

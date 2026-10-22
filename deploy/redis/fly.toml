@@ -1,0 +1,25 @@
+# Redis for the production server, as its own Fly app. See docs/deploy-fly.md.
+# No [http_service] or [[services]]: it has no public address, and the server reaches it on Fly's
+# private network at uma-stable-match-redis.internal:6379.
+app = "uma-stable-match-redis"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Create it first with `fly volumes create redis_data`. Fly snapshots it daily.
+[mounts]
+  source = "redis_data"
+  destination = "/data"
+
+[checks.redis]
+  type = "tcp"
+  port = 6379
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "10s"
+
+# Raise together with maxmemory in the Dockerfile.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
