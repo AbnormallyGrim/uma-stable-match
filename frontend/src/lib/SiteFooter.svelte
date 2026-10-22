@@ -1,15 +1,17 @@
 <!--
   @component
-  The page footer: tips for switching clubs, the privacy note, the disclaimer and attributions,
-  and project links. Keep the wording in step with the root README's Disclaimer section.
+  The page footer: tips for switching clubs, the logo, a link to report a problem, and the
+  disclaimer and attributions. Keep the wording in step with the root README's Disclaimer section.
 -->
 
 <script lang="ts">
+  import BrandLogo from './BrandLogo.svelte';
+
   const REPO = 'https://github.com/AbnormallyGrim/uma-stable-match';
 </script>
 
 <footer class="site-footer">
-  <details>
+  <details class="tips">
     <summary>Tips for switching clubs</summary>
     <ul>
       <li>
@@ -31,81 +33,74 @@
     <p>These rules can change, so check in-game if something doesn't match.</p>
   </details>
 
-  <details>
-    <summary>Privacy</summary>
-    <ul>
-      <li>
-        When you search by trainer ID, the server asks uma.moe for your club's fan data to work out
-        your pace. Your pace is kept in memory for a few minutes, so repeat searches are fast, and
-        then forgotten. Trainer IDs aren't logged or written to disk.
-      </li>
-      <li>
-        To prevent abuse, the server counts searches per IP address. The counts are kept in memory
-        only, and IP addresses aren't logged.
-      </li>
-      <li>
-        If you tick "Remember my trainer ID", it's saved in this browser only. Your theme choice is
-        saved the same way. You can clear both by clearing this site's data in your browser.
-      </li>
-      <li>There are no accounts, cookies, ads or trackers.</li>
-    </ul>
-  </details>
+  <div class="meta">
+    <div class="brand">
+      <BrandLogo size={32} />
+      <span>Uma Stable Match</span>
+    </div>
 
-  <div class="notes">
-    <p>
-      Uma Stable Match is an <strong>unofficial, non-commercial fan tool</strong>. It isn't
-      affiliated with, endorsed by or sponsored by uma.moe or Cygames, Inc.
-    </p>
-    <p>
-      Club and trainer data comes from
-      <a href="https://uma.moe" target="_blank" rel="noopener noreferrer">uma.moe</a> and may be delayed
-      or incomplete. Recommendations are estimates to help you decide, not judgements of any player or
-      club.
-    </p>
-    <p>
-      <em>Umamusume: Pretty Derby</em> and its names, characters, artwork and trademarks belong to
-      Cygames, Inc. The club tier icons are © Cygames, Inc. and are used non-commercially in line
-      with Cygames'
-      <a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener noreferrer"
-        >Fan-Created Content Guidelines</a
-      >.
-    </p>
+    <nav aria-label="Project links">
+      <a href="{REPO}/issues" target="_blank" rel="noopener noreferrer">Report a problem</a>
+    </nav>
+
+    <div class="notes">
+      <p>
+        Uma Stable Match is an <strong>unofficial, non-commercial fan tool</strong>. It isn't
+        affiliated with, endorsed by or sponsored by uma.moe or Cygames, Inc.
+      </p>
+      <p>
+        Club and trainer data comes from
+        <a href="https://uma.moe" target="_blank" rel="noopener noreferrer">uma.moe</a> and may be delayed
+        or incomplete. Recommendations are estimates to help you decide, not judgements of any player
+        or club.
+      </p>
+      <p>
+        <em>Umamusume: Pretty Derby</em> and its names, characters, artwork and trademarks belong to
+        Cygames, Inc. The club tier icons are © Cygames, Inc. and are used non-commercially in line
+        with Cygames'
+        <a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener noreferrer"
+          >Fan-Created Content Guidelines</a
+        >.
+      </p>
+    </div>
   </div>
-
-  <nav aria-label="Project links">
-    <a href={REPO} target="_blank" rel="noopener noreferrer">Source code</a>
-    <a href="{REPO}/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT licence</a>
-    <a href="{REPO}/issues" target="_blank" rel="noopener noreferrer">Report a problem</a>
-  </nav>
 </footer>
 
 <style>
   .site-footer {
     display: grid;
-    gap: 12px;
+    gap: 32px;
     max-width: var(--page-max);
     margin: 0 auto;
-    padding: 24px var(--gutter) 48px;
+    padding: 40px var(--gutter) 48px;
     border-top: 1px solid var(--border);
     color: var(--muted);
     font-size: 0.8125rem;
   }
 
-  details {
-    padding: 8px 12px;
+  .tips {
+    width: 100%;
+    max-width: 760px;
+    justify-self: center;
+    padding: 12px 18px;
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
   }
 
+  .tips[open] {
+    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
   summary {
     color: var(--text);
+    font-size: 0.9375rem;
     font-weight: 600;
     cursor: pointer;
   }
 
   ul {
-    margin: 8px 0 0;
+    margin: 10px 0 0;
     padding-left: 20px;
   }
 
@@ -113,21 +108,58 @@
     margin-top: 4px;
   }
 
-  details p {
-    margin: 8px 0 0;
+  .tips p {
+    margin: 10px 0 0;
   }
 
-  .notes p {
-    margin: 0 0 6px;
+  .meta {
+    display: grid;
+    gap: 18px;
+    justify-items: center;
+    text-align: center;
   }
 
-  strong {
-    color: var(--text-2);
+  .brand {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }
 
   nav {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 16px;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  nav a {
+    padding: 6px 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  nav a:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .notes {
+    max-width: 760px;
+  }
+
+  .notes p {
+    margin: 0 0 8px;
+  }
+
+  strong {
+    color: var(--text-2);
   }
 </style>
