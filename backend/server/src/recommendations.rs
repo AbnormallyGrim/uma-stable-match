@@ -241,6 +241,13 @@ async fn load_clubs(
         .copied()
         .filter(|id| !loaded.contains_key(id))
         .collect();
+    for club in details.load_shared(&misses).await {
+        loaded.insert(club.circle_id, club);
+    }
+    let misses: Vec<u64> = misses
+        .into_iter()
+        .filter(|id| !loaded.contains_key(id))
+        .collect();
     let (fetch, later) = misses.split_at(settings.fetch_budget.min(misses.len()));
     let mut fetches = JoinSet::new();
     for &circle_id in fetch {

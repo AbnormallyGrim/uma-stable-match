@@ -6,15 +6,19 @@
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime};
 
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use http_body_util::BodyExt;
 use serde_json::json;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
+use tower::ServiceExt;
 use uma_stable_match_server::{
-    club_key, run_scheduler, scan, Cache, CacheStatus, ClubDetails, ClubPool, DetailConfig,
-    KeySecret, ListedClub, PaceLookup, RedisUrl, RefreshConfig, ScanConfig, ScanPhase, SharedCache,
-    SharedPool, DEFAULT_PACE_TTL,
+    club_key, router, run_scheduler, scan, AppState, Cache, CacheStatus, ClubDetails, ClubPool,
+    DetailConfig, KeySecret, ListedClub, MatchSettings, PaceLookup, RateLimits, RedisUrl,
+    RefreshConfig, ScanConfig, ScanPhase, SharedCache, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -141,6 +145,11 @@ async fn a_redis_that_stops_answering_counts_as_a_miss() {
     shared
         .set("usm:v1:test:silent", &1u32, Duration::from_secs(60))
         .await;
+    let keys = [
+        "usm:v1:test:silent".to_owned(),
+        "usm:v1:test:quiet".to_owned(),
+    ];
+    assert_eq!(shared.get_many::<u32>(&keys).await, vec![None, None]);
     assert!(started.elapsed() < Duration::from_secs(3));
 }
 
@@ -174,6 +183,17 @@ async fn values_round_trip_and_expire() {
         .await;
     assert_eq!(shared.get::<Vec<u32>>(&key).await, Some(vec![1, 2, 3]));
     assert_eq!(shared.get::<String>(&key).await, None);
+    let missing = format!("usm:v1:test:{}", unique_id());
+    assert_eq!(
+        shared
+            .get_many::<Vec<u32>>(&[missing.clone(), key.clone(), missing])
+            .await,
+        vec![None, Some(vec![1, 2, 3]), None]
+    );
+    assert_eq!(
+        shared.get_many::<Vec<u32>>(&[]).await,
+        Vec::<Option<Vec<u32>>>::new()
+    );
     tokio::time::sleep(Duration::from_millis(700)).await;
     assert_eq!(shared.get::<Vec<u32>>(&key).await, None);
 }
@@ -981,4 +1001,60 @@ async fn coverage_counts_scheduled_clubs_stored_in_redis() {
         .await
         .unwrap();
     assert_eq!(second.refresh_status().await.loaded, 1);
+}
+
+#[tokio::test]
+async fn a_restarted_instance_scores_clubs_from_redis_without_fetching_them() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let ids = [unique_id(), unique_id(), unique_id()];
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(listed_clubs(&[
+            (ids[0], 10_000_000),
+            (ids[1], 20_000_000),
+            (ids[2], 30_000_000),
+        ]))
+        .mount(&server)
+        .await;
+    mount_details(&server, &ids).await;
+    let config = scan_config();
+    let first = refreshing(&server, config, first_shared);
+    scan(&client(&server), &first, &config).await.unwrap();
+    for id in ids {
+        first.get(id, Priority::Interactive).await.unwrap();
+    }
+
+    let restarted = refreshing(&server, config, redis().await.unwrap());
+    scan(&client(&server), &restarted, &config).await.unwrap();
+    assert_eq!(restarted.cached_clubs(), 0);
+    let state = AppState {
+        cache: Cache::new(),
+        details: restarted.clone(),
+        matching: MatchSettings {
+            shortlist_size: 3,
+            fetch_budget: 0,
+        },
+        paces: PaceLookup::new(client(&server), DEFAULT_PACE_TTL),
+        limits: RateLimits::new(10_000, 10_000, false),
+    };
+    let response = router(state)
+        .oneshot(
+            Request::get("/api/v1/recommendations?pace=500")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
+
+    assert_eq!(
+        body["coverage"],
+        json!({ "shortlisted": 3, "scored": 3, "pending": 0 })
+    );
+    assert_eq!(restarted.queued(), 0);
+    assert_eq!(calls(&server, "/api/v4/circles", None).await, 3);
 }

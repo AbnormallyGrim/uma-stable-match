@@ -244,6 +244,47 @@ impl SharedCache {
         }
     }
 
+    pub async fn get_many<T: DeserializeOwned>(&self, keys: &[String]) -> Vec<Option<T>> {
+        let misses = || keys.iter().map(|_| None).collect();
+        let Backend::Redis(redis) = &self.backend else {
+            return misses();
+        };
+        if keys.is_empty() {
+            return Vec::new();
+        }
+        let mut mget = redis::cmd("MGET");
+        mget.arg(keys);
+        let mut conn = redis.conn.clone();
+        let started = Instant::now();
+        let reply = timeout(
+            OP_TIMEOUT,
+            mget.query_async::<Vec<Option<Vec<u8>>>>(&mut conn),
+        )
+        .await;
+        observe("mget", started);
+        match reply {
+            Ok(Ok(values)) if values.len() == keys.len() => {
+                redis.up();
+                values
+                    .into_iter()
+                    .map(|value| serde_json::from_slice(&value?).ok())
+                    .collect()
+            }
+            Ok(Ok(_)) => {
+                redis.up();
+                misses()
+            }
+            Ok(Err(error)) => {
+                redis.down(&kind(&error));
+                misses()
+            }
+            Err(_) => {
+                redis.down("timed out");
+                misses()
+            }
+        }
+    }
+
     /// Stores a value until `ttl` passes. Failures are ignored, as the value can be fetched again.
     pub async fn set<T: Serialize + Sync>(&self, key: &str, value: &T, ttl: Duration) {
         let Backend::Redis(redis) = &self.backend else {
