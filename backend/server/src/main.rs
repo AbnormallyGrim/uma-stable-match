@@ -5,21 +5,22 @@ use std::process::ExitCode;
 
 use tokio::net::TcpListener;
 use tokio::sync::watch;
-use tracing_subscriber::EnvFilter;
 use uma_stable_match_server::{
-    app, install_metrics, metrics_router, run_scheduler, AppState, Cache, ClubDetails, Config,
-    DetailConfig, PaceLookup, RateLimits, RefreshConfig, SharedCache, SharedPool,
+    app, init_logging, install_metrics, metrics_router, run_scheduler, AppState, Cache,
+    ClubDetails, Config, DetailConfig, LogFormat, PaceLookup, RateLimits, RefreshConfig,
+    SharedCache, SharedPool,
 };
 use uma_stable_match_umamoe_client::{Client, ClientConfig};
 
 #[tokio::main]
 async fn main() -> ExitCode {
     dotenvy::dotenv().ok();
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-        )
-        .init();
+    let log_format = LogFormat::from_env();
+    init_logging(log_format.clone().unwrap_or_default());
+    if let Err(error) = log_format {
+        tracing::error!("{error}");
+        return ExitCode::FAILURE;
+    }
 
     let config = match Config::from_env() {
         Ok(config) => config,
