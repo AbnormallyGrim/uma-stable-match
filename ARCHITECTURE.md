@@ -92,7 +92,7 @@ The refresher loads each club's member data in the background lane, then refresh
 
 ## How a request is answered
 
-`GET /api/v1/recommendations` goes through the per-visitor rate limiter, then:
+`GET /api/v1/recommendations` goes through the per-visitor rate limiter and a 30-second time limit, then:
 
 1. **Pace:** taken from the request, or looked up from the trainer's club on uma.moe and cached for `TRAINER_CACHE_MINUTES`.
 2. **Shortlist:** the `SHORTLIST_SIZE` clubs (120) whose estimated median is nearest 0.85 × the pace.

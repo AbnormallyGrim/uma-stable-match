@@ -278,8 +278,13 @@ Every response, from the API and the frontend alike, carries these headers:
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `no-referrer` |
 | `X-Frame-Options` | `DENY` |
+| `Strict-Transport-Security` | `max-age=31536000`: browsers use HTTPS for the next year. They ignore it on plain-HTTP responses, so local setups are unaffected |
 
 The policy allows no inline scripts or styles, so the frontend must not add any. That's why the theme script lives in its own file.
+
+### Request timeout
+
+A request still running after 30 seconds is cut off with `504 {"error":"the request took too long; try again"}`, so slow or held-open requests can't pile up. 30 seconds is the longest `Retry-After` pause a visitor's request waits out; the web page gives up after 15 seconds on its own.
 
 ## Endpoints
 
@@ -463,6 +468,7 @@ Errors come back as `{"error": "..."}`:
 | `502` | uma.moe couldn't be reached for the trainer lookup |
 | `429` | Too many requests from this visitor. The `Retry-After` header says how many seconds to wait |
 | `503` | The first scan hasn't listed the clubs yet. Try again shortly |
+| `504` | The request took longer than 30 seconds. See [Request timeout](#request-timeout) |
 
 ### Rate limits
 
