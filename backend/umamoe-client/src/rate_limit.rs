@@ -119,8 +119,18 @@ impl RateLimiter {
         record_rate(state.gap);
     }
 
-    /// Waits for the next free slot.
+    #[cfg(test)]
     pub(crate) async fn acquire(&self, priority: Priority) {
+        let _ = self.acquire_within(priority, None).await;
+    }
+
+    /// Waits for the next free slot. Gives up, returning the pause left, if a `Retry-After` pause
+    /// runs longer than `max_pause`.
+    pub(crate) async fn acquire_within(
+        &self,
+        priority: Priority,
+        max_pause: Option<Duration>,
+    ) -> Result<(), Duration> {
         let mut waiter = Waiter {
             limiter: self,
             priority,
@@ -151,6 +161,14 @@ impl RateLimiter {
                     let gap = state.gap;
                     let mut slot = state.last_grant.map_or(now, |t| (t + gap).max(now));
                     if let Some(until) = state.paused_until {
+                        let left = until.saturating_duration_since(now);
+                        if max_pause.is_some_and(|limit| left > limit) {
+                            state.lane(priority).pop_front();
+                            waiter.ticket = None;
+                            drop(state);
+                            self.changed.notify_waiters();
+                            return Err(left);
+                        }
                         slot = slot.max(until);
                     }
                     if slot <= now {
@@ -159,7 +177,7 @@ impl RateLimiter {
                         waiter.ticket = None;
                         drop(state);
                         self.changed.notify_waiters();
-                        return;
+                        return Ok(());
                     }
                     Some(slot)
                 }

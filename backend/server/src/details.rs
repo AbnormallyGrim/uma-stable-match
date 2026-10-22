@@ -22,6 +22,8 @@ use crate::shared::{club_key, SharedCache};
 pub type SharedPool = Arc<RwLock<ClubPool>>;
 
 const KEEP_AFTER_DUE: Duration = Duration::from_secs(24 * 60 * 60);
+/// Longest `Retry-After` pause a visitor's request waits out; longer ones fail straight away.
+pub(crate) const VISITOR_MAX_PAUSE: Duration = Duration::from_secs(30);
 
 /// Detail cache settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -181,7 +183,9 @@ impl ClubDetails {
         let (sender, receiver) = mpsc::channel(config.queue_size.max(1));
         let details = Self {
             inner: Arc::new(Inner {
-                interactive: client.with_priority(Priority::Interactive),
+                interactive: client
+                    .with_priority(Priority::Interactive)
+                    .with_max_pause(VISITOR_MAX_PAUSE),
                 background: client.with_priority(Priority::Background),
                 cache,
                 period: RwLock::new(None),
