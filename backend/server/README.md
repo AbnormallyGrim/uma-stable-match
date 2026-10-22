@@ -22,6 +22,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `HOST` | `127.0.0.1` | IP address to listen on. Use `0.0.0.0` in a container, or `::` for all IPv6 and IPv4 interfaces |
 | `PORT` | `8080` | Port to listen on |
 | `RUST_LOG` | `info` | Log filter, such as `debug` or `uma_stable_match_server=debug`. At `debug`, the HTTP libraries can log request URLs, which include trainer IDs |
+| `LOG_FORMAT` | `text` | `text` for readable lines, or `json` for one JSON object per line, for a log search service. See [Logs](#logs) |
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to scan |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to scan |
 | `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is kept loaded, best rank first. Clubs past it load when a search needs them |
@@ -41,7 +42,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 Blank values count as unset. These stop the server at startup, with an error message and exit code 1:
 
 - a missing key, or a `HOST` that isn't an IP address (hostnames such as `localhost` aren't accepted)
-- a `PORT` outside 1 to 65535, or a `TRUST_FORWARDED_FOR` other than `true` or `false`
+- a `PORT` outside 1 to 65535, a `TRUST_FORWARDED_FOR` other than `true` or `false`, or a `LOG_FORMAT` other than `text` or `json`
 - a scan, cache or rate limit setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO`
 - a `FRONTEND_DIR` without an `index.html`
 - a `REDIS_URL` without a `redis://` or `rediss://` scheme, a missing or short `REDIS_KEY_SECRET`, or a Redis that can't be reached within 5 seconds
@@ -477,6 +478,18 @@ Visitors are identified by IP address:
 - **Behind a reverse proxy**, every request comes from the proxy's address. Set `TRUST_FORWARDED_FOR=true` and the server uses the right-most `X-Forwarded-For` address, the one your proxy added. Anything a client writes further left is ignored. Don't turn it on without a proxy, or clients can pick their own address.
 
 IP addresses are kept in memory only while they're being limited, and they're never logged.
+
+## Logs
+
+Logs go to stdout. With `LOG_FORMAT=json`, each line is a JSON object with the timestamp, level, message and module (`target`), plus the event's own fields, such as `circle_id` and `error`:
+
+```json
+{"timestamp":"2026-10-01T09:00:00.000000Z","level":"WARN","message":"club refresh failed; retrying later","circle_id":900000101,"error":"request to uma.moe timed out","target":"uma_stable_match_server::refresher"}
+```
+
+A log search service such as Axiom can then filter by those fields. If a log shipper wraps each line in its own record, as Fly.io's does, the line arrives as a string in `message`; read its fields with `parse_json(message)` in Axiom.
+
+At `info`, logs hold no trainer IDs or IP addresses. Keep `RUST_LOG` at `info` when logs leave the server.
 
 ## Metrics
 
