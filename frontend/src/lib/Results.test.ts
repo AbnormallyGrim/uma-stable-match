@@ -6,36 +6,37 @@ import { describe, expect, it } from 'vitest';
 import Results from './Results.svelte';
 import { club, recommendations } from './test-data';
 
-const now = new Date('2026-03-18T12:00:00Z');
-
 describe('Results', () => {
   it('summarises the search', () => {
-    render(Results, { result: recommendations({ total: 42 }), now });
+    const clubs = [
+      club({ circle_id: 1, your_place: 9, club_size: 26 }),
+      club({ circle_id: 2, your_place: 2, club_size: 20 }),
+      club({ circle_id: 3, your_place: 12, club_size: 20 }),
+    ];
+    render(Results, { result: recommendations({ total: 42, clubs }) });
     const summary = screen.getByTestId('result-summary');
     expect(within(summary).getByText('7.6M/day')).toBeInTheDocument();
     expect(within(summary).getByText('42')).toBeInTheDocument();
-    expect(within(summary).getByText('3 hours ago')).toHaveAttribute(
-      'datetime',
-      '2026-03-18T09:00:00Z',
-    );
-    expect(within(summary).getByText('Off')).toBeInTheDocument();
+    expect(within(summary).getByText('2')).toBeInTheDocument();
+    expect(within(summary).getByText('Top 35%')).toBeInTheDocument();
   });
 
-  it('shows the balance weight when balance is on', () => {
+  it("doesn't repeat the data age or the balance setting", () => {
     render(Results, {
       result: recommendations({
         options: { balance_weight: 0.5, include_closed: false, limit: 50 },
       }),
-      now,
     });
-    expect(screen.getByText('Weight 0.50')).toBeInTheDocument();
+    const summary = screen.getByTestId('result-summary');
+    expect(summary).not.toHaveTextContent('Data updated');
+    expect(summary).not.toHaveTextContent('Weight 0.50');
   });
 
   it('lists up to ten top picks in order', () => {
     const clubs = Array.from({ length: 12 }, (_, i) =>
       club({ circle_id: i + 1, name: `Club ${i + 1}`, url: `https://uma.moe/circles/${i + 1}` }),
     );
-    render(Results, { result: recommendations({ total: 12, clubs }), now });
+    render(Results, { result: recommendations({ total: 12, clubs }) });
     const picks = screen.getByRole('list');
     const items = within(picks).getAllByRole('listitem');
     expect(items).toHaveLength(10);
@@ -46,7 +47,7 @@ describe('Results', () => {
   });
 
   it('says when nothing matched', () => {
-    render(Results, { result: recommendations(), now });
+    render(Results, { result: recommendations() });
     expect(screen.getByText('No clubs matched your search.')).toBeInTheDocument();
   });
 });
@@ -57,7 +58,6 @@ describe('Results states', () => {
       result: recommendations({
         options: { balance_weight: 0.5, include_closed: false, limit: 100 },
       }),
-      now,
     });
     expect(screen.getByText('No clubs matched your search.')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
@@ -66,7 +66,6 @@ describe('Results states', () => {
   it('dims stale results while a new search loads', () => {
     const { container } = render(Results, {
       result: recommendations({ total: 1, clubs: [club()] }),
-      now,
       stale: true,
     });
     const section = container.querySelector('section');
@@ -75,14 +74,13 @@ describe('Results states', () => {
   });
 
   it('shows no notices for complete, current results', () => {
-    render(Results, { result: recommendations(), now });
+    render(Results, { result: recommendations() });
     expect(screen.queryByTestId('result-notice')).not.toBeInTheDocument();
   });
 
   it('says how many clubs are still loading', () => {
     render(Results, {
       result: recommendations({ coverage: { shortlisted: 10, scored: 6, pending: 4 } }),
-      now,
     });
     expect(screen.getByTestId('result-notice')).toHaveTextContent(
       '4 more clubs are still loading. Search again in a minute for complete results.',
@@ -92,7 +90,6 @@ describe('Results states', () => {
   it("says when results use last month's data", () => {
     render(Results, {
       result: recommendations({ updated_at: '2026-03-02T15:00:00Z', month: '2026-02' }),
-      now,
     });
     expect(screen.getByTestId('result-notice')).toHaveTextContent(
       "These results are based on last month's data (February 2026)",

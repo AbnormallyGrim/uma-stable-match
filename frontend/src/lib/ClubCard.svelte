@@ -83,28 +83,33 @@
     </dl>
   </div>
 
-  {#if club.comment}
-    <p class="comment">{club.comment}</p>
-  {/if}
+  {#if club.comment || club.balance}
+    <div class="details">
+      {#if club.comment}
+        <p class="comment">{club.comment}</p>
+      {/if}
 
-  {#if club.balance}
-    <dl class="balance">
-      <div class="bar-row">
-        <dt>Balance</dt>
-        <dd>
-          <span class="bar" aria-hidden="true"><i style:width="{club.balance.score}%"></i></span>
-          {club.balance.score}/100
-        </dd>
-      </div>
-      <div>
-        <dt>Passengers</dt>
-        <dd>{formatPlace(club.balance.passengers, club.balance.counted)}</dd>
-      </div>
-      <div>
-        <dt>Top 3 share</dt>
-        <dd>{formatPercent(club.balance.top3_share)}</dd>
-      </div>
-    </dl>
+      {#if club.balance}
+        <dl class="balance">
+          <div class="bar-row">
+            <dt>Balance</dt>
+            <dd>
+              <span class="bar" aria-hidden="true"><i style:width="{club.balance.score}%"></i></span
+              >
+              {club.balance.score}/100
+            </dd>
+          </div>
+          <div>
+            <dt>Passengers</dt>
+            <dd>{formatPlace(club.balance.passengers, club.balance.counted)}</dd>
+          </div>
+          <div>
+            <dt>Top 3 share</dt>
+            <dd>{formatPercent(club.balance.top3_share)}</dd>
+          </div>
+        </dl>
+      {/if}
+    </div>
   {/if}
 </article>
 
@@ -246,9 +251,18 @@
     white-space: nowrap;
   }
 
+  .details {
+    display: flex;
+    gap: 8px 24px;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+  }
+
   .comment {
+    flex: 1 1 auto;
     max-width: 80ch;
-    margin: 8px 0 0;
+    margin: 0;
     color: var(--muted);
     font-size: 0.8125rem;
     overflow-wrap: anywhere;
@@ -256,9 +270,10 @@
 
   .balance {
     display: flex;
+    flex: none;
     flex-wrap: wrap;
     gap: 6px 18px;
-    margin: 8px 0 0;
+    margin: 0;
     font-size: 0.8125rem;
   }
 
@@ -293,6 +308,14 @@
   }
 
   @media (max-width: 720px) {
+    .details {
+      display: block;
+    }
+
+    .comment + .balance {
+      margin-top: 8px;
+    }
+
     .head {
       grid-template-columns: 24px 48px minmax(0, 1fr);
       gap: 8px;

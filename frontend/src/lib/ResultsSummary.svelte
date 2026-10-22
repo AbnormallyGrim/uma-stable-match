@@ -5,21 +5,17 @@
 
 <script lang="ts">
   import type { Recommendations } from './api';
-  import { formatPerDay, formatUpdated } from './format';
+  import { formatPerDay } from './format';
+  import { comfortableFits, formatTopShare, typicalPlace } from './stats';
 
   interface Props {
     result: Recommendations;
-    now?: Date;
   }
 
-  let { result, now }: Props = $props();
+  let { result }: Props = $props();
 
-  const updated = $derived(formatUpdated(result.updated_at, now));
-  const balance = $derived(
-    result.options.balance_weight === null
-      ? 'Off'
-      : `Weight ${result.options.balance_weight.toFixed(2)}`,
-  );
+  const fits = $derived(comfortableFits(result.clubs));
+  const typical = $derived(formatTopShare(typicalPlace(result.clubs)));
 </script>
 
 <dl class="stats" data-testid="result-summary">
@@ -32,12 +28,12 @@
     <dd>{result.total}</dd>
   </div>
   <div class="stat">
-    <dt>Data updated</dt>
-    <dd><time datetime={result.updated_at} title={result.updated_at}>{updated}</time></dd>
+    <dt>Comfortable fits</dt>
+    <dd title="Clubs where you'd sit 25% to 60% of the way down the members">{fits}</dd>
   </div>
   <div class="stat">
-    <dt>Balance scoring</dt>
-    <dd>{balance}</dd>
+    <dt>Typical place</dt>
+    <dd title="Your middle place across these clubs">{typical}</dd>
   </div>
 </dl>
 
