@@ -72,9 +72,9 @@
 
         /* Top Navigation Header */
         .navbar {
-            border-bottom: 1px solid var(--border-color);
-            background-color: rgba(15, 18, 23, 0.9);
-            backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            background-color: rgba(15, 18, 23, 0.85);
+            backdrop-filter: blur(12px);
             position: sticky;
             top: 0;
             z-index: 100;
@@ -134,10 +134,15 @@
             width: 100%;
         }
 
-        /* Hero Section */
+        /* Hero Section with Smooth Radial & Linear Gradient Fade */
         .hero {
-            padding: 4rem 0 3rem;
+            position: relative;
+            padding: 6rem 0 5rem;
             text-align: center;
+            background:
+                    radial-gradient(circle at 50% 30%, rgba(15, 18, 23, 0.45) 0%, rgba(15, 18, 23, 0.85) 60%, var(--bg-color) 100%),
+                    linear-gradient(180deg, rgba(15, 18, 23, 0.6) 0%, rgba(15, 18, 23, 0.3) 40%, var(--bg-color) 100%),
+                    url('uma-stable-match-aspect.jpeg') center 25%/cover no-repeat;
         }
 
         .badge {
@@ -152,6 +157,7 @@
             letter-spacing: 0.5px;
             text-transform: uppercase;
             margin-bottom: 1.5rem;
+            backdrop-filter: blur(6px);
         }
 
         .hero h1 {
@@ -203,9 +209,10 @@
         }
 
         .btn-secondary {
-            background-color: var(--card-bg);
+            background-color: rgba(24, 29, 38, 0.9);
             color: var(--text-main);
             border: 1px solid var(--border-color);
+            backdrop-filter: blur(8px);
         }
 
         .btn-secondary:hover {
@@ -219,7 +226,7 @@
             border: 1px solid rgba(212, 175, 55, 0.25);
             border-radius: 12px;
             padding: 1.5rem 1.75rem;
-            margin: 2rem 0 3.5rem;
+            margin: 1rem 0 3.5rem;
             text-align: left;
             display: flex;
             gap: 1.25rem;
