@@ -3,18 +3,18 @@
 
 :root {
   color-scheme: light dark;
-  --bg: light-dark(#f3f5f8, #0a0a0a);
-  --card: light-dark(#ffffff, #161616);
-  --surface: light-dark(#f2f5f9, rgb(255 255 255 / 8%));
-  --text: light-dark(#111827, #ffffff);
-  --text-2: light-dark(#374151, rgb(255 255 255 / 70%));
-  --muted: light-dark(#4b5563, rgb(255 255 255 / 55%));
-  --border: light-dark(rgb(17 24 39 / 12%), rgb(255 255 255 / 12%));
+  --bg: light-dark(#eef1f5, #0f1217);
+  --card: light-dark(#ffffff, #181d26);
+  --surface: light-dark(#e6eaf0, rgb(255 255 255 / 6%));
+  --text: light-dark(#14213d, #f0f4f8);
+  --text-2: light-dark(#334155, #cbd5e1);
+  --muted: light-dark(#526077, #94a3b8);
+  --border: light-dark(rgb(20 33 61 / 12%), rgb(255 255 255 / 10%));
   /* Form field edges: at least 3:1 against cards and the page (WCAG 1.4.11). */
-  --control-border: light-dark(#848e9a, rgb(255 255 255 / 42%));
-  --border-strong: light-dark(rgb(17 24 39 / 20%), rgb(255 255 255 / 20%));
-  --accent: light-dark(#2563eb, #64b5f6);
-  --on-accent: light-dark(#ffffff, #0a0a0a);
+  --control-border: light-dark(#82878f, rgb(255 255 255 / 40%));
+  --border-strong: light-dark(rgb(20 33 61 / 22%), rgb(255 255 255 / 18%));
+  --accent: light-dark(#806210, #d4af37);
+  --on-accent: light-dark(#ffffff, #0f1217);
   --up: light-dark(#15803d, #81c784);
   --down: light-dark(#b91c1c, #e57373);
   --open: light-dark(#0b6a62, #81c784);
@@ -24,8 +24,8 @@
   --gold: light-dark(#946100, #ffd700);
   --silver: light-dark(#53616b, #c0c0c0);
   --bronze: light-dark(#9b521b, #cd7f32);
-  --radius-sm: 4px;
-  --radius: 8px;
+  --radius-sm: 6px;
+  --radius: 12px;
   --font: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   /* Page width, shared by <main> and the footer so their edges line up. */
   --page-max: 1760px;
@@ -53,6 +53,74 @@
   color-scheme: dark;
 }
 
+/* Theme-specific images: the background artwork and its strength, and .only-light and .only-dark
+   for elements that should show in one theme only. */
+:root {
+  --hero: url('./assets/brand/hero-light.webp');
+  --hero-opacity: 0.6;
+}
+
+.only-dark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --hero: url('./assets/brand/hero-dark.webp');
+    --hero-opacity: 0.55;
+  }
+
+  :root:not([data-theme='light']) .only-dark {
+    display: revert;
+  }
+
+  :root:not([data-theme='light']) .only-light {
+    display: none;
+  }
+}
+
+:root[data-theme='dark'] {
+  --hero: url('./assets/brand/hero-dark.webp');
+  --hero-opacity: 0.55;
+}
+
+:root[data-theme='dark'] .only-dark {
+  display: revert;
+}
+
+:root[data-theme='dark'] .only-light {
+  display: none;
+}
+
+/* The top of the page, with the background artwork behind it, faded out towards its edges. */
+.hero {
+  position: relative;
+  isolation: isolate;
+}
+
+.hero::before {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  z-index: -1;
+  height: min(100% + 64px, 520px);
+  aspect-ratio: 1456 / 720;
+  content: '';
+  background: var(--hero) center / cover no-repeat;
+  opacity: var(--hero-opacity);
+  transform: translateX(-50%);
+  mask-image: radial-gradient(closest-side, #000 45%, transparent 100%);
+  pointer-events: none;
+}
+
+@media (width <= 720px) {
+  .hero::before {
+    top: auto;
+    bottom: -24px;
+    height: min(100%, 120vw);
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -62,6 +130,7 @@
 html,
 body {
   margin: 0;
+  overflow-x: clip;
   min-width: 320px;
   background: var(--bg);
   color: var(--text);
