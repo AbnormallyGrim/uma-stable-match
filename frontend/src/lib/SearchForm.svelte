@@ -117,14 +117,16 @@
 </form>
 
 <style>
-  /* Two columns (field, options) on wide screens; one column below 720px. */
+  /* Two columns (field, options) on wide screens; one column below 720px. Translucent, so the
+     background artwork shows through. */
   .search {
     display: grid;
     gap: 16px;
     padding: 16px;
-    background: var(--card);
+    background: color-mix(in srgb, var(--card) 55%, transparent);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    backdrop-filter: blur(2px);
   }
 
   .search > .segmented {

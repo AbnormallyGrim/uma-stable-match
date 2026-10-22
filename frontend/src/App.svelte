@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
 
   import { fetchRecommendations, type RecommendationQuery } from './lib/api';
+  import BrandLogo from './lib/BrandLogo.svelte';
   import DataStatus from './lib/DataStatus.svelte';
   import Results from './lib/Results.svelte';
   import { SearchRunner, type SearchState as RunnerState } from './lib/runner';
@@ -78,12 +79,17 @@
 </script>
 
 <main>
-  <header>
-    <h1>Uma Stable Match</h1>
-    <ThemeToggle />
-  </header>
-  <DataStatus {onscanready} />
-  <SearchForm {initial} remember={remembered !== null} {busy} {onsearch} />
+  <div class="hero">
+    <header>
+      <div class="brand">
+        <BrandLogo size={44} />
+        <h1>Uma Stable Match</h1>
+      </div>
+      <ThemeToggle />
+    </header>
+    <DataStatus {onscanready} />
+    <SearchForm {initial} remember={remembered !== null} {busy} {onsearch} />
+  </div>
 
   <SearchStatus status={search.status} onretry={() => runner.retryNow()} />
 
@@ -106,7 +112,15 @@
     margin-bottom: 8px;
   }
 
+  .brand {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-top: 8px;
+  }
+
   h1 {
-    margin: 8px 0 0;
+    margin: 0;
+    letter-spacing: -0.02em;
   }
 </style>

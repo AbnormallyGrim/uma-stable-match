@@ -1,6 +1,6 @@
 // SiteFooter component tests.
 
-import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 
 import SiteFooter from './SiteFooter.svelte';
@@ -29,33 +29,16 @@ describe('SiteFooter', () => {
     }
   });
 
-  it('links to the source, licence and issues', () => {
+  it('links to the issue tracker to report a problem', () => {
     render(SiteFooter);
     const nav = screen.getByRole('navigation', { name: 'Project links' });
     const links = within(nav).getAllByRole('link');
-    expect(links.map((l) => l.textContent)).toEqual([
-      'Source code',
-      'MIT licence',
-      'Report a problem',
-    ]);
-    expect(links[1]).toHaveAttribute(
+    expect(links.map((l) => l.textContent)).toEqual(['Report a problem']);
+    expect(links[0]).toHaveAttribute(
       'href',
-      'https://github.com/AbnormallyGrim/uma-stable-match/blob/main/LICENSE',
+      'https://github.com/AbnormallyGrim/uma-stable-match/issues',
     );
-    for (const link of links) {
-      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-    }
-  });
-
-  it('explains privacy in a collapsible section', async () => {
-    render(SiteFooter);
-    const summary = screen.getByText('Privacy');
-    const details = summary.closest('details')!;
-    expect(details).not.toHaveAttribute('open');
-    await fireEvent.click(summary);
-    expect(details).toHaveAttribute('open');
-    expect(details).toHaveTextContent("Trainer IDs aren't logged or written to disk.");
-    expect(details).toHaveTextContent('There are no accounts, cookies, ads or trackers.');
+    expect(links[0]).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
   it('has the tips for switching clubs', () => {

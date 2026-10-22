@@ -49,6 +49,7 @@ CI runs `check`, `lint`, `test` and `build` on Node 22 for every push and pull r
 ```
 index.html                    Page shell
 public/theme-init.js          Applies the saved theme before the page renders
+public/favicon-32.png         Browser icon, with apple-touch-icon.png for home screens
 src/main.ts                   Mounts the app
 src/App.svelte                Root component: runs searches and keeps them in the URL
 src/lib/runner.ts             Search state machine: loading, retries and countdowns
@@ -57,7 +58,8 @@ src/lib/SearchStatus.svelte   Loading, waiting and error messages
 src/lib/DataStatus.svelte     How fresh the club data is, from /api/v1/status
 src/lib/ThemeToggle.svelte    System / Light / Dark switch
 src/lib/theme.ts              Saving and applying the theme choice
-src/lib/SiteFooter.svelte     Tips, privacy note, disclaimer, attributions and links
+src/lib/SiteFooter.svelte     Tips, the logo, a link to report a problem, and the disclaimer
+src/lib/BrandLogo.svelte      The logo, in the version for the current theme
 src/lib/api.ts                Typed API client
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
@@ -69,6 +71,7 @@ src/lib/TierBadge.svelte      Tier icon, with a fallback for unknown tiers
 src/lib/test-data.ts          Made-up data for component tests
 src/app.css                   Global styles and light and dark colour tokens
 src/assets/tiers/             Club tier icons (Cygames artwork, not MIT licensed)
+src/assets/brand/             Logo and background artwork, light and dark
 src/lib/SearchForm.svelte     The search form
 src/**/*.test.ts              Unit and component tests
 src/a11y.test.ts              axe-core checks for the main views and states
@@ -159,6 +162,18 @@ The **System / Light / Dark** switch in the header (`ThemeToggle.svelte`) sets t
 
 `public/theme-init.js` applies a saved theme before the page renders, so it never flashes the wrong theme while the app loads. `index.html` loads it from its own file because the server's content security policy blocks inline scripts. Vite copies it into `dist/` unchanged, so it isn't hashed and browsers revalidate it on each visit.
 
+The palette follows the project's logo and website: navy with a gold accent in the dark theme, and cool white with navy text and a deeper gold in the light theme, so gold text still meets the contrast check. The status colours for rank changes, join styles and the top three picks are the same in both. `index.html` sets a matching `theme-color` for each, which colours the browser bar on phones.
+
+### Brand artwork
+
+The logo and the background artwork each have a light and a dark version in `src/assets/brand/`, made from the originals in [`docs/images/`](../docs/images/): `logo.jpeg`, `hero.jpeg` and their `-light` versions.
+
+- **Logo.** `BrandLogo.svelte` shows the logo in the header and the footer. It renders both versions, and the `.only-light` and `.only-dark` classes in `app.css` show the one for the current theme, whether it comes from the system or the theme switch.
+- **Background.** The header, data status and search form sit in a `.hero` section. Its `::before` shows the wide artwork (`--hero`), dimmed by `--hero-opacity` and faded to transparent towards its edges with a radial mask, so no box shows whatever the image's background colour. It's anchored to the top of the section, and up to 720 pixels wide to the bottom, so on phones it sits behind the form rather than the title. It stays inside the section, so it never shows behind results or the footer.
+- **Search form.** The form's card is translucent with a slight blur, so the artwork shows through it.
+- **Alignment.** The light and dark artwork are aligned so their outlines lie on top of each other. Keep them aligned when replacing either: measure the drawing in both, and scale and centre the light version to match.
+- **Icons.** `public/favicon-32.png` and `public/apple-touch-icon.png` are the dark logo at 32 and 180 pixels.
+
 ### Page width
 
 `<main>` and the footer share two tokens from `app.css`, so their edges always line up:
@@ -189,13 +204,13 @@ Card descriptions are capped at `80ch` so they stay easy to read on wide screens
 | Part | Content |
 |---|---|
 | Tips for switching clubs | Collapsible. The four tips from the root README: the 14-day rule, the 24-hour cooldown, the month-start lock, and checking activity first |
-| Privacy | Collapsible. What happens to a trainer ID (an uma.moe lookup; the pace is cached in memory briefly; nothing is logged or written to disk), per-IP rate limiting in memory, what's stored in the browser (remember me and the theme), and no accounts, cookies, ads or trackers |
+| Brand | The logo and the project's name |
+| Report a problem | A link to the issue tracker |
 | Disclaimer | An unofficial, non-commercial fan tool, not affiliated with uma.moe or Cygames. uma.moe is credited as the data source, and the game and tier icons as © Cygames, Inc., with a link to Cygames' Fan-Created Content Guidelines |
-| Links | Source code, the MIT licence and issues |
 
-External links open in a new tab with `rel="noopener noreferrer"`.
+The tips sit in a card, and the rest is centred below it. External links open in a new tab with `rel="noopener noreferrer"`.
 
-The disclaimer follows the root README's Disclaimer section; change both together. The privacy note describes the server's default behaviour. With `RUST_LOG=debug`, the HTTP libraries can log request URLs, which include trainer IDs. See the [server README](../backend/server/README.md#configuration).
+The disclaimer follows the root README's Disclaimer section; change both together.
 
 ### Accessibility
 
