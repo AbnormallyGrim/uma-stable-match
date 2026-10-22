@@ -105,10 +105,10 @@ To keep your email address out of commits, turn on **Keep my email addresses pri
 
 The project's page lives in `site/`: one `index.html` with its styles inline, `sitemap.xml` and `images/`. There's no build step.
 
-- **Publishing.** The Website workflow publishes `site/` to GitHub Pages, at <https://abnormallygrim.github.io/uma-stable-match/>, whenever a push to `main` changes `site/` or the workflow. You can also run it from the Actions tab.
+- **Publishing.** The Website workflow publishes `site/` to GitHub Pages whenever a push to `main` changes `site/` or the workflow. You can also run it from the Actions tab. The page is served at <https://umastable.com/>, the custom domain set in the repository's Pages settings; the old `github.io` address redirects there. The app it links to runs at <https://app.umastable.com>.
 - **Previewing.** Run `python3 -m http.server -d site 8000` and open <http://localhost:8000>.
 - **Images.** The page uses small WebP copies; the originals are in `docs/images/`, which also holds the light and dark logo and background artwork the web app uses (see the [frontend README](frontend/README.md#brand-artwork)). Make a copy with [`cwebp`](https://developers.google.com/speed/webp/download), for example `cwebp -q 80 -resize 1200 0 docs/images/demo.png -o site/images/results.webp`, and remake the screenshot copies whenever the README's screenshots change. Screenshots show made-up clubs only.
-- **Search.** Keep the `google-site-verification` tag, which Google Search Console needs. Keep the FAQ structured data in step with the FAQ on the page, and update `lastmod` in `sitemap.xml` when the content changes.
+- **Search.** Keep the `google-site-verification` and `msvalidate.01` tags, which Google Search Console and Bing Webmaster Tools need. The canonical link, social preview tags, structured data and `sitemap.xml` use full `https://umastable.com/` addresses. Keep the FAQ structured data in step with the FAQ on the page, and update `lastmod` in `sitemap.xml` when the content changes.
 
 ### Documentation
 
