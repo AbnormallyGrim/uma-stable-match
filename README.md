@@ -120,7 +120,7 @@ docker compose up -d
 
 ### Hosting it publicly
 
-To run a public instance on Fly.io, with searchable logs and an alert when it's down, follow the [Fly.io guide](docs/deploy-fly.md). [`fly.toml`](fly.toml) holds the settings.
+To run a public instance on Fly.io, with searchable logs, a metrics dashboard and an alert when it's down, follow the [Fly.io guide](docs/deploy-fly.md). [`fly.toml`](fly.toml) holds the settings.
 
 ## Usage
 
