@@ -14,11 +14,10 @@
 
   interface Props {
     result: Recommendations;
-    now?: Date;
     stale?: boolean;
   }
 
-  let { result, now, stale = false }: Props = $props();
+  let { result, stale = false }: Props = $props();
 
   const picks = $derived(result.clubs.slice(0, TOP_PICKS));
   const balanceOn = $derived(result.options.balance_weight !== null);
@@ -28,7 +27,7 @@
 
 <section aria-labelledby="results-heading" class:stale aria-busy={stale}>
   <h2 id="results-heading" class="visually-hidden">Results</h2>
-  <ResultsSummary {result} {now} />
+  <ResultsSummary {result} />
   {#each notices as notice (notice)}
     <p class="notice" data-testid="result-notice">{notice}</p>
   {/each}

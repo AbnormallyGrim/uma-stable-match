@@ -136,6 +136,8 @@ Club data refreshes automatically once a day, shortly after uma.moe's daily upda
 
 <sub>The All results table, shown with made-up clubs. Search by name, or select a column to sort. With closed clubs included, a filter can hide them again.</sub>
 
+Above your top picks, a summary shows your pace, how many clubs were analysed, your **comfortable fits** (clubs where you'd sit 25–60% of the way down the members) and your **typical place** across your results, such as *Top 25%*.
+
 | Field | Meaning |
 |---|---|
 | **Fit** | How well the club suits you. **Lower is better.** |
