@@ -122,8 +122,8 @@ All calls go through the uma.moe client:
 
 - **Spacing:** at least 500 ms between calls, shared by every caller.
 - **Priority lanes:** visitors' requests use the interactive lane and always go before queued background work.
-- **Retries:** 429, 500, 502, 503 and 504 responses, timeouts and connection failures are retried with backoff, respecting `Retry-After`.
-- **Backing off:** a 429 pauses every call until `Retry-After` has passed and halves the sending rate; quiet periods bring it back gradually. See the [client README](backend/umamoe-client/README.md#backing-off).
+- **Retries:** 429, 500, 502, 503 and 504 responses, timeouts and connection failures are retried with backoff, respecting the full `Retry-After`.
+- **Backing off:** a 429 pauses every call until `Retry-After` has passed and halves the sending rate; quiet periods bring it back gradually. Visitors' requests give up on pauses over 30 seconds instead of holding the page, and each 429 is logged with its `Retry-After`. See the [client README](backend/umamoe-client/README.md#backing-off).
 - **Identification:** the `X-API-Key` header and a `uma-stable-match/<version>` User-Agent.
 
 With the defaults, a scan makes about 160 calls (9 list pages and about 150 club details). Request volume grows with the number of distinct trainers looked up, not with visitors, because club data is shared.

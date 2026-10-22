@@ -127,7 +127,7 @@ A steady stream of interactive requests can hold background ones back indefinite
 
 When uma.moe answers 429, the whole client slows down, not just the refused request:
 
-- **`Retry-After` pauses every request.** No request in either lane is sent until it has passed (capped at `RetryConfig::max_delay`).
+- **`Retry-After` pauses every request.** No request in either lane is sent until it has passed, however long uma.moe asks for.
 - **The rate halves on each 429**, down to one request per `max_interval`. Further 429s during the same pause don't halve it again, so one episode of throttling counts once.
 - **It recovers additively.** After each `recovery_every` without a 429, counted from the end of any pause, the rate goes up by `recovery_step` requests per second, back up to one per `min_interval`.
 
@@ -140,6 +140,12 @@ This is additive increase, multiplicative decrease (AIMD), the same scheme TCP u
 | `recovery_every` | 10 s | Length of a quiet period |
 
 With the defaults, recovering from a quarter of the normal rate takes about 5 minutes. With `min_interval` set to zero, only the `Retry-After` pause applies.
+
+Each 429 is logged as a warning through [`tracing`](https://docs.rs/tracing), with `endpoint`, `lane` and `retry_after_secs` when uma.moe sent `Retry-After`.
+
+### Not waiting too long
+
+A long `Retry-After` pause holds every request, which suits background work but not someone waiting for a page. `Client::with_max_pause` returns a clone that gives up instead: if the pause runs longer than its limit, before sending or before retrying, the call returns `Error::RateLimited` with the time left. Clones without a limit, the default, wait out every pause.
 
 ## Retries
 
@@ -154,7 +160,7 @@ Other errors are returned straight away. That includes other 4xx responses, inva
 |---|---|---|
 | `max_retries` | 3 | Retries after the first attempt |
 | `base_delay` | 500 ms | First retry delay, doubled each time |
-| `max_delay` | 30 s | Longest wait between attempts |
+| `max_delay` | 30 s | Longest backoff between attempts |
 
 The wait before retry *n* (from 0) is:
 
@@ -163,7 +169,7 @@ exp  = min(base_delay × 2ⁿ, max_delay)
 wait = exp ÷ 2 + random(0, exp ÷ 2)
 ```
 
-When the response has a `Retry-After` header in seconds, that value is used instead, capped at `max_delay`. A 429 also slows the whole client down; see [Backing off](#backing-off). HTTP-date values are ignored. `timeout` applies to each attempt, not to the whole call.
+When the response has a `Retry-After` header in seconds, that value is used instead, in full; a client with a [max pause](#not-waiting-too-long) gives up rather than wait longer than it. A 429 also slows the whole client down; see [Backing off](#backing-off). HTTP-date values are ignored. `timeout` applies to each attempt, not to the whole call.
 
 ## Errors
 
@@ -172,6 +178,7 @@ When the response has a `Retry-After` header in seconds, that value is used inst
 | `Config` | Invalid base URL or API key |
 | `InvalidRequest` | Invalid parameters, such as a month outside 1 to 12 |
 | `Status` | Non-success status, with the parsed `{error, status, details}` body when the API sent one |
+| `RateLimited` | uma.moe asked for a longer `Retry-After` pause than `with_max_pause` allows. `status()` returns 429 |
 | `Transport` | The request couldn't be sent or timed out, or the response couldn't be read |
 | `Decode` | The response body didn't match the expected shape |
 

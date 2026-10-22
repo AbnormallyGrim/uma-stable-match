@@ -2,7 +2,7 @@
 
 use std::fmt;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use reqwest::header::{HeaderValue, ACCEPT};
 use reqwest::{StatusCode, Url};
@@ -27,6 +27,7 @@ pub struct Client {
     retry: RetryConfig,
     limiter: Arc<RateLimiter>,
     priority: Priority,
+    max_pause: Option<Duration>,
 }
 
 impl fmt::Debug for Client {
@@ -34,6 +35,7 @@ impl fmt::Debug for Client {
         f.debug_struct("Client")
             .field("base_url", &self.base_url)
             .field("priority", &self.priority)
+            .field("max_pause", &self.max_pause)
             .finish_non_exhaustive()
     }
 }
@@ -64,6 +66,7 @@ impl Client {
                 config.backoff,
             )),
             priority: Priority::default(),
+            max_pause: None,
         })
     }
 
@@ -71,6 +74,15 @@ impl Client {
     pub fn with_priority(&self, priority: Priority) -> Self {
         Self {
             priority,
+            ..self.clone()
+        }
+    }
+
+    /// A clone that returns [`Error::RateLimited`] instead of waiting out a `Retry-After` pause
+    /// longer than `max_pause`. It shares this client's rate limit.
+    pub fn with_max_pause(&self, max_pause: Duration) -> Self {
+        Self {
+            max_pause: Some(max_pause),
             ..self.clone()
         }
     }
@@ -110,12 +122,16 @@ impl Client {
     {
         let url = format!("{}{path}", self.base_url);
         let lane = lane_label(self.priority);
+        let max_pause = self.max_pause;
         let mut retries = 0;
         loop {
             let waiting = Instant::now();
-            self.limiter.acquire(self.priority).await;
+            let acquired = self.limiter.acquire_within(self.priority, max_pause).await;
             metrics::histogram!("umamoe_queue_wait_seconds", "lane" => lane)
                 .record(waiting.elapsed().as_secs_f64());
+            if let Err(retry_in) = acquired {
+                return Err(Error::RateLimited { retry_in });
+            }
             let started = Instant::now();
             let result = self
                 .http
@@ -143,8 +159,13 @@ impl Client {
                     let status = response.status();
                     let retry_after = retry::retry_after(response.headers());
                     if status == StatusCode::TOO_MANY_REQUESTS {
-                        self.limiter
-                            .throttled(retry_after.map(|wait| wait.min(self.retry.max_delay)));
+                        tracing::warn!(
+                            endpoint = path,
+                            lane,
+                            retry_after_secs = retry_after.map(|wait| wait.as_secs()),
+                            "uma.moe returned 429 Too Many Requests"
+                        );
+                        self.limiter.throttled(retry_after);
                     }
                     let body = response
                         .bytes()
@@ -161,6 +182,11 @@ impl Client {
                 Err(e) => return Err(Error::Transport(e)),
             };
 
+            if let (Some(limit), Some(wait)) = (max_pause, retry_after) {
+                if wait > limit {
+                    return Err(Error::RateLimited { retry_in: wait });
+                }
+            }
             if retries >= self.retry.max_retries {
                 return Err(error);
             }

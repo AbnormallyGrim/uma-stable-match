@@ -518,3 +518,98 @@ async fn retry_after_pauses_other_requests_too() {
 
     assert!(waited >= Duration::from_millis(900), "waited {waited:?}");
 }
+
+#[tokio::test]
+async fn background_requests_wait_out_a_long_retry_after() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "1"))
+        .up_to_n_times(1)
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(json(CIRCLE))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let started = Instant::now();
+    client(&server)
+        .with_priority(Priority::Background)
+        .circle(&CircleRequest::by_circle_id(900001))
+        .await
+        .unwrap();
+    assert!(started.elapsed() >= Duration::from_millis(900));
+}
+
+#[tokio::test]
+async fn retry_after_is_waited_out_in_full_by_default() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "1"))
+        .up_to_n_times(1)
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(json(CIRCLE_LIST))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let started = Instant::now();
+    client(&server)
+        .list_circles(&ListCirclesRequest::default())
+        .await
+        .unwrap();
+    assert!(started.elapsed() >= Duration::from_millis(900));
+}
+
+#[tokio::test]
+async fn requests_with_a_max_pause_give_up_on_a_longer_retry_after() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "60"))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let started = Instant::now();
+    let error = client(&server)
+        .with_max_pause(Duration::from_secs(30))
+        .circle(&CircleRequest::by_circle_id(900001))
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(error, Error::RateLimited { retry_in } if retry_in == Duration::from_secs(60))
+    );
+    assert_eq!(error.status(), Some(StatusCode::TOO_MANY_REQUESTS));
+    assert!(started.elapsed() < Duration::from_secs(1));
+}
+
+#[tokio::test]
+async fn requests_with_a_max_pause_are_not_sent_during_a_longer_pause() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "60"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(json(CIRCLE_LIST))
+        .expect(0)
+        .mount(&server)
+        .await;
+    let visitor = client(&server).with_max_pause(Duration::from_secs(30));
+
+    visitor
+        .circle(&CircleRequest::by_circle_id(900001))
+        .await
+        .unwrap_err();
+    let error = visitor
+        .list_circles(&ListCirclesRequest::default())
+        .await
+        .unwrap_err();
+    assert!(matches!(error, Error::RateLimited { retry_in } if retry_in > Duration::from_secs(50)));
+}

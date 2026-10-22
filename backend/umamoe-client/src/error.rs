@@ -1,5 +1,7 @@
 //! Client errors.
 
+use std::time::Duration;
+
 use reqwest::StatusCode;
 use serde::Deserialize;
 
@@ -32,6 +34,13 @@ pub enum Error {
         /// Parsed error body, if the API sent one.
         body: Option<ApiErrorBody>,
     },
+    /// uma.moe asked for a longer wait than [`Client::with_max_pause`](crate::Client::with_max_pause)
+    /// allows.
+    #[error("uma.moe asked to wait {} s before the next request", retry_in.as_secs())]
+    RateLimited {
+        /// How long until requests may be sent again.
+        retry_in: Duration,
+    },
     /// The request could not be sent or the response could not be read.
     #[error("request to uma.moe failed: {0}")]
     Transport(#[source] reqwest::Error),
@@ -45,6 +54,7 @@ impl Error {
     pub fn status(&self) -> Option<StatusCode> {
         match self {
             Self::Status { status, .. } => Some(*status),
+            Self::RateLimited { .. } => Some(StatusCode::TOO_MANY_REQUESTS),
             _ => None,
         }
     }

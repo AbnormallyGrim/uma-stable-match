@@ -75,6 +75,7 @@ impl ScanError {
 fn upstream_summary(error: &Error) -> String {
     match error {
         Error::Status { status, .. } => format!("uma.moe returned {status}"),
+        Error::RateLimited { .. } => "uma.moe asked to slow down".into(),
         Error::Transport(_) => "could not reach uma.moe".into(),
         Error::Decode(_) => "unexpected response from uma.moe".into(),
         Error::Config(_) | Error::InvalidRequest(_) => "internal error".into(),
