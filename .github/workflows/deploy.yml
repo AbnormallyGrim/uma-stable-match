@@ -1,0 +1,72 @@
+name: Deploy
+
+# Deploys the server to Fly.io after CI passes for a push to main. See docs/deploy-fly.md.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+# No permissions by default; the job asks only for what it needs.
+permissions: {}
+
+# One deploy at a time, and a running deploy is never cancelled.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Fly.io
+    # Only CI runs for pushes to this repository's main. Without the last two checks, a pull request
+    # from a fork's own main branch would match too.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    # FLY_API_TOKEN is a secret of this environment, which can be limited to main.
+    environment: production
+    permissions:
+      contents: read
+    env:
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # master, 2026-04-08
+        with:
+          version: 0.4.114
+
+      # Deploys unless main has moved on, or nothing the server is built from changed since the live
+      # commit, read from the image's git-<commit> label. An unknown label deploys.
+      - name: Check for server changes
+        id: check
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ "$(git rev-parse origin/main)" != "$HEAD_SHA" ]; then
+            echo "main has moved on; the run for the newer commit deploys."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          deployed=$(flyctl status --json 2>/dev/null | jq -r '.Machines[0].image_ref.tag // ""' | sed -n 's/^git-//p' || true)
+          if [ -n "$deployed" ] && git cat-file -e "$deployed^{commit}" 2>/dev/null \
+            && git diff --quiet "$deployed" "$HEAD_SHA" -- \
+              backend frontend Cargo.toml Cargo.lock rust-toolchain.toml Dockerfile .dockerignore fly.toml ':(exclude)*.md'; then
+            echo "Nothing the server is built from changed since $deployed."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "deploy=true" >> "$GITHUB_OUTPUT"
+
+      # Labels the image with the commit, for the next run's check.
+      - name: Deploy
+        if: steps.check.outputs.deploy == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --remote-only --ha=false --image-label "git-$HEAD_SHA"

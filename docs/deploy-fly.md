@@ -156,11 +156,34 @@ fly certs add <your-domain>
 
 Create the DNS records it prints, then point the uptime monitor at the new address.
 
+## Automatic deploys
+
+Once the server has been deployed by hand, [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) deploys it whenever CI passes for a push to `main`. Pull requests never deploy and never see the token. Only the server is deployed this way; other Fly apps, such as the log shipper, are deployed by hand.
+
+Set it up once:
+
+1. Create a token that can only manage the server app, valid for a year:
+
+   ```bash
+   fly tokens create deploy -a uma-stable-match -n github-actions -x 8760h
+   ```
+
+2. In the repository on GitHub, go to **Settings → Environments → New environment** and name it `production`. Under **Deployment branches and tags**, choose **Selected branches and tags** and add `main`.
+3. In that environment, add a secret named `FLY_API_TOKEN` with the whole token, including its `FlyV1` prefix.
+
+Each run:
+
+- **Skips if nothing the server is built from changed** since the live commit: `backend`, `frontend`, the Cargo files, `rust-toolchain.toml`, `Dockerfile`, `.dockerignore` or `fly.toml`, ignoring Markdown. Docs-only merges don't restart the app.
+- **Skips if `main` has moved on** by the time CI finishes; the newer commit's run deploys.
+- **Labels the image `git-<commit>`**, which is how the next run finds the live commit. After a deploy by hand with another label, the next run deploys. To keep the check working, label manual deploys the same way, from an up-to-date `main`: `fly deploy --ha=false --image-label "git-$(git rev-parse HEAD)"`.
+
+Runs show under **Actions → Deploy**. To rotate the token, create a new one, replace the secret, then revoke the old one: `fly tokens list -a uma-stable-match` shows its ID for `fly tokens revoke <id>`.
+
 ## Day to day
 
 | Task | Command |
 |---|---|
-| Deploy a new version | `fly deploy --ha=false` from the repository root |
+| Deploy a new version | Merge to `main`; the [Deploy workflow](#automatic-deploys) runs after CI. By hand: `fly deploy --ha=false` from the repository root |
 | Live logs | `fly logs`; Axiom keeps the history |
 | Metrics | The dashboard at [fly-metrics.net](https://fly-metrics.net) |
 | Machine and health check status | `fly status` and `fly checks list` |
