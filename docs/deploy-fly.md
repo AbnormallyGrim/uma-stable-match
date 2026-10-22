@@ -10,7 +10,7 @@ visitors → Fly proxy (HTTPS) → server machine ─ logs → log shipper machi
                                      └─ metrics → Fly's Prometheus → Fly's Grafana
 ```
 
-It runs three always-on machines (the server, Redis and the log shipper) and a 1 GB volume. Fly.io needs a payment card; check its pricing for the current cost of small machines and volumes.
+It runs three always-on machines (the server and Redis with 512 MB each, and the log shipper) and a 1 GB volume. Fly.io needs a payment card; check its pricing for the current cost of small machines and volumes.
 
 ## 1. Install the Fly CLI and sign in
 
@@ -85,6 +85,8 @@ curl https://uma-stable-match.fly.dev/api/v1/health
 ```
 
 It answers `{"status":"ok"}`, and `fly logs` shows JSON lines such as `"message":"using Redis as a shared cache"` and `"message":"scan started"`. Open the site once the scan has finished.
+
+`fly.toml` scans ranks 1–10000 rather than the default 80–900, so slower trainers also get clubs near their pace. The server and Redis machines have 512 MB, and Redis may use 300 MB, to hold that club data. The scan settings are described in [Configuration](../README.md#configuration).
 
 ## 6. Ship logs to Axiom
 
