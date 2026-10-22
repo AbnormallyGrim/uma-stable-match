@@ -41,7 +41,7 @@ Out of scope:
 
 If you run Uma Stable Match yourself:
 
-- Keep your uma.moe API key in `.env` or an environment variable, never in code or committed files.
+- Keep your uma.moe API key in `.env`, an environment variable or your host's secret store (such as `fly secrets`), never in code or committed files.
 - Rate limiting is always on. Behind a reverse proxy, set `TRUST_FORWARDED_FOR=true` so each visitor gets their own limit; otherwise everyone shares the proxy's.
 - Only set `TRUST_FORWARDED_FOR=true` behind a proxy that sets `X-Forwarded-For`, or visitors could pick their own address.
 - If your key leaks, revoke it at [uma.moe/settings](https://uma.moe/settings) and create a new one.
