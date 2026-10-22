@@ -9,6 +9,7 @@ use uma_stable_match_umamoe_client::{
     CircleRequest, CircleResponse, Client, Error, RankingsGainsRequest, StatusCode,
 };
 
+use crate::details::VISITOR_MAX_PAUSE;
 use crate::pool::Period;
 use crate::shared::SharedCache;
 
@@ -61,7 +62,7 @@ impl PaceLookup {
     /// Reuses each result for `ttl`.
     pub fn new(client: Client, ttl: Duration) -> Self {
         Self {
-            client,
+            client: client.with_max_pause(VISITOR_MAX_PAUSE),
             ttl,
             entries: Arc::default(),
             shared: SharedCache::none(),

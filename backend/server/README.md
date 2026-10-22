@@ -145,6 +145,7 @@ Exact medians help most when many clubs have them. With an exact median for ever
 - **Exact medians.** Each successful load writes the club's exact median into the shared `ClubPool`. After a scan builds a new pool, `restore_exact_medians` copies in the medians of clubs that are still cached.
 - **Background loading.** `queue(circle_id)` adds a club for `BackgroundLoader::run` to fetch in the background lane. Clubs that are already cached or queued are skipped, and once `queue_size` clubs are waiting (1,000 by default), `queue` returns `false`. A failed background load is logged, and the club leaves the queue.
 - **Lanes.** Visitors' fetches use the interactive lane, so they go ahead of queued background loads. If a background load for a club is already running, a visitor asking for that club waits for it rather than starting a second fetch.
+- **Long pauses.** When uma.moe answers 429 with a `Retry-After` over 30 seconds, visitors' club fetches and trainer lookups fail straight away rather than hold the page; the clubs are queued for a background load instead. Scans and the refresher wait out the whole pause.
 
 `queued()` and `cached_clubs()` report the queue length and the approximate cache size.
 
@@ -347,6 +348,7 @@ While a scan runs, `scan` looks like this:
 | Message | Cause |
 |---|---|
 | `listing clubs failed: uma.moe returned 503 Service Unavailable` | uma.moe answered with an error status (the status varies) |
+| `listing clubs failed: uma.moe asked to slow down` | uma.moe asked for a pause longer than the caller waits out |
 | `listing clubs failed: could not reach uma.moe` | Timeout or connection error |
 | `listing clubs failed: unexpected response from uma.moe` | The response wasn't the expected JSON |
 | `listing clubs failed: internal error` | A problem in the server itself |

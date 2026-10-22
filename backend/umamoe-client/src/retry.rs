@@ -36,15 +36,14 @@ pub(crate) fn delay(
     retry_after: Option<Duration>,
     jitter: f64,
 ) -> Duration {
-    let delay = retry_after.unwrap_or_else(|| {
+    retry_after.unwrap_or_else(|| {
         // Half fixed, half random, so clients don't retry in lockstep.
         let exp = config
             .base_delay
             .saturating_mul(2u32.saturating_pow(retry))
             .min(config.max_delay);
         exp / 2 + exp.mul_f64(jitter.clamp(0.0, 1.0) / 2.0)
-    });
-    delay.min(config.max_delay)
+    })
 }
 
 #[cfg(test)]

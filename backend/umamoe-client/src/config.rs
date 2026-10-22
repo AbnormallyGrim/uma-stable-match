@@ -34,7 +34,7 @@ pub struct RetryConfig {
     pub max_retries: u32,
     /// Delay before the first retry; doubles on each retry.
     pub base_delay: Duration,
-    /// Longest delay between attempts, including `Retry-After`.
+    /// Longest backoff between attempts. A `Retry-After` from uma.moe isn't capped.
     pub max_delay: Duration,
 }
 
