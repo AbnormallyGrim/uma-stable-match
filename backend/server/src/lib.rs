@@ -8,6 +8,7 @@ mod config;
 mod details;
 mod frontend;
 mod limits;
+mod logging;
 mod pace;
 mod pool;
 mod recommendations;
@@ -27,6 +28,7 @@ pub use config::{
 pub use details::{BackgroundLoader, ClubDetails, DetailConfig, SharedPool};
 pub use frontend::CONTENT_SECURITY;
 pub use limits::RateLimits;
+pub use logging::{init_logging, InvalidLogFormat, LogFormat};
 pub use pace::{PaceError, PaceLookup, DEFAULT_PACE_TTL};
 pub use pool::{
     elapsed_days, game_month, game_month_start, is_early_month, jst, last_month_rate,
