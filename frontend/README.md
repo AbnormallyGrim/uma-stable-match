@@ -211,6 +211,7 @@ Card descriptions are capped at `80ch` so they stay easy to read on wide screens
 | Tips for switching clubs | Collapsible. The four tips from the root README: the 14-day rule, the 24-hour cooldown, the month-start lock, and checking activity first |
 | Brand | The logo and the project's name |
 | Report a problem | A link to the issue tracker |
+| Buy me a carrot | A gold link to the project's Ko-fi page, with a note that tips only help cover hosting and every feature stays free. It's a plain link, as the content security policy blocks Ko-fi's widget script |
 | Disclaimer | An unofficial, non-commercial fan tool, not affiliated with uma.moe or Cygames. uma.moe is credited as the data source, and the game and tier icons as © Cygames, Inc., with a link to Cygames' Fan-Created Content Guidelines |
 
 The tips sit in a card, and the rest is centred below it. External links open in a new tab with `rel="noopener noreferrer"`.
