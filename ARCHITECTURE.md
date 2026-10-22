@@ -64,7 +64,8 @@ backend/
   server/          API server, scheduled club scanner and cache
 frontend/          Web interface (Svelte + TypeScript)
 observability/     Prometheus config and Grafana dashboard for local metrics
-docs/images/       README screenshots
+site/              Project website, published to GitHub Pages
+docs/images/       README screenshots and the website's original artwork
 ```
 
 | Part | Package | Depends on | Details |
