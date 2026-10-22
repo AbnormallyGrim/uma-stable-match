@@ -6,8 +6,8 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::http::header::{
-    CACHE_CONTROL, CONTENT_SECURITY_POLICY, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
-    X_FRAME_OPTIONS,
+    CACHE_CONTROL, CONTENT_SECURITY_POLICY, REFERRER_POLICY, STRICT_TRANSPORT_SECURITY,
+    X_CONTENT_TYPE_OPTIONS, X_FRAME_OPTIONS,
 };
 use axum::http::{HeaderValue, StatusCode};
 use axum::middleware::{from_fn, Next};
@@ -68,6 +68,7 @@ pub(crate) async fn security_headers(request: Request, next: Next) -> Response {
         (X_CONTENT_TYPE_OPTIONS, "nosniff"),
         (REFERRER_POLICY, "no-referrer"),
         (X_FRAME_OPTIONS, "DENY"),
+        (STRICT_TRANSPORT_SECURITY, "max-age=31536000"),
     ] {
         headers
             .entry(name)

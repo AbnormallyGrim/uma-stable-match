@@ -157,6 +157,10 @@ async fn adds_security_headers_everywhere() {
         assert_eq!(reply.headers["x-content-type-options"], "nosniff", "{path}");
         assert_eq!(reply.headers["referrer-policy"], "no-referrer", "{path}");
         assert_eq!(reply.headers["x-frame-options"], "DENY", "{path}");
+        assert_eq!(
+            reply.headers["strict-transport-security"], "max-age=31536000",
+            "{path}"
+        );
     }
 }
 
