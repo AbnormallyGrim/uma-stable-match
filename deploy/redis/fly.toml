@@ -1,4 +1,4 @@
-# Redis for the production server, as its own Fly app. See docs/deploy-fly.md.
+# Redis for the production server, as its own Fly app.
 # No [http_service] or [[services]]: it has no public address, and the server reaches it on Fly's
 # private network at uma-stable-match-redis.internal:6379.
 app = "uma-stable-match-redis"

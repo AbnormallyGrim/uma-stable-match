@@ -1,4 +1,4 @@
-# Fly.io settings for a public instance. See docs/deploy-fly.md.
+# Fly.io settings for the public instance at app.umastable.com.
 # App names are global on Fly.io: change this if it's taken.
 app = "uma-stable-match"
 primary_region = "iad"
@@ -37,7 +37,7 @@ primary_region = "iad"
     timeout = "5s"
     grace_period = "10s"
 
-# Fly scrapes the metrics every 15 seconds into its managed Prometheus. See docs/deploy-fly.md.
+# Fly scrapes the metrics every 15 seconds into its managed Prometheus.
 [metrics]
   port = 9464
   path = "/metrics"
