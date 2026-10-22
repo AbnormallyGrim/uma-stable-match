@@ -282,3 +282,74 @@ async fn recovery_waits_for_the_pause_to_end() {
     limiter.acquire(Priority::Interactive).await;
     assert_eq!(gap(&limiter), Duration::from_millis(200));
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_pause_longer_than_the_limit_is_not_waited_out() {
+    let limiter = RateLimiter::new(Duration::from_millis(100));
+    limiter.throttled(Some(Duration::from_secs(60)));
+    let start = Instant::now();
+    let result = limiter
+        .acquire_within(Priority::Interactive, Some(Duration::from_secs(30)))
+        .await;
+    assert_eq!(result, Err(Duration::from_secs(60)));
+    assert_eq!(start.elapsed(), Duration::ZERO);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pause_within_the_limit_is_waited_out() {
+    let limiter = RateLimiter::new(Duration::from_millis(100));
+    limiter.throttled(Some(Duration::from_secs(20)));
+    let start = Instant::now();
+    let result = limiter
+        .acquire_within(Priority::Interactive, Some(Duration::from_secs(30)))
+        .await;
+    assert_eq!(result, Ok(()));
+    assert_eq!(start.elapsed(), Duration::from_secs(20));
+}
+
+#[tokio::test(start_paused = true)]
+async fn without_a_limit_the_whole_pause_is_waited_out() {
+    let limiter = RateLimiter::new(Duration::from_millis(100));
+    limiter.throttled(Some(Duration::from_secs(300)));
+    let start = Instant::now();
+    let result = limiter.acquire_within(Priority::Background, None).await;
+    assert_eq!(result, Ok(()));
+    assert_eq!(start.elapsed(), Duration::from_secs(300));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pause_that_starts_while_waiting_lets_limited_requests_give_up() {
+    let limiter = Arc::new(RateLimiter::new(Duration::from_millis(100)));
+    limiter.acquire(Priority::Interactive).await;
+    let waiting = {
+        let limiter = Arc::clone(&limiter);
+        tokio::spawn(async move {
+            limiter
+                .acquire_within(Priority::Interactive, Some(Duration::from_secs(30)))
+                .await
+        })
+    };
+    settle().await;
+    limiter.throttled(Some(Duration::from_secs(60)));
+    let result = waiting.await.unwrap();
+    assert!(result.is_err_and(|left| left > Duration::from_secs(30)));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_request_that_gives_up_frees_its_place() {
+    let limiter = Arc::new(RateLimiter::new(Duration::from_millis(100)));
+    limiter.throttled(Some(Duration::from_secs(60)));
+    let start = Instant::now();
+    let log: Log = Arc::default();
+    let background = spawn_acquire(&limiter, Priority::Background, "background", start, &log);
+    settle().await;
+    let result = limiter
+        .acquire_within(Priority::Interactive, Some(Duration::from_secs(30)))
+        .await;
+    assert!(result.is_err());
+    background.await.unwrap();
+    assert_eq!(
+        *log.lock().unwrap(),
+        vec![("background", Duration::from_secs(60))]
+    );
+}

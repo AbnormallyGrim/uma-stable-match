@@ -35,12 +35,17 @@ fn jitter_adds_up_to_half() {
 }
 
 #[test]
-fn delay_is_capped() {
+fn backoff_is_capped() {
     let c = config();
     assert!(delay(&c, 30, None, 0.999) <= c.max_delay);
+}
+
+#[test]
+fn retry_after_is_not_capped() {
+    let c = config();
     assert_eq!(
         delay(&c, 0, Some(Duration::from_secs(60)), 0.0),
-        c.max_delay
+        Duration::from_secs(60)
     );
 }
 

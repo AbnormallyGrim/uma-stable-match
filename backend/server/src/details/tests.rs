@@ -1,4 +1,6 @@
-use uma_stable_match_umamoe_client::{ApiKey, ClientConfig};
+use uma_stable_match_umamoe_client::{ApiKey, ClientConfig, StatusCode};
+use wiremock::matchers::path;
+use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::*;
 
@@ -40,4 +42,30 @@ fn default_config() {
     assert!(!config.refresher);
     assert!(config.max_clubs > 0);
     assert!(config.queue_size > 0);
+}
+
+#[tokio::test]
+async fn visitor_fetches_give_up_on_a_long_retry_after() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "120"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let client = Client::new(ClientConfig {
+        base_url: server.uri(),
+        min_interval: Duration::ZERO,
+        ..ClientConfig::new(ApiKey::new("test-key"))
+    })
+    .unwrap();
+    let (details, _loader) =
+        ClubDetails::new(&client, SharedPool::default(), DetailConfig::default());
+
+    let started = Instant::now();
+    let error = details
+        .get(900_000_101, Priority::Interactive)
+        .await
+        .unwrap_err();
+    assert_eq!(error.status(), Some(StatusCode::TOO_MANY_REQUESTS));
+    assert!(started.elapsed() < Duration::from_secs(5));
 }
