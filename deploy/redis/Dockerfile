@@ -1,4 +1,4 @@
-# Redis for the production server on Fly.io. See docs/deploy-fly.md.
+# Redis for the production server on Fly.io.
 FROM redis:7.4-alpine
 
 # Requires REDIS_PASSWORD, a Fly secret: Redis refuses to start without it. Persistence matches the
