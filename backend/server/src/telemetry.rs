@@ -9,7 +9,7 @@ use axum::routing::get;
 use axum::Router;
 use metrics_exporter_prometheus::{BuildError, PrometheusBuilder, PrometheusHandle};
 
-use crate::app::AppState;
+use crate::app::{status_router, AppState};
 use crate::refresher::utc_now;
 
 const BUCKETS: &[f64] = &[
@@ -35,19 +35,23 @@ pub fn install_metrics() -> Result<PrometheusHandle, BuildError> {
     Ok(handle)
 }
 
-/// Serves `GET /metrics`, refreshing the scan and pool values from `state` on each request.
+/// Serves `GET /metrics`, refreshing the scan and pool values from `state` on each request, and
+/// `GET /status` from [`status_router`](crate::status_router).
 pub fn metrics_router(handle: PrometheusHandle, state: AppState) -> Router {
-    Router::new().route(
-        "/metrics",
-        get(move || {
-            let handle = handle.clone();
-            let state = state.clone();
-            async move {
-                record_state(&state).await;
-                handle.render()
-            }
-        }),
-    )
+    let statuses = status_router(state.clone());
+    Router::new()
+        .route(
+            "/metrics",
+            get(move || {
+                let handle = handle.clone();
+                let state = state.clone();
+                async move {
+                    record_state(&state).await;
+                    handle.render()
+                }
+            }),
+        )
+        .merge(statuses)
 }
 
 pub(crate) async fn track_requests(request: Request, next: Next) -> Response {

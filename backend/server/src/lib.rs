@@ -18,7 +18,7 @@ mod scheduler;
 mod shared;
 mod telemetry;
 
-pub use app::{app, router, AppState};
+pub use app::{app, router, status_router, AppState};
 pub use cache::{Cache, CacheStatus, ScanFailure, ScanPhase, ScanProgress, Snapshot};
 pub use calibration::{club_median, Calibration, MIN_CALIBRATION_SAMPLES};
 pub use config::{

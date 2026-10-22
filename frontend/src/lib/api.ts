@@ -48,13 +48,6 @@ export interface Recommendations {
   clubs: Club[];
 }
 
-/** Response from `GET /api/v1/status`. */
-export interface Status {
-  scanning: boolean;
-  last_scan: { finished_at: string; clubs: number; candidates: number; failed: number } | null;
-  last_error: { at: string; message: string } | null;
-}
-
 /** Look up a trainer's pace, or give it directly in fans per day. */
 export type PaceSource = { trainerId: string } | { pace: number };
 
@@ -117,11 +110,6 @@ export function recommendationParams(query: RecommendationQuery): URLSearchParam
     params.set('limit', String(query.limit));
   }
   return params;
-}
-
-/** Fetches the scan status. */
-export function fetchStatus(options: RequestOptions = {}): Promise<Status> {
-  return getJson<Status>('/api/v1/status', options);
 }
 
 /**

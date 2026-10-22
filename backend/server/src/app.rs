@@ -12,7 +12,7 @@ use axum::{Json, Router};
 use serde_json::{json, Value};
 
 use crate::api_error::ApiError;
-use crate::cache::{Cache, ScanPhase};
+use crate::cache::{Cache, ScanFailure, ScanPhase, Snapshot};
 use crate::details::ClubDetails;
 use crate::frontend;
 use crate::limits::{limit_requests, RateLimits};
@@ -43,7 +43,6 @@ pub struct AppState {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/api/v1/health", get(health))
-        .route("/api/v1/status", get(status))
         .route(
             "/api/v1/recommendations",
             get(recommendations).route_layer(from_fn_with_state(state.clone(), limit_requests)),
@@ -85,7 +84,15 @@ async fn health() -> Json<Value> {
     Json(json!({ "status": "ok" }))
 }
 
-async fn status(State(state): State<AppState>) -> Json<Value> {
+/// Serves `GET /status`: the full scan, pool, cache and refresh state. Serve it only on a private
+/// address, as [`metrics_router`](crate::metrics_router) does.
+pub fn status_router(state: AppState) -> Router {
+    Router::new()
+        .route("/status", get(full_status))
+        .with_state(state)
+}
+
+async fn full_status(State(state): State<AppState>) -> Json<Value> {
     let status = state.cache.status();
     let refresh = state.details.refresh_status().await;
     let (pool_clubs, exact_medians, calibration) = {
@@ -113,13 +120,7 @@ async fn status(State(state): State<AppState>) -> Json<Value> {
     Json(json!({
         "scanning": status.scanning,
         "scan": scan,
-        "last_scan": status.snapshot.map(|s| json!({
-            "finished_at": timestamp(s.scanned_at),
-            "clubs": s.prefetched,
-            "candidates": s.candidates,
-            "failed": s.failed,
-            "month": s.month,
-        })),
+        "last_scan": status.snapshot.as_deref().map(last_scan),
         "pool": {
             "clubs": pool_clubs,
             "exact_medians": exact_medians,
@@ -138,11 +139,25 @@ async fn status(State(state): State<AppState>) -> Json<Value> {
             "due": refresh.due,
             "oldest_due_at": refresh.oldest_due.map(|due| timestamp(due.into())),
         },
-        "last_error": status.last_error.map(|e| json!({
-            "at": timestamp(e.at),
-            "message": e.message,
-        })),
+        "last_error": status.last_error.as_ref().map(last_error),
     }))
+}
+
+fn last_scan(snapshot: &Snapshot) -> Value {
+    json!({
+        "finished_at": timestamp(snapshot.scanned_at),
+        "clubs": snapshot.prefetched,
+        "candidates": snapshot.candidates,
+        "failed": snapshot.failed,
+        "month": snapshot.month,
+    })
+}
+
+fn last_error(failure: &ScanFailure) -> Value {
+    json!({
+        "at": timestamp(failure.at),
+        "message": failure.message,
+    })
 }
 
 pub(crate) fn timestamp(time: SystemTime) -> String {

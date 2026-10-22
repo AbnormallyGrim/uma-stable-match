@@ -15,7 +15,7 @@ primary_region = "iad"
   # Fly's proxy adds each visitor's address as the right-most X-Forwarded-For entry.
   TRUST_FORWARDED_FOR = "true"
   # Only Fly's private network can reach this port; [http_service] publishes 8080 alone.
-  METRICS_ADDR = "0.0.0.0:9464"
+  METRICS_ADDR = "[::]:9464"
   # Wider than the default 80–900, so slower trainers also get clubs near their pace.
   SCAN_RANK_FROM = "1"
   SCAN_RANK_TO = "10000"
