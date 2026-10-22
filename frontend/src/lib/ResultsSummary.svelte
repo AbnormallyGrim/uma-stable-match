@@ -5,7 +5,7 @@
 
 <script lang="ts">
   import type { Recommendations } from './api';
-  import { formatPerDay } from './format';
+  import { formatPerDay, formatUpdated } from './format';
   import { comfortableFits, formatTopShare, typicalPlace } from './stats';
 
   interface Props {
@@ -36,6 +36,12 @@
     <dd title="Your middle place across these clubs">{typical}</dd>
   </div>
 </dl>
+<p class="data-age" data-testid="data-age">
+  Club data updated
+  <time datetime={result.updated_at} title={result.updated_at}
+    >{formatUpdated(result.updated_at)}</time
+  >.
+</p>
 
 <style>
   .stats {
@@ -66,6 +72,12 @@
     font-variant-numeric: tabular-nums;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .data-age {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 0.8125rem;
   }
 
   @media (max-width: 720px) {

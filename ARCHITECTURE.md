@@ -7,7 +7,7 @@ flowchart TB
     visitor([Visitor's browser])
 
     subgraph frontend [frontend · Svelte]
-        ui[Search form, results and data status]
+        ui[Search form and results]
     end
 
     subgraph server [backend/server]
@@ -88,7 +88,7 @@ Once at start-up, then 30 minutes after each of uma.moe's daily updates (15:00 U
 
 The refresher loads each club's member data in the background lane, then refreshes it once a day, 30 minutes after uma.moe's daily update (15:00 UTC), best rank first. Clubs ranked below 5,000 refresh at half speed. A failed refresh is retried after 5 minutes, and the old data is served meanwhile. Clubs that searches load join the schedule too. `DETAIL_CACHE_MINUTES` replaces the daily timing with a fixed interval.
 
-`/api/v1/status` reports the running scan's phase and how many clubs it has listed and loaded. Requests are answered from step 3 on, even during the first scan; until the details catch up, they score the clubs loaded so far and report the rest as still loading. Every club whose details load gives the pool its **exact median**, and the pool recalibrates its estimates for the rest. A failed list request keeps the previous pool and results. With Redis, one instance scans for all of them; see [Caches](#caches).
+The private `/status`, on the metrics address, reports the running scan's phase and how many clubs it has listed and loaded. Requests are answered from step 3 on, even during the first scan; until the details catch up, they score the clubs loaded so far and report the rest as still loading. Every club whose details load gives the pool its **exact median**, and the pool recalibrates its estimates for the rest. A failed list request keeps the previous pool and results. With Redis, one instance scans for all of them; see [Caches](#caches).
 
 ## How a request is answered
 
@@ -134,10 +134,10 @@ uma.moe's game month starts on the 2nd at 00:00 JST. On the 2nd and 3rd there ar
 
 ## Web page
 
-The page is a single Svelte app, built by Vite into static files that the server serves. It calls only `/api/v1/recommendations` and `/api/v1/status`.
+The page is a single Svelte app, built by Vite into static files that the server serves. It calls only `/api/v1/recommendations`.
 
-- `SearchForm`, `SearchStatus` and `DataStatus` handle input, loading and error states, and data freshness.
-- `Results`, `ResultsSummary`, `ClubCard` and `ResultsTable` show the results, with notices for clubs still loading and last month's data.
+- `SearchForm` and `SearchStatus` handle input, and loading and error states.
+- `Results`, `ResultsSummary`, `ClubCard` and `ResultsTable` show the results, with the data's age and notices for clubs still loading and last month's data.
 - Searches are kept in the page address, and the trainer ID and theme can be remembered in the browser.
 
 ## Build and deployment

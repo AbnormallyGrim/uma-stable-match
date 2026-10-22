@@ -3,7 +3,6 @@
 
   import { fetchRecommendations, type RecommendationQuery } from './lib/api';
   import BrandLogo from './lib/BrandLogo.svelte';
-  import DataStatus from './lib/DataStatus.svelte';
   import Results from './lib/Results.svelte';
   import { SearchRunner, type SearchState as RunnerState } from './lib/runner';
   import SearchForm from './lib/SearchForm.svelte';
@@ -52,13 +51,6 @@
     search.result !== null && (search.status.phase === 'done' || search.status.phase === 'loading'),
   );
 
-  // A finished scan means a search waiting on a 503 can retry now.
-  function onscanready() {
-    if (search.status.phase === 'waiting-for-scan') {
-      runner.retryNow();
-    }
-  }
-
   function onsearch(query: RecommendationQuery, state: SearchState, remember: boolean) {
     if (state.mode === 'trainer') {
       saveRememberedTrainerId(storage, remember ? state.trainerId : null);
@@ -87,7 +79,6 @@
       </div>
       <ThemeToggle />
     </header>
-    <DataStatus {onscanready} />
     <SearchForm {initial} remember={remembered !== null} {busy} {onsearch} />
   </div>
 
