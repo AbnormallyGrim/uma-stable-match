@@ -8,6 +8,7 @@
   import BrandLogo from './BrandLogo.svelte';
 
   const REPO = 'https://github.com/AbnormallyGrim/uma-stable-match';
+  const KOFI = 'https://ko-fi.com/L5P6299MV1';
 </script>
 
 <footer class="site-footer">
@@ -41,7 +42,11 @@
 
     <nav aria-label="Project links">
       <a href="{REPO}/issues" target="_blank" rel="noopener noreferrer">Report a problem</a>
+      <a class="kofi" href={KOFI} target="_blank" rel="noopener noreferrer"
+        ><span aria-hidden="true">🥕</span> Buy me a carrot</a
+      >
     </nav>
+    <p class="support">Optional tips help cover hosting. Every feature stays free.</p>
 
     <div class="notes">
       <p>
@@ -149,6 +154,21 @@
   nav a:hover {
     border-color: var(--accent);
     color: var(--accent);
+  }
+
+  nav a.kofi {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+  }
+
+  nav a.kofi:hover {
+    background: color-mix(in srgb, var(--accent) 88%, var(--text));
+    color: var(--on-accent);
+  }
+
+  .support {
+    margin: -8px 0 0;
   }
 
   .notes {
