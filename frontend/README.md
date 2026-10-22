@@ -65,7 +65,8 @@ src/lib/search.ts             Search validation, URL parameters and "remember me
 src/lib/format.ts             Number, rank trend, label and time formatting
 src/lib/Results.svelte        Results view: summary, top picks and all results
 src/lib/ResultsTable.svelte   Sortable, searchable table of the best fits
-src/lib/ResultsSummary.svelte Pace, clubs analysed, data age and balance setting
+src/lib/ResultsSummary.svelte Pace, clubs analysed, comfortable fits and typical place
+src/lib/stats.ts              Comfortable fits and typical place, from the results
 src/lib/ClubCard.svelte       One top pick
 src/lib/TierBadge.svelte      Tier icon, with a fallback for unknown tiers
 src/lib/test-data.ts          Made-up data for component tests
@@ -107,16 +108,20 @@ Each search replaces the page URL's query with the same parameters the API uses,
 
 After a search, the page shows a summary and the top ten picks.
 
-- **Summary:** your pace, how many clubs were analysed (the API's `total`), how long ago the data was updated (with the exact time on hover), and the balance setting used.
+- **Summary:** your pace, how many clubs were analysed (the API's `total`), and two stats about you from the returned clubs (`stats.ts`):
+  - **Comfortable fits:** clubs where you'd sit 25% to 60% of the way down the members, the range fit aims for
+  - **Typical place:** the middle of your place ÷ club size across the clubs, such as "Top 25%"
+
+  Hovering over either value explains it. The data age is shown under the title instead, and the balance setting is in the form.
 - **Each card:**
   - **Header:** the pick number (gold, silver and bronze for the top three), the tier icon, and the club name linking to uma.moe in a new tab
   - **Details:** the monthly rank and trend, open spots, join style and playstyle tags, and the description
   - **How you'd compare:** your place, the club's median per day, and the fit (or the score, with balance on)
-  - **With balance on:** the balance score as a bar, passengers and top-three share
+  - **With balance on:** the balance score as a bar, passengers and top-three share. On wide screens they sit to the right of the description, so the card stays one row shorter
 - **Notices:** under the summary, when they apply:
   - "*N more clubs are still loading. Search again in a minute for complete results.*" when the API's `coverage.pending` is above 0
   - "*These results are based on last month's data (February 2026), because the new game month has only just started.*" when `month` isn't the game month of `updated_at`
-- **Layout:** on narrow screens, the numbers move below the club details.
+- **Layout:** on narrow screens, up to 720 pixels wide, the numbers move below the club details, and the description and balance details stack.
 - **Screen readers:** after a search, only a short "Found N clubs" message is announced, followed by any notices, not the whole list. The text goes into a live region that's always on the page, because a notice that appears together with new results isn't reliably announced. Rank trends have spoken descriptions, such as "Up 16 places since last month".
 
 ### Tier icons
