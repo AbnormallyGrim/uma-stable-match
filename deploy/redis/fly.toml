@@ -22,4 +22,4 @@ primary_region = "iad"
 # Raise together with maxmemory in the Dockerfile.
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "256mb"
+  memory = "512mb"
