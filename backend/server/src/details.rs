@@ -339,6 +339,30 @@ impl ClubDetails {
             .map(|entry| entry.club)
     }
 
+    pub(crate) async fn load_shared(&self, ids: &[u64]) -> Vec<Arc<Club>> {
+        let inner = &self.inner;
+        let period = self.period();
+        let keys: Vec<String> = ids.iter().map(|&id| club_key(id, period)).collect();
+        let found = inner.shared.get_many::<Stored>(&keys).await;
+        let now = utc_now();
+        let mut clubs = Vec::new();
+        for (&circle_id, stored) in ids.iter().zip(found) {
+            let Some(stored) = stored.filter(|s| s.is_current(now)) else {
+                continue;
+            };
+            count_detail("redis");
+            record_median(inner, &stored.club, circle_id, period);
+            let entry = inner
+                .cache
+                .entry((circle_id, period))
+                .or_insert(Entry::from(stored))
+                .await
+                .into_value();
+            clubs.push(entry.club);
+        }
+        clubs
+    }
+
     /// The month whose details are fetched and served: `None` for the current game month.
     pub fn period(&self) -> Option<Period> {
         *read(&self.inner.period)
