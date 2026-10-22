@@ -29,7 +29,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `SCAN_INTERVAL_MINUTES` | none | Minutes between scans. Unset, the server scans again 30 minutes after uma.moe's next daily update; see [Cache and schedule](#cache-and-schedule) |
 | `DETAIL_CACHE_MINUTES` | none | Minutes between refreshes of a club's member data. Unset, each club refreshes after uma.moe's daily update; see [Refresher](#refresher) and [Club details](#club-details) |
 | `SHORTLIST_SIZE` | `120` | Clubs nearest your pace considered for each request |
-| `REQUEST_FETCH_BUDGET` | `10` | Most uncached clubs fetched while a visitor waits. At 500 ms spacing, 10 take about 5 seconds |
+| `REQUEST_FETCH_BUDGET` | `10` | Most clubs fetched from uma.moe while a visitor waits. At 500 ms spacing, 10 take about 5 seconds. Clubs read from Redis don't count |
 | `TRAINER_CACHE_MINUTES` | `10` | Minutes a trainer's looked-up pace is reused |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Recommendation requests each visitor can make per minute |
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer lookups each visitor can make per minute that need a call to uma.moe |
@@ -243,7 +243,7 @@ $env:REDIS_TEST_URL="redis://127.0.0.1:6379"; cargo test
 
 ## Cache and schedule
 
-Scan results, the club pool and club details live in memory, and with Redis also in Redis. When the server starts it scans straight away. It scans again 30 minutes after uma.moe's next daily update: 24 hours after the scan's `updated_at`, plus the refresher's `margin`. If uma.moe hasn't updated yet, or the scan failed, it tries again an hour later. With `SCAN_INTERVAL_MINUTES` set, it scans again that long after each scan finishes instead. Until the first scan has listed the clubs there are no results; with the defaults that takes a few seconds. From then on, searches score the clubs loaded so far, fetch up to `REQUEST_FETCH_BUDGET` more, and report the rest as still loading, while the [refresher](#refresher) finishes loading details (about 80 seconds with the defaults). With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule; one that starts during a scan resumes it from the saved club list. See [Shared scans](#shared-scans).
+Scan results, the club pool and club details live in memory, and with Redis also in Redis. When the server starts it scans straight away. It scans again 30 minutes after uma.moe's next daily update: 24 hours after the scan's `updated_at`, plus the refresher's `margin`. If uma.moe hasn't updated yet, or the scan failed, it tries again an hour later. With `SCAN_INTERVAL_MINUTES` set, it scans again that long after each scan finishes instead. Until the first scan has listed the clubs there are no results; with the defaults that takes a few seconds. From then on, searches score the clubs loaded so far, fetch up to `REQUEST_FETCH_BUDGET` more, and report the rest as still loading, while the [refresher](#refresher) finishes loading details (about 80 seconds with the defaults). With Redis, a server that starts while a published scan is current loads it in a second or two instead, and follows that scan's schedule. Its memory starts empty, but searches read shortlisted clubs from Redis without using `REQUEST_FETCH_BUDGET`, so clubs already in Redis are scored from the first search. A server that starts during a scan resumes it from the saved club list. See [Shared scans](#shared-scans).
 
 - **No overlapping scans.** A new scan won't start while one is running.
 - **One scan for all instances.** With Redis, one instance scans and the others load its result; see [Shared scans](#shared-scans).
@@ -311,7 +311,7 @@ There's no public status endpoint. The page takes the data's age from each searc
 
 1. Check the pace and balance weight. An invalid request fails before anything is fetched.
 2. Shortlist the `SHORTLIST_SIZE` clubs whose estimated median is nearest `0.85 ×` your pace. Closed clubs are left out unless `include_closed=true`.
-3. Take every cached club in the pool, then fetch up to `REQUEST_FETCH_BUDGET` uncached shortlisted clubs in the interactive lane, nearest first. Requests that need the same club share one fetch.
+3. Take every cached club in the pool. With Redis, read the uncached shortlisted clubs from it in one `MGET`, and keep those not yet due for a refresh in memory. Then fetch up to `REQUEST_FETCH_BUDGET` of the rest from uma.moe in the interactive lane, nearest first. Requests that need the same club share one fetch.
 4. Queue the other uncached shortlisted clubs, and any that failed, for background loading.
 5. Score every loaded club in the pool, not only the shortlist.
 

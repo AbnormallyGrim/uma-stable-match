@@ -244,6 +244,8 @@ impl SharedCache {
         }
     }
 
+    /// The stored values for `keys`, in order, read in one round trip. Misses are `None`, as with
+    /// [`SharedCache::get`].
     pub async fn get_many<T: DeserializeOwned>(&self, keys: &[String]) -> Vec<Option<T>> {
         let misses = || keys.iter().map(|_| None).collect();
         let Backend::Redis(redis) = &self.backend else {
