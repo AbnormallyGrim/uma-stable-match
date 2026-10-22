@@ -411,7 +411,7 @@ Errors come back as `{"error": "..."}`:
 
 ### Rate limits
 
-`/api/v1/recommendations` is limited per visitor. Health and status aren't limited.
+`/api/v1/recommendations` is limited per visitor. Health isn't limited.
 
 - **All requests:** `RATE_LIMIT_PER_MINUTE` (30 by default).
 - **Trainer lookups:** `TRAINER_LOOKUPS_PER_MINUTE` (10 by default). This only counts `trainer_id` requests that need a call to uma.moe. Cached trainers and `pace` requests don't use it, so a public instance can't be used to flood uma.moe.
