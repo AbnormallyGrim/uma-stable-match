@@ -128,7 +128,7 @@ docker compose up -d
 6. Browse **Top picks**, or use **All results** to search and sort the 100 best fits.
 7. Select a club's name to open its uma.moe page in a new tab, then contact the leader.
 
-Club data refreshes automatically every 3 hours by default, and the line under the title shows when it last did. If some clubs are still loading, or it's the first two days of a game month and results use last month's data, a note under the summary says so.
+Club data refreshes automatically once a day, shortly after uma.moe's daily update, and the line under the title shows when it last did. If some clubs are still loading, or it's the first two days of a game month and results use last month's data, a note under the summary says so.
 
 ## Understanding your results
 
