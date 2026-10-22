@@ -251,6 +251,7 @@
     white-space: nowrap;
   }
 
+  /* The description and balance details share a row on wide screens, and stack on narrow ones. */
   .details {
     display: flex;
     gap: 8px 24px;

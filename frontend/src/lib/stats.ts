@@ -1,3 +1,5 @@
+/** Statistics about the visitor across their results, for the results summary. */
+
 import type { Club } from './api';
 
 const COMFORT_FROM = 0.25;
@@ -7,6 +9,7 @@ function placeShare(club: Club): number {
   return club.your_place / club.club_size;
 }
 
+/** Clubs where the visitor would sit 25% to 60% of the way down the members, the range fit aims for. */
 export function comfortableFits(clubs: Club[]): number {
   return clubs.filter((club) => {
     const share = placeShare(club);
@@ -14,6 +17,7 @@ export function comfortableFits(clubs: Club[]): number {
   }).length;
 }
 
+/** The middle of the visitor's place shares (place ÷ club size), or `null` without clubs. */
 export function typicalPlace(clubs: Club[]): number | null {
   if (clubs.length === 0) {
     return null;
@@ -23,6 +27,7 @@ export function typicalPlace(clubs: Club[]): number | null {
   return shares.length % 2 === 1 ? shares[middle]! : (shares[middle - 1]! + shares[middle]!) / 2;
 }
 
+/** A place share as `Top 46%`, never below `Top 1%`, or a dash for `null`. */
 export function formatTopShare(share: number | null): string {
   return share === null ? '–' : `Top ${Math.max(1, Math.round(share * 100))}%`;
 }

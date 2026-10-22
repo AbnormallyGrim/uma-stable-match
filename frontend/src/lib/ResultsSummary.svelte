@@ -1,6 +1,6 @@
 <!--
   @component
-  The search at a glance: pace used, clubs analysed, data age and balance setting.
+  The search at a glance: pace used, clubs analysed, comfortable fits and typical place.
 -->
 
 <script lang="ts">
