@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="google-site-verification" content="BIx7D0OpYQ2yMT9gEnTwrzaO_pAQWdLAYKrOUS7O0S0" />
+
+    <title>Uma Stable Match: Umamusume Club Finder &amp; Club Matcher</title>
+    <meta name="description" content="Free Umamusume club finder and club matcher. Compares your daily fan gain with every club that has an open spot and ranks the clubs where you'd fit." />
+    <link rel="canonical" href="https://abnormallygrim.github.io/uma-stable-match/" />
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png" />
+    <link rel="apple-touch-icon" href="images/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0f1217" />
+
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@graph": [
+                {
+                    "@type": "SoftwareApplication",
+                    "name": "Uma Stable Match",
+                    "alternateName": ["Umamusume club finder", "Umamusume club matcher"],
+                    "url": "https://abnormallygrim.github.io/uma-stable-match/",
+                    "description": "A free Umamusume: Pretty Derby club finder and club matching tool. It compares your daily fan gain with the members of every club that has an open spot and ranks the clubs where you'd fit.",
+                    "applicationCategory": "GameApplication",
+                    "operatingSystem": "Windows, macOS, Linux",
+                    "image": "https://abnormallygrim.github.io/uma-stable-match/images/results.webp",
+                    "isAccessibleForFree": true,
+                    "license": "https://opensource.org/licenses/MIT",
+                    "sameAs": "https://github.com/AbnormallyGrim/uma-stable-match",
+                    "offers": {
+                        "@type": "Offer",
+                        "price": "0",
+                        "priceCurrency": "USD"
+                    }
+                },
+                {
+                    "@type": "FAQPage",
+                    "mainEntity": [
+                        {
+                            "@type": "Question",
+                            "name": "How do I find a good club in Umamusume?",
+                            "acceptedAnswer": {
+                                "@type": "Answer",
+                                "text": "Look for a club with an open spot whose members gain fans at about your pace, where you'd sit around the middle of the members and most members pull their weight. Uma Stable Match does this comparison for you across every club in its rank range and ranks the best fits."
+                            }
+                        },
+                        {
+                            "@type": "Question",
+                            "name": "Is Uma Stable Match official?",
+                            "acceptedAnswer": {
+                                "@type": "Answer",
+                                "text": "No. It's an unofficial, non-commercial fan tool, not affiliated with, endorsed by, or sponsored by uma.moe or Cygames, Inc."
+                            }
+                        },
+                        {
+                            "@type": "Question",
+                            "name": "Where does the club data come from?",
+                            "acceptedAnswer": {
+                                "@type": "Answer",
+                                "text": "From uma.moe's club and trainer data. Each club refreshes once a day, shortly after uma.moe's daily update."
+                            }
+                        },
+                        {
+                            "@type": "Question",
+                            "name": "Is it free?",
+                            "acceptedAnswer": {
+                                "@type": "Answer",
+                                "text": "Yes. Uma Stable Match is free and open source under the MIT license."
+                            }
+                        },
+                        {
+                            "@type": "Question",
+                            "name": "What do I need to use it?",
+                            "acceptedAnswer": {
+                                "@type": "Answer",
+                                "text": "Your 12-digit trainer ID, found in-game under Menu, then Profile, or your daily fan gain. To run it yourself you also need a free uma.moe account and API key, Git and Docker."
+                            }
+                        },
+                        {
+                            "@type": "Question",
+                            "name": "Can I use it in my browser without installing anything?",
+                            "acceptedAnswer": {
+                                "@type": "Answer",
+                                "text": "Not yet. While it's in early testing you run it on your own computer. A published version is on the way, so check back soon."
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #0f1217;
+            --card-bg: #181d26;
+            --card-hover: #1f2633;
+            --border-color: #27303f;
+            --text-main: #f0f4f8;
+            --text-muted: #94a3b8;
+            --accent-gold: #d4af37;
+            --accent-gold-hover: #c29f2e;
+            --accent-silver: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 5rem;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        a {
+            color: var(--accent-gold);
+        }
+
+        :focus-visible {
+            outline: 2px solid var(--accent-gold);
+            outline-offset: 3px;
+            border-radius: 4px;
+        }
+
+        .navbar {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            background-color: rgba(15, 18, 23, 0.85);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 0.75rem 0;
+        }
+
+        .nav-container {
+            max-width: 1050px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            color: var(--text-main);
+        }
+
+        .nav-logo {
+            height: 42px;
+            width: 42px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .brand-title {
+            font-weight: 700;
+            font-size: 1.15rem;
+            letter-spacing: -0.3px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+
+        .nav-link {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+        }
+
+        .nav-link:hover {
+            color: var(--text-main);
+        }
+
+        .nav-btn {
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: background-color 0.2s;
+        }
+
+        .nav-btn:hover {
+            background-color: var(--border-color);
+        }
+
+        .container {
+            max-width: 1050px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            width: 100%;
+        }
+
+        .hero {
+            position: relative;
+            padding: 6rem 0 5rem;
+            text-align: center;
+            background:
+                    radial-gradient(circle at 50% 30%, rgba(15, 18, 23, 0.45) 0%, rgba(15, 18, 23, 0.85) 60%, var(--bg-color) 100%),
+                    linear-gradient(180deg, rgba(15, 18, 23, 0.6) 0%, rgba(15, 18, 23, 0.3) 40%, var(--bg-color) 100%),
+                    url('images/hero.webp') center 25%/cover no-repeat;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(212, 175, 55, 0.12);
+            color: var(--accent-gold);
+            border: 1px solid rgba(212, 175, 55, 0.35);
+            padding: 0.35rem 0.9rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 1.5rem;
+            backdrop-filter: blur(6px);
+        }
+
+        .hero h1 {
+            font-size: 2.75rem;
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: -0.8px;
+            margin-bottom: 1.25rem;
+            background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            max-width: 700px;
+            margin: 0 auto 2.25rem;
+        }
+
+        .cta-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.85rem 1.75rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-gold);
+            color: #0f1217;
+            box-shadow: 0 4px 14px rgba(212, 175, 55, 0.25);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-gold-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: rgba(24, 29, 38, 0.9);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(8px);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--border-color);
+            transform: translateY(-2px);
+        }
+
+        .testing-banner {
+            background-color: rgba(212, 175, 55, 0.05);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            border-radius: 12px;
+            padding: 1.5rem 1.75rem;
+            margin: 1rem 0 4rem;
+            text-align: left;
+            display: flex;
+            gap: 1.25rem;
+            align-items: flex-start;
+        }
+
+        .testing-icon {
+            font-size: 1.5rem;
+            line-height: 1;
+        }
+
+        .testing-content h2 {
+            font-size: 1.1rem;
+            color: var(--accent-gold);
+            margin-bottom: 0.25rem;
+        }
+
+        .testing-content p {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        section {
+            margin-bottom: 5rem;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .section-title h2 {
+            font-size: 1.85rem;
+            font-weight: 700;
+            letter-spacing: -0.4px;
+            margin-bottom: 0.5rem;
+        }
+
+        .section-title p {
+            color: var(--text-muted);
+            font-size: 1rem;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+
+        .showcase {
+            margin: 0;
+        }
+
+        .showcase-frame {
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            overflow: hidden;
+            background-color: var(--card-bg);
+            box-shadow:
+                    0 0 0 1px rgba(212, 175, 55, 0.08),
+                    0 24px 60px rgba(0, 0, 0, 0.45),
+                    0 0 80px rgba(212, 175, 55, 0.06);
+        }
+
+        .showcase-frame img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .showcase figcaption {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 0.9rem;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 1.75rem;
+            border-radius: 12px;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(212, 175, 55, 0.4);
+            transform: translateY(-3px);
+        }
+
+        .card-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.6rem;
+            color: var(--text-main);
+        }
+
+        .card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.55;
+        }
+
+        .fields {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 1rem;
+            margin-top: 2.5rem;
+        }
+
+        .field {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem 1.35rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .field:hover {
+            border-color: rgba(212, 175, 55, 0.4);
+            transform: translateY(-3px);
+        }
+
+        .field dt {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .field .field-value {
+            color: var(--accent-gold);
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .field dd {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .field .field-note {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .code-wrapper {
+            position: relative;
+            background-color: #090b0e;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .code-block {
+            padding: 1rem 6rem 1rem 1.25rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 0.9rem;
+            color: #e2e8f0;
+            overflow-x: auto;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.65rem;
+            right: 0.75rem;
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 0.4rem 0.75rem;
+            border-radius: 6px;
+            font: inherit;
+            font-size: 0.825rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+        }
+
+        .copy-btn:hover,
+        .copy-btn.copied {
+            background-color: var(--border-color);
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+        }
+
+        .try-note {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-top: 1.25rem;
+        }
+
+        .faq {
+            max-width: 780px;
+            margin: 0 auto;
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .faq details {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0 1.25rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .faq details[open] {
+            border-color: rgba(212, 175, 55, 0.35);
+        }
+
+        .faq summary {
+            cursor: pointer;
+            list-style: none;
+            font-weight: 600;
+            padding: 1rem 0;
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .faq summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .faq summary::after {
+            content: "+";
+            color: var(--accent-gold);
+            font-weight: 700;
+        }
+
+        .faq details[open] summary::after {
+            content: "−";
+        }
+
+        .faq details p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            padding-bottom: 1.1rem;
+        }
+
+        footer {
+            border-top: 1px solid var(--border-color);
+            padding: 2.5rem 0;
+            margin-top: auto;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        footer p {
+            max-width: 760px;
+            margin: 0 auto 0.75rem;
+        }
+
+        footer a {
+            color: var(--accent-silver);
+        }
+
+        @media (max-width: 640px) {
+            .hero {
+                padding: 4rem 0 3.5rem;
+            }
+
+            .hero h1 {
+                font-size: 2.1rem;
+            }
+
+            .hero p {
+                font-size: 1.05rem;
+            }
+
+            .nav-link {
+                display: none;
+            }
+
+            .testing-banner {
+                padding: 1.25rem;
+            }
+
+            .section-title h2 {
+                font-size: 1.55rem;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+
+            .btn,
+            .card,
+            .field {
+                transition: none;
+            }
+
+            .btn:hover,
+            .card:hover,
+            .field:hover {
+                transform: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar" aria-label="Main">
+    <div class="nav-container">
+        <a href="#" class="brand">
+            <img src="images/logo.webp" alt="" width="42" height="42" class="nav-logo" />
+            <span class="brand-title">Uma Stable Match</span>
+        </a>
+        <div class="nav-links">
+            <a href="#how-it-works" class="nav-link">How it works</a>
+            <a href="#faq" class="nav-link">FAQ</a>
+            <a href="https://github.com/AbnormallyGrim/uma-stable-match" class="nav-btn" target="_blank" rel="noopener">GitHub</a>
+        </div>
+    </div>
+</nav>
+
+<header class="hero">
+    <div class="container">
+        <span class="badge">Early testing</span>
+        <h1>Stop guessing. Find your ideal Umamusume club.</h1>
+        <p>Uma Stable Match is a free Umamusume club finder and club matching tool. It compares your daily fan gain with every club that has an open spot, and ranks the clubs where your pace fits and members pull their weight.</p>
+
+        <div class="cta-group">
+            <a href="https://github.com/AbnormallyGrim/uma-stable-match" class="btn btn-primary" target="_blank" rel="noopener">View on GitHub</a>
+            <a href="https://github.com/AbnormallyGrim/uma-stable-match/issues/new/choose" class="btn btn-secondary" target="_blank" rel="noopener">Leave feedback</a>
+        </div>
+    </div>
+</header>
+
+<main class="container">
+
+    <div class="testing-banner">
+        <div class="testing-icon" aria-hidden="true">🧪</div>
+        <div class="testing-content">
+            <h2>Early testing and community feedback</h2>
+            <p>Uma Stable Match is in early testing. You're welcome to clone it, try it on your own computer and leave feedback on GitHub. A published version is on the way, so <strong>check back soon!</strong></p>
+        </div>
+    </div>
+
+    <section aria-labelledby="see-it">
+        <div class="section-title">
+            <h2 id="see-it">Your best-fitting clubs, ranked</h2>
+            <p>Enter your trainer ID or daily fan gain and get your top picks, with each club's rank, open spots, join style and where you'd place among its members.</p>
+        </div>
+        <figure class="showcase">
+            <div class="showcase-frame">
+                <img src="images/results.webp" width="1200" height="1143" loading="lazy" decoding="async"
+                     alt="Uma Stable Match results: a daily pace of 6 million fans, a summary of the clubs analysed, and top picks showing each club's tier, rank and trend, open spots, join style, your place among its members, median daily gain, balance and passengers." />
+            </div>
+            <figcaption>Example results, shown with made-up clubs.</figcaption>
+        </figure>
+    </section>
+
+    <section id="how-it-works" aria-labelledby="how-title">
+        <div class="section-title">
+            <h2 id="how-title">How the club matching works</h2>
+            <p>Club leaderboards show how big a club is, not whether it's right for you. Uma Stable Match looks at the members.</p>
+        </div>
+
+        <div class="grid-3">
+            <div class="card">
+                <div class="card-icon" aria-hidden="true">🎯</div>
+                <h3>Matched to your fan pace</h3>
+                <p>Your daily fan gain is compared with each club's current members. The best matches are clubs where you'd sit around the middle: secure enough not to be cut, without carrying everyone else.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon" aria-hidden="true">⚖️</div>
+                <h3>Members who pull their weight</h3>
+                <p>Balance scoring looks at how evenly fans are spread across members and how many are passengers, so clubs where a few members carry everyone can rank lower.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon" aria-hidden="true">📈</div>
+                <h3>Open, active clubs</h3>
+                <p>Only clubs (circles) with an open spot are compared, unless you include closed ones. Only current members count, so players who've left don't skew a club's numbers.</p>
+            </div>
+        </div>
+    </section>
+
+    <section aria-labelledby="results-title">
+        <div class="section-title">
+            <h2 id="results-title">Everything you need to choose</h2>
+            <p>Search and sort your 100 best fits, then open a club's uma.moe page and contact its leader.</p>
+        </div>
+        <figure class="showcase">
+            <div class="showcase-frame">
+                <img src="images/results-table.webp" width="1600" height="757" loading="lazy" decoding="async"
+                     alt="The all results table, listing clubs with their tier, rank, last month's rank, open spots, join style, median daily gain, your place, balance, passengers, top-3 share and score." />
+            </div>
+            <figcaption>The all results table, shown with made-up clubs.</figcaption>
+        </figure>
+        <dl class="fields">
+            <div class="field">
+                <dt>Your place</dt>
+                <dd>
+                    <span class="field-value">8 of 30</span>
+                    <span class="field-note">Where you'd rank among the club's current members.</span>
+                </dd>
+            </div>
+            <div class="field">
+                <dt>Median per day</dt>
+                <dd>
+                    <span class="field-value">5.3M/day</span>
+                    <span class="field-note">The typical member's daily fan gain this month.</span>
+                </dd>
+            </div>
+            <div class="field">
+                <dt>Rank and tier</dt>
+                <dd>
+                    <span class="field-value">Rank 163 ▲30</span>
+                    <span class="field-note">The club's monthly rank, its change since last month, and its tier from D to SS.</span>
+                </dd>
+            </div>
+            <div class="field">
+                <dt>Join style</dt>
+                <dd>
+                    <span class="field-value">Open · Approval</span>
+                    <span class="field-note">Join instantly, or wait for the leader to accept you. Closed clubs are hidden unless you include them.</span>
+                </dd>
+            </div>
+            <div class="field">
+                <dt>Balance</dt>
+                <dd>
+                    <span class="field-value">86/100</span>
+                    <span class="field-note">How evenly members contribute. Higher is better.</span>
+                </dd>
+            </div>
+            <div class="field">
+                <dt>Passengers</dt>
+                <dd>
+                    <span class="field-value">0 of 27</span>
+                    <span class="field-note">Members gaining under 1M fans a day, or under a quarter of the club's median.</span>
+                </dd>
+            </div>
+        </dl>
+    </section>
+
+    <section aria-labelledby="try-title">
+        <div class="section-title">
+            <h2 id="try-title">Try it out</h2>
+            <p>Clone the repository to run the club finder on your own computer.</p>
+        </div>
+        <div class="code-wrapper">
+            <button type="button" class="copy-btn" data-copy="git clone https://github.com/AbnormallyGrim/uma-stable-match.git" aria-label="Copy the clone command">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+                <span class="copy-text">Copy</span>
+            </button>
+            <pre class="code-block"><code>git clone https://github.com/AbnormallyGrim/uma-stable-match.git</code></pre>
+        </div>
+        <p class="try-note">Then follow the <a href="https://github.com/AbnormallyGrim/uma-stable-match#installation" target="_blank" rel="noopener">setup steps in the README</a>.</p>
+    </section>
+
+    <section id="faq" aria-labelledby="faq-title">
+        <div class="section-title">
+            <h2 id="faq-title">Frequently asked questions</h2>
+        </div>
+        <div class="faq">
+            <details>
+                <summary>How do I find a good club in Umamusume?</summary>
+                <p>Look for a club with an open spot whose members gain fans at about your pace, where you'd sit around the middle of the members and most members pull their weight. Uma Stable Match does this comparison for you across every club in its rank range and ranks the best fits.</p>
+            </details>
+            <details>
+                <summary>Is Uma Stable Match official?</summary>
+                <p>No. It's an unofficial, non-commercial fan tool, not affiliated with, endorsed by, or sponsored by uma.moe or Cygames, Inc.</p>
+            </details>
+            <details>
+                <summary>Where does the club data come from?</summary>
+                <p>From <a href="https://uma.moe" target="_blank" rel="noopener">uma.moe</a>'s club and trainer data. Each club refreshes once a day, shortly after uma.moe's daily update.</p>
+            </details>
+            <details>
+                <summary>Is it free?</summary>
+                <p>Yes. Uma Stable Match is free and open source under the MIT license.</p>
+            </details>
+            <details>
+                <summary>What do I need to use it?</summary>
+                <p>Your 12-digit trainer ID, found in-game under Menu, then Profile, or your daily fan gain. To run it yourself you also need a free uma.moe account and API key, Git and Docker.</p>
+            </details>
+            <details>
+                <summary>Can I use it in my browser without installing anything?</summary>
+                <p>Not yet. While it's in early testing you run it on your own computer. A published version is on the way, so check back soon.</p>
+            </details>
+        </div>
+    </section>
+
+</main>
+
+<footer>
+    <div class="container">
+        <p>Uma Stable Match is an unofficial, non-commercial fan project and is not affiliated with, endorsed by, or sponsored by uma.moe or Cygames, Inc.</p>
+        <p>Umamusume: Pretty Derby and all related names, characters, artwork and trademarks belong to Cygames, Inc. Game artwork in the screenshots, including club tier icons, is © Cygames, Inc. and is used non-commercially in line with Cygames' <a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener">Fan-Created Content Guidelines</a>. Club and trainer data comes from <a href="https://uma.moe" target="_blank" rel="noopener">uma.moe</a>.</p>
+        <p><a href="https://github.com/AbnormallyGrim/uma-stable-match" target="_blank" rel="noopener">Source code</a> under the MIT license · <a href="https://github.com/AbnormallyGrim/uma-stable-match/issues/new/choose" target="_blank" rel="noopener">Report an issue</a></p>
+    </div>
+</footer>
+
+<script>
+    document.querySelectorAll('.copy-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            const label = button.querySelector('.copy-text');
+            navigator.clipboard.writeText(button.dataset.copy).then(() => {
+                label.textContent = 'Copied!';
+                button.classList.add('copied');
+                setTimeout(() => {
+                    label.textContent = 'Copy';
+                    button.classList.remove('copied');
+                }, 2000);
+            });
+        });
+    });
+</script>
+
+</body>
+</html>
