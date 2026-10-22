@@ -1,16 +1,17 @@
 //! HTTP routes.
 
 use std::path::Path;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
-use axum::extract::State;
+use axum::extract::{Request, State};
 use axum::http::StatusCode;
-use axum::middleware::{from_fn, from_fn_with_state};
-use axum::response::IntoResponse;
+use axum::middleware::{from_fn, from_fn_with_state, Next};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{any, get};
 use axum::{Json, Router};
 use serde_json::{json, Value};
 
+use crate::api_error::ApiError;
 use crate::cache::{Cache, ScanFailure, ScanPhase, Snapshot};
 use crate::details::ClubDetails;
 use crate::frontend;
@@ -18,6 +19,10 @@ use crate::limits::{limit_requests, RateLimits};
 use crate::pace::PaceLookup;
 use crate::recommendations::{recommendations, MatchSettings};
 use crate::telemetry::track_requests;
+
+/// Longest a request may run before it gets a 504. Matches the longest `Retry-After` pause a
+/// visitor's request waits out.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Shared state for request handlers.
 #[derive(Debug, Clone)]
@@ -47,14 +52,28 @@ pub fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
-/// The routes plus security headers, serving the built frontend from `frontend_dir` if given.
+/// The routes plus security headers and a request timeout, serving the built frontend from
+/// `frontend_dir` if given.
 pub fn app(state: AppState, frontend_dir: Option<&Path>) -> Router {
     let mut app = router(state);
     if let Some(dir) = frontend_dir {
         app = app.fallback_service(frontend::service(dir));
     }
-    app.layer(from_fn(track_requests))
+    app.layer(from_fn(time_limit))
+        .layer(from_fn(track_requests))
         .layer(from_fn(frontend::security_headers))
+}
+
+/// Answers 504 with a JSON error if the request runs longer than [`REQUEST_TIMEOUT`].
+async fn time_limit(request: Request, next: Next) -> Response {
+    match tokio::time::timeout(REQUEST_TIMEOUT, next.run(request)).await {
+        Ok(response) => response,
+        Err(_) => ApiError::new(
+            StatusCode::GATEWAY_TIMEOUT,
+            "the request took too long; try again",
+        )
+        .into_response(),
+    }
 }
 
 async fn api_not_found() -> impl IntoResponse {
@@ -144,3 +163,6 @@ fn last_error(failure: &ScanFailure) -> Value {
 pub(crate) fn timestamp(time: SystemTime) -> String {
     humantime::format_rfc3339_seconds(time).to_string()
 }
+
+#[cfg(test)]
+mod tests;
