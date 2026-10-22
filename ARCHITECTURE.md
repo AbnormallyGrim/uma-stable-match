@@ -64,7 +64,7 @@ backend/
   server/          API server, scheduled club scanner and cache
 frontend/          Web interface (Svelte + TypeScript)
 observability/     Prometheus config and Grafana dashboard for local metrics
-site/              Project website, published to GitHub Pages
+site/              Project website, published to GitHub Pages at umastable.com
 docs/images/       README screenshots and the website's original artwork
 ```
 

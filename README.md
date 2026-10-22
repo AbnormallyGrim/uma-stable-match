@@ -2,7 +2,7 @@
 
 **Uma Stable Match: an Umamusume Pretty Derby club finder.** Uma Stable Match recommends Umamusume: Pretty Derby clubs that suit you: clubs where your fan pace fits and members pull their weight.
 
-**Website:** [abnormallygrim.github.io/uma-stable-match](https://abnormallygrim.github.io/uma-stable-match/)
+**Use it:** [app.umastable.com](https://app.umastable.com), in your browser with nothing to install · **Website:** [umastable.com](https://umastable.com/)
 
 ![Uma Stable Match results page: the search form, a summary of your pace and the clubs analysed, then ranked club cards showing each club's tier, rank trend, open spots, join style, balance and your expected place](docs/images/demo.png)
 
