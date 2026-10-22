@@ -11,7 +11,7 @@ server (/metrics on 127.0.0.1:9464)  ←  Prometheus (127.0.0.1:9090)  ←  Graf
 | `prometheus.yml` | Scrapes the server's metrics from `127.0.0.1:9464` every 5 seconds |
 | `grafana-dashboard.json` | The dashboard to import. It asks which Prometheus data source to use |
 
-The metrics themselves are described in the [server README](../backend/server/README.md#metrics).
+The metrics themselves are described in the [server README](../backend/server/README.md#metrics). For a server on Fly.io, Fly's managed Prometheus and Grafana replace this setup; see the [Fly.io guide](../docs/deploy-fly.md#8-view-the-metrics).
 
 ## 1. Install Prometheus and Grafana
 

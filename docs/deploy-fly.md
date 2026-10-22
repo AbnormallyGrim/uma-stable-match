@@ -1,12 +1,13 @@
 # Hosting on Fly.io
 
-How to run a public instance on [Fly.io](https://fly.io), with Redis keeping its data across restarts, logs searchable in [Axiom](https://axiom.co) and an alert when the site goes down. [`fly.toml`](../fly.toml) in the repository root holds the server's settings, and [`deploy/redis`](../deploy/redis) holds Redis's.
+How to run a public instance on [Fly.io](https://fly.io), with Redis keeping its data across restarts, logs searchable in [Axiom](https://axiom.co), metrics on a Grafana dashboard and an alert when the site goes down. [`fly.toml`](../fly.toml) in the repository root holds the server's settings, and [`deploy/redis`](../deploy/redis) holds Redis's.
 
 ```text
 visitors → Fly proxy (HTTPS) → server machine ─ logs → log shipper machine → Axiom
                                      │  ↑
                                      │  uptime monitor checks /api/v1/health
-                                     └─ private network → Redis machine + volume
+                                     ├─ private network → Redis machine + volume
+                                     └─ metrics → Fly's Prometheus → Fly's Grafana
 ```
 
 It runs three always-on machines (the server, Redis and the log shipper) and a 1 GB volume. Fly.io needs a payment card; check its pricing for the current cost of small machines and volumes.
@@ -132,11 +133,22 @@ Lines appear in the dataset's Stream view within a minute. The shipper sends eac
 
 To filter by clicking instead, save `log.level`, `log.message` and `log.circle_id` as virtual fields. The fields are described in the [server README](../backend/server/README.md#logs).
 
-## 8. Get an alert when the site is down
+## 8. View the metrics
+
+Fly scrapes the server's [metrics](../backend/server/README.md#metrics) every 15 seconds into its managed Prometheus, through the `[metrics]` section of `fly.toml`. They're served on port 9464 of Fly's private network only, never the public address. Fly keeps them for about 15 days, with no extra charge at the time of writing.
+
+To see them on the repository's dashboard:
+
+1. Open [fly-metrics.net](https://fly-metrics.net), Fly's managed Grafana, and sign in with your Fly account.
+2. Go to **Dashboards → New → Import**, upload [`observability/grafana-dashboard.json`](../observability/grafana-dashboard.json), choose Fly's Prometheus data source and click **Import**.
+
+Panels fill in within a few minutes of a deploy. To check a single value, query it in **Explore**, such as `scans_total`. Fly doesn't alert on metrics; the uptime monitor in the next step covers the site going down.
+
+## 9. Get an alert when the site is down
 
 Add an HTTP(s) monitor at an uptime service such as [UptimeRobot](https://uptimerobot.com), checking `https://uma-stable-match.fly.dev/api/v1/health` every 5 minutes, with an email alert.
 
-## 9. Optional: your own domain
+## 10. Optional: your own domain
 
 ```bash
 fly certs add <your-domain>
@@ -150,6 +162,7 @@ Create the DNS records it prints, then point the uptime monitor at the new addre
 |---|---|
 | Deploy a new version | `fly deploy --ha=false` from the repository root |
 | Live logs | `fly logs`; Axiom keeps the history |
+| Metrics | The dashboard at [fly-metrics.net](https://fly-metrics.net) |
 | Machine and health check status | `fly status` and `fly checks list` |
 | Roll back | `fly releases --image`, then `fly deploy --ha=false --image <previous image>` |
 | Restart | `fly machine restart` |
