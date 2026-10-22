@@ -118,6 +118,10 @@ docker compose up -d
 - **Optional metrics:** add `METRICS_PORT=9464` to `.env` to serve metrics to this computer only, for a local Prometheus and Grafana; see the [metrics dashboard guide](observability/README.md).
 - **Optional Redis:** to try the [shared cache](backend/server/README.md#shared-cache), add `REDIS_URL=redis://redis:6379` and a `REDIS_KEY_SECRET` of at least 32 characters to `.env`, then start with `docker compose --profile redis up -d` (and stop with `docker compose --profile redis down`). Redis holds up to 512 MB and keeps its data in the `redis-data` volume, so club data survives restarts (`docker compose --profile redis down -v` deletes it). It isn't reachable from outside Compose, and is locked down like the server. Without the profile it doesn't run; if `REDIS_URL` is set without it, the server stops because it can't reach Redis.
 
+### Hosting it publicly
+
+To run a public instance on Fly.io, with searchable logs and an alert when it's down, follow the [Fly.io guide](docs/deploy-fly.md). [`fly.toml`](fly.toml) holds the settings.
+
 ## Usage
 
 1. Open Uma Stable Match in your browser.
