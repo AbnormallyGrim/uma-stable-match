@@ -274,7 +274,6 @@ curl "http://localhost:8080/api/v1/recommendations?trainer_id=123456789012&balan
 
 | Endpoint | Returns |
 |---|---|
-| `GET /api/v1/status` | When club data was last refreshed, the club pool and cache, and the last scan error |
 | `GET /api/v1/health` | `200 OK` while the server is running |
 
 ## Tips for switching clubs

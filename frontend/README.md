@@ -55,7 +55,6 @@ src/App.svelte                Root component: runs searches and keeps them in th
 src/lib/runner.ts             Search state machine: loading, retries and countdowns
 src/lib/states.ts             Error messages and empty-result hints
 src/lib/SearchStatus.svelte   Loading, waiting and error messages
-src/lib/DataStatus.svelte     How fresh the club data is, from /api/v1/status
 src/lib/ThemeToggle.svelte    System / Light / Dark switch
 src/lib/theme.ts              Saving and applying the theme choice
 src/lib/SiteFooter.svelte     Tips, the logo, a link to report a problem, and the disclaimer
@@ -65,7 +64,7 @@ src/lib/search.ts             Search validation, URL parameters and "remember me
 src/lib/format.ts             Number, rank trend, label and time formatting
 src/lib/Results.svelte        Results view: summary, top picks and all results
 src/lib/ResultsTable.svelte   Sortable, searchable table of the best fits
-src/lib/ResultsSummary.svelte Pace, clubs analysed, comfortable fits and typical place
+src/lib/ResultsSummary.svelte Pace, clubs analysed, comfortable fits, typical place and data age
 src/lib/stats.ts              Comfortable fits and typical place, from the results
 src/lib/ClubCard.svelte       One top pick
 src/lib/TierBadge.svelte      Tier icon, with a fallback for unknown tiers
@@ -112,7 +111,7 @@ After a search, the page shows a summary and the top ten picks.
   - **Comfortable fits:** clubs where you'd sit 25% to 60% of the way down the members, the range fit aims for
   - **Typical place:** the middle of your place ÷ club size across the clubs, such as "Top 25%"
 
-  Hovering over either value explains it. The data age is shown under the title instead, and the balance setting is in the form.
+  Hovering over either value explains it. Under the stats, "Club data updated 3 hours ago." comes from the response's `updated_at`, with the exact time on hover. The balance setting is in the form.
 - **Each card:**
   - **Header:** the pick number (gold, silver and bronze for the top three), the tier icon, and the club name linking to uma.moe in a new tab
   - **Details:** the monthly rank and trend, open spots, join style and playstyle tags, and the description
@@ -174,7 +173,7 @@ The palette follows the project's logo and website: navy with a gold accent in t
 The logo and the background artwork each have a light and a dark version in `src/assets/brand/`, made from the originals in [`docs/images/`](../docs/images/): `logo.jpeg`, `hero.jpeg` and their `-light` versions.
 
 - **Logo.** `BrandLogo.svelte` shows the logo in the header and the footer. It renders both versions, and the `.only-light` and `.only-dark` classes in `app.css` show the one for the current theme, whether it comes from the system or the theme switch.
-- **Background.** The header, data status and search form sit in a `.hero` section. Its `::before` shows the wide artwork (`--hero`), dimmed by `--hero-opacity` and faded to transparent towards its edges with a radial mask, so no box shows whatever the image's background colour. It's anchored to the top of the section, and up to 720 pixels wide to the bottom, so on phones it sits behind the form rather than the title. It stays inside the section, so it never shows behind results or the footer.
+- **Background.** The header and search form sit in a `.hero` section. Its `::before` shows the wide artwork (`--hero`), dimmed by `--hero-opacity` and faded to transparent towards its edges with a radial mask, so no box shows whatever the image's background colour. It's anchored to the top of the section, and up to 720 pixels wide to the bottom, so on phones it sits behind the form rather than the title. It stays inside the section, so it never shows behind results or the footer.
 - **Search form.** The form's card is translucent with a slight blur, so the artwork shows through it.
 - **Alignment.** The light and dark artwork are aligned so their outlines lie on top of each other. Keep them aligned when replacing either: measure the drawing in both, and scale and centre the light version to match.
 - **Icons.** `public/favicon-32.png` and `public/apple-touch-icon.png` are the dark logo at 32 and 180 pixels.
@@ -237,7 +236,7 @@ When you add or change a colour token, add its pairs to the test. A failing pair
 - the form, with a validation error and with balance on
 - the sorted table
 - every search status
-- the theme switch, and the data status after a failed refresh
+- the theme switch
 
 Two axe rules are adjusted. The colour-contrast rule is off, because jsdom doesn't render, and the contrast test covers it instead. The landmark (region) rule only applies to the whole-page checks.
 
@@ -265,22 +264,6 @@ Two axe rules are adjusted. The colour-contrast rule is off, because jsdom doesn
 Starting a new search cancels any pending retry and any earlier request, so an old answer never replaces a newer one. Loading and waiting messages use `role="status"`, and errors use `role="alert"`. The dimming transition is turned off when the visitor prefers reduced motion.
 
 The runner takes the fetch function, a change callback, the retry delays and the timer functions as options. Its tests replace them, so they can check retries and countdowns to the second with fake timers.
-
-### Data status
-
-Under the heading, `DataStatus.svelte` shows how fresh the club data is, using `/api/v1/status`.
-
-| Server state | Line shown |
-|---|---|
-| Data ready | "Club data updated 3 hours ago." The exact time shows on hover |
-| Refreshing | "Club data updated 3 hours ago; refreshing now…" |
-| First scan running | "Loading club data for the first time…" |
-| Last refresh failed | The line, then "The last refresh didn't finish (…)" with the server's public-safe message, in the warning colour |
-| Status request failed | Nothing |
-
-It checks when the page loads, then every 60 seconds (`POLL_MS`). While a scan runs, or before any data exists, it checks every 5 seconds (`FAST_POLL_MS`). It doesn't check while the tab is hidden, and checks straight away when the tab becomes visible again.
-
-When it sees a newly finished scan, it calls `onscanready`. If a search is waiting for the first scan, the app retries it straight away instead of waiting out the countdown.
 
 ## Display formatting
 

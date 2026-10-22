@@ -6,7 +6,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App.svelte';
 import type { Recommendations } from './lib/api';
-import DataStatus from './lib/DataStatus.svelte';
 import ResultsTable from './lib/ResultsTable.svelte';
 import SearchForm from './lib/SearchForm.svelte';
 import SearchStatus from './lib/SearchStatus.svelte';
@@ -31,20 +30,10 @@ async function violations(node: Element, wholePage = false) {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-const READY = {
-  scanning: false,
-  last_scan: { finished_at: '2026-03-18T09:00:00Z', clubs: 3, candidates: 5, failed: 0 },
-  last_error: null,
-};
-
 function stubApi(recommendationsResponse: () => Response) {
   vi.stubGlobal(
     'fetch',
-    vi.fn((input: RequestInfo | URL) =>
-      Promise.resolve(
-        String(input).startsWith('/api/v1/status') ? json(READY) : recommendationsResponse(),
-      ),
-    ),
+    vi.fn(() => Promise.resolve(recommendationsResponse())),
   );
 }
 
@@ -80,7 +69,7 @@ describe('accessibility', () => {
   it('has no violations on the empty page', async () => {
     stubApi(() => json(withResults));
     render(App);
-    await screen.findByTestId('data-status');
+    await screen.findByRole('heading', { name: 'Uma Stable Match' });
     expect(await violations(document.body, true)).toEqual([]);
   });
 
@@ -157,18 +146,8 @@ describe('accessibility', () => {
     expect(await violations(container)).toEqual([]);
   });
 
-  it('has no violations in the theme switch and data status', async () => {
+  it('has no violations in the theme switch', async () => {
     const { container } = render(ThemeToggle, { storage: localStorage });
     expect(await violations(container)).toEqual([]);
-
-    const status = render(DataStatus, {
-      load: () =>
-        Promise.resolve({
-          ...READY,
-          last_error: { at: '2026-03-18T10:00:00Z', message: 'could not reach uma.moe' },
-        }),
-    });
-    await screen.findByTestId('data-status');
-    expect(await violations(status.container)).toEqual([]);
   });
 });
