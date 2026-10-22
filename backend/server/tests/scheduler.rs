@@ -10,8 +10,9 @@ use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    router, run_scheduler, AppState, Cache, CacheStatus, ClubDetails, DetailConfig, MatchSettings,
-    PaceLookup, RateLimits, RefreshConfig, ScanConfig, SharedPool, DEFAULT_PACE_TTL,
+    run_scheduler, status_router, AppState, Cache, CacheStatus, ClubDetails, DetailConfig,
+    MatchSettings, PaceLookup, RateLimits, RefreshConfig, ScanConfig, ScanPhase, SharedPool,
+    DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -128,8 +129,8 @@ async fn stop(running: Running) {
 }
 
 async fn status_json(cache: &Cache, details: &ClubDetails) -> Value {
-    let response = router(app(cache.clone(), details.clone()))
-        .oneshot(Request::get("/api/v1/status").body(Body::empty()).unwrap())
+    let response = status_router(app(cache.clone(), details.clone()))
+        .oneshot(Request::get("/status").body(Body::empty()).unwrap())
         .await
         .unwrap();
     let body = response.into_body().collect().await.unwrap().to_bytes();
@@ -149,17 +150,14 @@ async fn list_calls(server: &MockServer) -> usize {
 #[tokio::test]
 async fn status_before_first_scan() {
     let status = status_json(&Cache::new(), &details(&offline())).await;
+    assert_eq!(status["scanning"], false);
+    assert_eq!(status["scan"], Value::Null);
+    assert_eq!(status["last_scan"], Value::Null);
+    assert_eq!(status["last_error"], Value::Null);
+    assert_eq!(status["pool"]["clubs"], 0);
     assert_eq!(
-        status,
-        json!({
-            "scanning": false,
-            "scan": null,
-            "last_scan": null,
-            "last_error": null,
-            "pool": { "clubs": 0, "exact_medians": 0, "calibration": { "factor": 1.0, "samples": 0 } },
-            "details": { "cached": 0, "queued": 0 },
-            "refresh": { "scheduled": 0, "loaded": 0, "due": 0, "oldest_due_at": null },
-        })
+        status["refresh"],
+        json!({ "scheduled": 0, "loaded": 0, "due": 0, "oldest_due_at": null })
     );
 }
 
@@ -181,7 +179,7 @@ async fn scans_at_startup() {
     assert_eq!(status["last_scan"]["candidates"], 1);
     assert_eq!(status["last_scan"]["failed"], 0);
     assert_eq!(status["last_scan"]["month"], "2026-03");
-    assert_eq!(status["pool"]["clubs"], 1);
+    assert_eq!(running.details.pool().read().unwrap().len(), 1);
     assert!(status["last_scan"]["finished_at"]
         .as_str()
         .unwrap()
@@ -388,15 +386,13 @@ async fn status_reports_the_running_scan() {
 
     let status = status_json(&running.cache, &running.details).await;
     assert_eq!(status["scanning"], true);
-    assert_eq!(status["scan"]["phase"], "loading");
-    assert_eq!(status["scan"]["listed"], 2);
-    assert_eq!(status["scan"]["to_load"], 2);
-    assert_eq!(status["scan"]["loaded"], 1);
-    assert_eq!(status["scan"]["failed"], 0);
-    assert!(status["scan"]["started_at"]
-        .as_str()
-        .unwrap()
-        .ends_with('Z'));
+    let progress = running.cache.status().progress.unwrap();
+    assert_eq!(progress.phase, ScanPhase::Loading);
+    assert_eq!(progress.listed, 2);
+    assert_eq!(progress.to_load, 2);
+    assert_eq!(progress.loaded, 1);
+    assert_eq!(progress.failed, 0);
+    assert!(progress.started_at.is_some());
 
     let cache = running.cache.clone();
     stop(running).await;

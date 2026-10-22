@@ -6,10 +6,8 @@ import {
   ApiError,
   DEFAULT_TIMEOUT_MS,
   fetchRecommendations,
-  fetchStatus,
   recommendationParams,
   type Recommendations,
-  type Status,
 } from './api';
 
 const recommendations: Recommendations = {
@@ -182,7 +180,9 @@ function hangingFetch() {
 describe('timeouts and cancellation', () => {
   it('times out after the default timeout', async () => {
     vi.useFakeTimers();
-    const pending = rejection(fetchStatus({ fetch: hangingFetch() }));
+    const pending = rejection(
+      fetchRecommendations({ source: { pace: 5_000_000 } }, { fetch: hangingFetch() }),
+    );
     await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS);
     const error = await pending;
     expect(error.kind).toBe('timeout');
@@ -190,14 +190,22 @@ describe('timeouts and cancellation', () => {
 
   it('honours a custom timeout', async () => {
     vi.useFakeTimers();
-    const pending = rejection(fetchStatus({ fetch: hangingFetch(), timeoutMs: 100 }));
+    const pending = rejection(
+      fetchRecommendations(
+        { source: { pace: 5_000_000 } },
+        { fetch: hangingFetch(), timeoutMs: 100 },
+      ),
+    );
     await vi.advanceTimersByTimeAsync(100);
     expect((await pending).kind).toBe('timeout');
   });
 
   it('passes a caller abort through unchanged', async () => {
     const controller = new AbortController();
-    const pending = fetchStatus({ fetch: hangingFetch(), signal: controller.signal });
+    const pending = fetchRecommendations(
+      { source: { pace: 5_000_000 } },
+      { fetch: hangingFetch(), signal: controller.signal },
+    );
     controller.abort();
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
   });
@@ -206,22 +214,14 @@ describe('timeouts and cancellation', () => {
     const controller = new AbortController();
     controller.abort();
     const fetchFn = hangingFetch();
-    await expect(fetchStatus({ fetch: fetchFn, signal: controller.signal })).rejects.toMatchObject({
+    await expect(
+      fetchRecommendations(
+        { source: { pace: 5_000_000 } },
+        { fetch: fetchFn, signal: controller.signal },
+      ),
+    ).rejects.toMatchObject({
       name: 'AbortError',
     });
     expect(fetchFn).not.toHaveBeenCalled();
-  });
-});
-
-describe('fetchStatus', () => {
-  it('requests and parses the status', async () => {
-    const status: Status = {
-      scanning: false,
-      last_scan: { finished_at: '2026-03-18T09:00:00Z', clubs: 80, candidates: 214, failed: 0 },
-      last_error: null,
-    };
-    const fetch = fetchReturning(json(status));
-    expect(await fetchStatus({ fetch })).toEqual(status);
-    expect(fetch).toHaveBeenCalledWith('/api/v1/status', expect.anything());
   });
 });

@@ -208,14 +208,25 @@ async fn trusted_forwarded_for_uses_the_rightmost_address() {
 }
 
 #[tokio::test]
-async fn health_and_status_are_not_limited() {
+async fn health_is_not_limited() {
     let app = offline(RateLimits::new(1, 1, false));
-    for path in ["/api/v1/health", "/api/v1/status"] {
-        for _ in 0..3 {
-            let (status, _, _) = Call::to(path).from("203.0.113.1:5000").send(&app).await;
-            assert_eq!(status, StatusCode::OK, "{path}");
-        }
+    for _ in 0..3 {
+        let (status, _, _) = Call::to("/api/v1/health")
+            .from("203.0.113.1:5000")
+            .send(&app)
+            .await;
+        assert_eq!(status, StatusCode::OK);
     }
+}
+
+#[tokio::test]
+async fn there_is_no_public_status() {
+    let app = offline(RateLimits::new(10, 10, false));
+    let (status, _, _) = Call::to("/api/v1/status")
+        .from("203.0.113.1:5000")
+        .send(&app)
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 fn series(pace: i64) -> Vec<i64> {

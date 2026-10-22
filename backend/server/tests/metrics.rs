@@ -180,6 +180,28 @@ async fn the_metrics_route_reports_the_pool_and_caches() {
 }
 
 #[tokio::test]
+async fn the_metrics_address_also_serves_the_full_status() {
+    let response = metrics_router(handle().clone(), state())
+        .oneshot(Request::get("/status").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let status: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    for key in [
+        "scanning",
+        "scan",
+        "last_scan",
+        "last_error",
+        "pool",
+        "details",
+        "refresh",
+    ] {
+        assert!(status.get(key).is_some(), "missing {key}");
+    }
+}
+
+#[tokio::test]
 async fn club_details_are_counted_by_source() {
     let handle = handle();
     let server = MockServer::start().await;

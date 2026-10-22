@@ -37,7 +37,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `FRONTEND_DIR` | none | Built frontend to serve, such as `frontend/dist`. Unset, the server serves only the API |
 | `REDIS_URL` | none | A `redis://` or `rediss://` URL to share club details, trainer paces and scans with other instances. Unset, everything stays in this instance's memory. See [Shared cache](#shared-cache) |
 | `REDIS_KEY_SECRET` | none | Required with `REDIS_URL`: at least 32 characters, the same on every instance. Keys the hash that replaces trainer IDs in Redis |
-| `METRICS_ADDR` | none | IP address and port to serve Prometheus metrics on, such as `127.0.0.1:9464`. Unset, no metrics are recorded. See [Metrics](#metrics) |
+| `METRICS_ADDR` | none | IP address and port to serve Prometheus metrics and the full [status](#status) on, such as `127.0.0.1:9464`. Unset, no metrics are recorded. See [Metrics](#metrics) |
 
 Blank values count as unset. These stop the server at startup, with an error message and exit code 1:
 
@@ -211,7 +211,7 @@ With Redis, instances that have the same `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `S
 
 - **Lock.** It lasts 60 seconds and is renewed every 20 seconds while scanning. Shutdown releases it; if an instance crashes, another takes over within 60 seconds.
 - **Publishing.** After listing and scheduling the clubs, the leader publishes them and marks them current until the next scan is due: 30 minutes after uma.moe's next update, or for one `SCAN_INTERVAL_MINUTES` when set. It keeps them for twice that. The others build their pool from those rows and load club details from Redis, so they barely call uma.moe. An instance that starts later loads the published scan straight away.
-- **Resuming.** As soon as the leader has listed the clubs, it saves the list in Redis with when it was listed. An instance that takes the lock later, after a restart, redeploy or crash, continues that scan instead of listing again, if the list is less than `SCAN_INTERVAL_MINUTES` old (180 minutes when unset) and from the current game month (counting the [early-month](#early-in-the-month) switch). The resumed scan keeps its original start time in `/api/v1/status` and the metrics. Publishing the finished scan deletes the saved list.
+- **Resuming.** As soon as the leader has listed the clubs, it saves the list in Redis with when it was listed. An instance that takes the lock later, after a restart, redeploy or crash, continues that scan instead of listing again, if the list is less than `SCAN_INTERVAL_MINUTES` old (180 minutes when unset) and from the current game month (counting the [early-month](#early-in-the-month) switch). The resumed scan keeps its original start time in [`/status`](#status) and the metrics. Publishing the finished scan deletes the saved list.
 - **Failures.** A failed scan is published too: every instance records the same error, keeps its last results, and waits until the next scan is due.
 - **Missing data.** If a scan is marked current but its rows are gone from Redis, the instance scans on its own.
 
@@ -287,69 +287,9 @@ All endpoints are under `/api/v1`.
 | Method | Path | Response |
 |---|---|---|
 | `GET` | `/api/v1/health` | `200 {"status":"ok"}` |
-| `GET` | `/api/v1/status` | `200` with the scan state, below |
 | `GET` | `/api/v1/recommendations` | Ranked clubs for a trainer or a pace, below |
 
-`/api/v1/status` looks like this:
-
-```json
-{
-  "scanning": false,
-  "scan": null,
-  "last_scan": {
-    "finished_at": "2026-03-18T09:00:00Z",
-    "clubs": 152,
-    "candidates": 152,
-    "failed": 0,
-    "month": "2026-03"
-  },
-  "last_error": null,
-  "pool": { "clubs": 152, "exact_medians": 152, "calibration": { "factor": 0.86, "samples": 152 } },
-  "details": { "cached": 152, "queued": 0 },
-  "refresh": { "scheduled": 152, "loaded": 152, "due": 0, "oldest_due_at": null }
-}
-```
-
-| Field | Meaning |
-|---|---|
-| `scanning` | Whether a scan is running. With Redis, also while waiting for another instance's scan |
-| `scan` | The running scan's progress, or `null` when no scan is running. See below |
-| `last_scan.clubs` | Clubs whose member data was already loaded when the scan finished listing |
-| `last_scan.candidates` | Clubs in the pool after the scan's filters |
-| `last_scan.month` | Game month of the listed data, `YYYY-MM` |
-| `pool.clubs` | Clubs in the current pool |
-| `pool.exact_medians` | Pool clubs whose exact median is known from loaded details |
-| `pool.calibration` | The mean-to-median factor and how many clubs it's based on |
-| `details.cached` | Clubs in the detail cache (approximate) |
-| `details.queued` | Clubs waiting for a background load |
-| `refresh.scheduled` | Clubs on the [refresh](#refresher) schedule |
-| `refresh.loaded` | Scheduled clubs whose details are stored: in Redis with Redis, otherwise in this instance's memory |
-| `refresh.due` | Scheduled clubs due for a refresh now. It jumps after uma.moe's daily update, then falls as the refresher catches up |
-| `refresh.oldest_due_at` | When the longest-waiting due club became due, or `null` when none are due |
-
-While a scan runs, `scan` looks like this:
-
-```json
-"scan": { "phase": "loading", "started_at": "2026-03-18T08:58:00Z", "listed": 152, "to_load": 152, "loaded": 40, "failed": 0 }
-```
-
-| Field | Meaning |
-|---|---|
-| `scan.phase` | `listing` clubs, `loading` club details, or `waiting` for another instance's scan (with Redis) |
-| `scan.started_at` | When the scan started. A [resumed scan](#shared-scans) keeps its original start; a waiting instance shows the leader's once it has the saved club list, and `null` before that |
-| `scan.listed` | Clubs in the rank window listed so far |
-| `scan.to_load`, `scan.loaded`, `scan.failed` | Clubs whose details the scan loads, has loaded, and failed to load. A resumed scan counts again from 0, quickly passing clubs already in Redis |
-
-`last_scan` is `null` until the first scan succeeds. `last_error` holds `{ "at", "message" }` for a failure since the last success. Times are RFC 3339 in UTC.
-
-`message` is short and safe to show publicly. It never includes request URLs or text from uma.moe's error responses. The full error goes to the server log.
-
-| Message | Cause |
-|---|---|
-| `listing clubs failed: uma.moe returned 503 Service Unavailable` | uma.moe answered with an error status (the status varies) |
-| `listing clubs failed: could not reach uma.moe` | Timeout or connection error |
-| `listing clubs failed: unexpected response from uma.moe` | The response wasn't the expected JSON |
-| `listing clubs failed: internal error` | A problem in the server itself |
+There's no public status endpoint. The page takes the data's age from each search's `updated_at`, and the full scan state is served privately at [`/status`](#status), next to the metrics.
 
 ### Recommendations
 
@@ -495,7 +435,7 @@ At `info`, logs hold no trainer IDs or IP addresses. Keep `RUST_LOG` at `info` w
 
 With `METRICS_ADDR` set, the server records metrics and serves them in the Prometheus text format at `GET /metrics`, on that address only. The app's port never serves them. Unset, nothing is recorded.
 
-Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, set `METRICS_PORT` in `.env` instead: the container listens on `0.0.0.0:9464` and Compose publishes it to `127.0.0.1:<METRICS_PORT>` only. On Fly.io, `fly.toml` uses `0.0.0.0:9464`, which only Fly's private network and its metrics scraper can reach. Labels never include trainer IDs or IP addresses. Routes are labelled by their pattern, such as `/api/v1/recommendations`; paths that match no route are labelled `/api (unknown)` or `frontend`.
+Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, set `METRICS_PORT` in `.env` instead: the container listens on `0.0.0.0:9464` and Compose publishes it to `127.0.0.1:<METRICS_PORT>` only. On Fly.io, `fly.toml` uses `[::]:9464`, which only Fly's private network, its metrics scraper and `fly proxy` can reach. Labels never include trainer IDs or IP addresses. Routes are labelled by their pattern, such as `/api/v1/recommendations`; paths that match no route are labelled `/api (unknown)` or `frontend`.
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
@@ -530,6 +470,77 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 `scan_last_success_timestamp_seconds` and the `pool_*`, `detail_*` and `refresh_*` values are read from the server each time `/metrics` is requested. With Redis, the `refresh_*` values come from one script over the shared schedule, so every instance reports the same; the detail cache settles its pending work first, so `detail_cache_clubs` is exact. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
 
 To watch these on a dashboard, [observability/README.md](../../observability/README.md) sets up Prometheus and Grafana locally, with a ready-made dashboard.
+
+## Status
+
+With `METRICS_ADDR` set, the metrics address also serves `GET /status`: the scan, the club pool, the caches and the refresh schedule, as JSON. Like `/metrics`, it's never on the app's port. Each request counts the refresh schedule in Redis, so keep the address private. On Fly.io, reach it through the private network:
+
+```bash
+fly proxy 9464 -a uma-stable-match
+```
+
+Then open <http://localhost:9464/status>.
+
+`GET /status` looks like this:
+
+```json
+{
+  "scanning": false,
+  "scan": null,
+  "last_scan": {
+    "finished_at": "2026-03-18T09:00:00Z",
+    "clubs": 152,
+    "candidates": 152,
+    "failed": 0,
+    "month": "2026-03"
+  },
+  "last_error": null,
+  "pool": { "clubs": 152, "exact_medians": 152, "calibration": { "factor": 0.86, "samples": 152 } },
+  "details": { "cached": 152, "queued": 0 },
+  "refresh": { "scheduled": 152, "loaded": 152, "due": 0, "oldest_due_at": null }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `scanning` | Whether a scan is running. With Redis, also while waiting for another instance's scan |
+| `scan` | The running scan's progress, or `null` when no scan is running. See below |
+| `last_scan.clubs` | Clubs whose member data was already loaded when the scan finished listing |
+| `last_scan.candidates` | Clubs in the pool after the scan's filters |
+| `last_scan.month` | Game month of the listed data, `YYYY-MM` |
+| `pool.clubs` | Clubs in the current pool |
+| `pool.exact_medians` | Pool clubs whose exact median is known from loaded details |
+| `pool.calibration` | The mean-to-median factor and how many clubs it's based on |
+| `details.cached` | Clubs in the detail cache (approximate) |
+| `details.queued` | Clubs waiting for a background load |
+| `refresh.scheduled` | Clubs on the [refresh](#refresher) schedule |
+| `refresh.loaded` | Scheduled clubs whose details are stored: in Redis with Redis, otherwise in this instance's memory |
+| `refresh.due` | Scheduled clubs due for a refresh now. It jumps after uma.moe's daily update, then falls as the refresher catches up |
+| `refresh.oldest_due_at` | When the longest-waiting due club became due, or `null` when none are due |
+
+While a scan runs, `scan` looks like this:
+
+```json
+"scan": { "phase": "loading", "started_at": "2026-03-18T08:58:00Z", "listed": 152, "to_load": 152, "loaded": 40, "failed": 0 }
+```
+
+| Field | Meaning |
+|---|---|
+| `scan.phase` | `listing` clubs, `loading` club details, or `waiting` for another instance's scan (with Redis) |
+| `scan.started_at` | When the scan started. A [resumed scan](#shared-scans) keeps its original start; a waiting instance shows the leader's once it has the saved club list, and `null` before that |
+| `scan.listed` | Clubs in the rank window listed so far |
+| `scan.to_load`, `scan.loaded`, `scan.failed` | Clubs whose details the scan loads, has loaded, and failed to load. A resumed scan counts again from 0, quickly passing clubs already in Redis |
+
+`last_scan` is `null` until the first scan succeeds. `last_error` holds `{ "at", "message" }` for a failure since the last success. Times are RFC 3339 in UTC.
+
+`message` is short. It never includes request URLs or text from uma.moe's error responses. The full error goes to the server log.
+
+| Message | Cause |
+|---|---|
+| `listing clubs failed: uma.moe returned 503 Service Unavailable` | uma.moe answered with an error status (the status varies) |
+| `listing clubs failed: could not reach uma.moe` | Timeout or connection error |
+| `listing clubs failed: unexpected response from uma.moe` | The response wasn't the expected JSON |
+| `listing clubs failed: internal error` | A problem in the server itself |
 
 ## Shutdown
 
