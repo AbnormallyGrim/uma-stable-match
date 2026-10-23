@@ -44,3 +44,24 @@ async fn slow_requests_time_out_with_a_json_error() {
     );
     assert_eq!(started.elapsed(), REQUEST_TIMEOUT);
 }
+
+#[tokio::test]
+async fn panicking_requests_get_a_json_500() {
+    let router = Router::new()
+        .route(
+            "/",
+            get(|| async {
+                if true {
+                    panic!("made-up failure");
+                }
+                "unreachable"
+            }),
+        )
+        .layer(CatchPanicLayer::custom(panic_response));
+    let (status, body) = call(router).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(
+        serde_json::from_str::<Value>(&body).unwrap(),
+        json!({ "error": "internal error" })
+    );
+}

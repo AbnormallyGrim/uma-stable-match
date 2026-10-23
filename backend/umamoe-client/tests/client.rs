@@ -613,3 +613,33 @@ async fn requests_with_a_max_pause_are_not_sent_during_a_longer_pause() {
         .unwrap_err();
     assert!(matches!(error, Error::RateLimited { retry_in } if retry_in > Duration::from_secs(50)));
 }
+
+#[tokio::test]
+async fn errors_say_where_they_came_from() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(ResponseTemplate::new(503))
+        .mount(&server)
+        .await;
+    let umamoe = client(&server)
+        .circle(&CircleRequest::by_circle_id(1))
+        .await
+        .unwrap_err();
+    assert_eq!(umamoe.origin(), "umamoe");
+
+    let unreachable = Client::new(ClientConfig {
+        base_url: "http://127.0.0.1:9".into(),
+        ..config(&server)
+    })
+    .unwrap()
+    .circle(&CircleRequest::by_circle_id(1))
+    .await
+    .unwrap_err();
+    assert_eq!(unreachable.origin(), "network");
+
+    let invalid = client(&server)
+        .circle(&CircleRequest::by_circle_id(1).for_month(2026, 13))
+        .await
+        .unwrap_err();
+    assert_eq!(invalid.origin(), "server");
+}

@@ -12,6 +12,8 @@ primary_region = "iad"
   # JSON lines for a log search service. Keep RUST_LOG at info so logs hold no trainer IDs.
   LOG_FORMAT = "json"
   RUST_LOG = "info"
+  # Captures a stack trace when an uma.moe request fails, for the "uma.moe request failed" log line.
+  RUST_LIB_BACKTRACE = "1"
   # Fly's proxy adds each visitor's address as the right-most X-Forwarded-For entry.
   TRUST_FORWARDED_FOR = "true"
   # Only Fly's private network can reach this port; [http_service] publishes 8080 alone.

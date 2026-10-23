@@ -1,5 +1,6 @@
 //! The API client.
 
+use std::backtrace::Backtrace;
 use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -120,6 +121,45 @@ impl Client {
         T: DeserializeOwned,
         Q: Serialize + ?Sized,
     {
+        let mut attempts = 0;
+        let result = self.send(path, query, &mut attempts).await;
+        if let Err(error) = &result {
+            self.log_failure(path, attempts, error);
+        }
+        result
+    }
+
+    // One warning per failed call, after any retries, with a stack trace of the caller. 404s are
+    // normal answers ("no such club or trainer"), so they aren't logged.
+    fn log_failure(&self, path: &str, attempts: u32, error: &Error) {
+        if error.status() == Some(StatusCode::NOT_FOUND) {
+            return;
+        }
+        let umamoe_error = match error {
+            Error::Status {
+                body: Some(body), ..
+            } => Some(body.error.as_str()),
+            _ => None,
+        };
+        tracing::warn!(
+            endpoint = path,
+            lane = lane_label(self.priority),
+            origin = error.origin(),
+            status = error.status().map(|status| status.as_u16()),
+            umamoe_error,
+            attempts,
+            error = %error,
+            cause = std::error::Error::source(error).map(|source| source.to_string()),
+            backtrace = %Backtrace::capture(),
+            "uma.moe request failed"
+        );
+    }
+
+    async fn send<T, Q>(&self, path: &str, query: &Q, attempts: &mut u32) -> Result<T, Error>
+    where
+        T: DeserializeOwned,
+        Q: Serialize + ?Sized,
+    {
         let url = format!("{}{path}", self.base_url);
         let lane = lane_label(self.priority);
         let max_pause = self.max_pause;
@@ -132,6 +172,7 @@ impl Client {
             if let Err(retry_in) = acquired {
                 return Err(Error::RateLimited { retry_in });
             }
+            *attempts += 1;
             let started = Instant::now();
             let result = self
                 .http
