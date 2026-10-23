@@ -180,6 +180,7 @@ async fn failed_umamoe_requests_are_logged_once_with_their_origin() {
     let line = &failures[0];
     assert_eq!(line["level"], "WARN");
     assert_eq!(line["endpoint"], "/api/v4/circles");
+    assert_eq!(line["query"], "circle_id=1");
     assert_eq!(line["origin"], "umamoe");
     assert_eq!(line["status"], 500);
     assert_eq!(line["umamoe_error"], "database unavailable");

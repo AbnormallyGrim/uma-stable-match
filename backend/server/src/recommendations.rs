@@ -2,9 +2,10 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use axum::extract::rejection::QueryRejection;
-use axum::extract::{Query, State};
+use axum::extract::{Query, RawQuery, State};
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -120,7 +121,63 @@ struct BalanceView {
     top3_share: f64,
 }
 
+/// `GET /api/v1/recommendations`: runs [`search`] and logs it.
 pub(crate) async fn recommendations(
+    state: State<AppState>,
+    visitor: Extension<Visitor>,
+    RawQuery(query): RawQuery,
+    params: Result<Query<Params>, QueryRejection>,
+) -> Result<Json<Recommendations>, ApiError> {
+    let started = Instant::now();
+    let result = search(state, visitor, params).await;
+    log_search(query.as_deref(), &result, started.elapsed());
+    result
+}
+
+/// Logs one line per search with its query string and outcome, so it can be found and rerun.
+fn log_search(
+    query: Option<&str>,
+    result: &Result<Json<Recommendations>, ApiError>,
+    took: Duration,
+) {
+    let duration_ms = u64::try_from(took.as_millis()).unwrap_or(u64::MAX);
+    match result {
+        Ok(Json(found)) => {
+            let top_clubs: Vec<u64> = found.clubs.iter().take(10).map(|c| c.circle_id).collect();
+            tracing::info!(
+                query,
+                status = 200,
+                trainer_id = found.trainer.trainer_id,
+                pace_per_day = found.trainer.pace_per_day,
+                month = found.month.as_deref(),
+                shortlisted = found.coverage.shortlisted,
+                scored = found.coverage.scored,
+                pending = found.coverage.pending,
+                total = found.total,
+                top_clubs = ?top_clubs,
+                duration_ms,
+                "search"
+            );
+        }
+        Err(error) if error.status.is_server_error() => tracing::warn!(
+            query,
+            status = error.status.as_u16(),
+            error = %error.message,
+            duration_ms,
+            "search failed"
+        ),
+        Err(error) => tracing::info!(
+            query,
+            status = error.status.as_u16(),
+            error = %error.message,
+            duration_ms,
+            "search failed"
+        ),
+    }
+}
+
+/// Answers `GET /api/v1/recommendations`; [`recommendations`] wraps it to log the search.
+async fn search(
     State(state): State<AppState>,
     Extension(visitor): Extension<Visitor>,
     params: Result<Query<Params>, QueryRejection>,

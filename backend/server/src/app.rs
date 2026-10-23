@@ -73,14 +73,15 @@ fn panic_response(_: Box<dyn std::any::Any + Send>) -> Response {
 
 /// Answers 504 with a JSON error if the request runs longer than [`REQUEST_TIMEOUT`].
 async fn time_limit(request: Request, next: Next) -> Response {
-    match tokio::time::timeout(REQUEST_TIMEOUT, next.run(request)).await {
-        Ok(response) => response,
-        Err(_) => ApiError::new(
-            StatusCode::GATEWAY_TIMEOUT,
-            "the request took too long; try again",
-        )
-        .into_response(),
-    }
+    tokio::time::timeout(REQUEST_TIMEOUT, next.run(request))
+        .await
+        .unwrap_or_else(|_| {
+            ApiError::new(
+                StatusCode::GATEWAY_TIMEOUT,
+                "the request took too long; try again",
+            )
+            .into_response()
+        })
 }
 
 async fn api_not_found() -> impl IntoResponse {
