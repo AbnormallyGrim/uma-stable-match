@@ -6,10 +6,11 @@ use std::time::{Duration, Instant};
 
 use uma_stable_match_scoring::daily_pace;
 use uma_stable_match_umamoe_client::{
-    CircleRequest, CircleResponse, Client, Error, RankingsGainsRequest, StatusCode,
+    CircleRequest, CircleResponse, Client, Error, Priority, RankingsGainsRequest,
+    RankingsMonthlyRequest, StatusCode,
 };
 
-use crate::details::VISITOR_MAX_PAUSE;
+use crate::details::{ClubDetails, VISITOR_MAX_PAUSE};
 use crate::pool::Period;
 use crate::shared::SharedCache;
 
@@ -56,6 +57,7 @@ pub struct PaceLookup {
     ttl: Duration,
     entries: Arc<Mutex<Entries>>,
     shared: SharedCache,
+    details: Option<ClubDetails>,
 }
 
 impl PaceLookup {
@@ -66,12 +68,21 @@ impl PaceLookup {
             ttl,
             entries: Arc::default(),
             shared: SharedCache::none(),
+            details: None,
         }
     }
 
     /// Checks `shared` before uma.moe, and stores each result in it.
     pub fn with_shared(self, shared: SharedCache) -> Self {
         Self { shared, ..self }
+    }
+
+    /// Reads trainers' clubs through `details`, so cached clubs don't need another uma.moe call.
+    pub fn with_details(self, details: ClubDetails) -> Self {
+        Self {
+            details: Some(details),
+            ..self
+        }
     }
 
     /// The trainer's daily fan gain this month, or in `period` if given. For a given period it
@@ -90,13 +101,7 @@ impl PaceLookup {
             return outcome.into_result();
         }
 
-        let outcome = match period {
-            None => {
-                self.lookup_club(CircleRequest::by_viewer_id(viewer_id), viewer_id)
-                    .await
-            }
-            Some(period) => self.lookup_last_month(viewer_id, period).await,
-        };
+        let outcome = self.lookup(viewer_id, period).await;
         count_pace(if outcome.is_ok() { "umamoe" } else { "error" });
         let outcome = outcome?;
         self.store(viewer_id, period, outcome);
@@ -124,16 +129,90 @@ impl PaceLookup {
         }
     }
 
-    async fn lookup_last_month(
+    async fn lookup(&self, viewer_id: u64, period: Option<Period>) -> Result<Outcome, PaceError> {
+        let ranked = match self.ranked_club(viewer_id, period).await {
+            Some(circle_id) => self.pace_in_club(circle_id, viewer_id, period).await,
+            None => Outcome::NotFound,
+        };
+        let outcome = if ranked == Outcome::NotFound {
+            let mut request = CircleRequest::by_viewer_id(viewer_id);
+            if let Some((year, month)) = period {
+                request = request.for_month(year, month);
+            }
+            self.lookup_club(request, viewer_id).await?
+        } else {
+            ranked
+        };
+        match period {
+            Some(_) if !matches!(outcome, Outcome::Pace(_)) => {
+                self.seven_day_gains(viewer_id, outcome).await
+            }
+            _ => Ok(outcome),
+        }
+    }
+
+    async fn ranked_club(&self, viewer_id: u64, period: Option<Period>) -> Option<u64> {
+        let mut request = RankingsMonthlyRequest::for_viewer(viewer_id);
+        if let Some((year, month)) = period {
+            request = request.for_month(year, month);
+        }
+        match self.client.rankings_monthly(&request).await {
+            Ok(rankings) => rankings.viewer(viewer_id).and_then(|row| row.circle_id),
+            Err(error) if error.status() == Some(StatusCode::NOT_FOUND) => None,
+            Err(error) => {
+                tracing::warn!(status = ?error.status(), "trainer club lookup failed");
+                None
+            }
+        }
+    }
+
+    async fn pace_in_club(
+        &self,
+        circle_id: u64,
+        viewer_id: u64,
+        period: Option<Period>,
+    ) -> Outcome {
+        let result = match &self.details {
+            Some(details) if details.period() == period => details
+                .get(circle_id, Priority::Interactive)
+                .await
+                .map(|club| {
+                    pace_of(
+                        club.members.iter().map(|m| {
+                            (
+                                m.viewer_id,
+                                m.year,
+                                m.month.and_then(|n| i32::try_from(n).ok()),
+                                m.daily_fans.as_slice(),
+                            )
+                        }),
+                        viewer_id,
+                    )
+                })
+                .map_err(|error| error.status()),
+            _ => {
+                let mut request = CircleRequest::by_circle_id(circle_id);
+                if let Some((year, month)) = period {
+                    request = request.for_month(year, month);
+                }
+                self.client
+                    .circle(&request)
+                    .await
+                    .map(|response| pace_from_response(&response, viewer_id))
+                    .map_err(|error| error.status())
+            }
+        };
+        result.unwrap_or_else(|status| {
+            tracing::warn!(?status, "trainer club details lookup failed");
+            Outcome::NotFound
+        })
+    }
+
+    async fn seven_day_gains(
         &self,
         viewer_id: u64,
-        (year, month): Period,
+        outcome: Outcome,
     ) -> Result<Outcome, PaceError> {
-        let request = CircleRequest::by_viewer_id(viewer_id).for_month(year, month);
-        let outcome = self.lookup_club(request, viewer_id).await?;
-        if matches!(outcome, Outcome::Pace(_)) {
-            return Ok(outcome);
-        }
         let gains = match self
             .client
             .rankings_gains(&RankingsGainsRequest::for_viewer(viewer_id))
@@ -172,14 +251,25 @@ fn count_pace(source: &'static str) {
 }
 
 fn pace_from_response(response: &CircleResponse, viewer_id: u64) -> Outcome {
-    let snapshot = response
-        .members
-        .iter()
-        .filter(|m| m.viewer_id == viewer_id)
-        .max_by_key(|m| (m.year, m.month));
+    pace_of(
+        response
+            .members
+            .iter()
+            .map(|m| (m.viewer_id, m.year, m.month, m.daily_fans.as_slice())),
+        viewer_id,
+    )
+}
+
+fn pace_of<'a>(
+    members: impl Iterator<Item = (u64, Option<i32>, Option<i32>, &'a [i64])>,
+    viewer_id: u64,
+) -> Outcome {
+    let snapshot = members
+        .filter(|(id, ..)| *id == viewer_id)
+        .max_by_key(|(_, year, month, _)| (*year, *month));
     match snapshot {
         None => Outcome::NotFound,
-        Some(member) => match daily_pace(&member.daily_fans) {
+        Some((.., daily_fans)) => match daily_pace(daily_fans) {
             Some(pace) if pace > 0.0 => Outcome::Pace(pace),
             _ => Outcome::NotEnoughData,
         },

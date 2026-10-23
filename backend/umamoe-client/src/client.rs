@@ -13,9 +13,13 @@ use serde::Serialize;
 use crate::config::{ClientConfig, RetryConfig};
 use crate::error::{ApiErrorBody, Error};
 use crate::rate_limit::{Priority, RateLimiter};
-use crate::requests::{CircleRequest, ListCirclesRequest, RankingsGainsRequest};
+use crate::requests::{
+    CircleRequest, ListCirclesRequest, RankingsGainsRequest, RankingsMonthlyRequest,
+};
 use crate::retry;
-use crate::types::{CircleListResponse, CircleResponse, GainsRankingsResponse};
+use crate::types::{
+    CircleListResponse, CircleResponse, GainsRankingsResponse, MonthlyRankingsResponse,
+};
 
 const API_KEY_HEADER: &str = "X-API-Key";
 
@@ -106,6 +110,21 @@ impl Client {
         request: &ListCirclesRequest,
     ) -> Result<CircleListResponse, Error> {
         self.get("/api/v4/circles/list", request).await
+    }
+
+    /// Fetches one page of a month's fan rankings (`GET /api/v4/rankings/monthly`).
+    pub async fn rankings_monthly(
+        &self,
+        request: &RankingsMonthlyRequest,
+    ) -> Result<MonthlyRankingsResponse, Error> {
+        if let Some(month) = request.month {
+            if !(1..=12).contains(&month) {
+                return Err(Error::InvalidRequest(format!(
+                    "month must be 1 to 12, got {month}"
+                )));
+            }
+        }
+        self.get("/api/v4/rankings/monthly", request).await
     }
 
     /// Fetches one page of rolling fan gains (`GET /api/v4/rankings/gains`).

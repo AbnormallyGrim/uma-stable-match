@@ -42,8 +42,9 @@ if let Some(circle) = page.circles.first() {
 | `Client::circle` | `GET /api/v4/circles` | `CircleResponse`: a club, its members' daily fans and its tier |
 | `Client::list_circles` | `GET /api/v4/circles/list` | `CircleListResponse`: one page of clubs, without members or tier |
 | `Client::rankings_gains` | `GET /api/v4/rankings/gains` | `GainsRankingsResponse`: one page of trainers' fan gains over the last 3, 7 and 30 days |
+| `Client::rankings_monthly` | `GET /api/v4/rankings/monthly` | `MonthlyRankingsResponse`: one page of a month's fan rankings, with each trainer's club that month |
 
-`CircleRequest` looks a club up by `circle_id` or by a member's `viewer_id`. Without `for_month`, the API returns the current game month, which starts on the 2nd (JST). A month outside 1 to 12 is rejected before any request is sent.
+`CircleRequest` looks a club up by `circle_id` or by a member's `viewer_id`. A `viewer_id` lookup returns the trainer's oldest club in uma.moe's records once they've changed clubs, so it can miss their current club; `rankings_monthly` gives the club for a given month. Without `for_month`, the API returns the current game month, which starts on the 2nd (JST). A month outside 1 to 12 is rejected before any request is sent.
 
 `ListCirclesRequest` filters by name, minimum members and worst monthly rank, and sorts by name, member count, monthly rank or monthly points. Fields left as `None` aren't sent, so the API's defaults apply. Pages start at 0: use `has_next_page` on the response and `ListCirclesRequest::page` to walk them.
 
@@ -61,6 +62,8 @@ let me = response.viewer(100000001).unwrap();
 assert_eq!(me.gain_7d, Some(14_000_000));
 ```
 
+`RankingsMonthlyRequest` works the same way for one month: `for_viewer` searches for a trainer ID, `for_month` picks the month (the current one by default), and `MonthlyRankingsResponse::viewer` picks the exact trainer. Its `circle_id` is the club the trainer was in that month. A month outside 1 to 12 is rejected before any request is sent.
+
 ## Response types
 
 | Type | Endpoint |
@@ -68,6 +71,7 @@ assert_eq!(me.gain_7d, Some(14_000_000));
 | `CircleResponse` | `GET /api/v4/circles`: a club, its members' daily fans and its tier |
 | `CircleListResponse` | `GET /api/v4/circles/list`: one page of clubs, without members or tier |
 | `GainsRankingsResponse` | `GET /api/v4/rankings/gains`: one page of `GainsRanking` rows |
+| `MonthlyRankingsResponse` | `GET /api/v4/rankings/monthly`: one page of `MonthlyRanking` rows |
 
 The types follow the uma.moe OpenAPI schema but are lenient. Missing fields take their default, `null` becomes `None`, and unknown fields are ignored. Timestamps are kept as ISO 8601 strings.
 

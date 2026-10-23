@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use uma_stable_match_scoring::{Club, JoinStyle};
 use uma_stable_match_umamoe_client::{
     ApiKey, CircleRequest, CircleSort, Client, ClientConfig, Error, GainsSort, ListCirclesRequest,
-    Priority, RankingsGainsRequest, RetryConfig, SortDir, StatusCode,
+    Priority, RankingsGainsRequest, RankingsMonthlyRequest, RetryConfig, SortDir, StatusCode,
 };
 use wiremock::matchers::{header, method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -642,4 +642,45 @@ async fn errors_say_where_they_came_from() {
         .await
         .unwrap_err();
     assert_eq!(invalid.origin(), "server");
+}
+
+#[tokio::test]
+async fn fetches_monthly_rankings_for_a_trainer() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/v4/rankings/monthly"))
+        .and(query_param("query", "123456789"))
+        .and(query_param("year", "2026"))
+        .and(query_param("month", "2"))
+        .and(header("x-api-key", KEY))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "rankings": [
+                { "viewer_id": 1234567890, "circle_id": 5 },
+                { "viewer_id": 123456789, "circle_id": 9, "circle_name": "Example Club" }
+            ],
+            "total": 2, "page": 0, "limit": 100, "total_pages": 1, "year": 2026, "month": 2
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let response = client(&server)
+        .rankings_monthly(&RankingsMonthlyRequest::for_viewer(123456789).for_month(2026, 2))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.viewer(123456789).and_then(|r| r.circle_id),
+        Some(9)
+    );
+    assert!(response.viewer(42).is_none());
+}
+
+#[tokio::test]
+async fn monthly_rankings_reject_an_invalid_month() {
+    let server = MockServer::start().await;
+    let error = client(&server)
+        .rankings_monthly(&RankingsMonthlyRequest::for_viewer(1).for_month(2026, 13))
+        .await
+        .unwrap_err();
+    assert!(matches!(error, Error::InvalidRequest(_)));
 }
