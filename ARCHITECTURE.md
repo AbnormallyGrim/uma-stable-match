@@ -94,7 +94,7 @@ The private `/status`, on the metrics address, reports the running scan's phase 
 
 `GET /api/v1/recommendations` goes through the per-visitor rate limiter and a 30-second time limit, then:
 
-1. **Pace:** taken from the request, or looked up from the trainer's club on uma.moe and cached for `TRAINER_CACHE_MINUTES`.
+1. **Pace:** taken from the request, or worked out from the trainer's fans in their club, found through uma.moe's monthly rankings, and cached for `TRAINER_CACHE_MINUTES`.
 2. **Shortlist:** the `SHORTLIST_SIZE` clubs (120) whose estimated median is nearest 0.85 × the pace.
 3. **Load:** every cached club in the pool is used as is. Up to `REQUEST_FETCH_BUDGET` (10) uncached shortlisted clubs are fetched in the **interactive lane** while the visitor waits; the rest are queued for the background loader.
 4. **Score:** every loaded club in the pool is scored with the scoring crate, so results are exact once the cache is warm.

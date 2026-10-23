@@ -180,6 +180,55 @@ impl GainsRankingsResponse {
     }
 }
 
+/// A trainer's fans for one month. Missing fields take their default.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MonthlyRanking {
+    /// Trainer ID.
+    pub viewer_id: u64,
+    /// Trainer name.
+    pub trainer_name: Option<String>,
+    /// Year of the ranking.
+    pub year: Option<i32>,
+    /// Month of the ranking (1–12).
+    pub month: Option<u32>,
+    /// Fans gained that month.
+    pub monthly_gain: Option<i64>,
+    /// Days with fan data that month.
+    pub active_days: Option<i32>,
+    /// The club the trainer was in that month.
+    pub circle_id: Option<u64>,
+    /// That club's name.
+    pub circle_name: Option<String>,
+}
+
+/// Response from `GET /api/v4/rankings/monthly`.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MonthlyRankingsResponse {
+    /// Trainers on this page.
+    pub rankings: Vec<MonthlyRanking>,
+    /// Total matching trainers.
+    pub total: i64,
+    /// Page number (0-indexed).
+    pub page: i64,
+    /// Page size.
+    pub limit: i64,
+    /// Total pages.
+    pub total_pages: i64,
+    /// Year of the rankings.
+    pub year: Option<i32>,
+    /// Month of the rankings (1–12).
+    pub month: Option<u32>,
+}
+
+impl MonthlyRankingsResponse {
+    /// The row for exactly this trainer ID, if it's on this page.
+    pub fn viewer(&self, viewer_id: u64) -> Option<&MonthlyRanking> {
+        self.rankings.iter().find(|r| r.viewer_id == viewer_id)
+    }
+}
+
 impl From<Circle> for Club {
     /// Club details only: no members or tier.
     fn from(c: Circle) -> Self {

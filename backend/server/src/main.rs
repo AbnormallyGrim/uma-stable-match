@@ -130,7 +130,7 @@ async fn main() -> ExitCode {
     }
     let state = AppState {
         cache,
-        paces,
+        paces: paces.with_details(details.clone()),
         limits,
         details,
         matching: config.matching,
