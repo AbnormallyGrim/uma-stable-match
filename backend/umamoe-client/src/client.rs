@@ -143,14 +143,20 @@ impl Client {
         let mut attempts = 0;
         let result = self.send(path, query, &mut attempts).await;
         if let Err(error) = &result {
-            self.log_failure(path, attempts, error);
+            self.log_failure(path, query, attempts, error);
         }
         result
     }
 
     // One warning per failed call, after any retries, with a stack trace of the caller. 404s are
     // normal answers ("no such club or trainer"), so they aren't logged.
-    fn log_failure(&self, path: &str, attempts: u32, error: &Error) {
+    fn log_failure<Q: Serialize + ?Sized>(
+        &self,
+        path: &str,
+        query: &Q,
+        attempts: u32,
+        error: &Error,
+    ) {
         if error.status() == Some(StatusCode::NOT_FOUND) {
             return;
         }
@@ -162,6 +168,7 @@ impl Client {
         };
         tracing::warn!(
             endpoint = path,
+            query = serde_urlencoded::to_string(query).ok(),
             lane = lane_label(self.priority),
             origin = error.origin(),
             status = error.status().map(|status| status.as_u16()),
