@@ -22,6 +22,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `HOST` | `127.0.0.1` | IP address to listen on. Use `0.0.0.0` in a container, or `::` for all IPv6 and IPv4 interfaces |
 | `PORT` | `8080` | Port to listen on |
 | `RUST_LOG` | `info` | Log filter, such as `debug` or `uma_stable_match_server=debug`. At `debug`, the HTTP libraries can log request URLs, which include trainer IDs |
+| `RUST_LIB_BACKTRACE` | none | `1` to capture a stack trace for each failed uma.moe request. See [Logs](#logs) |
 | `LOG_FORMAT` | `text` | `text` for readable lines, or `json` for one JSON object per line, for a log search service. See [Logs](#logs) |
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to scan |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to scan |
@@ -434,11 +435,19 @@ IP addresses are kept in memory only while they're being limited, and they're ne
 
 ## Logs
 
-Logs go to stdout. With `LOG_FORMAT=json`, each line is a JSON object with the timestamp, level, message and module (`target`), plus the event's own fields, such as `circle_id` and `error`:
+Logs go to stdout. With `LOG_FORMAT=json`, each line is a JSON object with the timestamp, level, message, module (`target`) and the source file and line that logged it (`filename`, `line_number`), plus the event's own fields, such as `circle_id` and `error`:
 
 ```json
-{"timestamp":"2026-10-01T09:00:00.000000Z","level":"WARN","message":"club refresh failed; retrying later","circle_id":900000101,"error":"request to uma.moe timed out","target":"uma_stable_match_server::refresher"}
+{"timestamp":"2026-10-01T09:00:00.000000Z","level":"WARN","message":"club refresh failed; retrying later","circle_id":900000101,"origin":"network","error":"request to uma.moe timed out","target":"uma_stable_match_server::refresher","filename":"backend/server/src/refresher.rs","line_number":348}
 ```
+
+### Errors and stack traces
+
+Error lines carry an `origin`: `umamoe` for an error status, rate limit or unexpected response from uma.moe, `network` when no response came back, and `server` for a problem on our side.
+
+- **Failed uma.moe requests.** Each call that fails, after any retries, logs one `uma.moe request failed` warning with the `endpoint`, `lane`, `origin`, HTTP `status`, uma.moe's own message (`umamoe_error`), the number of `attempts`, the `error` and its `cause`, and a `backtrace` showing which code made the call. A 404 isn't logged: it means the club or trainer doesn't exist. The backtrace is only captured with `RUST_LIB_BACKTRACE=1`, which `fly.toml` sets; without it the field reads `disabled backtrace`.
+- **Panics.** A panic logs one `panicked` error with the `panic` message, its `location` and a full `backtrace`, and the request gets `500 {"error":"internal error"}`.
+- **Line numbers.** Release builds keep line tables (`debug = "line-tables-only"` in the workspace `Cargo.toml`), so backtraces show files and lines.
 
 A log search service such as Axiom can then filter by those fields. If a log shipper wraps each line in its own record, as Fly.io's does, the line arrives as a string in `message`; read its fields with `parse_json(message)` in Axiom.
 

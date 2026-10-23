@@ -63,6 +63,15 @@ pub enum ScanError {
 }
 
 impl ScanError {
+    /// Where the error came from, as [`Error::origin`]. A scan published by another instance counts
+    /// as `"server"`.
+    pub(crate) fn origin(&self) -> &'static str {
+        match self {
+            Self::List(error) => error.origin(),
+            Self::Shared(_) => "server",
+        }
+    }
+
     /// A short message that's safe to show visitors: no URLs or upstream error text.
     pub(crate) fn public_message(&self) -> String {
         match self {
@@ -146,7 +155,7 @@ pub(crate) async fn load(
             Err(error) => {
                 failed += 1;
                 cache.update_progress(|p| p.failed = failed);
-                tracing::warn!(circle_id, %error, "skipping club that failed to load");
+                tracing::warn!(circle_id, origin = error.origin(), %error, "skipping club that failed to load");
             }
         }
     }

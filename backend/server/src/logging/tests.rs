@@ -1,6 +1,7 @@
 use super::*;
 use std::io;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 #[derive(Clone, Default)]
 struct Captured(Arc<Mutex<Vec<u8>>>);
@@ -79,4 +80,109 @@ fn text_keeps_readable_lines() {
     assert!(output.contains("INFO"));
     assert!(output.contains("scan finished"));
     assert!(serde_json::from_str::<serde_json::Value>(output.trim()).is_err());
+}
+
+fn json_lines(output: &str) -> Vec<serde_json::Value> {
+    output
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect()
+}
+
+#[test]
+fn json_lines_say_where_they_were_logged() {
+    let output = capture(LogFormat::Json, || tracing::warn!("club refresh failed"));
+    let line = &json_lines(&output)[0];
+    assert!(line["filename"]
+        .as_str()
+        .unwrap()
+        .ends_with("logging/tests.rs"));
+    assert!(line["line_number"].as_u64().unwrap() > 0);
+}
+
+#[test]
+fn panics_are_logged_with_their_location_and_a_backtrace() {
+    let output = capture(LogFormat::Json, || {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(log_panic));
+        let _ = std::panic::catch_unwind(|| panic!("made-up failure"));
+        std::panic::set_hook(previous);
+    });
+    let line = &json_lines(&output)[0];
+    assert_eq!(line["level"], "ERROR");
+    assert_eq!(line["message"], "panicked");
+    assert_eq!(line["origin"], "server");
+    assert_eq!(line["panic"], "made-up failure");
+    assert!(line["location"]
+        .as_str()
+        .unwrap()
+        .contains("logging/tests.rs"));
+    assert!(!line["backtrace"].as_str().unwrap().is_empty());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn failed_umamoe_requests_are_logged_once_with_their_origin() {
+    use uma_stable_match_umamoe_client::{
+        ApiKey, CircleRequest, Client, ClientConfig, RetryConfig,
+    };
+    use wiremock::matchers::{path, query_param};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "1"))
+        .respond_with(
+            ResponseTemplate::new(500).set_body_json(
+                serde_json::json!({ "error": "database unavailable", "status": 500 }),
+            ),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "2"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+    let client = Client::new(ClientConfig {
+        base_url: server.uri(),
+        min_interval: Duration::ZERO,
+        retry: RetryConfig {
+            max_retries: 1,
+            base_delay: Duration::from_millis(1),
+            max_delay: Duration::from_millis(5),
+        },
+        ..ClientConfig::new(ApiKey::new("test-key"))
+    })
+    .unwrap();
+
+    let captured = Captured::default();
+    let _guard = tracing::subscriber::set_default(subscriber(
+        LogFormat::Json,
+        EnvFilter::new("info"),
+        captured.clone(),
+    ));
+    client
+        .circle(&CircleRequest::by_circle_id(1))
+        .await
+        .unwrap_err();
+    client
+        .circle(&CircleRequest::by_circle_id(2))
+        .await
+        .unwrap_err();
+    drop(_guard);
+
+    let output = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
+    let failures: Vec<_> = json_lines(&output)
+        .into_iter()
+        .filter(|line| line["message"] == "uma.moe request failed")
+        .collect();
+    assert_eq!(failures.len(), 1);
+    let line = &failures[0];
+    assert_eq!(line["level"], "WARN");
+    assert_eq!(line["endpoint"], "/api/v4/circles");
+    assert_eq!(line["origin"], "umamoe");
+    assert_eq!(line["status"], 500);
+    assert_eq!(line["umamoe_error"], "database unavailable");
+    assert_eq!(line["attempts"], 2);
+    assert!(line["backtrace"].is_string());
 }

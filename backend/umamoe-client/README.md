@@ -186,6 +186,8 @@ When the response has a `Retry-After` header in seconds, that value is used inst
 | `Transport` | The request couldn't be sent or timed out, or the response couldn't be read |
 | `Decode` | The response body didn't match the expected shape |
 
+`Error::origin` says where an error came from: `"umamoe"` for `Status`, `RateLimited` and `Decode`, `"network"` for `Transport`, and `"server"` for `Config` and `InvalidRequest`. Each failed call, after any retries, also logs one `uma.moe request failed` warning through [`tracing`](https://docs.rs/tracing) with the endpoint, lane, origin, status, uma.moe's error message, attempts and a stack trace (captured when `RUST_LIB_BACKTRACE=1`). 404s aren't logged.
+
 ## Metrics
 
 Each call records metrics through the [`metrics`](https://docs.rs/metrics) facade. They cost nothing unless the application installs a recorder, such as the server's Prometheus exporter.

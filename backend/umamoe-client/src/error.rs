@@ -50,6 +50,16 @@ pub enum Error {
 }
 
 impl Error {
+    /// Where the error came from: `"umamoe"` (an error status, rate limit or unexpected response),
+    /// `"network"` (no response) or `"server"` (invalid settings or parameters on our side).
+    pub fn origin(&self) -> &'static str {
+        match self {
+            Self::Status { .. } | Self::RateLimited { .. } | Self::Decode(_) => "umamoe",
+            Self::Transport(_) => "network",
+            Self::Config(_) | Self::InvalidRequest(_) => "server",
+        }
+    }
+
     /// HTTP status, if the API returned one.
     pub fn status(&self) -> Option<StatusCode> {
         match self {

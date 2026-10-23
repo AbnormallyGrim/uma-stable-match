@@ -10,6 +10,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{any, get};
 use axum::{Json, Router};
 use serde_json::{json, Value};
+use tower_http::catch_panic::CatchPanicLayer;
 
 use crate::api_error::ApiError;
 use crate::cache::{Cache, ScanFailure, ScanPhase, Snapshot};
@@ -52,16 +53,22 @@ pub fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
-/// The routes plus security headers and a request timeout, serving the built frontend from
-/// `frontend_dir` if given.
+/// The routes plus security headers, a request timeout and a JSON 500 for panics, serving the built
+/// frontend from `frontend_dir` if given.
 pub fn app(state: AppState, frontend_dir: Option<&Path>) -> Router {
     let mut app = router(state);
     if let Some(dir) = frontend_dir {
         app = app.fallback_service(frontend::service(dir));
     }
-    app.layer(from_fn(time_limit))
+    app.layer(CatchPanicLayer::custom(panic_response))
+        .layer(from_fn(time_limit))
         .layer(from_fn(track_requests))
         .layer(from_fn(frontend::security_headers))
+}
+
+/// Answers a request whose handler panicked. The panic itself is logged by the panic hook.
+fn panic_response(_: Box<dyn std::any::Any + Send>) -> Response {
+    ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "internal error").into_response()
 }
 
 /// Answers 504 with a JSON error if the request runs longer than [`REQUEST_TIMEOUT`].

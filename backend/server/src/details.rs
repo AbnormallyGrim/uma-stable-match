@@ -465,7 +465,7 @@ impl BackgroundLoader {
     pub async fn run(mut self) {
         while let Some(circle_id) = self.receiver.recv().await {
             if let Err(error) = self.details.get(circle_id, Priority::Background).await {
-                tracing::warn!(circle_id, %error, "background club load failed");
+                tracing::warn!(circle_id, origin = error.origin(), %error, "background club load failed");
             }
             lock(&self.details.inner.queued).remove(&circle_id);
         }
