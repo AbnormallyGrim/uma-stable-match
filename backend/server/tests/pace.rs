@@ -464,3 +464,180 @@ async fn early_month_recommendations_use_last_month() {
     assert_eq!(body["trainer"]["pace_per_day"], 3_000_000.0);
     assert_eq!(body["total"], 1);
 }
+
+async fn mount_rankings(server: &MockServer, rows: Vec<Value>, times: u64) {
+    Mock::given(path("/api/v4/rankings/monthly"))
+        .and(query_param("query", TRAINER.to_string()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "rankings": rows })))
+        .expect(times)
+        .mount(server)
+        .await;
+}
+
+async fn mount_club(server: &MockServer, circle_id: u64, response: ResponseTemplate, times: u64) {
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", circle_id.to_string()))
+        .respond_with(response)
+        .expect(times)
+        .mount(server)
+        .await;
+}
+
+fn ranked_in(circle_id: Option<u64>) -> Value {
+    json!({ "viewer_id": TRAINER, "circle_id": circle_id })
+}
+
+fn oldest_club() -> ResponseTemplate {
+    ResponseTemplate::new(200).set_body_json(json!({
+        "circle": { "circle_id": 7, "name": "First Club" },
+        "members": [{ "viewer_id": 1, "year": 2026, "month": 3, "daily_fans": series(1_000_000) }],
+    }))
+}
+
+#[tokio::test]
+async fn a_trainer_who_changed_clubs_is_found_in_their_ranked_club() {
+    let server = MockServer::start().await;
+    mount_rankings(&server, vec![ranked_in(Some(2))], 1).await;
+    mount_club(&server, 2, trainer_club(series(3_000_000)), 1).await;
+    mount_trainer(&server, oldest_club(), 0).await;
+
+    let pace = lookup(&server).pace(TRAINER, None).await.unwrap();
+    assert_eq!(pace, 3_000_000.0);
+}
+
+#[tokio::test]
+async fn only_the_exact_trainer_id_counts_in_rankings() {
+    let server = MockServer::start().await;
+    let partial_match = json!({ "viewer_id": TRAINER + 1, "circle_id": 3 });
+    mount_rankings(&server, vec![partial_match], 1).await;
+    mount_club(&server, 3, trainer_club(series(9_000_000)), 0).await;
+    mount_trainer(&server, trainer_club(series(3_000_000)), 1).await;
+
+    let pace = lookup(&server).pace(TRAINER, None).await.unwrap();
+    assert_eq!(pace, 3_000_000.0);
+}
+
+#[tokio::test]
+async fn without_a_rankings_row_the_trainer_lookup_is_used() {
+    let server = MockServer::start().await;
+    mount_rankings(&server, vec![], 1).await;
+    mount_trainer(&server, trainer_club(series(3_000_000)), 1).await;
+
+    let pace = lookup(&server).pace(TRAINER, None).await.unwrap();
+    assert_eq!(pace, 3_000_000.0);
+}
+
+#[tokio::test]
+async fn a_ranked_trainer_without_a_club_falls_back() {
+    let server = MockServer::start().await;
+    mount_rankings(&server, vec![ranked_in(None)], 1).await;
+    mount_trainer(&server, ResponseTemplate::new(404), 1).await;
+
+    let error = lookup(&server).pace(TRAINER, None).await.unwrap_err();
+    assert!(matches!(error, PaceError::NotFound));
+}
+
+#[tokio::test]
+async fn a_rankings_failure_falls_back() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/rankings/monthly"))
+        .respond_with(ResponseTemplate::new(500))
+        .expect(1)
+        .mount(&server)
+        .await;
+    mount_trainer(&server, trainer_club(series(3_000_000)), 1).await;
+
+    let pace = lookup(&server).pace(TRAINER, None).await.unwrap();
+    assert_eq!(pace, 3_000_000.0);
+}
+
+#[tokio::test]
+async fn a_ranked_club_without_the_trainer_falls_back() {
+    let server = MockServer::start().await;
+    mount_rankings(&server, vec![ranked_in(Some(7))], 1).await;
+    mount_club(&server, 7, oldest_club(), 1).await;
+    mount_trainer(&server, trainer_club(series(3_000_000)), 1).await;
+
+    let pace = lookup(&server).pace(TRAINER, None).await.unwrap();
+    assert_eq!(pace, 3_000_000.0);
+}
+
+#[tokio::test]
+async fn too_little_data_in_the_ranked_club_is_not_enough_data() {
+    let server = MockServer::start().await;
+    mount_rankings(&server, vec![ranked_in(Some(2))], 1).await;
+    mount_club(&server, 2, trainer_club(one_day()), 1).await;
+    mount_trainer(&server, oldest_club(), 0).await;
+
+    let error = lookup(&server).pace(TRAINER, None).await.unwrap_err();
+    assert!(matches!(error, PaceError::NotEnoughData));
+}
+
+#[tokio::test]
+async fn early_month_finds_last_months_club_through_rankings() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/rankings/monthly"))
+        .and(query_param("query", TRAINER.to_string()))
+        .and(query_param("year", "2026"))
+        .and(query_param("month", "2"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({ "rankings": [ranked_in(Some(2))] })),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "2"))
+        .and(query_param("month", "2"))
+        .respond_with(trainer_club(series(3_000_000)))
+        .expect(1)
+        .mount(&server)
+        .await;
+    mount_last_month(&server, oldest_club(), 0).await;
+    mount_gains(&server, gains(Some(70_000_000)), 0).await;
+
+    let pace = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap();
+    assert_eq!(pace, 3_000_000.0);
+}
+
+#[tokio::test]
+async fn early_month_ranked_club_with_too_little_data_uses_gains() {
+    let server = MockServer::start().await;
+    mount_rankings(&server, vec![ranked_in(Some(2))], 1).await;
+    mount_club(&server, 2, trainer_club(one_day()), 1).await;
+    mount_last_month(&server, oldest_club(), 0).await;
+    mount_gains(&server, gains(Some(70_000_000)), 1).await;
+
+    let pace = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap();
+    assert_eq!(pace, 10_000_000.0);
+}
+
+#[tokio::test]
+async fn searches_read_the_ranked_club_from_the_club_cache() {
+    let server = MockServer::start().await;
+    let (cache, details) = scanned(&server).await;
+    let member = 9003;
+    Mock::given(path("/api/v4/rankings/monthly"))
+        .and(query_param("query", member.to_string()))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "rankings": [{ "viewer_id": member, "circle_id": 1 }] })),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("viewer_id", member.to_string()))
+        .respond_with(oldest_club())
+        .expect(0)
+        .mount(&server)
+        .await;
+    let state = AppState {
+        paces: PaceLookup::new(client(&server), DEFAULT_PACE_TTL).with_details(details.clone()),
+        ..app(&server, (cache, details), DEFAULT_PACE_TTL)
+    };
+
+    let (status, body) = get(&state, &format!("?trainer_id={member}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["trainer"]["pace_per_day"], 5_500_000.0);
+}
