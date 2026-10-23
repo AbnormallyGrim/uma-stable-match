@@ -289,7 +289,7 @@ fn finish(
         .unwrap_or_default();
     metrics::histogram!("scan_duration_seconds", "source" => source).record(took.as_secs_f64());
     if let Err(error) = &result {
-        tracing::error!(%error, "scan failed; keeping the last results");
+        tracing::error!(origin = error.origin(), %error, "scan failed; keeping the last results");
     }
     cache.finish_scan(result, SystemTime::now());
 }
