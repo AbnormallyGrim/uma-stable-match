@@ -82,7 +82,7 @@ On the first two days of a game month (the 2nd and 3rd in JST), there are fewer 
 |---|---|---|
 | Pool estimate | `monthly_point ÷ elapsed days ÷ member_count` | `last_month_point ÷ days in the previous game month ÷ member_count` (`from_circle_last_month`) |
 | Club details | Current month | `CircleRequest::for_month` with the previous month |
-| Trainer pace | This month's `daily_fans` | Last month's `daily_fans`, or the 7-day gain ÷ 7 from `rankings_gains` if that month has too little data |
+| Trainer pace | This month's `daily_fans`, from the club in this month's rankings | Last month's `daily_fans`, from the club in last month's rankings, or the 7-day gain ÷ 7 from `rankings_gains` if that month has too little data |
 | `month` in responses | Current game month | Previous game month |
 
 The scan decides the month from the list's snapshot time (`is_early_month`), so clubs and trainers always use the same month. The detail cache and the trainer pace cache keep each month's data separately, so the switch on the 4th never mixes months. A detail load that started under the old month doesn't write its median into the new pool.
@@ -324,7 +324,13 @@ Cached clubs are always scored exactly, so the shortlist only decides which unca
 
 #### Looking up a trainer
 
-With `trainer_id`, the server fetches that trainer's club from uma.moe and finds their snapshot (the latest month if there's more than one). It then calculates their pace with `daily_pace`, which needs at least 3 days of data and a gain above zero. [Early in the month](#early-in-the-month), it uses last month's data, falling back to the trainer's 7-day gain.
+With `trainer_id`, the server finds the trainer's club and their snapshot in it (the latest month if there's more than one), then calculates their pace with `daily_pace`, which needs at least 3 days of data and a gain above zero:
+
+1. **Their club, from monthly rankings.** `rankings_monthly` gives the club the trainer is in for the month, matching the exact trainer ID. uma.moe's own trainer lookup returns a trainer's oldest club once they've changed clubs, so it isn't used first.
+2. **Their fans, from that club.** The club comes through the detail cache (memory, then Redis, then uma.moe), so a club already loaded costs no extra call.
+3. **Fallback.** With no rankings row, no club, a club that doesn't list them, or a failed rankings or club request, the server uses uma.moe's trainer lookup (`CircleRequest::by_viewer_id`) instead.
+
+[Early in the month](#early-in-the-month), it uses last month's rankings and data, falling back to the trainer's 7-day gain.
 
 - **Cached for `TRAINER_CACHE_MINUTES`** (10 by default). A found pace, and a "not found" or "not enough data" answer, is reused for that long, so repeat requests don't call uma.moe again. Failed uma.moe requests aren't cached.
 - **IDs stay out of logs.** Trainer IDs never appear in log messages or error responses, only in the response to the trainer's own request. Failed lookups log only the HTTP status.

@@ -170,5 +170,44 @@ impl RankingsGainsRequest {
     }
 }
 
+/// Parameters for `GET /api/v4/rankings/monthly`. Unset fields use the API's defaults.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct RankingsMonthlyRequest {
+    /// Year; the API defaults to the current one (JST).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub year: Option<i32>,
+    /// Month (1–12); the API defaults to the current one (JST).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub month: Option<u32>,
+    /// Page number (0-indexed).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page: Option<u32>,
+    /// Page size, up to 100.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    /// Exact trainer ID, or a partial trainer or club name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+}
+
+impl RankingsMonthlyRequest {
+    /// Searches for a trainer ID. Results can also include partial name matches.
+    pub fn for_viewer(viewer_id: u64) -> Self {
+        Self {
+            query: Some(viewer_id.to_string()),
+            ..Default::default()
+        }
+    }
+
+    /// Asks for a specific month instead of the current one.
+    pub fn for_month(self, year: i32, month: u32) -> Self {
+        Self {
+            year: Some(year),
+            month: Some(month),
+            ..self
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests;

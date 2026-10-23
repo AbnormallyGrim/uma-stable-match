@@ -14,9 +14,10 @@ pub use error::{ApiErrorBody, Error};
 pub use rate_limit::Priority;
 pub use requests::{
     CircleLookup, CircleRequest, CircleSort, GainsSort, ListCirclesRequest, RankingsGainsRequest,
-    SortDir,
+    RankingsMonthlyRequest, SortDir,
 };
 pub use reqwest::StatusCode;
 pub use types::{
     Circle, CircleListResponse, CircleMember, CircleResponse, GainsRanking, GainsRankingsResponse,
+    MonthlyRanking, MonthlyRankingsResponse,
 };
