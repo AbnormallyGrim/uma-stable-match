@@ -123,7 +123,14 @@ impl PaceLookup {
             Ok(response) => Ok(pace_from_response(&response, viewer_id)),
             Err(error) if error.status() == Some(StatusCode::NOT_FOUND) => Ok(Outcome::NotFound),
             Err(error) => {
-                tracing::warn!(status = ?error.status(), "trainer pace lookup failed");
+                tracing::warn!(
+                    trainer_id = viewer_id,
+                    month = month_label(request.period),
+                    origin = error.origin(),
+                    status = error.status().map(|status| status.as_u16()),
+                    %error,
+                    "trainer pace lookup failed"
+                );
                 Err(PaceError::Upstream(error))
             }
         }
@@ -160,7 +167,14 @@ impl PaceLookup {
             Ok(rankings) => rankings.viewer(viewer_id).and_then(|row| row.circle_id),
             Err(error) if error.status() == Some(StatusCode::NOT_FOUND) => None,
             Err(error) => {
-                tracing::warn!(status = ?error.status(), "trainer club lookup failed");
+                tracing::warn!(
+                    trainer_id = viewer_id,
+                    month = month_label(period),
+                    origin = error.origin(),
+                    status = error.status().map(|status| status.as_u16()),
+                    %error,
+                    "trainer club lookup failed"
+                );
                 None
             }
         }
@@ -189,7 +203,7 @@ impl PaceLookup {
                         viewer_id,
                     )
                 })
-                .map_err(|error| error.status()),
+                .map_err(|error| (error.origin(), error.to_string())),
             _ => {
                 let mut request = CircleRequest::by_circle_id(circle_id);
                 if let Some((year, month)) = period {
@@ -199,11 +213,18 @@ impl PaceLookup {
                     .circle(&request)
                     .await
                     .map(|response| pace_from_response(&response, viewer_id))
-                    .map_err(|error| error.status())
+                    .map_err(|error| (error.origin(), error.to_string()))
             }
         };
-        result.unwrap_or_else(|status| {
-            tracing::warn!(?status, "trainer club details lookup failed");
+        result.unwrap_or_else(|(origin, error)| {
+            tracing::warn!(
+                trainer_id = viewer_id,
+                circle_id,
+                month = month_label(period),
+                origin,
+                error,
+                "trainer club details lookup failed"
+            );
             Outcome::NotFound
         })
     }
@@ -221,7 +242,13 @@ impl PaceLookup {
             Ok(gains) => gains,
             Err(error) if error.status() == Some(StatusCode::NOT_FOUND) => return Ok(outcome),
             Err(error) => {
-                tracing::warn!(status = ?error.status(), "trainer gains lookup failed");
+                tracing::warn!(
+                    trainer_id = viewer_id,
+                    origin = error.origin(),
+                    status = error.status().map(|status| status.as_u16()),
+                    %error,
+                    "trainer gains lookup failed"
+                );
                 return Err(PaceError::Upstream(error));
             }
         };
@@ -248,6 +275,11 @@ impl PaceLookup {
 
 fn count_pace(source: &'static str) {
     metrics::counter!("pace_lookups_total", "source" => source).increment(1);
+}
+
+/// `period` as `YYYY-MM` for logs, or `None` for the current month.
+fn month_label(period: Option<Period>) -> Option<String> {
+    period.map(|(year, month)| format!("{year}-{month:02}"))
 }
 
 fn pace_from_response(response: &CircleResponse, viewer_id: u64) -> Outcome {
