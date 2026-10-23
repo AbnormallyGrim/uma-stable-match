@@ -120,7 +120,7 @@ docker compose up -d
 
 ## Usage
 
-1. Open Uma Stable Match in your browser.
+1. Open Uma Stable Match in your browser. New to it? Open **How to use** under the search form for step-by-step instructions, including where to find your trainer ID and daily pace.
 2. Enter your **trainer ID**, or switch to **Daily pace** and enter your daily fan gain in millions. Tick **Remember my trainer ID on this device** to have it filled in next time.
 3. Optionally turn on **Balance scoring** and adjust its strength (0–1). Higher values push clubs with many low contributors further down.
 4. Optionally tick **Include closed clubs** to also see clubs that aren't recruiting.
