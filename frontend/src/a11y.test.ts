@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App.svelte';
 import type { Recommendations } from './lib/api';
+import HowToUse from './lib/HowToUse.svelte';
 import ResultsTable from './lib/ResultsTable.svelte';
 import SearchForm from './lib/SearchForm.svelte';
 import SearchStatus from './lib/SearchStatus.svelte';
@@ -143,6 +144,12 @@ describe('accessibility', () => {
     },
   ])('has no violations in the $phase status', async (status) => {
     const { container } = render(SearchStatus, { status, onretry: vi.fn() });
+    expect(await violations(container)).toEqual([]);
+  });
+
+  it('has no violations in the open instructions', async () => {
+    const { container } = render(HowToUse);
+    container.querySelector('details')!.open = true;
     expect(await violations(container)).toEqual([]);
   });
 

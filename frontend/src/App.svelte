@@ -3,6 +3,7 @@
 
   import { fetchRecommendations, type RecommendationQuery } from './lib/api';
   import BrandLogo from './lib/BrandLogo.svelte';
+  import HowToUse from './lib/HowToUse.svelte';
   import Results from './lib/Results.svelte';
   import { SearchRunner, type SearchState as RunnerState } from './lib/runner';
   import SearchForm from './lib/SearchForm.svelte';
@@ -80,6 +81,7 @@
       <ThemeToggle />
     </header>
     <SearchForm {initial} remember={remembered !== null} {busy} {onsearch} />
+    <HowToUse />
   </div>
 
   <SearchStatus status={search.status} onretry={() => runner.retryNow()} />
