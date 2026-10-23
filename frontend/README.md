@@ -54,6 +54,7 @@ src/main.ts                   Mounts the app
 src/App.svelte                Root component: runs searches and keeps them in the URL
 src/lib/runner.ts             Search state machine: loading, retries and countdowns
 src/lib/states.ts             Error messages and empty-result hints
+src/lib/HowToUse.svelte       Step-by-step instructions under the search form
 src/lib/SearchStatus.svelte   Loading, waiting and error messages
 src/lib/ThemeToggle.svelte    System / Light / Dark switch
 src/lib/theme.ts              Saving and applying the theme choice
@@ -94,6 +95,10 @@ The form searches by **trainer ID** or by **daily pace**, with an optional **bal
 | Include closed clubs | On or off | `include_closed=true`, only when on |
 
 Only the field for the chosen mode is checked. An invalid field gets a message linked to it with `aria-describedby`, and nothing is sent.
+
+### How to use
+
+Under the form, `HowToUse.svelte` is a collapsible "How to use" section, closed by default so it doesn't get in returning visitors' way. It walks through five steps: finding the trainer ID in the game (Menu → Profile), searching with it, searching by daily pace instead (with how to find it in [uma.moe's rankings](https://uma.moe/rankings), which opens in a new tab), the balance and closed-club options, and picking a club. A note says it works with the global (English) version and suggests searching by pace if a trainer ID isn't found. It quotes the form's and results' labels, so update it when those change.
 
 ### Search in the URL
 
@@ -237,6 +242,7 @@ When you add or change a colour token, add its pairs to the test. A failing pair
 - the sorted table
 - every search status
 - the theme switch
+- the open "How to use" section
 
 Two axe rules are adjusted. The colour-contrast rule is off, because jsdom doesn't render, and the contrast test covers it instead. The landmark (region) rule only applies to the whole-page checks.
 
