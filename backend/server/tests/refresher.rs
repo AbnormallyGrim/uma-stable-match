@@ -415,6 +415,7 @@ async fn reports_scheduled_loaded_and_due_clubs() {
     let status = details.refresh_status().await;
     assert_eq!((status.scheduled, status.loaded, status.due), (3, 0, 3));
     assert!(status.oldest_due.is_some_and(|due| due >= before));
+    assert_eq!(status.stored_ttl, None);
     details.get(2, Priority::Interactive).await.unwrap();
     assert_eq!(details.refresh_status().await.loaded, 1);
 

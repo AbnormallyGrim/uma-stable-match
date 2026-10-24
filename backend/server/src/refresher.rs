@@ -72,6 +72,18 @@ pub struct RefreshStatus {
     pub due: usize,
     /// When the longest-waiting due club became due, if any are due.
     pub oldest_due: Option<DateTime<Utc>>,
+    /// Time left before the stored details expire, with Redis. `None` without Redis or before any
+    /// are stored.
+    pub stored_ttl: Option<StoredTtl>,
+}
+
+/// Time to live of the scheduled clubs' details in Redis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StoredTtl {
+    /// The club whose details expire first.
+    pub shortest: Duration,
+    /// The average across the stored clubs.
+    pub average: Duration,
 }
 
 pub(crate) struct Refreshing {
@@ -142,10 +154,13 @@ impl Refreshing {
         now: DateTime<Utc>,
     ) -> RefreshStatus {
         let counts = match &self.store {
-            Store::Local(schedule) => Some(lock(schedule).coverage(loaded, now)),
+            Store::Local(schedule) => {
+                let (scheduled, loaded, due) = lock(schedule).coverage(loaded, now);
+                Some((scheduled, loaded, due, None))
+            }
             Store::Shared(schedule) => schedule.coverage(period, now).await,
         };
-        let Some((scheduled, loaded, due)) = counts else {
+        let Some((scheduled, loaded, due, stored_ttl)) = counts else {
             return RefreshStatus::default();
         };
         let oldest_due = self
@@ -158,6 +173,7 @@ impl Refreshing {
             loaded,
             due,
             oldest_due,
+            stored_ttl,
         }
     }
 

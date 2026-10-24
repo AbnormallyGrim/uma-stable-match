@@ -15,6 +15,7 @@ use sha2::Sha256;
 use tokio::time::timeout;
 
 use crate::pool::Period;
+use crate::refresher::StoredTtl;
 use crate::scanner::ScanConfig;
 
 const KEY_PREFIX: &str = "usm:v1";
@@ -283,6 +284,34 @@ impl SharedCache {
             Err(_) => {
                 redis.down("timed out");
                 misses()
+            }
+        }
+    }
+
+    /// Redis's key, TTL, memory and eviction figures from one `INFO` call, or `None` without Redis
+    /// or if it doesn't answer.
+    pub(crate) async fn stats(&self) -> Option<RedisStats> {
+        let Backend::Redis(redis) = &self.backend else {
+            return None;
+        };
+        let mut info = redis::cmd("INFO");
+        info.arg("memory").arg("stats").arg("keyspace");
+        let mut conn = redis.conn.clone();
+        let started = Instant::now();
+        let reply = timeout(OP_TIMEOUT, info.query_async::<String>(&mut conn)).await;
+        observe("info", started);
+        match reply {
+            Ok(Ok(text)) => {
+                redis.up();
+                Some(RedisStats::parse(&text))
+            }
+            Ok(Err(error)) => {
+                redis.down(&kind(&error));
+                None
+            }
+            Err(_) => {
+                redis.down("timed out");
+                None
             }
         }
     }
@@ -573,7 +602,7 @@ impl SharedSchedule {
         &self,
         period: Option<Period>,
         now: DateTime<Utc>,
-    ) -> Option<(usize, usize, usize)> {
+    ) -> Option<(usize, usize, usize, Option<StoredTtl>)> {
         let script = Script::new(COVERAGE_SCRIPT);
         let mut invocation = script.prepare_invoke();
         invocation
@@ -583,10 +612,18 @@ impl SharedSchedule {
             .arg(due_by(now));
         let reply = self
             .redis
-            .invoke::<Vec<usize>>(&invocation, SNAPSHOT_TIMEOUT)
+            .invoke::<Vec<i64>>(&invocation, SNAPSHOT_TIMEOUT)
             .await?;
+        let count = |n: i64| usize::try_from(n).unwrap_or(0);
+        let ms = |n: i64| Duration::from_millis(u64::try_from(n).unwrap_or(0));
         match reply.as_slice() {
-            [scheduled, loaded, due] => Some((*scheduled, *loaded, *due)),
+            &[scheduled, loaded, due, expiring, shortest, total] => {
+                let ttl = (expiring > 0).then(|| StoredTtl {
+                    shortest: ms(shortest),
+                    average: ms(total / expiring),
+                });
+                Some((count(scheduled), count(loaded), count(due), ttl))
+            }
             _ => None,
         }
     }
@@ -753,14 +790,22 @@ return 1
 
 const COVERAGE_SCRIPT: &str = r"
 local ids = redis.call('ZRANGE', KEYS[1], 0, -1)
-local loaded = 0
+local loaded, expiring, shortest, total = 0, 0, -1, 0
 for _, id in ipairs(ids) do
-  if redis.call('EXISTS', ARGV[1] .. id .. ARGV[2]) == 1 then
+  local ttl = redis.call('PTTL', ARGV[1] .. id .. ARGV[2])
+  if ttl ~= -2 then
     loaded = loaded + 1
+  end
+  if ttl >= 0 then
+    expiring = expiring + 1
+    total = total + ttl
+    if shortest < 0 or ttl < shortest then
+      shortest = ttl
+    end
   end
 end
 local due = redis.call('ZCOUNT', KEYS[1], '-inf', ARGV[3])
-return {#ids, loaded, due}
+return {#ids, loaded, due, expiring, shortest, total}
 ";
 
 const RESCHEDULE_SCRIPT: &str = r"
@@ -774,6 +819,59 @@ local score = tonumber(ARGV[2]) * slots + rank
 redis.call('ZADD', KEYS[1], 'XX', string.format('%.0f', score), ARGV[1])
 return 1
 ";
+
+/// Figures from `INFO memory stats keyspace`, summed over every database.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct RedisStats {
+    pub(crate) keys: u64,
+    pub(crate) expiring: u64,
+    pub(crate) average_ttl: Duration,
+    pub(crate) used_memory: u64,
+    pub(crate) max_memory: u64,
+    pub(crate) evicted: u64,
+    pub(crate) expired: u64,
+}
+
+impl RedisStats {
+    /// Reads `INFO` output. Missing fields count as zero; `average_ttl` is weighted by each
+    /// database's keys with a TTL.
+    pub(crate) fn parse(info: &str) -> Self {
+        let mut stats = Self::default();
+        let mut ttl_weighted = 0u128;
+        for line in info.lines() {
+            let Some((name, value)) = line.trim().split_once(':') else {
+                continue;
+            };
+            let number = || value.parse::<u64>().unwrap_or(0);
+            match name {
+                "used_memory" => stats.used_memory = number(),
+                "maxmemory" => stats.max_memory = number(),
+                "evicted_keys" => stats.evicted = number(),
+                "expired_keys" => stats.expired = number(),
+                db if db.starts_with("db") => {
+                    let field = |key: &str| {
+                        value
+                            .split(',')
+                            .find_map(|pair| pair.strip_prefix(key)?.strip_prefix('='))
+                            .and_then(|n| n.parse::<u64>().ok())
+                            .unwrap_or(0)
+                    };
+                    let (keys, expires, avg_ttl) =
+                        (field("keys"), field("expires"), field("avg_ttl"));
+                    stats.keys += keys;
+                    stats.expiring += expires;
+                    ttl_weighted += u128::from(avg_ttl) * u128::from(expires);
+                }
+                _ => {}
+            }
+        }
+        if stats.expiring > 0 {
+            let average = ttl_weighted / u128::from(stats.expiring);
+            stats.average_ttl = Duration::from_millis(u64::try_from(average).unwrap_or(u64::MAX));
+        }
+        stats
+    }
+}
 
 fn observe(op: &'static str, started: Instant) {
     metrics::histogram!("redis_op_duration_seconds", "op" => op)

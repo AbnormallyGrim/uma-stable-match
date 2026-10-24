@@ -119,6 +119,20 @@ async fn record_state(state: &AppState) {
             .as_secs_f64()
     });
     metrics::gauge!("refresh_overdue_seconds").set(overdue);
+    if let Some(ttl) = refresh.stored_ttl {
+        metrics::gauge!("redis_club_ttl_shortest_seconds").set(ttl.shortest.as_secs_f64());
+        metrics::gauge!("redis_club_ttl_average_seconds").set(ttl.average.as_secs_f64());
+    }
+
+    if let Some(stats) = state.details.shared().stats().await {
+        metrics::gauge!("redis_keys").set(stats.keys as f64);
+        metrics::gauge!("redis_keys_expiring").set(stats.expiring as f64);
+        metrics::gauge!("redis_average_ttl_seconds").set(stats.average_ttl.as_secs_f64());
+        metrics::gauge!("redis_memory_used_bytes").set(stats.used_memory as f64);
+        metrics::gauge!("redis_memory_max_bytes").set(stats.max_memory as f64);
+        metrics::counter!("redis_evicted_keys_total").absolute(stats.evicted);
+        metrics::counter!("redis_expired_keys_total").absolute(stats.expired);
+    }
 }
 
 fn unix_seconds(time: SystemTime) -> f64 {
