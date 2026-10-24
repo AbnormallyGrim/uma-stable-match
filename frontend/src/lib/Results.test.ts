@@ -46,6 +46,25 @@ describe('Results', () => {
     expect(within(screen.getByRole('table')).getAllByRole('link')).toHaveLength(12);
   });
 
+  it('heads the table with the number of results', () => {
+    const clubs = Array.from({ length: 12 }, (_, i) => club({ circle_id: i + 1 }));
+    render(Results, { result: recommendations({ total: 40, clubs }) });
+    expect(screen.getByRole('heading', { name: 'Top 12 results' })).toBeInTheDocument();
+  });
+
+  it('heads a single result in the singular', () => {
+    render(Results, { result: recommendations({ total: 1, clubs: [club()] }) });
+    expect(screen.getByRole('heading', { name: 'Top 1 result' })).toBeInTheDocument();
+  });
+
+  it('explains missing full clubs and lower tiers, even with no matches', () => {
+    render(Results, { result: recommendations() });
+    const about = screen.getByTestId('results-about');
+    expect(about).toHaveTextContent("Full clubs (30 of 30 members) aren't shown");
+    expect(within(about).getByText('Why not a higher-tier club?')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
   it('says when nothing matched', () => {
     render(Results, { result: recommendations() });
     expect(screen.getByText('No clubs matched your search.')).toBeInTheDocument();

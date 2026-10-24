@@ -1,6 +1,7 @@
 <!--
   @component
-  The results view: summary, any notices, the top ten picks as cards, then every club in a table.
+  The results view: summary, any notices, the top ten picks as cards, notes on full clubs and tiers,
+  then the returned clubs in a table.
 -->
 
 <script lang="ts">
@@ -23,6 +24,7 @@
   const balanceOn = $derived(result.options.balance_weight !== null);
   const hints = $derived(emptyHints(result.options));
   const notices = $derived(resultNotices(result));
+  const count = $derived(result.clubs.length);
 </script>
 
 <section aria-labelledby="results-heading" class:stale aria-busy={stale}>
@@ -49,8 +51,26 @@
         <li><ClubCard {club} position={i + 1} {balanceOn} /></li>
       {/each}
     </ol>
+  {/if}
 
-    <h3>All results</h3>
+  <div class="about" data-testid="results-about">
+    <p>
+      Full clubs (30 of 30 members) aren't shown, since there's no spot to join. If your current
+      club is full, it won't appear here.
+    </p>
+    <details>
+      <summary>Why not a higher-tier club?</summary>
+      <p>
+        A club's tier comes from its total fans, which its fastest members drive. Matches are based
+        on a club's typical member instead, so you land in clubs where you'd sit around the middle.
+        If you're well below a high-tier club's typical member, your best fits may be a tier or two
+        lower.
+      </p>
+    </details>
+  </div>
+
+  {#if picks.length > 0}
+    <h3>Top {count} {count === 1 ? 'result' : 'results'}</h3>
     <ResultsTable clubs={result.clubs} {balanceOn} includeClosed={result.options.include_closed} />
   {/if}
 </section>
@@ -80,6 +100,30 @@
     margin: 32px 0 12px;
     font-size: 1rem;
     font-weight: 650;
+  }
+
+  .about {
+    margin: 16px 0 0;
+    color: var(--muted);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .about p {
+    margin: 0;
+  }
+
+  .about details {
+    margin-top: 6px;
+  }
+
+  .about summary {
+    color: var(--text-2);
+    cursor: pointer;
+  }
+
+  .about details p {
+    margin-top: 4px;
   }
 
   .cards {
