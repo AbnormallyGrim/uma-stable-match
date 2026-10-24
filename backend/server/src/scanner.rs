@@ -121,11 +121,12 @@ pub(crate) async fn load(
     let Installed {
         candidates,
         ids,
+        full_ids,
         month,
         updated_at,
     } = install(details, rows, config);
     if details.refreshes() {
-        details.schedule(ids).await;
+        details.schedule(ids, full_ids).await;
         let prefetched = details.cached_in_pool().len();
         tracing::info!(candidates, prefetched, "scan listed the clubs");
         return Scan {
@@ -173,6 +174,7 @@ pub(crate) async fn load(
 pub(crate) struct Installed {
     candidates: usize,
     ids: Vec<(u64, u32)>,
+    full_ids: Vec<(u64, u32)>,
     month: Option<String>,
     updated_at: Option<DateTime<Utc>>,
 }
@@ -195,7 +197,9 @@ pub(crate) fn install(details: &ClubDetails, rows: Vec<Circle>, config: &ScanCon
         ListedClub::from_circle
     };
     let mut pool = ClubPool::new(rows.iter().filter_map(listed));
-    let ids = prefetch_ids(&rows, &pool, config.max_details as usize);
+    let max = config.max_details as usize;
+    let ids = by_rank(&rows, |id| pool.is_joinable(id), max);
+    let full_ids = by_rank(&rows, |id| pool.contains(id) && !pool.is_joinable(id), max);
     details.set_period(period);
     details.set_listed(rows.into_iter().map(|c| (c.circle_id, c)));
     details.restore_exact_medians(&mut pool);
@@ -205,6 +209,7 @@ pub(crate) fn install(details: &ClubDetails, rows: Vec<Circle>, config: &ScanCon
     Installed {
         candidates,
         ids,
+        full_ids,
         month,
         updated_at: snapshot,
     }
@@ -218,10 +223,10 @@ pub(crate) fn scan_period(at: DateTime<Utc>) -> Period {
     }
 }
 
-fn prefetch_ids(rows: &[Circle], pool: &ClubPool, max: usize) -> Vec<(u64, u32)> {
+fn by_rank(rows: &[Circle], keep: impl Fn(u64) -> bool, max: usize) -> Vec<(u64, u32)> {
     let mut ranked: Vec<(u64, u32)> = rows
         .iter()
-        .filter(|c| pool.is_joinable(c.circle_id))
+        .filter(|c| keep(c.circle_id))
         .map(|c| (c.circle_id, rank(c)))
         .collect();
     ranked.sort_by_key(|&(id, rank)| (rank, id));

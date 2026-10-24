@@ -59,9 +59,9 @@ The API key, `REDIS_URL` (which can hold a password) and `REDIS_KEY_SECRET` are 
 2. Decide which month to use. Early in a game month the previous month is used instead; see [Early in the month](#early-in-the-month).
 3. Build a `ClubPool` from the clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO`. `ListedClub::from_circle` drops archived clubs, clubs with fewer than 8 members, and rows missing points, a member count or `last_updated`. Closed and full clubs are kept, so each request can include or exclude them.
 4. Copy in the exact medians of clubs that are still cached for that month, then swap the new pool in.
-5. Take up to `SCAN_MAX_DETAILS` joinable clubs from the pool, best rank first. Full clubs are skipped, so they're only loaded when a search includes them. If a club's details come back without club information, the listed details are used.
-   - **With a [refresher](#refresher)**, as the server always has: put them on its schedule and finish. The refresher loads them.
-   - **Without one**: prefetch their member data in the background lane, so visitors' requests go first.
+5. Take up to `SCAN_MAX_DETAILS` joinable clubs from the pool, best rank first. If a club's details come back without club information, the listed details are used.
+   - **With a [refresher](#refresher)**, as the server always has: put them on its schedule, put up to `SCAN_MAX_DETAILS` full clubs on its [full-club schedule](#full-clubs), and finish. The refresher loads them.
+   - **Without one**: prefetch their member data in the background lane, so visitors' requests go first. Full clubs are only loaded when a search includes them.
 
 While prefetching, a club whose details fail to load is logged and skipped. A failed list request fails the whole scan and leaves the previous pool in place. `Scan` returns the number of candidates (the pool size, full clubs included), how many clubs were prefetched (with a refresher, how many were already loaded), how many failed, the game month of the listed data, and when uma.moe last updated it (`updated_at`, the latest `last_updated` listed).
 
@@ -169,13 +169,22 @@ uma.moe updates club data once a day, at 15:00 UTC, and each club's `last_update
 - **Speed.** Clubs ranked up to `fast_ranks` (5,000) refresh as fast as the client allows. After each club ranked lower, the refresher waits as long as the fetch took, which halves the pace and leaves room for visitors. The client's [backoff](../umamoe-client/README.md#backing-off) slows both.
 - **Override.** With `DETAIL_CACHE_MINUTES` set (`RefreshConfig::every`), each club is refreshed that many minutes after its last refresh, whatever uma.moe's update time.
 
-`scheduled()` returns how many clubs are on the schedule, and `next_refresh(circle_id)` when a club is next due.
+`scheduled()` returns how many clubs are on either schedule, and `next_refresh(circle_id)` when a club is next due.
+
+### Full clubs
+
+Full clubs have a schedule of their own, with the same timing, so joinable clubs are always refreshed first:
+
+- **Order.** The refresher takes a full club only when no joinable club is due. While joinable clubs are waiting, full clubs wait too, even if they became due earlier.
+- **Speed.** Every full club refreshes at half pace, whatever its rank.
+- **Moving.** A scan moves a club that filled up to the full-club schedule, and one with an open spot again back, using the pool's latest member counts. A club that moves is refreshed again soon after.
+- **Searches.** A full club loaded for a search joins the full-club schedule.
 
 ### With Redis
 
 Every instance shares one schedule, and one instance at a time refreshes:
 
-- **Schedule.** A sorted set at `usm:v1:scan:<from>-<to>-<max>:schedule`, with no expiry. Each score holds the due time, rounded up to the second, then the rank, so clubs due at the same time come out best rank first. A listing on any instance updates it, and clubs loaded on any instance join it.
+- **Schedule.** A sorted set at `usm:v1:scan:<from>-<to>-<max>:schedule`, with no expiry, and one for full clubs at `…:schedule-full`. Each score holds the due time, rounded up to the second, then the rank, so clubs due at the same time come out best rank first. A listing on any instance updates it, and clubs loaded on any instance join it.
 - **Lease.** Each instance's refresher tries to take `usm:v1:scan:<from>-<to>-<max>:refresher` every 10 seconds. The holder refreshes and renews it every 20 seconds; it lasts 60 seconds, so another instance takes over within about 70 seconds after a crash or redeploy.
 - **Already refreshed.** Before fetching a due club, the refresher checks the club's due time in memory and then in Redis. A club another instance has loaded since is only rescheduled.
 - **In memory.** Each instance's copies expire when due, as in [Club details](#club-details), so they're read again from Redis once the holder has refreshed them.
@@ -217,7 +226,7 @@ With Redis, instances that have the same `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `S
 - **Failures.** A failed scan is published too: every instance records the same error, keeps its last results, and waits until the next scan is due.
 - **Missing data.** If a scan is marked current but its rows are gone from Redis, the instance scans on its own.
 
-The keys are `usm:v1:scan:<from>-<to>-<max>:lock`, `:fresh`, `:latest`, `:progress`, `:progress-id`, `:schedule` and `:refresher`, so instances with different scan windows don't share.
+The keys are `usm:v1:scan:<from>-<to>-<max>:lock`, `:fresh`, `:latest`, `:progress`, `:progress-id`, `:schedule`, `:schedule-full` and `:refresher`, so instances with different scan windows don't share.
 
 ### Redis tests
 
@@ -514,10 +523,11 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `pace_lookups_total` | counter | `source`: `memory`, `redis`, `umamoe` or `error` | Where each trainer's pace came from |
 | `detail_cache_clubs` | gauge | | Clubs in this instance's detail cache |
 | `detail_queue_clubs` | gauge | | Clubs waiting for a background load |
-| `refresh_scheduled_clubs` | gauge | | Clubs on the refresh schedule |
-| `refresh_loaded_clubs` | gauge | | Scheduled clubs whose details are stored: in Redis with Redis, otherwise in memory. Divided by `refresh_scheduled_clubs`, it's how complete the stored data is |
-| `refresh_due_clubs` | gauge | | Scheduled clubs due for a refresh now |
-| `refresh_overdue_seconds` | gauge | | How long the longest-waiting due club has waited, `0` when none are due |
+| `refresh_scheduled_clubs` | gauge | | Joinable clubs on the refresh schedule |
+| `refresh_loaded_clubs` | gauge | | Scheduled joinable clubs whose details are stored: in Redis with Redis, otherwise in memory. Divided by `refresh_scheduled_clubs`, it's how complete the stored data is |
+| `refresh_due_clubs` | gauge | | Scheduled joinable clubs due for a refresh now |
+| `refresh_overdue_seconds` | gauge | | How long the longest-waiting due joinable club has waited, `0` when none are due |
+| `refresh_full_scheduled_clubs`, `refresh_full_loaded_clubs`, `refresh_full_due_clubs` | gauge | | The same counts for the [full-club schedule](#full-clubs) |
 | `redis_up` | gauge | | `1` while Redis answers, `0` after a failure. Absent without Redis |
 | `redis_errors_total` | counter | `reason` | Failed or timed-out Redis operations, by the kind of failure |
 | `redis_op_duration_seconds` | histogram | `op`: `get`, `mget`, `set`, `script`, `schedule` or `info` | Time per Redis operation, failures included |
@@ -558,7 +568,13 @@ Then open <http://localhost:9464/status>.
   "last_error": null,
   "pool": { "clubs": 152, "exact_medians": 152, "calibration": { "factor": 0.86, "samples": 152 } },
   "details": { "cached": 152, "queued": 0 },
-  "refresh": { "scheduled": 152, "loaded": 152, "due": 0, "oldest_due_at": null }
+  "refresh": {
+    "scheduled": 152,
+    "loaded": 152,
+    "due": 0,
+    "oldest_due_at": null,
+    "full": { "scheduled": 140, "loaded": 96, "due": 44 }
+  }
 }
 ```
 
@@ -574,10 +590,11 @@ Then open <http://localhost:9464/status>.
 | `pool.calibration` | The mean-to-median factor and how many clubs it's based on |
 | `details.cached` | Clubs in the detail cache (approximate) |
 | `details.queued` | Clubs waiting for a background load |
-| `refresh.scheduled` | Clubs on the [refresh](#refresher) schedule |
-| `refresh.loaded` | Scheduled clubs whose details are stored: in Redis with Redis, otherwise in this instance's memory |
-| `refresh.due` | Scheduled clubs due for a refresh now. It jumps after uma.moe's daily update, then falls as the refresher catches up |
-| `refresh.oldest_due_at` | When the longest-waiting due club became due, or `null` when none are due |
+| `refresh.scheduled` | Joinable clubs on the [refresh](#refresher) schedule |
+| `refresh.loaded` | Scheduled joinable clubs whose details are stored: in Redis with Redis, otherwise in this instance's memory |
+| `refresh.due` | Scheduled joinable clubs due for a refresh now. It jumps after uma.moe's daily update, then falls as the refresher catches up |
+| `refresh.oldest_due_at` | When the longest-waiting due joinable club became due, or `null` when none are due |
+| `refresh.full` | `scheduled`, `loaded` and `due` for the [full-club schedule](#full-clubs). Its `due` only falls once the joinable clubs are done |
 
 While a scan runs, `scan` looks like this:
 

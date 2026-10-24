@@ -111,6 +111,9 @@ async fn record_state(state: &AppState) {
     metrics::gauge!("refresh_scheduled_clubs").set(refresh.scheduled as f64);
     metrics::gauge!("refresh_loaded_clubs").set(refresh.loaded as f64);
     metrics::gauge!("refresh_due_clubs").set(refresh.due as f64);
+    metrics::gauge!("refresh_full_scheduled_clubs").set(refresh.full.scheduled as f64);
+    metrics::gauge!("refresh_full_loaded_clubs").set(refresh.full.loaded as f64);
+    metrics::gauge!("refresh_full_due_clubs").set(refresh.full.due as f64);
     let overdue = refresh.oldest_due.map_or(0.0, |due| {
         utc_now()
             .signed_duration_since(due)

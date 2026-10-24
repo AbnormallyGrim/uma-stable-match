@@ -43,11 +43,11 @@ fn prefetch_takes_everything_that_fits() {
     let pool = ClubPool::new((1..=3).map(|id| listed(id, 100.0 * id as f64)));
     let rows: Vec<Circle> = (1..=3).map(|id| ranked(id, Some(id as i32 + 10))).collect();
     assert_eq!(
-        prefetch_ids(&rows, &pool, 3),
+        by_rank(&rows, |id| pool.is_joinable(id), 3),
         vec![(1, 11), (2, 12), (3, 13)]
     );
     assert_eq!(
-        prefetch_ids(&rows, &pool, 10),
+        by_rank(&rows, |id| pool.is_joinable(id), 10),
         vec![(1, 11), (2, 12), (3, 13)]
     );
 }
@@ -59,10 +59,10 @@ fn prefetch_takes_the_best_ranks_first() {
         .map(|id| ranked(id, Some(100 - id as i32)))
         .collect();
     assert_eq!(
-        prefetch_ids(&rows, &pool, 3),
+        by_rank(&rows, |id| pool.is_joinable(id), 3),
         vec![(10, 90), (9, 91), (8, 92)]
     );
-    assert!(prefetch_ids(&rows, &pool, 0).is_empty());
+    assert!(by_rank(&rows, |id| pool.is_joinable(id), 0).is_empty());
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn prefetch_skips_clubs_outside_the_pool_and_repeats() {
         ranked(1, Some(9)),
     ];
     assert_eq!(
-        prefetch_ids(&rows, &pool, 10),
+        by_rank(&rows, |id| pool.is_joinable(id), 10),
         vec![(2, 5), (1, 9), (3, u32::MAX)]
     );
 }
@@ -89,7 +89,7 @@ fn prefetch_skips_full_clubs() {
     };
     let pool = ClubPool::new([listed(1, 100.0), full]);
     let rows = vec![ranked(2, Some(1)), ranked(1, Some(2))];
-    assert_eq!(prefetch_ids(&rows, &pool, 10), vec![(1, 2)]);
+    assert_eq!(by_rank(&rows, |id| pool.is_joinable(id), 10), vec![(1, 2)]);
 }
 
 #[test]

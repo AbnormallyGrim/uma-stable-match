@@ -27,7 +27,8 @@ pub struct RefreshConfig {
     pub recheck: Duration,
     /// Wait before retrying a failed refresh.
     pub retry: Duration,
-    /// Clubs ranked up to this refresh at full speed; the rest at half.
+    /// Joinable clubs ranked up to this refresh at full speed; the rest, and every full club, at
+    /// half.
     pub fast_ranks: u32,
 }
 
@@ -60,21 +61,42 @@ impl RefreshConfig {
     }
 }
 
-/// How current the scheduled clubs' details are.
+/// How current the scheduled clubs' details are. The top-level counts are joinable clubs; full
+/// clubs are in `full`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RefreshStatus {
-    /// Clubs on the refresh schedule.
+    /// Joinable clubs on the refresh schedule.
     pub scheduled: usize,
-    /// Scheduled clubs whose details are stored: in the shared cache with Redis, otherwise in
-    /// memory.
+    /// Scheduled joinable clubs whose details are stored: in the shared cache with Redis,
+    /// otherwise in memory.
     pub loaded: usize,
-    /// Scheduled clubs due for a refresh now.
+    /// Scheduled joinable clubs due for a refresh now.
     pub due: usize,
-    /// When the longest-waiting due club became due, if any are due.
+    /// When the longest-waiting due joinable club became due, if any are due.
     pub oldest_due: Option<DateTime<Utc>>,
     /// Time left before the stored details expire, with Redis. `None` without Redis or before any
     /// are stored.
     pub stored_ttl: Option<StoredTtl>,
+    /// The full clubs' schedule.
+    pub full: FullRefreshStatus,
+}
+
+/// How current the full clubs' details are. They're refreshed only when no joinable club is due.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FullRefreshStatus {
+    /// Full clubs on the refresh schedule.
+    pub scheduled: usize,
+    /// Scheduled full clubs whose details are stored.
+    pub loaded: usize,
+    /// Scheduled full clubs due for a refresh now.
+    pub due: usize,
+}
+
+/// Which schedule a club is on: joinable clubs come first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Tier {
+    Joinable,
+    Full,
 }
 
 /// Time to live of the scheduled clubs' details in Redis.
@@ -89,6 +111,7 @@ pub struct StoredTtl {
 pub(crate) struct Refreshing {
     pub(crate) config: RefreshConfig,
     store: Store,
+    full: Store,
     wake: Notify,
 }
 
@@ -97,54 +120,132 @@ enum Store {
     Shared(SharedSchedule),
 }
 
-impl Refreshing {
-    pub(crate) fn new(config: RefreshConfig, shared: Option<SharedSchedule>) -> Self {
-        let store = match shared {
-            Some(schedule) => Store::Shared(schedule),
-            None => Store::Local(Mutex::new(Schedule::default())),
-        };
-        Self {
-            config,
-            store,
-            wake: Notify::new(),
+impl Store {
+    fn new(shared: Option<SharedSchedule>) -> Self {
+        match shared {
+            Some(schedule) => Self::Shared(schedule),
+            None => Self::Local(Mutex::new(Schedule::default())),
         }
     }
 
-    pub(crate) async fn replace(
+    async fn replace(
         &self,
         clubs: Vec<(u64, u32)>,
         keep: impl Fn(u64) -> bool,
         now: DateTime<Utc>,
     ) {
-        match &self.store {
-            Store::Local(schedule) => lock(schedule).replace(clubs, keep, now),
-            Store::Shared(schedule) => schedule.replace(clubs, keep, now).await,
+        match self {
+            Self::Local(schedule) => lock(schedule).replace(clubs, keep, now),
+            Self::Shared(schedule) => schedule.replace(clubs, keep, now).await,
         }
+    }
+
+    async fn insert_new(&self, circle_id: u64, rank: u32, due: DateTime<Utc>) -> bool {
+        match self {
+            Self::Local(schedule) => lock(schedule).insert_new(circle_id, rank, due),
+            Self::Shared(schedule) => schedule.insert_new(circle_id, rank, due).await,
+        }
+    }
+
+    async fn due_at(&self, circle_id: u64) -> Option<DateTime<Utc>> {
+        match self {
+            Self::Local(schedule) => lock(schedule).due_at(circle_id),
+            Self::Shared(schedule) => schedule.due_at(circle_id).await,
+        }
+    }
+
+    async fn len(&self) -> usize {
+        match self {
+            Self::Local(schedule) => lock(schedule).len(),
+            Self::Shared(schedule) => schedule.len().await,
+        }
+    }
+
+    async fn coverage(
+        &self,
+        period: Option<Period>,
+        loaded: impl Fn(u64) -> bool,
+        now: DateTime<Utc>,
+    ) -> Option<(usize, usize, usize, Option<StoredTtl>)> {
+        match self {
+            Self::Local(schedule) => {
+                let (scheduled, loaded, due) = lock(schedule).coverage(loaded, now);
+                Some((scheduled, loaded, due, None))
+            }
+            Self::Shared(schedule) => schedule.coverage(period, now).await,
+        }
+    }
+
+    async fn next(&self) -> Option<(DateTime<Utc>, u32, u64)> {
+        match self {
+            Self::Local(schedule) => lock(schedule).next(),
+            Self::Shared(schedule) => schedule.next().await,
+        }
+    }
+
+    async fn reschedule(&self, circle_id: u64, due: DateTime<Utc>) {
+        match self {
+            Self::Local(schedule) => lock(schedule).reschedule(circle_id, due),
+            Self::Shared(schedule) => schedule.reschedule(circle_id, due).await,
+        }
+    }
+}
+
+impl Refreshing {
+    pub(crate) fn new(
+        config: RefreshConfig,
+        shared: Option<(SharedSchedule, SharedSchedule)>,
+    ) -> Self {
+        let (joinable, full) = match shared {
+            Some((joinable, full)) => (Some(joinable), Some(full)),
+            None => (None, None),
+        };
+        Self {
+            config,
+            store: Store::new(joinable),
+            full: Store::new(full),
+            wake: Notify::new(),
+        }
+    }
+
+    fn tier(&self, tier: Tier) -> &Store {
+        match tier {
+            Tier::Joinable => &self.store,
+            Tier::Full => &self.full,
+        }
+    }
+
+    pub(crate) async fn replace(
+        &self,
+        joinable: Vec<(u64, u32)>,
+        full: Vec<(u64, u32)>,
+        tier_of: impl Fn(u64) -> Option<Tier>,
+        now: DateTime<Utc>,
+    ) {
+        self.store
+            .replace(joinable, |id| tier_of(id) == Some(Tier::Joinable), now)
+            .await;
+        self.full
+            .replace(full, |id| tier_of(id) == Some(Tier::Full), now)
+            .await;
         self.wake.notify_one();
     }
 
-    pub(crate) async fn loaded(&self, circle_id: u64, rank: u32, due: DateTime<Utc>) {
-        let added = match &self.store {
-            Store::Local(schedule) => lock(schedule).insert_new(circle_id, rank, due),
-            Store::Shared(schedule) => schedule.insert_new(circle_id, rank, due).await,
-        };
-        if added {
+    pub(crate) async fn loaded(&self, tier: Tier, circle_id: u64, rank: u32, due: DateTime<Utc>) {
+        if self.tier(tier).insert_new(circle_id, rank, due).await {
             self.wake.notify_one();
         }
     }
 
     pub(crate) async fn due_at(&self, circle_id: u64) -> Option<DateTime<Utc>> {
-        match &self.store {
-            Store::Local(schedule) => lock(schedule).due_at(circle_id),
-            Store::Shared(schedule) => schedule.due_at(circle_id).await,
+        match self.store.due_at(circle_id).await {
+            Some(due) => Some(due),
+            None => self.full.due_at(circle_id).await,
         }
     }
 
     pub(crate) async fn len(&self) -> usize {
-        match &self.store {
-            Store::Local(schedule) => lock(schedule).len(),
-            Store::Shared(schedule) => schedule.len().await,
-        }
+        self.store.len().await + self.full.len().await
     }
 
     pub(crate) async fn status(
@@ -153,17 +254,26 @@ impl Refreshing {
         loaded: impl Fn(u64) -> bool,
         now: DateTime<Utc>,
     ) -> RefreshStatus {
-        let counts = match &self.store {
-            Store::Local(schedule) => {
-                let (scheduled, loaded, due) = lock(schedule).coverage(loaded, now);
-                Some((scheduled, loaded, due, None))
-            }
-            Store::Shared(schedule) => schedule.coverage(period, now).await,
-        };
-        let Some((scheduled, loaded, due, stored_ttl)) = counts else {
-            return RefreshStatus::default();
+        let full = self
+            .full
+            .coverage(period, &loaded, now)
+            .await
+            .map(|(scheduled, loaded, due, _)| FullRefreshStatus {
+                scheduled,
+                loaded,
+                due,
+            })
+            .unwrap_or_default();
+        let Some((scheduled, loaded, due, stored_ttl)) =
+            self.store.coverage(period, &loaded, now).await
+        else {
+            return RefreshStatus {
+                full,
+                ..RefreshStatus::default()
+            };
         };
         let oldest_due = self
+            .store
             .next()
             .await
             .map(|(due, _, _)| due)
@@ -174,20 +284,22 @@ impl Refreshing {
             due,
             oldest_due,
             stored_ttl,
+            full,
         }
     }
 
-    async fn next(&self) -> Option<(DateTime<Utc>, u32, u64)> {
-        match &self.store {
-            Store::Local(schedule) => lock(schedule).next(),
-            Store::Shared(schedule) => schedule.next().await,
+    // The first due joinable club, else the first due full club, else whichever is due soonest.
+    async fn next(&self, now: DateTime<Utc>) -> Option<(DateTime<Utc>, u32, u64, Tier)> {
+        let joinable = self.store.next().await;
+        if let Some((due, rank, id)) = joinable.filter(|(due, _, _)| *due <= now) {
+            return Some((due, rank, id, Tier::Joinable));
         }
-    }
-
-    async fn reschedule(&self, circle_id: u64, due: DateTime<Utc>) {
-        match &self.store {
-            Store::Local(schedule) => lock(schedule).reschedule(circle_id, due),
-            Store::Shared(schedule) => schedule.reschedule(circle_id, due).await,
+        let full = self.full.next().await;
+        match (joinable, full) {
+            (Some((a, ..)), Some((b, rank, id))) if b < a => Some((b, rank, id, Tier::Full)),
+            (None, Some((due, rank, id))) => Some((due, rank, id, Tier::Full)),
+            (Some((due, rank, id)), _) => Some((due, rank, id, Tier::Joinable)),
+            (None, None) => None,
         }
     }
 }
@@ -324,15 +436,16 @@ impl Refresher {
 
     async fn step(&self) {
         let now = utc_now();
-        let next = self.refreshing.next().await;
-        if let Some((_, rank, circle_id)) = next.filter(|(due, _, _)| *due <= now) {
-            let took = self.refresh(circle_id, now).await;
-            if let Some(took) = took.filter(|_| rank > self.refreshing.config.fast_ranks) {
+        let next = self.refreshing.next(now).await;
+        if let Some((_, rank, circle_id, tier)) = next.filter(|(due, ..)| *due <= now) {
+            let took = self.refresh(tier, circle_id, now).await;
+            let slow = tier == Tier::Full || rank > self.refreshing.config.fast_ranks;
+            if let Some(took) = took.filter(|_| slow) {
                 tokio::time::sleep(took).await;
             }
             return;
         }
-        let wait = next.map_or(POLL, |(due, _, _)| {
+        let wait = next.map_or(POLL, |(due, ..)| {
             due.signed_duration_since(now)
                 .to_std()
                 .unwrap_or_default()
@@ -344,10 +457,11 @@ impl Refresher {
         }
     }
 
-    async fn refresh(&self, circle_id: u64, now: DateTime<Utc>) -> Option<Duration> {
+    async fn refresh(&self, tier: Tier, circle_id: u64, now: DateTime<Utc>) -> Option<Duration> {
         let config = self.refreshing.config;
+        let store = self.refreshing.tier(tier);
         if let Some(due) = self.details.due(circle_id).await.filter(|due| *due > now) {
-            self.refreshing.reschedule(circle_id, due).await;
+            store.reschedule(circle_id, due).await;
             return None;
         }
         let started = Instant::now();
@@ -365,7 +479,7 @@ impl Refresher {
                 now + config.retry
             }
         };
-        self.refreshing.reschedule(circle_id, due).await;
+        store.reschedule(circle_id, due).await;
         Some(took)
     }
 }
