@@ -133,7 +133,7 @@ Go to **Dashboards → New → Import**, upload `observability/grafana-dashboard
 
 | Row | Panels |
 |---|---|
-| Searches | Searches in the last 24 hours, the same by status code, and searches per hour |
+| Searches | Searches in the last 24 hours, the same by status code, searches per hour, how deep into the rankings searches go (worst shortlisted and top-pick rank, median and 90th percentile), the share of searches that reached the slowest clubs in the pool, and searches by deepest shortlisted rank |
 | Errors | Warnings and errors logged per hour, and a table of them by the file and line that logged them. Each file links to [Axiom](#links-to-axiom) |
 | Scan | Phase, refresh counts for joinable clubs (loaded, scheduled and due), clubs listed, time since the last successful scan, scans finished, scan duration, club details loaded as a percentage of the scheduled clubs (in Redis with Redis), what the instance did when a scan was due, how long the longest-waiting due club has waited, and the same counts and percentage loaded for full clubs |
 | uma.moe calls | Calls per second by status code and by endpoint and lane, response times, errors per minute by status, and time waiting for the 500 ms spacing |

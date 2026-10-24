@@ -483,6 +483,18 @@ Logs go to stdout. With `LOG_FORMAT=json`, each line is a JSON object with the t
 {"timestamp":"2026-10-01T09:00:00.000000Z","level":"WARN","message":"club refresh failed; retrying later","circle_id":900000101,"origin":"network","error":"request to uma.moe timed out","target":"uma_stable_match_server::refresher","filename":"backend/server/src/refresher.rs","line_number":348}
 ```
 
+### Searches
+
+Each search logs one `search` line, so it can be found and rerun. It holds the `query` string, `status`, the `trainer_id` for a trainer search, `pace_per_day`, `month`, the `coverage` counts (`shortlisted`, `scored`, `pending`), `total`, the top ten `top_clubs`, and `duration_ms`. It also says how deep into the rankings the search went:
+
+| Field | Meaning |
+|---|---|
+| `shortlist_rank` | The worst monthly rank among the shortlisted clubs |
+| `pick_rank` | The worst monthly rank among the top ten picks with an open spot |
+| `pool_bottom` | Whether the shortlist included the slowest club in the pool that the search's options allow. Searches that do want slower clubs than the scan window has |
+
+A search that fails logs `search failed` with the `query`, `status`, `error` and `duration_ms`: a warning for a server error, otherwise at info level.
+
 ### Errors and stack traces
 
 Error lines carry an `origin`: `umamoe` for an error status, rate limit or unexpected response from uma.moe, `network` when no response came back, and `server` for a problem on our side.
@@ -505,6 +517,9 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 |---|---|---|---|
 | `http_requests_total` | counter | `route`, `method`, `status` | Requests answered, by HTTP status code |
 | `http_request_duration_seconds` | histogram | `route`, `method` | Time to answer a request |
+| `search_shortlist_worst_rank` | histogram | | Per search, the worst monthly rank among the shortlisted clubs. Buckets from 1,000 to 65,000 |
+| `search_pick_worst_rank` | histogram | | Per search, the worst monthly rank among the top ten picks with an open spot |
+| `search_pool_bottom_total` | counter | | Searches whose shortlist reached the slowest club in the pool. Divided by `search_shortlist_worst_rank_count`, it's the share of searches the scan window was too short for |
 | `rate_limited_total` | counter | `limit`: `requests` or `trainer_lookups` | Requests turned away by a [rate limit](#rate-limits) |
 | `scan_phase` | gauge | | `0` idle or waiting for another instance's scan, `1` listing clubs, `2` loading club details |
 | `scan_listed_clubs` | gauge | | Clubs in the rank window listed so far in this scan |
