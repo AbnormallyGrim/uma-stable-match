@@ -229,6 +229,10 @@ async fn rejects_invalid_input() {
             "playstyle must be a comma-separated list of playstyle codes",
         ),
         (
+            "?pace=5000000&has_discord=yes",
+            "has_discord must be true or false",
+        ),
+        (
             "?pace=5000000&playstyle=0",
             "playstyle must be a comma-separated list of playstyle codes",
         ),
@@ -350,6 +354,33 @@ async fn includes_full_clubs_on_request() {
         .unwrap();
     assert_eq!(full["open_spots"], 0);
     assert_eq!(full["club_size"], 30);
+}
+
+#[tokio::test]
+async fn filters_clubs_that_mention_discord() {
+    let mut all = details();
+    let mut with_discord = detail(5, 1, 20, &paces(4.0 * M, 0.5 * M, 20));
+    with_discord["circle"]["comment"] = json!("Chill club, join our Discord: discord.gg/example");
+    all.push(with_discord);
+    let cache = scanned_with(all).await;
+
+    let (_, body) = get(&cache, "?pace=7600000").await;
+    assert_eq!(body["options"]["has_discord"], false);
+    let club = |body: &Value, id: u64| {
+        body["clubs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["circle_id"] == id)
+            .cloned()
+    };
+    assert_eq!(club(&body, 5).unwrap()["has_discord"], true);
+    assert_eq!(club(&body, 1).unwrap()["has_discord"], false);
+
+    let (status, body) = get(&cache, "?pace=7600000&has_discord=true").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(ids(&body), vec![5]);
+    assert_eq!(body["options"]["has_discord"], true);
 }
 
 #[tokio::test]

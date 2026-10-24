@@ -107,6 +107,8 @@ pub struct ListedClub {
     pub join_style: Option<JoinStyle>,
     /// Playstyle code, kept so searches can filter by it.
     pub policy: Option<u32>,
+    /// Whether the description mentions Discord, from [`mentions_discord`].
+    pub discord: bool,
     /// Mean daily fans per member, from [`raw_rate`].
     pub raw_rate: f64,
 }
@@ -153,6 +155,7 @@ impl ListedClub {
             member_count,
             join_style,
             policy: circle.policy.and_then(|code| u32::try_from(code).ok()),
+            discord: circle.comment.as_deref().is_some_and(mentions_discord),
             raw_rate,
         })
     }
@@ -178,6 +181,8 @@ pub struct ShortlistFilter {
     /// Only clubs with one of these playstyles, as bit `1 << code` per playstyle code (1 to 31).
     /// Clubs with an unknown playstyle are left out.
     pub playstyles: Option<u32>,
+    /// Only clubs whose description mentions Discord.
+    pub discord_only: bool,
 }
 
 impl ShortlistFilter {
@@ -203,8 +208,19 @@ impl ShortlistFilter {
                 .is_some_and(|code| mask & (1 << code) != 0),
             None => true,
         };
-        join_style && playstyle && (self.include_full || !club.is_full())
+        join_style
+            && playstyle
+            && (self.include_full || !club.is_full())
+            && (!self.discord_only || club.discord)
     }
+}
+
+/// Whether a club description points to a Discord server: an invite link (`discord.gg`,
+/// `discord.com/invite`, `discordapp.com/invite`, `dsc.gg`) or the word "Discord". A best guess:
+/// some clubs share their link in game instead, and some links have expired.
+pub fn mentions_discord(text: &str) -> bool {
+    let text = text.to_lowercase();
+    text.contains("discord") || text.contains("dsc.gg/")
 }
 
 /// The `ShortlistFilter::join_styles` bit for a join style.

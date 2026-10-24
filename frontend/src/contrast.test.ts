@@ -50,7 +50,8 @@ const TEXT = 4.5;
 const LARGE = 3;
 const UI = 3;
 
-// [foreground token, background, minimum]. `tag` and `policy-tag` are the tinted tag backgrounds.
+// [foreground token, background, minimum]. `tag`, `policy-tag` and `discord-tag` are the tinted tag
+// backgrounds.
 const pairs: [string, string, number][] = [
   ['text', 'bg', TEXT],
   ['text', 'card', TEXT],
@@ -71,6 +72,7 @@ const pairs: [string, string, number][] = [
   ['approval', 'tag', TEXT],
   ['closed', 'tag', TEXT],
   ['policy', 'policy-tag', TEXT],
+  ['discord', 'discord-tag', TEXT],
   ['gold', 'card', LARGE],
   ['silver', 'card', LARGE],
   ['bronze', 'card', LARGE],
@@ -92,6 +94,7 @@ describe.each([
   const background = (name: string, fg: Rgba): Rgba => {
     if (name === 'tag') return over([fg[0], fg[1], fg[2], 0.15], card);
     if (name === 'policy-tag') return over([fg[0], fg[1], fg[2], 0.12], card);
+    if (name === 'discord-tag') return over([fg[0], fg[1], fg[2], 0.14], card);
     return over(colour(name), card);
   };
 

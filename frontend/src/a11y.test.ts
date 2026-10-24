@@ -64,6 +64,7 @@ const withResults: Recommendations = recommendations({
     include_full: false,
     join_styles: null,
     playstyles: null,
+    has_discord: false,
     limit: 100,
   },
 });

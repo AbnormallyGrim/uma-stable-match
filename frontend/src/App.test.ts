@@ -19,6 +19,7 @@ function recommendations(
       include_full: false,
       join_styles: null,
       playstyles: null,
+      has_discord: false,
       limit: 50,
     },
     updated_at: '2026-03-18T09:00:00Z',

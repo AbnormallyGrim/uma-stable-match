@@ -69,7 +69,14 @@ describe('emptyHints', () => {
     include_full: false,
     join_styles: null,
     playstyles,
+    has_discord: false,
     limit: 100,
+  });
+
+  it('suggests turning off Has Discord', () => {
+    expect(emptyHints({ ...options(null, true), has_discord: true })).toEqual([
+      'Turn off Has Discord.',
+    ]);
   });
 
   it('suggests what could widen the search', () => {
@@ -92,6 +99,7 @@ describe('filter notice', () => {
     include_full: false,
     join_styles,
     playstyles,
+    has_discord: false,
     limit: 100,
   });
 

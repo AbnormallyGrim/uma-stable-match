@@ -36,6 +36,7 @@ describe('Results', () => {
           include_full: false,
           join_styles: null,
           playstyles: null,
+          has_discord: false,
           limit: 50,
         },
       }),
@@ -120,6 +121,7 @@ describe('Results', () => {
           include_full: true,
           join_styles: null,
           playstyles: null,
+          has_discord: false,
           limit: 100,
         },
       }),
@@ -129,6 +131,23 @@ describe('Results', () => {
     expect(screen.getByTestId('results-about')).toHaveTextContent(
       'Full clubs (30 of 30 members) are in the table, but not the top picks',
     );
+  });
+
+  it('says the Discord filter is a best guess', () => {
+    render(Results, {
+      result: recommendations({
+        options: {
+          balance_weight: null,
+          include_closed: false,
+          include_full: false,
+          join_styles: null,
+          playstyles: null,
+          has_discord: true,
+          limit: 100,
+        },
+      }),
+    });
+    expect(screen.getByText(/Some clubs with a Discord won't show up/)).toBeInTheDocument();
   });
 
   it('says when nothing matched', () => {
@@ -147,6 +166,7 @@ describe('Results states', () => {
           include_full: false,
           join_styles: null,
           playstyles: null,
+          has_discord: false,
           limit: 100,
         },
       }),

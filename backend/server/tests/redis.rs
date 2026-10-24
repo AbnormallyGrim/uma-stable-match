@@ -67,6 +67,7 @@ fn pool(id: u64) -> SharedPool {
         join_style: None,
         raw_rate: 1000.0,
         policy: None,
+        discord: false,
     }])))
 }
 

@@ -14,6 +14,7 @@ fn listed(circle_id: u64, raw_rate: f64) -> ListedClub {
         join_style: Some(JoinStyle::Approval),
         raw_rate,
         policy: None,
+        discord: false,
     }
 }
 
@@ -499,4 +500,42 @@ fn playstyle_filters_keep_only_matching_clubs() {
     ids.sort_unstable();
     assert_eq!(ids, vec![1, 2]);
     assert_eq!(pool.eligible(filter), 2);
+}
+
+#[test]
+fn spots_discord_links_and_mentions() {
+    for text in [
+        "Join us: discord.gg/example",
+        "https://discord.com/invite/example",
+        "discordapp.com/invite/example",
+        "DM the leader for our DISCORD",
+        "dsc.gg/example",
+    ] {
+        assert!(mentions_discord(text), "{text}");
+    }
+    for text in [
+        "",
+        "Casual club, log in daily",
+        "discussion welcome",
+        "dsc.gg",
+    ] {
+        assert!(!mentions_discord(text), "{text}");
+    }
+}
+
+#[test]
+fn discord_filter_keeps_only_clubs_that_mention_it() {
+    let pool = ClubPool::new([
+        ListedClub {
+            discord: true,
+            ..listed(1, 100.0)
+        },
+        listed(2, 200.0),
+    ]);
+    let filter = ShortlistFilter {
+        discord_only: true,
+        ..ShortlistFilter::default()
+    };
+    assert_eq!(pool.shortlist_matching(150.0, 10, filter), vec![1]);
+    assert_eq!(pool.eligible(filter), 1);
 }

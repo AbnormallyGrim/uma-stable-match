@@ -26,6 +26,8 @@ export interface Club {
   monthly_rank: number | null;
   last_month_rank: number | null;
   comment: string | null;
+  /** Whether the description mentions Discord. A best guess. */
+  has_discord: boolean;
   your_place: number;
   club_size: number;
   ranked_members: number;
@@ -52,6 +54,8 @@ export interface Recommendations {
     join_styles: JoinStyle[] | null;
     /** The playstyle codes searched for, or `null` for any. */
     playstyles: number[] | null;
+    /** Whether only clubs that mention Discord were searched. */
+    has_discord: boolean;
     limit: number;
   };
   updated_at: string;
@@ -75,6 +79,8 @@ export interface RecommendationQuery {
   joinStyle?: JoinStyle | null;
   /** The only playstyle code to search for. Unset or `null` means any. */
   playstyle?: number | null;
+  /** Only clubs whose description mentions Discord. */
+  hasDiscord?: boolean;
   includeFull?: boolean;
   limit?: number;
 }
@@ -130,13 +136,16 @@ export function recommendationParams(query: RecommendationQuery): URLSearchParam
   return params;
 }
 
-/** Adds the join style, playstyle and full-club parameters, leaving out defaults. */
+/** Adds the join style, playstyle, Discord and full-club parameters, leaving out defaults. */
 export function setFilterParams(params: URLSearchParams, query: RecommendationQuery): void {
   if (query.joinStyle) {
     params.set('join_style', query.joinStyle);
   }
   if (query.playstyle != null) {
     params.set('playstyle', String(query.playstyle));
+  }
+  if (query.hasDiscord) {
+    params.set('has_discord', 'true');
   }
   if (query.includeFull) {
     params.set('include_full', 'true');

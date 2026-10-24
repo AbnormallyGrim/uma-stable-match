@@ -65,6 +65,9 @@
         {#if spots}<span>{spots}</span>{/if}
         {#if joinStyle}<span class="tag join {club.join_style}">{joinStyle}</span>{/if}
         {#if playstyle}<span class="tag policy">{playstyle}</span>{/if}
+        {#if club.has_discord}
+          <span class="tag discord" title="The description mentions Discord">Discord</span>
+        {/if}
       </div>
     </div>
     <dl class="nums">
@@ -225,6 +228,11 @@
   .policy {
     background: color-mix(in srgb, var(--policy) 12%, transparent);
     color: var(--policy);
+  }
+
+  .discord {
+    background: color-mix(in srgb, var(--discord) 14%, transparent);
+    color: var(--discord);
   }
 
   .nums {

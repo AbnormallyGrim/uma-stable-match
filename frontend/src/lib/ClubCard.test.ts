@@ -84,4 +84,17 @@ describe('ClubCard', () => {
     expect(container.querySelector('article')).toHaveClass('p2');
     expect(screen.getByLabelText('Pick 2')).toHaveTextContent('2');
   });
+
+  it('tags clubs whose description mentions Discord', () => {
+    render(ClubCard, { club: club({ has_discord: true }), position: 4, balanceOn: false });
+    expect(screen.getByText('Discord')).toHaveAttribute(
+      'title',
+      'The description mentions Discord',
+    );
+  });
+
+  it('shows no Discord tag otherwise', () => {
+    render(ClubCard, { club: club(), position: 4, balanceOn: false });
+    expect(screen.queryByText('Discord')).not.toBeInTheDocument();
+  });
 });

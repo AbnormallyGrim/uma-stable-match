@@ -5,6 +5,7 @@
   import Dropdown from './Dropdown.svelte';
   import { joinStyleLabel, PLAYSTYLES } from './format';
   import {
+    DISCORD_NOTE,
     JOIN_STYLES,
     narrowsSearch,
     validate,
@@ -128,6 +129,11 @@
         <span class="track" aria-hidden="true"></span>
         Include full clubs
       </label>
+      <label class="switch">
+        <input type="checkbox" role="switch" bind:checked={search.hasDiscord} />
+        <span class="track" aria-hidden="true"></span>
+        Has Discord
+      </label>
 
       <span class="label" id="join-style-label">Join style</span>
       <div class="join-styles" role="group" aria-labelledby="join-style-label">
@@ -179,6 +185,9 @@
           Filtering by join style or playstyle leaves fewer clubs to choose from, so your best
           matches may be further from your pace than usual.
         </p>
+      {/if}
+      {#if search.hasDiscord}
+        <p class="warning" data-testid="discord-warning">{DISCORD_NOTE}</p>
       {/if}
     </div>
   </div>
