@@ -988,6 +988,8 @@ async fn coverage_counts_scheduled_clubs_stored_in_redis() {
 
     let status = second.refresh_status().await;
     assert_eq!((status.scheduled, status.loaded, status.due), (3, 2, 3));
+    let ttl = status.stored_ttl.expect("stored clubs have a TTL");
+    assert!(ttl.shortest > Duration::ZERO && ttl.shortest <= ttl.average);
 
     let url = std::env::var("REDIS_TEST_URL").unwrap();
     let mut conn = redis::Client::open(url)

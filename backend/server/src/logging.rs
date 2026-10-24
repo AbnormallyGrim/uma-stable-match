@@ -2,8 +2,9 @@
 
 use std::backtrace::Backtrace;
 
-use tracing::Subscriber;
+use tracing::{Event, Level, Subscriber};
 use tracing_subscriber::fmt::MakeWriter;
+use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
@@ -77,15 +78,44 @@ where
         .with_file(true)
         .with_line_number(true);
     match format {
-        LogFormat::Text => Box::new(builder.finish()),
+        LogFormat::Text => Box::new(builder.finish().with(CountProblems)),
         LogFormat::Json => Box::new(
             builder
                 .json()
                 .flatten_event(true)
                 .with_current_span(false)
                 .with_span_list(false)
-                .finish(),
+                .finish()
+                .with(CountProblems),
         ),
+    }
+}
+
+/// Counts every warning and error as `log_events_total`, by level and the file and line that logged
+/// it. Other crates' lines are counted without a file or line, so the label set stays small.
+struct CountProblems;
+
+impl<S: Subscriber> Layer<S> for CountProblems {
+    fn on_event(&self, event: &Event<'_>, _: Context<'_, S>) {
+        let metadata = event.metadata();
+        let level = match *metadata.level() {
+            Level::ERROR => "error",
+            Level::WARN => "warn",
+            _ => return,
+        };
+        let (file, line) = if metadata.target().starts_with("uma_stable_match") {
+            (
+                metadata.file().unwrap_or_default(),
+                metadata
+                    .line()
+                    .map(|line| line.to_string())
+                    .unwrap_or_default(),
+            )
+        } else {
+            ("", String::new())
+        };
+        metrics::counter!("log_events_total", "level" => level, "file" => file, "line" => line)
+            .increment(1);
     }
 }
 

@@ -187,3 +187,37 @@ async fn failed_umamoe_requests_are_logged_once_with_their_origin() {
     assert_eq!(line["attempts"], 2);
     assert!(line["backtrace"].is_string());
 }
+
+#[test]
+fn warnings_and_errors_are_counted_by_where_they_were_logged() {
+    let recorder = metrics_exporter_prometheus::PrometheusBuilder::new().build_recorder();
+    let handle = recorder.handle();
+    metrics::with_local_recorder(&recorder, || {
+        let captured = Captured::default();
+        let subscriber = subscriber(LogFormat::Json, EnvFilter::new("info"), captured);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::warn!("club refresh failed");
+            tracing::warn!(target: "hyper", "connection reset");
+            tracing::error!("scan failed");
+            tracing::info!("scan finished");
+        });
+    });
+    let rendered = handle.render();
+    let counted = |level: &str, file: &str| {
+        rendered
+            .lines()
+            .filter(|line| line.starts_with("log_events_total{"))
+            .filter(|line| line.contains(&format!(r#"level="{level}",file="{file}",line=""#)))
+            .filter_map(|line| {
+                let number = line.split(r#"line=""#).nth(1)?.split('"').next()?;
+                (file.is_empty() == number.is_empty()).then_some(line.ends_with(" 1"))
+            })
+            .filter(|&one| one)
+            .count()
+    };
+    let here = "backend/server/src/logging/tests.rs";
+    assert_eq!(counted("warn", here), 1);
+    assert_eq!(counted("error", here), 1);
+    assert_eq!(counted("warn", ""), 1);
+    assert!(!rendered.contains(r#"level="info""#));
+}

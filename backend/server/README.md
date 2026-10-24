@@ -487,9 +487,15 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `refresh_overdue_seconds` | gauge | | How long the longest-waiting due club has waited, `0` when none are due |
 | `redis_up` | gauge | | `1` while Redis answers, `0` after a failure. Absent without Redis |
 | `redis_errors_total` | counter | `reason` | Failed or timed-out Redis operations, by the kind of failure |
-| `redis_op_duration_seconds` | histogram | `op`: `get`, `set`, `script` or `schedule` | Time per Redis operation, failures included |
+| `redis_op_duration_seconds` | histogram | `op`: `get`, `mget`, `set`, `script`, `schedule` or `info` | Time per Redis operation, failures included |
+| `redis_keys`, `redis_keys_expiring` | gauge | | Every key in Redis, and how many have a TTL |
+| `redis_average_ttl_seconds` | gauge | | Redis's average TTL across the keys that have one |
+| `redis_memory_used_bytes`, `redis_memory_max_bytes` | gauge | | Memory Redis uses, and its `maxmemory` limit (`0` for none) |
+| `redis_expired_keys_total`, `redis_evicted_keys_total` | counter | | Keys that reached their TTL, and keys removed because Redis hit its memory limit |
+| `redis_club_ttl_shortest_seconds`, `redis_club_ttl_average_seconds` | gauge | | Time to live of the scheduled clubs' details in Redis: the soonest to expire and the average. Details stay a day past their next refresh, so the soonest stays above a day while the refresher keeps up |
+| `log_events_total` | counter | `level`: `warn` or `error`; `file`, `line` | Warnings and errors logged, by where in the code they were logged. Other libraries' lines have an empty `file` and `line` |
 
-`scan_last_success_timestamp_seconds` and the `pool_*`, `detail_*` and `refresh_*` values are read from the server each time `/metrics` is requested. With Redis, the `refresh_*` values come from one script over the shared schedule, so every instance reports the same; the detail cache settles its pending work first, so `detail_cache_clubs` is exact. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
+`scan_last_success_timestamp_seconds` and the `pool_*`, `detail_*` and `refresh_*` values are read from the server each time `/metrics` is requested. With Redis, the `refresh_*` and `redis_club_ttl_*` values come from one script over the shared schedule, so every instance reports the same, and the other `redis_*` gauges come from one `INFO` call; the detail cache settles its pending work first, so `detail_cache_clubs` is exact. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
 
 To watch these on a dashboard, [observability/README.md](../../observability/README.md) sets up Prometheus and Grafana locally, with a ready-made dashboard.
 
