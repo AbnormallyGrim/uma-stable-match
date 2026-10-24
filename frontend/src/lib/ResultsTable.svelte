@@ -185,7 +185,7 @@
 </div>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="scroll" role="region" aria-label="All results" tabindex="0">
+<div class="scroll" role="region" aria-label="Top results" tabindex="0">
   <table>
     <thead>
       <tr>
