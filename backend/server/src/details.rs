@@ -72,6 +72,7 @@ struct Inner {
     sender: mpsc::Sender<u64>,
     shared: SharedCache,
     timing: RefreshConfig,
+    scan: ScanConfig,
     refreshing: Option<Arc<Refreshing>>,
 }
 
@@ -194,6 +195,7 @@ impl ClubDetails {
                 listing: RwLock::new(None),
                 queued: Mutex::new(HashSet::new()),
                 timing: config.refresh,
+                scan: config.scan,
                 refreshing: config.refresher.then(|| {
                     Arc::new(Refreshing::new(
                         config.refresh,
@@ -544,6 +546,10 @@ async fn track(inner: &Inner, circle_id: u64, due: DateTime<Utc>) {
         .and_then(|c| c.monthly_rank)
         .and_then(|r| u32::try_from(r).ok())
         .unwrap_or(u32::MAX);
+    // Clubs in the lower range aren't refreshed yet; they're loaded again when a search needs them.
+    if inner.scan.is_lower(rank) {
+        return;
+    }
     refreshing.loaded(tier, circle_id, rank, due).await;
 }
 

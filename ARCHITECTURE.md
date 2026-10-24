@@ -81,7 +81,7 @@ The scoring crate has no network or storage code: club and member data go in, sc
 
 Once at start-up, then 30 minutes after each of uma.moe's daily updates (15:00 UTC), the scanner runs. If uma.moe hasn't updated yet, it tries again an hour later. `SCAN_INTERVAL_MINUTES` replaces this with a fixed interval. The scanner:
 
-1. Lists clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO` (80 to 900) from uma.moe, 100 per page.
+1. Lists clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO` (80 to 900) from uma.moe, 100 per page. With `SCAN_LOWER_RANK_TO` set, it carries on below the window until clubs have no fans this month, and keeps lower-range clubs only while they're still gaining fans.
 2. Builds a new **club pool** from the list rows alone. Archived and unscorable clubs are left out; closed and full clubs stay, so each request can include them. Joinable and full clubs go on separate refresh schedules. Each club gets a pace estimate from its monthly points.
 3. Copies in the exact medians of clubs still in the detail cache, then swaps the new pool in.
 4. Picks up to `SCAN_MAX_DETAILS` joinable clubs (200), best rank first, and as many full clubs. Today's pool (about 150 clubs) fits whole. It hands them to the **refresher**.
