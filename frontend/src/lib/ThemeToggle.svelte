@@ -30,10 +30,10 @@
   });
 </script>
 
-<fieldset class="segmented theme">
+<fieldset class="segmented theme" data-tour="theme">
   <legend class="visually-hidden">Theme</legend>
   {#each options as option (option.value)}
-    <label data-tooltip={option.label}>
+    <label class="tooltip" data-tooltip={option.label}>
       <input type="radio" name="theme" value={option.value} bind:group={choice} />
       <svg
         viewBox="0 0 16 16"
@@ -67,40 +67,5 @@
   .theme label {
     display: inline-flex;
     padding: 6px 9px;
-  }
-
-  /* A themed tooltip under each icon, on hover and keyboard focus. */
-  .theme label::after {
-    position: absolute;
-    z-index: 1;
-    top: calc(100% + 8px);
-    left: 50%;
-    padding: 3px 8px;
-    background: var(--card);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
-    color: var(--text);
-    font-size: 0.75rem;
-    white-space: nowrap;
-    content: attr(data-tooltip);
-    opacity: 0;
-    pointer-events: none;
-    transform: translate(-50%, -2px);
-    transition:
-      opacity 0.12s,
-      transform 0.12s;
-  }
-
-  .theme label:hover::after,
-  .theme label:has(input:focus-visible)::after {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .theme label::after {
-      transition: none;
-    }
   }
 </style>

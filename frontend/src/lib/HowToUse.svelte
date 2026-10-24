@@ -8,7 +8,7 @@
   const RANKINGS = 'https://uma.moe/rankings';
 </script>
 
-<details class="how-to">
+<details class="how-to" data-tour="how-to">
   <summary>How to use</summary>
   <ol>
     <li>

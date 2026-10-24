@@ -288,6 +288,48 @@ input[type='range']:disabled {
   }
 }
 
+/* A themed tooltip under an element, from its `data-tooltip`, on hover and keyboard focus. It's
+   for sighted users only: give the element an accessible name as well. */
+.tooltip {
+  position: relative;
+}
+
+.tooltip::after {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 8px);
+  left: 50%;
+  padding: 3px 8px;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 400;
+  white-space: nowrap;
+  content: attr(data-tooltip);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -2px);
+  transition:
+    opacity 0.12s,
+    transform 0.12s;
+}
+
+.tooltip:hover::after,
+.tooltip:focus-visible::after,
+.tooltip:has(:focus-visible)::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tooltip::after {
+    transition: none;
+  }
+}
+
 /* A pill-shaped group of radio buttons. The selected one is styled with :has(), so it needs
    no component state. */
 .segmented {

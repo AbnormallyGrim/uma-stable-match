@@ -120,7 +120,7 @@ docker compose up -d
 
 ## Usage
 
-1. Open Uma Stable Match in your browser. New to it? Open **How to use** under the search form for step-by-step instructions, including where to find your trainer ID and daily pace.
+1. Open Uma Stable Match in your browser. On your first visit, a short tour shows you around; select the **?** in the top bar to take it again. **How to use** under the search form has step-by-step instructions too, including where to find your trainer ID and daily pace.
 2. Enter your **trainer ID**, or switch to **Daily pace** and enter your daily fan gain in millions. Tick **Remember my trainer ID on this device** to have it filled in next time.
 3. Optionally turn on **Balance scoring** and adjust its strength (0–1). Higher values push clubs with many low contributors further down.
 4. Optionally tick **Include full clubs** to add clubs with no open spot to the table for comparison; full clubs never appear as top picks. Pick one **Join style** (Open, Approval or Closed) or one **Playstyle** to see only those clubs; without one, open and approval clubs of every playstyle are searched. Filtering leaves fewer clubs near your pace, so the page warns that your best matches may be further from it. Turn on **Has Discord** to keep only clubs whose description mentions Discord; it's a best guess, as some clubs only share their link in game. Club cards show a **Discord** tag for these clubs.

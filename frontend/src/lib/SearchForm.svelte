@@ -52,7 +52,7 @@
 </script>
 
 <form class="search" onsubmit={submit} novalidate aria-label="Find clubs">
-  <fieldset class="segmented">
+  <fieldset class="segmented" data-tour="search-by">
     <legend class="visually-hidden">Search by</legend>
     <label>
       <input type="radio" name="mode" value="trainer" bind:group={search.mode} />
@@ -66,7 +66,7 @@
 
   <div class="row">
     {#if search.mode === 'trainer'}
-      <div class="field">
+      <div class="field" data-tour="search-field">
         <label class="label" for="trainer-id">Trainer ID</label>
         <input
           id="trainer-id"
@@ -88,7 +88,7 @@
         </label>
       </div>
     {:else}
-      <div class="field">
+      <div class="field" data-tour="search-field">
         <label class="label" for="pace">Daily fan gain (millions)</label>
         <input
           id="pace"
@@ -107,85 +107,89 @@
     {/if}
 
     <div class="field options">
-      <label class="switch">
-        <input type="checkbox" role="switch" bind:checked={search.balance} />
-        <span class="track" aria-hidden="true"></span>
-        Balance scoring
-      </label>
-      <label class="slider-label" for="balance-weight"
-        >Balance strength: {search.balanceWeight.toFixed(2)}</label
-      >
-      <input
-        id="balance-weight"
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
-        bind:value={search.balanceWeight}
-        disabled={!search.balance}
-      />
-      <label class="switch">
-        <input type="checkbox" role="switch" bind:checked={search.includeFull} />
-        <span class="track" aria-hidden="true"></span>
-        Include full clubs
-      </label>
-      <label class="switch">
-        <input type="checkbox" role="switch" bind:checked={search.hasDiscord} />
-        <span class="track" aria-hidden="true"></span>
-        Has Discord
-      </label>
-
-      <span class="label" id="join-style-label">Join style</span>
-      <div class="join-styles" role="group" aria-labelledby="join-style-label">
-        {#each JOIN_STYLES as style (style)}
-          <button
-            type="button"
-            class="join {style}"
-            aria-pressed={search.joinStyle === style}
-            onclick={() => pickJoinStyle(style)}
-          >
-            <svg
-              viewBox="0 0 16 16"
-              width="14"
-              height="14"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              {#if style === 'open'}
-                <rect x="3" y="7" width="10" height="7" rx="1.5" />
-                <path d="M5.5 7V4.5a2.5 2.5 0 0 1 4.8-1" />
-              {:else if style === 'approval'}
-                <circle cx="6" cy="5" r="2.5" />
-                <path d="M1.5 14c.5-2.5 2.3-4 4.5-4s4 1.5 4.5 4" />
-                <path d="m10.5 7.5 1.5 1.5 3-3" />
-              {:else}
-                <rect x="3" y="7" width="10" height="7" rx="1.5" />
-                <path d="M5.5 7V4.5a2.5 2.5 0 0 1 5 0V7" />
-              {/if}
-            </svg>
-            {joinStyleLabel(style)}
-          </button>
-        {/each}
+      <div class="group" data-tour="balance">
+        <label class="switch">
+          <input type="checkbox" role="switch" bind:checked={search.balance} />
+          <span class="track" aria-hidden="true"></span>
+          Balance scoring
+        </label>
+        <label class="slider-label" for="balance-weight"
+          >Balance strength: {search.balanceWeight.toFixed(2)}</label
+        >
+        <input
+          id="balance-weight"
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          bind:value={search.balanceWeight}
+          disabled={!search.balance}
+        />
       </div>
+      <div class="group" data-tour="filters">
+        <label class="switch">
+          <input type="checkbox" role="switch" bind:checked={search.includeFull} />
+          <span class="track" aria-hidden="true"></span>
+          Include full clubs
+        </label>
+        <label class="switch">
+          <input type="checkbox" role="switch" bind:checked={search.hasDiscord} />
+          <span class="track" aria-hidden="true"></span>
+          Has Discord
+        </label>
 
-      <span class="label" id="playstyle-label">Playstyle</span>
-      <Dropdown
-        id="playstyle"
-        labelledby="playstyle-label"
-        options={PLAYSTYLE_OPTIONS}
-        bind:value={search.playstyle}
-      />
+        <span class="label" id="join-style-label">Join style</span>
+        <div class="join-styles" role="group" aria-labelledby="join-style-label">
+          {#each JOIN_STYLES as style (style)}
+            <button
+              type="button"
+              class="join {style}"
+              aria-pressed={search.joinStyle === style}
+              onclick={() => pickJoinStyle(style)}
+            >
+              <svg
+                viewBox="0 0 16 16"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                {#if style === 'open'}
+                  <rect x="3" y="7" width="10" height="7" rx="1.5" />
+                  <path d="M5.5 7V4.5a2.5 2.5 0 0 1 4.8-1" />
+                {:else if style === 'approval'}
+                  <circle cx="6" cy="5" r="2.5" />
+                  <path d="M1.5 14c.5-2.5 2.3-4 4.5-4s4 1.5 4.5 4" />
+                  <path d="m10.5 7.5 1.5 1.5 3-3" />
+                {:else}
+                  <rect x="3" y="7" width="10" height="7" rx="1.5" />
+                  <path d="M5.5 7V4.5a2.5 2.5 0 0 1 5 0V7" />
+                {/if}
+              </svg>
+              {joinStyleLabel(style)}
+            </button>
+          {/each}
+        </div>
 
-      {#if narrowed}
-        <p class="warning" data-testid="filter-warning">
-          Filtering by join style or playstyle leaves fewer clubs to choose from, so your best
-          matches may be further from your pace than usual.
-        </p>
-      {/if}
+        <span class="label" id="playstyle-label">Playstyle</span>
+        <Dropdown
+          id="playstyle"
+          labelledby="playstyle-label"
+          options={PLAYSTYLE_OPTIONS}
+          bind:value={search.playstyle}
+        />
+
+        {#if narrowed}
+          <p class="warning" data-testid="filter-warning">
+            Filtering by join style or playstyle leaves fewer clubs to choose from, so your best
+            matches may be further from your pace than usual.
+          </p>
+        {/if}
+      </div>
       {#if search.hasDiscord}
         <p class="warning" data-testid="discord-warning">{DISCORD_NOTE}</p>
       {/if}
@@ -193,7 +197,7 @@
   </div>
 
   <div class="actions">
-    <button class="primary" type="submit" disabled={busy}
+    <button class="primary" data-tour="find" type="submit" disabled={busy}
       >{busy ? 'Searching…' : 'Find clubs'}</button
     >
   </div>
@@ -256,11 +260,18 @@
     margin: 0;
   }
 
+  /* Groups the tour highlights, laid out like the rest of the options column. */
+  .options .group {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+  }
+
   .options .switch + .slider-label {
     margin-top: 2px;
   }
 
-  .options input[type='range'] + .switch {
+  .options .group + .group {
     margin-top: 6px;
   }
 
