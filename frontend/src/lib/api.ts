@@ -35,6 +35,12 @@ export interface Club {
   balance: Balance | null;
 }
 
+/** The trainer's current club, scored as if they were joining it. */
+export interface YourClub extends Club {
+  /** Where it would sit among the results, from 1. Above the result count, it's below them. */
+  result_rank: number;
+}
+
 /** Response from `GET /api/v1/recommendations`. */
 export interface Recommendations {
   trainer: { trainer_id: number | null; pace_per_day: number };
@@ -46,6 +52,7 @@ export interface Recommendations {
   coverage: { shortlisted: number; scored: number; pending: number };
   total: number;
   clubs: Club[];
+  your_club: YourClub | null;
 }
 
 /** Look up a trainer's pace, or give it directly in fans per day. */

@@ -12,7 +12,8 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
 use uma_stable_match_scoring::{
-    score_clubs, Balance, Club, JoinStyle, ScoredClub, ScoringOptions, DEFAULT_BALANCE_WEIGHT,
+    score_club, score_clubs, Balance, Club, JoinStyle, ScoredClub, ScoringOptions,
+    DEFAULT_BALANCE_WEIGHT,
 };
 use uma_stable_match_umamoe_client::Priority;
 
@@ -67,6 +68,14 @@ pub(crate) struct Recommendations {
     coverage: Coverage,
     total: usize,
     clubs: Vec<Recommendation>,
+    your_club: Option<YourClub>,
+}
+
+#[derive(Debug, Serialize)]
+struct YourClub {
+    #[serde(flatten)]
+    club: Recommendation,
+    result_rank: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -232,21 +241,39 @@ async fn search(
             "no scan results yet; try again shortly",
         ))?,
     };
-    let (pace, trainer_id) = match source {
-        PaceSource::Given(pace) => (pace, None),
+    let (pace, trainer_id, own_club_id) = match source {
+        PaceSource::Given(pace) => (pace, None, None),
         PaceSource::Trainer(id) => {
             let period = state.details.period();
             if !state.paces.is_cached(id, period) {
                 state.limits.check_lookup(visitor)?;
             }
-            let pace = state.paces.pace(id, period).await.map_err(pace_error)?;
-            (pace, Some(id))
+            let found = state.paces.pace(id, period).await.map_err(pace_error)?;
+            (found.pace, Some(id), found.circle_id)
         }
     };
     score_clubs(pace, &[], &options).map_err(|e| ApiError::bad_request(e.to_string()))?;
-    let (clubs, coverage) = load_clubs(&state.details, state.matching, pace, include_closed).await;
+    let (mut clubs, coverage) =
+        load_clubs(&state.details, state.matching, pace, include_closed).await;
+    if let Some(circle_id) = own_club_id {
+        clubs.retain(|club| club.circle_id != circle_id);
+    }
     let scored =
         score_clubs(pace, &clubs, &options).map_err(|e| ApiError::bad_request(e.to_string()))?;
+    let your_club = match (trainer_id, own_club_id) {
+        (Some(trainer_id), Some(circle_id)) => {
+            own_club(
+                &state.details,
+                circle_id,
+                trainer_id,
+                pace,
+                &options,
+                &scored,
+            )
+            .await
+        }
+        _ => None,
+    };
 
     Ok(Json(Recommendations {
         trainer: TrainerView {
@@ -267,7 +294,48 @@ async fn search(
             .take(limit as usize)
             .map(recommendation)
             .collect(),
+        your_club,
     }))
+}
+
+// The trainer's club scored as if they were joining it: without their own member row and one
+// member smaller. Closed clubs count, since they're already in it.
+async fn own_club(
+    details: &ClubDetails,
+    circle_id: u64,
+    trainer_id: u64,
+    pace: f64,
+    options: &ScoringOptions,
+    scored: &[ScoredClub<'_>],
+) -> Option<YourClub> {
+    let loaded = details
+        .get(circle_id, Priority::Interactive)
+        .await
+        .inspect_err(|error| {
+            tracing::warn!(
+                trainer_id,
+                circle_id,
+                origin = error.origin(),
+                %error,
+                "trainer's club lookup failed"
+            );
+        })
+        .ok()?;
+    let mut club = Club::clone(&loaded);
+    let before = club.members.len();
+    club.members.retain(|member| member.viewer_id != trainer_id);
+    if club.members.len() < before {
+        club.member_count = club.member_count.map(|n| n.saturating_sub(1));
+    }
+    let options = options.with_include_closed(true);
+    let own = score_club(pace, &club, &options).ok()??;
+    let mut view = recommendation(&own);
+    view.member_count = loaded.member_count;
+    view.open_spots = loaded.open_spots();
+    Some(YourClub {
+        club: view,
+        result_rank: scored.iter().filter(|s| s.score < own.score).count() + 1,
+    })
 }
 
 // Every cached club in the pool, the uncached shortlisted clubs current in Redis, and up to

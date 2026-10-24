@@ -171,6 +171,103 @@ async fn works_out_pace_from_trainer_id() {
     assert_eq!(body["clubs"].as_array().unwrap().len(), 1);
 }
 
+fn home_club_detail() -> Value {
+    let mut members: Vec<Value> = (0..10)
+        .map(|i| json!({ "viewer_id": 8000 + i, "year": 2026, "month": 3, "daily_fans": series(2_000_000 + 1_000_000 * i) }))
+        .collect();
+    members.push(
+        json!({ "viewer_id": TRAINER, "year": 2026, "month": 3, "daily_fans": series(6_000_000) }),
+    );
+    json!({
+        "circle": {
+            "circle_id": 2,
+            "name": "Home Club",
+            "member_count": 30,
+            "join_style": 3,
+            "last_updated": "2026-03-19T15:00:00Z",
+        },
+        "members": members,
+    })
+}
+
+#[tokio::test]
+async fn compares_the_trainers_own_club() {
+    let server = MockServer::start().await;
+    let cache = scanned(&server).await;
+    mount_trainer(
+        &server,
+        ResponseTemplate::new(200).set_body_json(home_club_detail()),
+        1,
+    )
+    .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "2"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(home_club_detail()))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let state = app(&server, cache, DEFAULT_PACE_TTL);
+
+    let (status, body) = get(&state, &by_trainer()).await;
+    assert_eq!(status, StatusCode::OK);
+    let own = &body["your_club"];
+    assert_eq!(own["circle_id"], 2);
+    assert_eq!(own["join_style"], "closed");
+    assert_eq!(own["member_count"], 30);
+    assert_eq!(own["open_spots"], 0);
+    assert_eq!(own["club_size"], 30);
+    assert_eq!(own["ranked_members"], 10);
+    assert_eq!(own["your_place"], 6);
+    assert!(own["result_rank"].as_u64().unwrap() >= 1);
+}
+
+#[tokio::test]
+async fn leaves_the_trainers_own_club_out_of_the_results() {
+    let server = MockServer::start().await;
+    let cache = scanned(&server).await;
+    let mut detail = club_detail();
+    detail["members"].as_array_mut().unwrap().push(
+        json!({ "viewer_id": TRAINER, "year": 2026, "month": 3, "daily_fans": series(6_000_000) }),
+    );
+    mount_trainer(&server, ResponseTemplate::new(200).set_body_json(detail), 1).await;
+    let state = app(&server, cache, DEFAULT_PACE_TTL);
+
+    let (status, body) = get(&state, &by_trainer()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["clubs"].as_array().unwrap().is_empty());
+    assert_eq!(body["your_club"]["circle_id"], 1);
+    assert_eq!(body["your_club"]["result_rank"], 1);
+}
+
+#[tokio::test]
+async fn a_pace_search_has_no_own_club() {
+    let server = MockServer::start().await;
+    let cache = scanned(&server).await;
+    let state = app(&server, cache, DEFAULT_PACE_TTL);
+
+    let (status, body) = get(&state, "?pace=6000000").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["your_club"].is_null());
+}
+
+#[tokio::test]
+async fn an_own_club_that_fails_to_load_is_left_out() {
+    let server = MockServer::start().await;
+    let cache = scanned(&server).await;
+    mount_trainer(&server, trainer_club(series(6_000_000)), 1).await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "2"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&server)
+        .await;
+    let state = app(&server, cache, DEFAULT_PACE_TTL);
+
+    let (status, body) = get(&state, &by_trainer()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["your_club"].is_null());
+    assert_eq!(body["clubs"].as_array().unwrap().len(), 1);
+}
+
 #[tokio::test]
 async fn caches_the_pace() {
     let server = MockServer::start().await;
@@ -341,7 +438,7 @@ async fn early_month_uses_last_months_fans() {
     mount_last_month(&server, trainer_club(series(3_000_000)), 1).await;
     mount_gains(&server, gains(Some(70_000_000)), 0).await;
 
-    let pace = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap();
+    let pace = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap().pace;
     assert_eq!(pace, 3_000_000.0);
 }
 
@@ -351,7 +448,7 @@ async fn early_month_falls_back_to_seven_day_gains() {
     mount_last_month(&server, trainer_club(one_day()), 1).await;
     mount_gains(&server, gains(Some(70_000_000)), 1).await;
 
-    let pace = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap();
+    let pace = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap().pace;
     assert_eq!(pace, 10_000_000.0);
 }
 
@@ -409,8 +506,11 @@ async fn paces_are_cached_per_month() {
 
     let paces = lookup(&server);
     for _ in 0..2 {
-        assert_eq!(paces.pace(TRAINER, None).await.unwrap(), 5_000_000.0);
-        assert_eq!(paces.pace(TRAINER, FEBRUARY).await.unwrap(), 3_000_000.0);
+        assert_eq!(paces.pace(TRAINER, None).await.unwrap().pace, 5_000_000.0);
+        assert_eq!(
+            paces.pace(TRAINER, FEBRUARY).await.unwrap().pace,
+            3_000_000.0
+        );
     }
     assert!(paces.is_cached(TRAINER, None));
     assert!(paces.is_cached(TRAINER, FEBRUARY));
@@ -501,8 +601,9 @@ async fn a_trainer_who_changed_clubs_is_found_in_their_ranked_club() {
     mount_club(&server, 2, trainer_club(series(3_000_000)), 1).await;
     mount_trainer(&server, oldest_club(), 0).await;
 
-    let pace = lookup(&server).pace(TRAINER, None).await.unwrap();
-    assert_eq!(pace, 3_000_000.0);
+    let found = lookup(&server).pace(TRAINER, None).await.unwrap();
+    assert_eq!(found.pace, 3_000_000.0);
+    assert_eq!(found.circle_id, Some(2));
 }
 
 #[tokio::test]
@@ -513,7 +614,7 @@ async fn only_the_exact_trainer_id_counts_in_rankings() {
     mount_club(&server, 3, trainer_club(series(9_000_000)), 0).await;
     mount_trainer(&server, trainer_club(series(3_000_000)), 1).await;
 
-    let pace = lookup(&server).pace(TRAINER, None).await.unwrap();
+    let pace = lookup(&server).pace(TRAINER, None).await.unwrap().pace;
     assert_eq!(pace, 3_000_000.0);
 }
 
@@ -523,7 +624,7 @@ async fn without_a_rankings_row_the_trainer_lookup_is_used() {
     mount_rankings(&server, vec![], 1).await;
     mount_trainer(&server, trainer_club(series(3_000_000)), 1).await;
 
-    let pace = lookup(&server).pace(TRAINER, None).await.unwrap();
+    let pace = lookup(&server).pace(TRAINER, None).await.unwrap().pace;
     assert_eq!(pace, 3_000_000.0);
 }
 
@@ -547,7 +648,7 @@ async fn a_rankings_failure_falls_back() {
         .await;
     mount_trainer(&server, trainer_club(series(3_000_000)), 1).await;
 
-    let pace = lookup(&server).pace(TRAINER, None).await.unwrap();
+    let pace = lookup(&server).pace(TRAINER, None).await.unwrap().pace;
     assert_eq!(pace, 3_000_000.0);
 }
 
@@ -558,7 +659,7 @@ async fn a_ranked_club_without_the_trainer_falls_back() {
     mount_club(&server, 7, oldest_club(), 1).await;
     mount_trainer(&server, trainer_club(series(3_000_000)), 1).await;
 
-    let pace = lookup(&server).pace(TRAINER, None).await.unwrap();
+    let pace = lookup(&server).pace(TRAINER, None).await.unwrap().pace;
     assert_eq!(pace, 3_000_000.0);
 }
 
@@ -596,7 +697,7 @@ async fn early_month_finds_last_months_club_through_rankings() {
     mount_last_month(&server, oldest_club(), 0).await;
     mount_gains(&server, gains(Some(70_000_000)), 0).await;
 
-    let pace = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap();
+    let pace = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap().pace;
     assert_eq!(pace, 3_000_000.0);
 }
 
@@ -608,7 +709,7 @@ async fn early_month_ranked_club_with_too_little_data_uses_gains() {
     mount_last_month(&server, oldest_club(), 0).await;
     mount_gains(&server, gains(Some(70_000_000)), 1).await;
 
-    let pace = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap();
+    let pace = lookup(&server).pace(TRAINER, FEBRUARY).await.unwrap().pace;
     assert_eq!(pace, 10_000_000.0);
 }
 

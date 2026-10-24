@@ -29,7 +29,7 @@ pub use details::{BackgroundLoader, ClubDetails, DetailConfig, SharedPool};
 pub use frontend::CONTENT_SECURITY;
 pub use limits::RateLimits;
 pub use logging::{init_logging, InvalidLogFormat, LogFormat};
-pub use pace::{PaceError, PaceLookup, DEFAULT_PACE_TTL};
+pub use pace::{PaceError, PaceLookup, TrainerPace, DEFAULT_PACE_TTL};
 pub use pool::{
     elapsed_days, game_month, game_month_start, is_early_month, jst, last_month_rate,
     previous_game_month, previous_game_month_days, raw_rate, ClubPool, ListedClub, Period,

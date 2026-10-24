@@ -1,6 +1,6 @@
 // Made-up clubs and responses for component tests.
 
-import type { Club, Recommendations } from './api';
+import type { Club, Recommendations, YourClub } from './api';
 
 export function club(overrides: Partial<Club> = {}): Club {
   return {
@@ -35,6 +35,28 @@ export function recommendations(overrides: Partial<Recommendations> = {}): Recom
     coverage: { shortlisted: 0, scored: 0, pending: 0 },
     total: 0,
     clubs: [],
+    your_club: null,
+    ...overrides,
+  };
+}
+
+export function yourClub(overrides: Partial<YourClub> = {}): YourClub {
+  return {
+    ...club({
+      circle_id: 99,
+      name: 'Home Club',
+      url: 'https://uma.moe/circles/99',
+      tier: 'S',
+      join_style: 'closed',
+      member_count: 30,
+      open_spots: 0,
+      your_place: 24,
+      club_size: 30,
+      median_per_day: 11_200_000,
+      fit: 0.4321,
+      score: 0.4821,
+    }),
+    result_rank: 37,
     ...overrides,
   };
 }
