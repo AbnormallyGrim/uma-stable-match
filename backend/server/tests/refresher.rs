@@ -5,8 +5,8 @@ use std::time::{Duration, Instant, SystemTime};
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{json, Value};
 use uma_stable_match_server::{
-    scan, ClubDetails, DetailConfig, FullRefreshStatus, RefreshConfig, RefreshStatus, ScanConfig,
-    SharedPool,
+    scan, ClubDetails, DetailConfig, RefreshConfig, RefreshStatus, ScanConfig, SharedPool,
+    TierStatus,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -455,7 +455,7 @@ async fn full_clubs_refresh_after_joinable_ones() {
     assert_eq!((status.scheduled, status.due), (2, 2));
     assert_eq!(
         status.full,
-        FullRefreshStatus {
+        TierStatus {
             scheduled: 1,
             loaded: 0,
             due: 1
@@ -508,4 +508,81 @@ async fn a_full_club_loaded_for_a_search_joins_the_full_schedule() {
     let status = details.refresh_status().await;
     assert_eq!((status.full.scheduled, status.full.loaded), (2, 1));
     assert!(details.next_refresh(3).await.is_some_and(|due| due > now()));
+}
+
+fn lower_range_config() -> ScanConfig {
+    ScanConfig {
+        lower_to: Some(20),
+        rank_to: 10,
+        ..scan_config(10)
+    }
+}
+
+fn refreshing_with(server: &MockServer, scan: ScanConfig) -> ClubDetails {
+    let config = DetailConfig {
+        refresher: true,
+        scan,
+        ..DetailConfig::default()
+    };
+    ClubDetails::new(&client(server), SharedPool::default(), config).0
+}
+
+#[tokio::test]
+async fn lower_range_clubs_refresh_last() {
+    let server = MockServer::start().await;
+    mount_list(&server, vec![listed(1, 5), full(2, 6), listed(3, 15)]).await;
+    for id in 1..=3 {
+        mount_detail(&server, id, detail(id, "Lower", Some(now()))).await;
+    }
+    let config = lower_range_config();
+    let details = refreshing_with(&server, config);
+    scan(&client(&server), &details, &config).await.unwrap();
+
+    let status = details.refresh_status().await;
+    assert_eq!(status.scheduled, 1);
+    assert_eq!(status.full.scheduled, 1);
+    assert_eq!(
+        status.lower,
+        TierStatus {
+            scheduled: 1,
+            loaded: 0,
+            due: 1
+        }
+    );
+
+    start(&details);
+    wait_until("every club loads", async || {
+        details.refresh_status().await.lower.loaded == 1
+    })
+    .await;
+    assert_eq!(detail_calls(&server).await, vec![1, 2, 3]);
+}
+
+#[tokio::test]
+async fn lower_range_clubs_wait_three_days_between_refreshes() {
+    let server = MockServer::start().await;
+    mount_list(&server, vec![listed(1, 5), listed(3, 15)]).await;
+    for id in [1, 3] {
+        mount_detail(&server, id, detail(id, "Lower", Some(now()))).await;
+    }
+    let config = lower_range_config();
+    let details = refreshing_with(&server, config);
+    scan(&client(&server), &details, &config).await.unwrap();
+    start(&details);
+    wait_until("both clubs load", async || {
+        let status = details.refresh_status().await;
+        status.loaded == 1 && status.lower.loaded == 1
+    })
+    .await;
+    wait_until("both clubs are rescheduled", async || {
+        details.next_refresh(1).await.is_some_and(|due| due > now())
+            && details.next_refresh(3).await.is_some_and(|due| due > now())
+    })
+    .await;
+
+    let days = chrono::Duration::days;
+    let window = details.next_refresh(1).await.unwrap();
+    let lower = details.next_refresh(3).await.unwrap();
+    assert!(window > now() && window < now() + days(2));
+    assert!(lower > now() + days(3) && lower < now() + days(4));
 }

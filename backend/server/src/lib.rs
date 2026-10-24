@@ -36,7 +36,7 @@ pub use pool::{
     ShortlistFilter, DEFAULT_SHORTLIST_SIZE, EARLY_MONTH_DAYS, TARGET_MEDIAN_RATIO,
 };
 pub use recommendations::{MatchSettings, DEFAULT_FETCH_BUDGET};
-pub use refresher::{FullRefreshStatus, RefreshConfig, RefreshStatus, Refresher, StoredTtl};
+pub use refresher::{RefreshConfig, RefreshStatus, Refresher, StoredTtl, TierStatus};
 pub use scanner::{scan, Scan, ScanConfig, ScanError};
 pub use scheduler::run_scheduler;
 pub use shared::{club_key, KeySecret, RedisUrl, SharedCache, SharedCacheError};

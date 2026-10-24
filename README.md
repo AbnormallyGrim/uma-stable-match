@@ -194,7 +194,7 @@ Set these in `.env`. Only `UMAMOE_API_KEY` is required; [`.env.example`](.env.ex
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to include |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to include |
 | `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is kept loaded, best rank first. The rest load when a search needs them |
-| `SCAN_LOWER_RANK_TO` | none | Also list clubs below `SCAN_RANK_TO` down to this rank, for slower trainers. Listing stops early once clubs have no fans this month. Unset, only the rank window is listed |
+| `SCAN_LOWER_RANK_TO` | none | Also list clubs below `SCAN_RANK_TO` down to this rank, for slower trainers. Listing stops early once clubs have no fans this month, and these clubs are refreshed every three days. Unset, only the rank window is listed |
 | `TRAINER_CACHE_MINUTES` | `10` | How long a trainer's pace is reused before refreshing |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests allowed per visitor per minute |
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer ID lookups allowed per visitor per minute, not counting cached ones |

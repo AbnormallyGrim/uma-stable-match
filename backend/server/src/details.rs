@@ -311,11 +311,11 @@ impl ClubDetails {
             .await
     }
 
-    pub(crate) async fn schedule(&self, joinable: Vec<(u64, u32)>, full: Vec<(u64, u32)>) {
+    pub(crate) async fn schedule(&self, clubs: [Vec<(u64, u32)>; 3]) {
         if let Some(refreshing) = &self.inner.refreshing {
-            let pool = &self.inner.pool;
+            let inner = &self.inner;
             refreshing
-                .replace(joinable, full, |id| tier(&read(pool), id), utc_now())
+                .replace(clubs, |id| tier(inner, id), utc_now())
                 .await;
         }
     }
@@ -516,10 +516,13 @@ async fn fetch(
     }
     record_median(inner, &club, circle_id, period);
     let now = utc_now();
-    let due = inner.timing.next_refresh(
+    let mut due = inner.timing.next_refresh(
         last_updated.and_then(|t| DateTime::from_timestamp(t, 0)),
         now,
     );
+    if inner.scan.is_lower(listed_rank(inner, circle_id)) {
+        due += inner.timing.lower_delay;
+    }
     track(inner, circle_id, due).await;
     let keep = due.signed_duration_since(now).to_std().unwrap_or_default() + KEEP_AFTER_DUE;
     let stored = Stored {
@@ -538,23 +541,29 @@ async fn track(inner: &Inner, circle_id: u64, due: DateTime<Utc>) {
     let Some(refreshing) = &inner.refreshing else {
         return;
     };
-    let Some(tier) = tier(&read(&inner.pool), circle_id) else {
+    let Some(tier) = tier(inner, circle_id) else {
         return;
     };
-    let rank = read(&inner.listed)
+    refreshing
+        .loaded(tier, circle_id, listed_rank(inner, circle_id), due)
+        .await;
+}
+
+fn listed_rank(inner: &Inner, circle_id: u64) -> u32 {
+    read(&inner.listed)
         .get(&circle_id)
         .and_then(|c| c.monthly_rank)
         .and_then(|r| u32::try_from(r).ok())
-        .unwrap_or(u32::MAX);
-    // Clubs in the lower range aren't refreshed yet; they're loaded again when a search needs them.
-    if inner.scan.is_lower(rank) {
-        return;
-    }
-    refreshing.loaded(tier, circle_id, rank, due).await;
+        .unwrap_or(u32::MAX)
 }
 
-fn tier(pool: &ClubPool, circle_id: u64) -> Option<Tier> {
-    if pool.is_joinable(circle_id) {
+fn tier(inner: &Inner, circle_id: u64) -> Option<Tier> {
+    let pool = read(&inner.pool);
+    if !pool.contains(circle_id) {
+        None
+    } else if inner.scan.is_lower(listed_rank(inner, circle_id)) {
+        Some(Tier::Lower)
+    } else if pool.is_joinable(circle_id) {
         Some(Tier::Joinable)
     } else if pool.contains(circle_id) {
         Some(Tier::Full)

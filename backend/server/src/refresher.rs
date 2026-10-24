@@ -27,9 +27,11 @@ pub struct RefreshConfig {
     pub recheck: Duration,
     /// Wait before retrying a failed refresh.
     pub retry: Duration,
-    /// Joinable clubs ranked up to this refresh at full speed; the rest, and every full club, at
-    /// half.
+    /// Joinable clubs ranked up to this refresh at full speed; the rest, and every full or
+    /// lower-range club, at half.
     pub fast_ranks: u32,
+    /// How much longer lower-range clubs wait between refreshes.
+    pub lower_delay: Duration,
 }
 
 impl Default for RefreshConfig {
@@ -40,6 +42,7 @@ impl Default for RefreshConfig {
             recheck: Duration::from_secs(60 * 60),
             retry: Duration::from_secs(5 * 60),
             fast_ranks: 5_000,
+            lower_delay: 2 * DAY,
         }
     }
 }
@@ -62,7 +65,7 @@ impl RefreshConfig {
 }
 
 /// How current the scheduled clubs' details are. The top-level counts are joinable clubs; full
-/// clubs are in `full`.
+/// and lower-range clubs are in `full` and `lower`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RefreshStatus {
     /// Joinable clubs on the refresh schedule.
@@ -78,25 +81,33 @@ pub struct RefreshStatus {
     /// are stored.
     pub stored_ttl: Option<StoredTtl>,
     /// The full clubs' schedule.
-    pub full: FullRefreshStatus,
+    pub full: TierStatus,
+    /// The lower-range clubs' schedule.
+    pub lower: TierStatus,
 }
 
-/// How current the full clubs' details are. They're refreshed only when no joinable club is due.
+/// How current a lower-priority schedule's details are. It's only worked on when no club on a
+/// higher-priority schedule is due.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct FullRefreshStatus {
-    /// Full clubs on the refresh schedule.
+pub struct TierStatus {
+    /// Clubs on the schedule.
     pub scheduled: usize,
-    /// Scheduled full clubs whose details are stored.
+    /// Scheduled clubs whose details are stored.
     pub loaded: usize,
-    /// Scheduled full clubs due for a refresh now.
+    /// Scheduled clubs due for a refresh now.
     pub due: usize,
 }
 
-/// Which schedule a club is on: joinable clubs come first.
+/// Which schedule a club is on, highest priority first.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Tier {
     Joinable,
     Full,
+    Lower,
+}
+
+impl Tier {
+    const ALL: [Self; 3] = [Self::Joinable, Self::Full, Self::Lower];
 }
 
 /// Time to live of the scheduled clubs' details in Redis.
@@ -112,6 +123,7 @@ pub(crate) struct Refreshing {
     pub(crate) config: RefreshConfig,
     store: Store,
     full: Store,
+    lower: Store,
     wake: Notify,
 }
 
@@ -192,18 +204,16 @@ impl Store {
 }
 
 impl Refreshing {
-    pub(crate) fn new(
-        config: RefreshConfig,
-        shared: Option<(SharedSchedule, SharedSchedule)>,
-    ) -> Self {
-        let (joinable, full) = match shared {
-            Some((joinable, full)) => (Some(joinable), Some(full)),
-            None => (None, None),
+    pub(crate) fn new(config: RefreshConfig, shared: Option<[SharedSchedule; 3]>) -> Self {
+        let [joinable, full, lower] = match shared {
+            Some(schedules) => schedules.map(Some),
+            None => [None, None, None],
         };
         Self {
             config,
             store: Store::new(joinable),
             full: Store::new(full),
+            lower: Store::new(lower),
             wake: Notify::new(),
         }
     }
@@ -212,22 +222,21 @@ impl Refreshing {
         match tier {
             Tier::Joinable => &self.store,
             Tier::Full => &self.full,
+            Tier::Lower => &self.lower,
         }
     }
 
     pub(crate) async fn replace(
         &self,
-        joinable: Vec<(u64, u32)>,
-        full: Vec<(u64, u32)>,
+        clubs: [Vec<(u64, u32)>; 3],
         tier_of: impl Fn(u64) -> Option<Tier>,
         now: DateTime<Utc>,
     ) {
-        self.store
-            .replace(joinable, |id| tier_of(id) == Some(Tier::Joinable), now)
-            .await;
-        self.full
-            .replace(full, |id| tier_of(id) == Some(Tier::Full), now)
-            .await;
+        for (tier, clubs) in Tier::ALL.into_iter().zip(clubs) {
+            self.tier(tier)
+                .replace(clubs, |id| tier_of(id) == Some(tier), now)
+                .await;
+        }
         self.wake.notify_one();
     }
 
@@ -238,14 +247,20 @@ impl Refreshing {
     }
 
     pub(crate) async fn due_at(&self, circle_id: u64) -> Option<DateTime<Utc>> {
-        match self.store.due_at(circle_id).await {
-            Some(due) => Some(due),
-            None => self.full.due_at(circle_id).await,
+        for tier in Tier::ALL {
+            if let Some(due) = self.tier(tier).due_at(circle_id).await {
+                return Some(due);
+            }
         }
+        None
     }
 
     pub(crate) async fn len(&self) -> usize {
-        self.store.len().await + self.full.len().await
+        let mut total = 0;
+        for tier in Tier::ALL {
+            total += self.tier(tier).len().await;
+        }
+        total
     }
 
     pub(crate) async fn status(
@@ -254,21 +269,25 @@ impl Refreshing {
         loaded: impl Fn(u64) -> bool,
         now: DateTime<Utc>,
     ) -> RefreshStatus {
-        let full = self
-            .full
-            .coverage(period, &loaded, now)
-            .await
-            .map(|(scheduled, loaded, due, _)| FullRefreshStatus {
-                scheduled,
-                loaded,
-                due,
-            })
-            .unwrap_or_default();
+        let tier_status = async |store: &Store| {
+            store
+                .coverage(period, &loaded, now)
+                .await
+                .map(|(scheduled, loaded, due, _)| TierStatus {
+                    scheduled,
+                    loaded,
+                    due,
+                })
+                .unwrap_or_default()
+        };
+        let full = tier_status(&self.full).await;
+        let lower = tier_status(&self.lower).await;
         let Some((scheduled, loaded, due, stored_ttl)) =
             self.store.coverage(period, &loaded, now).await
         else {
             return RefreshStatus {
                 full,
+                lower,
                 ..RefreshStatus::default()
             };
         };
@@ -285,22 +304,26 @@ impl Refreshing {
             oldest_due,
             stored_ttl,
             full,
+            lower,
         }
     }
 
-    // The first due joinable club, else the first due full club, else whichever is due soonest.
+    // The first due club on the highest-priority schedule that has one, else whichever club is due
+    // soonest.
     async fn next(&self, now: DateTime<Utc>) -> Option<(DateTime<Utc>, u32, u64, Tier)> {
-        let joinable = self.store.next().await;
-        if let Some((due, rank, id)) = joinable.filter(|(due, _, _)| *due <= now) {
-            return Some((due, rank, id, Tier::Joinable));
+        let mut soonest: Option<(DateTime<Utc>, u32, u64, Tier)> = None;
+        for tier in Tier::ALL {
+            let Some((due, rank, id)) = self.tier(tier).next().await else {
+                continue;
+            };
+            if due <= now {
+                return Some((due, rank, id, tier));
+            }
+            if soonest.is_none_or(|(first, ..)| due < first) {
+                soonest = Some((due, rank, id, tier));
+            }
         }
-        let full = self.full.next().await;
-        match (joinable, full) {
-            (Some((a, ..)), Some((b, rank, id))) if b < a => Some((b, rank, id, Tier::Full)),
-            (None, Some((due, rank, id))) => Some((due, rank, id, Tier::Full)),
-            (Some((due, rank, id)), _) => Some((due, rank, id, Tier::Joinable)),
-            (None, None) => None,
-        }
+        soonest
     }
 }
 
@@ -439,7 +462,7 @@ impl Refresher {
         let next = self.refreshing.next(now).await;
         if let Some((_, rank, circle_id, tier)) = next.filter(|(due, ..)| *due <= now) {
             let took = self.refresh(tier, circle_id, now).await;
-            let slow = tier == Tier::Full || rank > self.refreshing.config.fast_ranks;
+            let slow = tier != Tier::Joinable || rank > self.refreshing.config.fast_ranks;
             if let Some(took) = took.filter(|_| slow) {
                 tokio::time::sleep(took).await;
             }
