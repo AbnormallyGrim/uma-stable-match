@@ -48,6 +48,10 @@ export interface Recommendations {
     balance_weight: number | null;
     include_closed: boolean;
     include_full: boolean;
+    /** The join styles searched for, or `null` for the default (open and approval). */
+    join_styles: JoinStyle[] | null;
+    /** The playstyle codes searched for, or `null` for any. */
+    playstyles: number[] | null;
     limit: number;
   };
   updated_at: string;
@@ -67,7 +71,10 @@ export type PaceSource = { trainerId: string } | { pace: number };
 export interface RecommendationQuery {
   source: PaceSource;
   balanceWeight?: number | null;
-  includeClosed?: boolean;
+  /** The only join style to search for. Unset or `null` uses the server's default. */
+  joinStyle?: JoinStyle | null;
+  /** The only playstyle code to search for. Unset or `null` means any. */
+  playstyle?: number | null;
   includeFull?: boolean;
   limit?: number;
 }
@@ -116,16 +123,24 @@ export function recommendationParams(query: RecommendationQuery): URLSearchParam
   if (query.balanceWeight != null) {
     params.set('balance_weight', String(query.balanceWeight));
   }
-  if (query.includeClosed) {
-    params.set('include_closed', 'true');
-  }
-  if (query.includeFull) {
-    params.set('include_full', 'true');
-  }
+  setFilterParams(params, query);
   if (query.limit != null) {
     params.set('limit', String(query.limit));
   }
   return params;
+}
+
+/** Adds the join style, playstyle and full-club parameters, leaving out defaults. */
+export function setFilterParams(params: URLSearchParams, query: RecommendationQuery): void {
+  if (query.joinStyle) {
+    params.set('join_style', query.joinStyle);
+  }
+  if (query.playstyle != null) {
+    params.set('playstyle', String(query.playstyle));
+  }
+  if (query.includeFull) {
+    params.set('include_full', 'true');
+  }
 }
 
 /**

@@ -105,6 +105,8 @@ pub struct ListedClub {
     pub member_count: u32,
     /// Join style, kept so closed clubs can be filtered per request.
     pub join_style: Option<JoinStyle>,
+    /// Playstyle code, kept so searches can filter by it.
+    pub policy: Option<u32>,
     /// Mean daily fans per member, from [`raw_rate`].
     pub raw_rate: f64,
 }
@@ -150,6 +152,7 @@ impl ListedClub {
             circle_id: circle.circle_id,
             member_count,
             join_style,
+            policy: circle.policy.and_then(|code| u32::try_from(code).ok()),
             raw_rate,
         })
     }
@@ -165,16 +168,52 @@ struct Entry {
 /// Which clubs a shortlist may include. The default leaves out closed and full clubs.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ShortlistFilter {
-    /// Include clubs that aren't accepting members.
+    /// Include clubs that aren't accepting members. Ignored when `join_styles` is set.
     pub include_closed: bool,
     /// Include clubs with no open spot.
     pub include_full: bool,
+    /// Only clubs with one of these join styles, as bit `1 << code` per game code (1 open,
+    /// 2 approval, 3 closed). Clubs with an unknown join style are left out.
+    pub join_styles: Option<u8>,
+    /// Only clubs with one of these playstyles, as bit `1 << code` per playstyle code (1 to 31).
+    /// Clubs with an unknown playstyle are left out.
+    pub playstyles: Option<u32>,
 }
 
 impl ShortlistFilter {
+    /// Whether closed clubs can be included.
+    pub fn allows_closed(&self) -> bool {
+        match self.join_styles {
+            Some(mask) => mask & join_style_bit(JoinStyle::Closed) != 0,
+            None => self.include_closed,
+        }
+    }
+
     fn allows(&self, club: &ListedClub) -> bool {
-        (self.include_closed || club.join_style != Some(JoinStyle::Closed))
-            && (self.include_full || !club.is_full())
+        let join_style = match self.join_styles {
+            Some(mask) => club
+                .join_style
+                .is_some_and(|style| mask & join_style_bit(style) != 0),
+            None => self.include_closed || club.join_style != Some(JoinStyle::Closed),
+        };
+        let playstyle = match self.playstyles {
+            Some(mask) => club
+                .policy
+                .filter(|code| *code < 32)
+                .is_some_and(|code| mask & (1 << code) != 0),
+            None => true,
+        };
+        join_style && playstyle && (self.include_full || !club.is_full())
+    }
+}
+
+/// The `ShortlistFilter::join_styles` bit for a join style.
+pub fn join_style_bit(style: JoinStyle) -> u8 {
+    match style {
+        JoinStyle::Open => 1 << 1,
+        JoinStyle::Approval => 1 << 2,
+        JoinStyle::Closed => 1 << 3,
+        _ => 0,
     }
 }
 
@@ -320,6 +359,7 @@ impl ClubPool {
             ShortlistFilter {
                 include_closed,
                 include_full: false,
+                ..ShortlistFilter::default()
             },
         )
     }

@@ -16,6 +16,7 @@ fn listed(circle_id: u64, raw_rate: f64) -> ListedClub {
         member_count: 20,
         join_style: None,
         raw_rate,
+        policy: None,
     }
 }
 

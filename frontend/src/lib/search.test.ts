@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import type { JoinStyle } from './api';
 import {
   DEFAULT_SEARCH,
   PACE_ERROR,
@@ -64,21 +65,30 @@ describe('validate', () => {
       query: {
         source: { trainerId: '123456789012' },
         balanceWeight: null,
-        includeClosed: false,
+        joinStyle: null,
+        playstyle: null,
         includeFull: false,
       },
     });
   });
 
-  it('builds a pace query with balance and closed clubs', () => {
+  it('builds a pace query with balance and filters', () => {
     expect(
-      validate(pace('7.6', { balance: true, balanceWeight: 0.75, includeClosed: true })),
+      validate(
+        pace('7.6', {
+          balance: true,
+          balanceWeight: 0.75,
+          joinStyle: 'closed',
+          playstyle: 12,
+        }),
+      ),
     ).toEqual({
       ok: true,
       query: {
         source: { pace: 7_600_000 },
         balanceWeight: 0.75,
-        includeClosed: true,
+        joinStyle: 'closed',
+        playstyle: 12,
         includeFull: false,
       },
     });
@@ -108,12 +118,25 @@ describe('URL state', () => {
     );
   });
 
-  it('round-trips a pace search', () => {
-    const result = validate(pace('7.6', { includeClosed: true }));
+  it('round-trips a pace search with filters', () => {
+    const filters = { joinStyle: 'approval' as JoinStyle, playstyle: 12 };
+    const result = validate(pace('7.6', filters));
     if (!result.ok) throw new Error('expected a valid search');
     const params = toUrlParams(result.query);
-    expect(params.toString()).toBe('pace=7600000&include_closed=true');
-    expect(fromUrlParams(params)).toEqual(pace('7.6', { includeClosed: true }));
+    expect(params.toString()).toBe('pace=7600000&join_style=approval&playstyle=12');
+    expect(fromUrlParams(params)).toEqual(pace('7.6', filters));
+  });
+
+  it('ignores unknown or several join styles and playstyles in links', () => {
+    for (const query of [
+      'pace=7600000&join_style=locked&playstyle=99',
+      'pace=7600000&join_style=open,closed&playstyle=2,12',
+      'pace=7600000&include_closed=true&playstyle=x',
+    ]) {
+      const state = fromUrlParams(new URLSearchParams(query));
+      expect(state?.joinStyle, query).toBeNull();
+      expect(state?.playstyle, query).toBeNull();
+    }
   });
 
   it('round-trips full clubs', () => {

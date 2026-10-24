@@ -25,7 +25,8 @@ describe('SearchForm', () => {
       {
         source: { trainerId: '123456789012' },
         balanceWeight: null,
-        includeClosed: false,
+        joinStyle: null,
+        playstyle: null,
         includeFull: false,
       },
       expect.objectContaining({ trainerId: '123456789012' }),
@@ -74,13 +75,49 @@ describe('SearchForm', () => {
     expect(onsearch.mock.lastCall?.[0]).toMatchObject({ balanceWeight: 0.8 });
   });
 
-  it('passes include closed and remember choices', async () => {
+  it('passes one join style and the remember choice', async () => {
     const onsearch = setup({ trainerId: '123456789' }, true);
     expect(screen.getByLabelText('Remember my trainer ID on this device')).toBeChecked();
-    await fireEvent.click(screen.getByLabelText('Include closed clubs'));
+    const open = screen.getByRole('button', { name: 'Open' });
+    const closed = screen.getByRole('button', { name: 'Closed' });
+    expect(open).toHaveAttribute('aria-pressed', 'false');
+    await fireEvent.click(open);
+    await fireEvent.click(closed);
+    expect(open).toHaveAttribute('aria-pressed', 'false');
+    expect(closed).toHaveAttribute('aria-pressed', 'true');
     await submit();
-    expect(onsearch.mock.lastCall?.[0]).toMatchObject({ includeClosed: true });
+    expect(onsearch.mock.lastCall?.[0]).toMatchObject({ joinStyle: 'closed' });
     expect(onsearch.mock.lastCall?.[2]).toBe(true);
+  });
+
+  it('clears the join style when it is picked again', async () => {
+    const onsearch = setup({ trainerId: '123456789' });
+    const approval = screen.getByRole('button', { name: 'Approval' });
+    await fireEvent.click(approval);
+    await fireEvent.click(approval);
+    expect(approval).toHaveAttribute('aria-pressed', 'false');
+    await submit();
+    expect(onsearch.mock.lastCall?.[0]).toMatchObject({ joinStyle: null });
+  });
+
+  it('picks one playstyle and warns that filters narrow the search', async () => {
+    const onsearch = setup({ trainerId: '123456789' });
+    const playstyle = screen.getByRole('combobox', { name: /Playstyle/ });
+    expect(playstyle).toHaveTextContent('Any playstyle');
+    expect(screen.queryByTestId('filter-warning')).not.toBeInTheDocument();
+    await fireEvent.click(playstyle);
+    await fireEvent.click(screen.getByRole('option', { name: 'Log in Daily' }));
+    expect(playstyle).toHaveTextContent('Log in Daily');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.getByTestId('filter-warning')).toHaveTextContent('further from your pace');
+    await submit();
+    expect(onsearch.mock.lastCall?.[0]).toMatchObject({ playstyle: 12 });
+  });
+
+  it('shows balance scoring and full clubs as switches', () => {
+    setup();
+    expect(screen.getByRole('switch', { name: 'Balance scoring' })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Include full clubs' })).not.toBeChecked();
   });
 
   it('passes include full', async () => {

@@ -123,7 +123,7 @@ docker compose up -d
 1. Open Uma Stable Match in your browser. New to it? Open **How to use** under the search form for step-by-step instructions, including where to find your trainer ID and daily pace.
 2. Enter your **trainer ID**, or switch to **Daily pace** and enter your daily fan gain in millions. Tick **Remember my trainer ID on this device** to have it filled in next time.
 3. Optionally turn on **Balance scoring** and adjust its strength (0–1). Higher values push clubs with many low contributors further down.
-4. Optionally tick **Include closed clubs** to also see clubs that aren't recruiting, or **Include full clubs** to add clubs with no open spot to the table for comparison. Full clubs never appear as top picks.
+4. Optionally tick **Include full clubs** to add clubs with no open spot to the table for comparison; full clubs never appear as top picks. Pick one **Join style** (Open, Approval or Closed) or one **Playstyle** to see only those clubs; without one, open and approval clubs of every playstyle are searched. Filtering leaves fewer clubs near your pace, so the page warns that your best matches may be further from it.
 5. Select **Find clubs**. The search is saved in the page's address, so you can bookmark or share it.
 6. Browse **Top picks**, or use **Top results** to search and sort the 100 best fits.
 7. Select a club's name to open its uma.moe page in a new tab, then contact the leader.
@@ -222,7 +222,9 @@ GET /api/v1/recommendations
 | `pace` | yes, or `trainer_id` | | Your daily fan gain, if you'd rather not look up a trainer |
 | `balance` | no | `false` | `true` turns on balance scoring at strength 0.5 |
 | `balance_weight` | no | | Balance strength, 0–1. Setting it turns balance on |
-| `include_closed` | no | `false` | Include closed clubs |
+| `include_closed` | no | `false` | Include closed clubs. Ignored with `join_style` |
+| `join_style` | no | `open,approval` | Comma-separated join styles to include: `open`, `approval`, `closed` |
+| `playstyle` | no | any | Comma-separated playstyle codes to include |
 | `include_full` | no | `false` | Include full clubs |
 | `limit` | no | `50` | Maximum number of clubs returned |
 
@@ -235,7 +237,7 @@ curl "http://localhost:8080/api/v1/recommendations?trainer_id=123456789012&balan
 ```json
 {
   "trainer": { "trainer_id": 123456789012, "pace_per_day": 7620000 },
-  "options": { "balance_weight": 0.6, "include_closed": false, "include_full": false, "limit": 1 },
+  "options": { "balance_weight": 0.6, "include_closed": false, "include_full": false, "join_styles": null, "playstyles": null, "limit": 1 },
   "updated_at": "2026-10-19T08:00:00Z",
   "month": "2026-10",
   "coverage": { "considered": 4980, "shortlisted": 120, "scored": 240, "pending": 0 },

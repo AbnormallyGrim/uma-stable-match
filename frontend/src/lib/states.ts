@@ -78,13 +78,27 @@ function describeStatus(error: ApiError): ErrorMessage {
 /** Suggestions for widening a search that found nothing. */
 export function emptyHints(options: Recommendations['options']): string[] {
   const hints: string[] = [];
+  if (options.playstyles !== null) {
+    hints.push('Set playstyle back to any.');
+  }
   if (!options.include_closed) {
-    hints.push("Include closed clubs to see clubs that aren't recruiting right now.");
+    hints.push("Pick Closed under join style to see clubs that aren't recruiting right now.");
   }
   if (options.balance_weight !== null && options.balance_weight > 0) {
     hints.push('Lower the balance strength or turn balance scoring off.');
   }
   return hints;
+}
+
+/** Warns that join style or playstyle filters make matches less close, or `null` without them. */
+export function filterNotice(options: Recommendations['options']): string | null {
+  const joinStyles = options.join_styles;
+  const narrowed =
+    (joinStyles !== null && !(joinStyles.includes('open') && joinStyles.includes('approval'))) ||
+    options.playstyles !== null;
+  return narrowed
+    ? 'These results are filtered by join style or playstyle, so your best matches may be further from your pace than usual.'
+    : null;
 }
 
 /** Says how many shortlisted clubs are still loading, or `null` when none are. */
@@ -107,7 +121,7 @@ export function monthNotice(result: Pick<Recommendations, 'month' | 'updated_at'
 
 /** Every notice for a result, the month first. */
 export function resultNotices(result: Recommendations): string[] {
-  return [monthNotice(result), pendingNotice(result.coverage)].filter(
+  return [filterNotice(result.options), monthNotice(result), pendingNotice(result.coverage)].filter(
     (notice): notice is string => notice !== null,
   );
 }

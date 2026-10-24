@@ -220,6 +220,18 @@ async fn rejects_invalid_input() {
             "?pace=5000000&include_full=yes",
             "include_full must be true or false",
         ),
+        (
+            "?pace=5000000&join_style=open,locked",
+            "join_style must be a comma-separated list of open, approval and closed",
+        ),
+        (
+            "?pace=5000000&playstyle=2,x",
+            "playstyle must be a comma-separated list of playstyle codes",
+        ),
+        (
+            "?pace=5000000&playstyle=0",
+            "playstyle must be a comma-separated list of playstyle codes",
+        ),
         ("?pace=5000000&balance=yes", "balance must be true or false"),
         (
             "?pace=5000000&balance=false&balance_weight=0.5",
@@ -338,6 +350,35 @@ async fn includes_full_clubs_on_request() {
         .unwrap();
     assert_eq!(full["open_spots"], 0);
     assert_eq!(full["club_size"], 30);
+}
+
+#[tokio::test]
+async fn filters_by_join_style() {
+    let cache = scanned_cache().await;
+    let (status, body) = get(&cache, "?pace=7600000&join_style=closed").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(ids(&body), vec![3]);
+    assert_eq!(body["options"]["join_styles"], json!(["closed"]));
+    assert_eq!(body["options"]["include_closed"], true);
+
+    let (_, body) = get(&cache, "?pace=7600000&join_style=approval,%20open,open").await;
+    assert!(!ids(&body).contains(&3));
+    assert_eq!(body["options"]["join_styles"], json!(["approval", "open"]));
+    assert_eq!(body["options"]["include_closed"], false);
+}
+
+#[tokio::test]
+async fn filters_by_playstyle() {
+    let cache = scanned_cache().await;
+    let (_, all) = get(&cache, "?pace=7600000").await;
+    assert_eq!(all["options"]["playstyles"], Value::Null);
+    let (_, matching) = get(&cache, "?pace=7600000&playstyle=12,2").await;
+    assert_eq!(ids(&matching), ids(&all));
+    assert_eq!(matching["options"]["playstyles"], json!([2, 12]));
+    let (status, none) = get(&cache, "?pace=7600000&playstyle=5").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(ids(&none).is_empty());
+    assert_eq!(none["coverage"]["considered"], 0);
 }
 
 #[tokio::test]

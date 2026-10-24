@@ -2,8 +2,15 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { ApiError } from './api';
-import { describeError, emptyHints, monthNotice, pendingNotice, resultNotices } from './states';
+import { ApiError, type JoinStyle } from './api';
+import {
+  describeError,
+  emptyHints,
+  filterNotice,
+  monthNotice,
+  pendingNotice,
+  resultNotices,
+} from './states';
 import { recommendations } from './test-data';
 
 const http = (status: number, message = 'server message') =>
@@ -52,22 +59,47 @@ describe('describeError', () => {
 });
 
 describe('emptyHints', () => {
-  const options = (balance_weight: number | null, include_closed: boolean) => ({
+  const options = (
+    balance_weight: number | null,
+    include_closed: boolean,
+    playstyles: number[] | null = null,
+  ) => ({
     balance_weight,
     include_closed,
     include_full: false,
+    join_styles: null,
+    playstyles,
     limit: 100,
   });
 
   it('suggests what could widen the search', () => {
     expect(emptyHints(options(0.5, false))).toHaveLength(2);
     expect(emptyHints(options(null, false))).toEqual([
-      "Include closed clubs to see clubs that aren't recruiting right now.",
+      "Pick Closed under join style to see clubs that aren't recruiting right now.",
     ]);
+    expect(emptyHints(options(null, true, [2]))).toEqual(['Set playstyle back to any.']);
     expect(emptyHints(options(0.5, true))).toEqual([
       'Lower the balance strength or turn balance scoring off.',
     ]);
     expect(emptyHints(options(0, true))).toEqual([]);
+  });
+});
+
+describe('filter notice', () => {
+  const options = (join_styles: JoinStyle[] | null, playstyles: number[] | null) => ({
+    balance_weight: null,
+    include_closed: false,
+    include_full: false,
+    join_styles,
+    playstyles,
+    limit: 100,
+  });
+
+  it('warns only when filters narrow the search', () => {
+    expect(filterNotice(options(null, null))).toBeNull();
+    expect(filterNotice(options(['open', 'approval', 'closed'], null))).toBeNull();
+    expect(filterNotice(options(['open'], null))).toMatch(/filtered by join style or playstyle/);
+    expect(filterNotice(options(null, [12]))).toMatch(/further from your pace/);
   });
 });
 

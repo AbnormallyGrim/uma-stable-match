@@ -129,7 +129,7 @@ estimated median = exact median if known, otherwise c × raw rate
 distance = |ln(estimated median ÷ target)|
 ```
 
-The pool is sorted once by estimate. A query binary-searches to the target and walks outwards in both directions, skipping the clubs `filter` leaves out: closed clubs unless `include_closed`, and full clubs unless `include_full`. `ClubPool::shortlist(target, k, include_closed)` is a shorthand that always leaves full clubs out. That costs O(log n + k). Ties go to the lower club ID, and a property test checks that the result always matches sorting every club by distance. Clubs are re-sorted only when exact medians are added, not for each query.
+The pool is sorted once by estimate. A query binary-searches to the target and walks outwards in both directions, skipping the clubs `filter` leaves out: closed clubs unless `include_closed`, full clubs unless `include_full`, and with `join_styles` or `playstyles` set, clubs whose join style or playstyle isn't among them, including clubs where it's unknown. `join_styles` replaces `include_closed`. `ClubPool::shortlist(target, k, include_closed)` is a shorthand that always leaves full clubs out. That costs O(log n + k). Ties go to the lower club ID, and a property test checks that the result always matches sorting every club by distance. Clubs are re-sorted only when exact medians are added, not for each query.
 
 ### Shortlist size
 
@@ -340,7 +340,9 @@ There's no public status endpoint. The page takes the data's age from each searc
 | `pace` | One of these two | | Your daily fan gain, such as `7600000` |
 | `balance` | No | `false` | `true` turns on balance scoring at weight 0.5 |
 | `balance_weight` | No | | Balance strength, from 0 to 1. Setting it turns balance scoring on |
-| `include_closed` | No | `false` | `true` to include clubs that aren't accepting members |
+| `include_closed` | No | `false` | `true` to include clubs that aren't accepting members. Ignored with `join_style` |
+| `join_style` | No | | Comma-separated join styles to include, from `open`, `approval` and `closed`. Without it, open and approval clubs are included, and clubs whose join style is unknown too |
+| `playstyle` | No | | Comma-separated playstyle codes to include, from 1 to 31, such as `2,12`. Without it, every playstyle is included |
 | `include_full` | No | `false` | `true` to include clubs with no open spot |
 | `limit` | No | `50` | Most clubs to return |
 
@@ -349,7 +351,7 @@ There's no public status endpoint. The page takes the data's age from each searc
 #### Choosing clubs
 
 1. Check the pace and balance weight. An invalid request fails before anything is fetched.
-2. Shortlist the `SHORTLIST_SIZE` clubs whose estimated median is nearest `0.85 ×` your pace. Closed clubs are left out unless `include_closed=true`, and full clubs unless `include_full=true`.
+2. Shortlist the `SHORTLIST_SIZE` clubs whose estimated median is nearest `0.85 ×` your pace. Closed clubs are left out unless `include_closed=true` or `join_style` includes `closed`, and full clubs unless `include_full=true`. With `join_style` or `playstyle`, only clubs with one of those join styles or playstyles are shortlisted, so the shortlist is the nearest matching clubs rather than a filtered nearest 120.
 3. Take the clubs nearest your pace, twice `SHORTLIST_SIZE` of them, the shortlist first. Read their member data from memory, then the rest from Redis in one `MGET`, keeping those not yet due for a refresh in memory. Then fetch up to `REQUEST_FETCH_BUDGET` of the shortlisted clubs still missing from uma.moe in the interactive lane, nearest first. Requests that need the same club share one fetch. The clubs past the shortlist are only scored if they're already stored.
 4. Queue the other uncached shortlisted clubs, and any that failed, for background loading.
 5. Score the loaded clubs. Without `include_full=true`, full clubs are dropped first, judged by the pool's latest list data rather than their cached details, which can be a day old.
@@ -387,7 +389,7 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
 ```json
 {
   "trainer": { "trainer_id": 123456789012, "pace_per_day": 7600000.0 },
-  "options": { "balance_weight": 0.5, "include_closed": false, "include_full": false, "limit": 50 },
+  "options": { "balance_weight": 0.5, "include_closed": false, "include_full": false, "join_styles": null, "playstyles": null, "limit": 50 },
   "updated_at": "2026-03-18T09:00:00Z",
   "month": "2026-03",
   "coverage": { "considered": 4980, "shortlisted": 120, "scored": 240, "pending": 0 },
@@ -449,7 +451,7 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
 |---|---|
 | `trainer.trainer_id` | The trainer ID you asked about, or `null` when you gave a `pace` |
 | `trainer.pace_per_day` | The pace used: yours from uma.moe, or the `pace` you gave |
-| `options` | The settings used, after defaults: `balance_weight` is `null` when balance scoring is off |
+| `options` | The settings used, after defaults: `balance_weight` is `null` when balance scoring is off. `include_closed` says whether closed clubs could be included. `join_styles` and `playstyles` list the filters, or are `null` without them |
 | `updated_at` | When the clubs were scanned. Before the first scan finishes, when its club list was fetched |
 | `month` | Game month of the club data, `YYYY-MM` |
 | `coverage.considered` | Clubs in the pool that your options allow. Each was compared with your pace by its estimate |
@@ -474,7 +476,7 @@ Errors come back as `{"error": "..."}`:
 
 | Status | When |
 |---|---|
-| `400` | Any of these:<br>• the query string can't be read, for example because a parameter is repeated<br>• neither or both of `trainer_id` and `pace` are given<br>• `trainer_id` isn't a trainer ID<br>• `pace` isn't a number above zero<br>• `balance_weight` isn't a number from 0 to 1<br>• `balance=false` is given with `balance_weight`<br>• `balance`, `include_closed` or `include_full` isn't `true` or `false`<br>• `limit` isn't a positive whole number |
+| `400` | Any of these:<br>• the query string can't be read, for example because a parameter is repeated<br>• neither or both of `trainer_id` and `pace` are given<br>• `trainer_id` isn't a trainer ID<br>• `pace` isn't a number above zero<br>• `balance_weight` isn't a number from 0 to 1<br>• `balance=false` is given with `balance_weight`<br>• `balance`, `include_closed` or `include_full` isn't `true` or `false`<br>• `join_style` names something other than `open`, `approval` and `closed`<br>• `playstyle` isn't a list of codes from 1 to 31<br>• `limit` isn't a positive whole number |
 | `404` | uma.moe doesn't know the trainer, or they aren't in their club's data |
 | `422` | The trainer has too little fan data this month to work out a pace |
 | `502` | uma.moe couldn't be reached for the trainer lookup |

@@ -23,7 +23,7 @@ use crate::app::AppState;
 use crate::details::ClubDetails;
 use crate::limits::Visitor;
 use crate::pace::PaceError;
-use crate::pool::{ShortlistFilter, DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO};
+use crate::pool::{join_style_bit, ShortlistFilter, DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO};
 
 const CLUB_URL: &str = "https://uma.moe/circles/";
 const DEFAULT_LIMIT: u32 = 50;
@@ -60,6 +60,8 @@ pub(crate) struct Params {
     balance_weight: Option<String>,
     include_closed: Option<String>,
     include_full: Option<String>,
+    join_style: Option<String>,
+    playstyle: Option<String>,
     limit: Option<String>,
 }
 
@@ -110,6 +112,8 @@ struct OptionsView {
     balance_weight: Option<f64>,
     include_closed: bool,
     include_full: bool,
+    join_styles: Option<Vec<&'static str>>,
+    playstyles: Option<Vec<u32>>,
     limit: u32,
 }
 
@@ -254,12 +258,22 @@ async fn search(
         (Some(true), None) => Some(DEFAULT_BALANCE_WEIGHT),
         _ => None,
     };
-    let include_closed = parse_bool("include_closed", &params.include_closed)?.unwrap_or(false);
     let include_full = parse_bool("include_full", &params.include_full)?.unwrap_or(false);
+    let join_styles = parse_join_styles(&params.join_style)?;
+    let playstyles = parse_playstyles(&params.playstyle)?;
     let filter = ShortlistFilter {
-        include_closed,
+        include_closed: parse_bool("include_closed", &params.include_closed)?.unwrap_or(false),
         include_full,
+        join_styles: join_styles.as_ref().map(|styles| {
+            styles
+                .iter()
+                .fold(0, |mask, style| mask | join_style_bit(*style))
+        }),
+        playstyles: playstyles
+            .as_ref()
+            .map(|codes| codes.iter().fold(0, |mask, code| mask | (1 << code))),
     };
+    let include_closed = filter.allows_closed();
     let limit = match blank_to_none(&params.limit) {
         None => DEFAULT_LIMIT,
         Some(value) => value
@@ -333,6 +347,9 @@ async fn search(
             balance_weight,
             include_closed,
             include_full,
+            join_styles: join_styles
+                .map(|styles| styles.into_iter().map(join_style_name).collect()),
+            playstyles,
             limit,
         },
         updated_at: timestamp(updated_at),
@@ -479,6 +496,58 @@ async fn load_clubs(
 enum PaceSource {
     Given(f64),
     Trainer(u64),
+}
+
+fn parse_join_styles(value: &Option<String>) -> Result<Option<Vec<JoinStyle>>, ApiError> {
+    let Some(value) = blank_to_none(value) else {
+        return Ok(None);
+    };
+    let mut styles = Vec::new();
+    for name in value.split(',').map(str::trim) {
+        let style = match name {
+            "open" => JoinStyle::Open,
+            "approval" => JoinStyle::Approval,
+            "closed" => JoinStyle::Closed,
+            _ => {
+                return Err(ApiError::bad_request(
+                    "join_style must be a comma-separated list of open, approval and closed",
+                ))
+            }
+        };
+        if !styles.contains(&style) {
+            styles.push(style);
+        }
+    }
+    Ok(Some(styles))
+}
+
+fn parse_playstyles(value: &Option<String>) -> Result<Option<Vec<u32>>, ApiError> {
+    let Some(value) = blank_to_none(value) else {
+        return Ok(None);
+    };
+    let mut codes = Vec::new();
+    for code in value.split(',').map(str::trim) {
+        let code = code
+            .parse::<u32>()
+            .ok()
+            .filter(|code| (1..32).contains(code))
+            .ok_or_else(|| {
+                ApiError::bad_request("playstyle must be a comma-separated list of playstyle codes")
+            })?;
+        if !codes.contains(&code) {
+            codes.push(code);
+        }
+    }
+    codes.sort_unstable();
+    Ok(Some(codes))
+}
+
+fn join_style_name(style: JoinStyle) -> &'static str {
+    match style {
+        JoinStyle::Open => "open",
+        JoinStyle::Approval => "approval",
+        _ => "closed",
+    }
 }
 
 fn parse_bool(name: &str, value: &Option<String>) -> Result<Option<bool>, ApiError> {

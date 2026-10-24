@@ -114,6 +114,11 @@ const PLAYSTYLE_LABELS: Record<number, string> = {
   17: 'Active at Night',
 };
 
+/** Every playstyle code with its name, in code order. */
+export const PLAYSTYLES: [number, string][] = Object.entries(PLAYSTYLE_LABELS).map(
+  ([code, label]) => [Number(code), label],
+);
+
 /** uma.moe's name for a club's playstyle code, or `null` if unknown. */
 export function playstyleLabel(policy: number | null): string | null {
   return policy === null ? null : (PLAYSTYLE_LABELS[policy] ?? null);

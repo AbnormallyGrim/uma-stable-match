@@ -30,7 +30,14 @@ describe('Results', () => {
   it("doesn't repeat the data age or the balance setting", () => {
     render(Results, {
       result: recommendations({
-        options: { balance_weight: 0.5, include_closed: false, include_full: false, limit: 50 },
+        options: {
+          balance_weight: 0.5,
+          include_closed: false,
+          include_full: false,
+          join_styles: null,
+          playstyles: null,
+          limit: 50,
+        },
       }),
     });
     const summary = screen.getByTestId('result-summary');
@@ -107,7 +114,14 @@ describe('Results', () => {
       result: recommendations({
         total: 1,
         clubs,
-        options: { balance_weight: null, include_closed: false, include_full: true, limit: 100 },
+        options: {
+          balance_weight: null,
+          include_closed: false,
+          include_full: true,
+          join_styles: null,
+          playstyles: null,
+          limit: 100,
+        },
       }),
     });
     expect(screen.getByText(/Every matching club is full/)).toBeInTheDocument();
@@ -127,7 +141,14 @@ describe('Results states', () => {
   it('suggests how to widen an empty search', () => {
     render(Results, {
       result: recommendations({
-        options: { balance_weight: 0.5, include_closed: false, include_full: false, limit: 100 },
+        options: {
+          balance_weight: 0.5,
+          include_closed: false,
+          include_full: false,
+          join_styles: null,
+          playstyles: null,
+          limit: 100,
+        },
       }),
     });
     expect(screen.getByText('No clubs matched your search.')).toBeInTheDocument();
