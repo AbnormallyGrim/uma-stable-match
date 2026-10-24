@@ -141,11 +141,12 @@ pub(crate) async fn load(
         lower,
         ids,
         full_ids,
+        lower_ids,
         month,
         updated_at,
     } = install(details, rows, config);
     if details.refreshes() {
-        details.schedule(ids, full_ids).await;
+        details.schedule([ids, full_ids, lower_ids]).await;
         let prefetched = details.cached_in_pool().len();
         tracing::info!(candidates, lower, prefetched, "scan listed the clubs");
         return Scan {
@@ -195,6 +196,7 @@ pub(crate) struct Installed {
     lower: usize,
     ids: Vec<(u64, u32)>,
     full_ids: Vec<(u64, u32)>,
+    lower_ids: Vec<(u64, u32)>,
     month: Option<String>,
     updated_at: Option<DateTime<Utc>>,
 }
@@ -227,10 +229,13 @@ pub(crate) fn install(details: &ClubDetails, rows: Vec<Circle>, config: &ScanCon
         .filter(|c| !config.is_lower(rank(c)))
         .cloned()
         .collect();
-    let lower = rows
+    let lower_rows: Vec<Circle> = rows
         .iter()
-        .filter(|c| config.is_lower(rank(c)) && pool.contains(c.circle_id))
-        .count();
+        .filter(|c| config.is_lower(rank(c)))
+        .cloned()
+        .collect();
+    let lower_ids = by_rank(&lower_rows, |id| pool.contains(id), lower_rows.len());
+    let lower = lower_ids.len();
     let ids = by_rank(&main, |id| pool.is_joinable(id), max);
     let full_ids = by_rank(&main, |id| pool.contains(id) && !pool.is_joinable(id), max);
     details.set_period(period);
@@ -244,6 +249,7 @@ pub(crate) fn install(details: &ClubDetails, rows: Vec<Circle>, config: &ScanCon
         lower,
         ids,
         full_ids,
+        lower_ids,
         month,
         updated_at: snapshot,
     }

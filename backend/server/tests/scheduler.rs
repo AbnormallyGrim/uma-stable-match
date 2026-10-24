@@ -163,6 +163,7 @@ async fn status_before_first_scan() {
             "due": 0,
             "oldest_due_at": null,
             "full": { "scheduled": 0, "loaded": 0, "due": 0 },
+            "lower": { "scheduled": 0, "loaded": 0, "due": 0 },
         })
     );
 }

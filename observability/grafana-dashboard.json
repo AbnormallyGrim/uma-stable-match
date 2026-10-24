@@ -1760,6 +1760,170 @@
       "description": "Share of scheduled full clubs whose details are stored."
     },
     {
+      "id": 219,
+      "type": "stat",
+      "title": "Lower range: loaded / scheduled / due",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 72
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "refresh_lower_loaded_clubs",
+          "legendFormat": "loaded",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "refresh_lower_scheduled_clubs",
+          "legendFormat": "scheduled",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "refresh_lower_due_clubs",
+          "legendFormat": "due",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 80,
+                "color": "red"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Clubs below the scan window on their own refresh schedule, refreshed every three days, after the joinable and full clubs and at half pace."
+    },
+    {
+      "id": 220,
+      "type": "gauge",
+      "title": "Lower range details loaded",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 72
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "100 * refresh_lower_loaded_clubs / clamp_min(refresh_lower_scheduled_clubs, 1)",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "options": {
+        "barShape": "flat",
+        "barWidthFactor": 0.5,
+        "effects": {
+          "barGlow": false,
+          "centerGlow": false,
+          "gradient": false
+        },
+        "endpointMarker": "point",
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "segmentCount": 1,
+        "segmentSpacing": 0.3,
+        "shape": "gauge",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "sparkline": false,
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 80,
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Share of scheduled lower-range clubs whose details are stored."
+    },
+    {
       "id": 102,
       "type": "row",
       "title": "uma.moe calls",
@@ -1768,7 +1932,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 72
+        "y": 77
       },
       "panels": []
     },
@@ -1784,7 +1948,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 73
+        "y": 78
       },
       "targets": [
         {
@@ -1882,7 +2046,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 81
+        "y": 86
       },
       "targets": [
         {
@@ -1980,7 +2144,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 89
+        "y": 94
       },
       "targets": [
         {
@@ -2087,7 +2251,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 97
+        "y": 102
       },
       "targets": [
         {
@@ -2185,7 +2349,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 105
+        "y": 110
       },
       "targets": [
         {
@@ -2281,7 +2445,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 113
+        "y": 118
       },
       "panels": []
     },
@@ -2297,7 +2461,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 114
+        "y": 119
       },
       "targets": [
         {
@@ -2395,7 +2559,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 122
+        "y": 127
       },
       "targets": [
         {
@@ -2492,7 +2656,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 130
+        "y": 135
       },
       "targets": [
         {
@@ -2590,7 +2754,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 138
+        "y": 143
       },
       "targets": [
         {
@@ -2687,7 +2851,7 @@
         "h": 8,
         "w": 16,
         "x": 8,
-        "y": 138
+        "y": 143
       },
       "targets": [
         {
@@ -2747,7 +2911,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 146
+        "y": 151
       },
       "panels": []
     },
@@ -2763,7 +2927,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 147
+        "y": 152
       },
       "targets": [
         {
@@ -2860,7 +3024,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 155
+        "y": 160
       },
       "targets": [
         {
@@ -2958,7 +3122,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 163
+        "y": 168
       },
       "targets": [
         {
@@ -3061,7 +3225,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 171
+        "y": 176
       },
       "panels": []
     },
@@ -3077,7 +3241,7 @@
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 172
+        "y": 177
       },
       "targets": [
         {
@@ -3149,7 +3313,7 @@
         "h": 5,
         "w": 6,
         "x": 6,
-        "y": 172
+        "y": 177
       },
       "targets": [
         {
@@ -3221,7 +3385,7 @@
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 172
+        "y": 177
       },
       "targets": [
         {
@@ -3304,7 +3468,7 @@
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 172
+        "y": 177
       },
       "targets": [
         {
@@ -3376,7 +3540,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 177
+        "y": 182
       },
       "targets": [
         {
@@ -3492,7 +3656,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 177
+        "y": 182
       },
       "targets": [
         {
@@ -3601,7 +3765,7 @@
         "h": 8,
         "w": 4,
         "x": 0,
-        "y": 185
+        "y": 190
       },
       "targets": [
         {
@@ -3680,7 +3844,7 @@
         "h": 8,
         "w": 20,
         "x": 4,
-        "y": 185
+        "y": 190
       },
       "targets": [
         {
@@ -3778,7 +3942,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 193
+        "y": 198
       },
       "targets": [
         {
@@ -3872,7 +4036,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 202
+        "y": 207
       },
       "panels": []
     },
@@ -3888,7 +4052,7 @@
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 203
+        "y": 208
       },
       "targets": [
         {
@@ -3951,7 +4115,7 @@
         "h": 5,
         "w": 6,
         "x": 6,
-        "y": 203
+        "y": 208
       },
       "targets": [
         {
@@ -4014,7 +4178,7 @@
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 203
+        "y": 208
       },
       "targets": [
         {
@@ -4078,7 +4242,7 @@
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 203
+        "y": 208
       },
       "targets": [
         {
