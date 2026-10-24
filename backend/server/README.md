@@ -133,6 +133,8 @@ The pool is sorted once by estimate. A query binary-searches to the target and w
 
 The synthetic pools (`tests/shortlist_recall.rs`) need a mean of at least 0.95 and at least 0.8 at every pace. On real data the estimate is much rougher: real clubs sit in a narrow pace band, and their median-to-mean ratio varies widely. So a shortlist needs a large share of the pool to keep recall high. A larger shortlist means more club details to look up for each request.
 
+Scoring twice the shortlist, as searches do, is checked separately on three synthetic pools of 3,000 clubs with an exact median for every club: the top 10 must match scoring every club with a mean recall of at least 0.99 and at least 0.9 at every pace.
+
 Exact medians help most when many clubs have them. With an exact median for every synthetic club, a shortlist of 60 reaches 0.995. On real data, with exact medians for the 80 prefetched clubs (about half the pool), a shortlist of 30 rises from 0.72 to 0.77, and one of 60 barely changes. Fit also depends on where you'd place among the members, so on real data being close in median isn't a strong enough signal on its own.
 
 ## Club details
@@ -309,7 +311,7 @@ There's no public status endpoint. The page takes the data's age from each searc
 
 ### Recommendations
 
-`GET /api/v1/recommendations` scores every cached club that's in the current pool with [`uma-stable-match-scoring`](../scoring/README.md) and returns them best first.
+`GET /api/v1/recommendations` scores the cached clubs nearest your pace with [`uma-stable-match-scoring`](../scoring/README.md) and returns them best first.
 
 | Parameter | Required | Default | Meaning |
 |---|---|---|---|
@@ -327,11 +329,11 @@ There's no public status endpoint. The page takes the data's age from each searc
 
 1. Check the pace and balance weight. An invalid request fails before anything is fetched.
 2. Shortlist the `SHORTLIST_SIZE` clubs whose estimated median is nearest `0.85 ×` your pace. Closed clubs are left out unless `include_closed=true`, and full clubs unless `include_full=true`.
-3. Take every cached club in the pool. With Redis, read the uncached shortlisted clubs from it in one `MGET`, and keep those not yet due for a refresh in memory. Then fetch up to `REQUEST_FETCH_BUDGET` of the rest from uma.moe in the interactive lane, nearest first. Requests that need the same club share one fetch.
+3. Take the clubs nearest your pace, twice `SHORTLIST_SIZE` of them, the shortlist first. Read their member data from memory, then the rest from Redis in one `MGET`, keeping those not yet due for a refresh in memory. Then fetch up to `REQUEST_FETCH_BUDGET` of the shortlisted clubs still missing from uma.moe in the interactive lane, nearest first. Requests that need the same club share one fetch. The clubs past the shortlist are only scored if they're already stored.
 4. Queue the other uncached shortlisted clubs, and any that failed, for background loading.
-5. Score every loaded club in the pool, not only the shortlist. Without `include_full=true`, full clubs are dropped first, judged by the pool's latest list data rather than their cached details, which can be a day old.
+5. Score the loaded clubs. Without `include_full=true`, full clubs are dropped first, judged by the pool's latest list data rather than their cached details, which can be a day old.
 
-Cached clubs are always scored exactly, so the shortlist only decides which uncached clubs to load. Once every club is cached, which is the normal case when `SCAN_MAX_DETAILS` is at least the pool size, results are the same as scoring the whole pool. `coverage` says how complete a response is.
+Only these clubs are copied and scored, so a search costs the same however large the pool is. Clubs further from your pace can't fit well, so this gives the same results as scoring every club: on three synthetic pools of 3,000 clubs with exact medians, the normal case once the refresher has loaded them, the top 10 matches scoring every club (mean recall 1.0, or 0.9975 with closed clubs). `coverage` says how complete a response is.
 
 #### Looking up a trainer
 
@@ -367,8 +369,8 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
   "options": { "balance_weight": 0.5, "include_closed": false, "include_full": false, "limit": 50 },
   "updated_at": "2026-03-18T09:00:00Z",
   "month": "2026-03",
-  "coverage": { "shortlisted": 102, "scored": 113, "pending": 0 },
-  "total": 62,
+  "coverage": { "considered": 4980, "shortlisted": 120, "scored": 240, "pending": 0 },
+  "total": 236,
   "clubs": [
     {
       "circle_id": 1,
@@ -429,8 +431,9 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
 | `options` | The settings used, after defaults: `balance_weight` is `null` when balance scoring is off |
 | `updated_at` | When the clubs were scanned. Before the first scan finishes, when its club list was fetched |
 | `month` | Game month of the club data, `YYYY-MM` |
+| `coverage.considered` | Clubs in the pool that your options allow. Each was compared with your pace by its estimate |
 | `coverage.shortlisted` | Clubs on the shortlist for your pace |
-| `coverage.scored` | Clubs with member data that were scored, including cached clubs outside the shortlist |
+| `coverage.scored` | Clubs with member data that were scored, at most twice the shortlist |
 | `coverage.pending` | Shortlisted clubs still loading in the background. Above 0, searching again shortly can give more results |
 | `total` | How many clubs were scored, before `limit` |
 | `clubs` | Up to `limit` clubs, best first. The trainer's own club is never one of them |
@@ -485,7 +488,7 @@ Logs go to stdout. With `LOG_FORMAT=json`, each line is a JSON object with the t
 
 ### Searches
 
-Each search logs one `search` line, so it can be found and rerun. It holds the `query` string, `status`, the `trainer_id` for a trainer search, `pace_per_day`, `month`, the `coverage` counts (`shortlisted`, `scored`, `pending`), `total`, the top ten `top_clubs`, and `duration_ms`. It also says how deep into the rankings the search went:
+Each search logs one `search` line, so it can be found and rerun. It holds the `query` string, `status`, the `trainer_id` for a trainer search, `pace_per_day`, `month`, the `coverage` counts (`considered`, `shortlisted`, `scored`, `pending`), `total`, the top ten `top_clubs`, and `duration_ms`. It also says how deep into the rankings the search went:
 
 | Field | Meaning |
 |---|---|

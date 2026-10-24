@@ -136,7 +136,7 @@ Club data refreshes automatically once a day, shortly after uma.moe's daily upda
 
 <sub>The top results table, shown with made-up clubs. Search by name, or select a column to sort. With closed clubs included, a filter can hide them again.</sub>
 
-Above your top picks, a summary shows your pace, how many clubs were analysed, your **comfortable fits** (clubs where you'd sit 25–60% of the way down the members) and your **typical place** across your results, such as *Top 25%*.
+Above your top picks, a summary shows your pace, how many clubs were analysed (every club in the pool that your options allow), your **comfortable fits** (clubs where you'd sit 25–60% of the way down the members) and your **typical place** across your results, such as *Top 25%*.
 
 Full clubs (30 of 30 members) aren't shown unless you tick **Include full clubs**, since there's no spot to join. Your own club is never in the results. When you search by trainer ID, a **Your club** card above the table shows where your club would sit among your results and compares its median, your place and its fit with your top pick. Matches are based on a club's typical member rather than its tier, so your best fits may be a tier or two below a high-tier club whose members are much faster than you.
 
@@ -237,8 +237,8 @@ curl "http://localhost:8080/api/v1/recommendations?trainer_id=123456789012&balan
   "options": { "balance_weight": 0.6, "include_closed": false, "include_full": false, "limit": 1 },
   "updated_at": "2026-10-19T08:00:00Z",
   "month": "2026-10",
-  "coverage": { "shortlisted": 102, "scored": 113, "pending": 0 },
-  "total": 98,
+  "coverage": { "considered": 4980, "shortlisted": 120, "scored": 240, "pending": 0 },
+  "total": 236,
   "clubs": [
     {
       "circle_id": 100000001,
@@ -271,7 +271,7 @@ curl "http://localhost:8080/api/v1/recommendations?trainer_id=123456789012&balan
 }
 ```
 
-`total` is how many clubs were scored before `limit` was applied. `month` is the game month the data comes from, and `coverage.pending` counts clubs that are still loading. The [server README](backend/server/README.md#recommendations) describes every field and error.
+`total` is how many clubs were scored before `limit` was applied, and `coverage.considered` how many were compared with your pace. `month` is the game month the data comes from, and `coverage.pending` counts clubs that are still loading. The [server README](backend/server/README.md#recommendations) describes every field and error.
 
 ### Other endpoints
 

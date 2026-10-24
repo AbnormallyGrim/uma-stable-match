@@ -53,8 +53,8 @@ export interface Recommendations {
   updated_at: string;
   /** Game month of the club data, `YYYY-MM`. */
   month: string | null;
-  /** How complete the result is: clubs shortlisted, scored, and still loading. */
-  coverage: { shortlisted: number; scored: number; pending: number };
+  /** Clubs compared with the pace, shortlisted, scored, and still loading. */
+  coverage: { considered: number; shortlisted: number; scored: number; pending: number };
   total: number;
   clubs: Club[];
   your_club: YourClub | null;

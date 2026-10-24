@@ -73,11 +73,11 @@ describe('emptyHints', () => {
 
 describe('result notices', () => {
   it('count clubs still loading', () => {
-    expect(pendingNotice({ shortlisted: 5, scored: 5, pending: 0 })).toBeNull();
-    expect(pendingNotice({ shortlisted: 5, scored: 4, pending: 1 })).toBe(
+    expect(pendingNotice({ considered: 50, shortlisted: 5, scored: 5, pending: 0 })).toBeNull();
+    expect(pendingNotice({ considered: 50, shortlisted: 5, scored: 4, pending: 1 })).toBe(
       '1 more club is still loading. Search again in a minute for complete results.',
     );
-    expect(pendingNotice({ shortlisted: 5, scored: 2, pending: 3 })).toBe(
+    expect(pendingNotice({ considered: 50, shortlisted: 5, scored: 2, pending: 3 })).toBe(
       '3 more clubs are still loading. Search again in a minute for complete results.',
     );
   });
@@ -96,7 +96,7 @@ describe('result notices', () => {
       recommendations({
         updated_at: '2026-03-02T15:00:00Z',
         month: '2026-02',
-        coverage: { shortlisted: 3, scored: 1, pending: 2 },
+        coverage: { considered: 340, shortlisted: 3, scored: 1, pending: 2 },
       }),
     );
     expect(notices).toHaveLength(2);

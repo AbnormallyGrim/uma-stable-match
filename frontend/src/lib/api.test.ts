@@ -15,7 +15,7 @@ const recommendations: Recommendations = {
   options: { balance_weight: null, include_closed: false, include_full: false, limit: 50 },
   updated_at: '2026-03-18T09:00:00Z',
   month: '2026-03',
-  coverage: { shortlisted: 1, scored: 1, pending: 0 },
+  coverage: { considered: 340, shortlisted: 1, scored: 1, pending: 0 },
   total: 1,
   clubs: [
     {

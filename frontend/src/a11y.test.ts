@@ -89,7 +89,7 @@ describe('accessibility', () => {
         ...withResults,
         updated_at: '2026-03-02T15:00:00Z',
         month: '2026-02',
-        coverage: { shortlisted: 9, scored: 3, pending: 6 },
+        coverage: { considered: 340, shortlisted: 9, scored: 3, pending: 6 },
       }),
     );
     render(App);

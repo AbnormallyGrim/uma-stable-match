@@ -183,7 +183,7 @@ async fn fetches_the_nearest_clubs_within_the_budget() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         body["coverage"],
-        json!({ "shortlisted": 4, "scored": 2, "pending": 2 })
+        json!({ "considered": 6, "shortlisted": 4, "scored": 2, "pending": 2 })
     );
     assert_eq!(ids(&body), vec![3, 4]);
     for (id, expected) in [(1, 0), (2, 0), (3, 1), (4, 1), (5, 0), (6, 0)] {
@@ -208,7 +208,7 @@ async fn queued_clubs_load_in_the_background() {
     let (_, body) = flow.get(settings(4, 2), NEAR_3M).await;
     assert_eq!(
         body["coverage"],
-        json!({ "shortlisted": 4, "scored": 4, "pending": 0 })
+        json!({ "considered": 6, "shortlisted": 4, "scored": 4, "pending": 0 })
     );
     for id in 2..=5 {
         assert_eq!(flow.fetches(id).await, 1, "club {id}");
@@ -231,14 +231,14 @@ async fn concurrent_requests_share_fetches() {
 }
 
 #[tokio::test]
-async fn every_cached_club_is_scored() {
+async fn cached_clubs_next_to_the_shortlist_are_scored_too() {
     let flow = flow(&[], &[], 10).await;
     let (_, body) = flow.get(settings(1, 2), NEAR_3M).await;
     assert_eq!(
         body["coverage"],
-        json!({ "shortlisted": 1, "scored": 6, "pending": 0 })
+        json!({ "considered": 6, "shortlisted": 1, "scored": 2, "pending": 0 })
     );
-    assert_eq!(ids(&body), vec![1, 2, 3, 4, 5, 6]);
+    assert_eq!(ids(&body), vec![2, 3]);
     for id in 1..=CLUBS {
         assert_eq!(flow.fetches(id).await, 1, "club {id}");
     }
@@ -265,7 +265,7 @@ async fn failed_fetches_are_pending_and_queued() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         body["coverage"],
-        json!({ "shortlisted": 2, "scored": 1, "pending": 1 })
+        json!({ "considered": 6, "shortlisted": 2, "scored": 1, "pending": 1 })
     );
     assert_eq!(ids(&body), vec![4]);
     assert_eq!(flow.details.queued(), 1);

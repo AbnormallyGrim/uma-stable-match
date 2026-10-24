@@ -16,7 +16,7 @@ function recommendations(
     options: { balance_weight: null, include_closed: false, include_full: false, limit: 50 },
     updated_at: '2026-03-18T09:00:00Z',
     month: '2026-03',
-    coverage: { shortlisted: total, scored: total, pending: 0 },
+    coverage: { considered: 340, shortlisted: total, scored: total, pending: 0 },
     total,
     clubs: [],
     your_club: null,
@@ -59,7 +59,7 @@ describe('App', () => {
     const result = recommendations(2, 7_600_000, {
       updated_at: '2026-03-02T15:00:00Z',
       month: '2026-02',
-      coverage: { shortlisted: 7, scored: 2, pending: 5 },
+      coverage: { considered: 340, shortlisted: 7, scored: 2, pending: 5 },
     });
     stubApi(() => json(result));
     render(App);
