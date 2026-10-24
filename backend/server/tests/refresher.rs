@@ -5,7 +5,8 @@ use std::time::{Duration, Instant, SystemTime};
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{json, Value};
 use uma_stable_match_server::{
-    scan, ClubDetails, DetailConfig, RefreshConfig, RefreshStatus, ScanConfig, SharedPool,
+    scan, ClubDetails, DetailConfig, FullRefreshStatus, RefreshConfig, RefreshStatus, ScanConfig,
+    SharedPool,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -429,4 +430,81 @@ async fn reports_scheduled_loaded_and_due_clubs() {
         (status.scheduled, status.due, status.oldest_due),
         (3, 0, None)
     );
+}
+
+fn full(id: u64, rank: i32) -> Value {
+    let mut row = listed(id, rank);
+    row["member_count"] = json!(30);
+    row
+}
+
+#[tokio::test]
+async fn full_clubs_refresh_after_joinable_ones() {
+    let server = MockServer::start().await;
+    mount_list(&server, vec![full(1, 10), listed(2, 11), listed(3, 12)]).await;
+    for id in 1..=3 {
+        mount_detail(&server, id, detail(id, "Tiered", Some(now()))).await;
+    }
+    let details = refreshing(&server, RefreshConfig::default());
+    scan(&client(&server), &details, &scan_config(10))
+        .await
+        .unwrap();
+
+    let status = details.refresh_status().await;
+    assert_eq!((status.scheduled, status.due), (2, 2));
+    assert_eq!(
+        status.full,
+        FullRefreshStatus {
+            scheduled: 1,
+            loaded: 0,
+            due: 1
+        }
+    );
+    assert_eq!(details.scheduled().await, 3);
+
+    start(&details);
+    wait_until("every club loads", async || {
+        details.refresh_status().await.full.loaded == 1
+    })
+    .await;
+    assert_eq!(detail_calls(&server).await, vec![2, 3, 1]);
+    let status = details.refresh_status().await;
+    assert_eq!((status.loaded, status.full.due), (2, 0));
+}
+
+#[tokio::test]
+async fn a_club_that_fills_up_moves_to_the_full_schedule() {
+    let server = MockServer::start().await;
+    mount_list(&server, vec![listed(1, 10), listed(2, 11)]).await;
+    mount_list(&server, vec![full(1, 10), listed(2, 11)]).await;
+    let details = refreshing(&server, RefreshConfig::default());
+    scan(&client(&server), &details, &scan_config(10))
+        .await
+        .unwrap();
+    assert_eq!(details.refresh_status().await.scheduled, 2);
+
+    scan(&client(&server), &details, &scan_config(10))
+        .await
+        .unwrap();
+    let status = details.refresh_status().await;
+    assert_eq!((status.scheduled, status.full.scheduled), (1, 1));
+    assert!(details.next_refresh(1).await.is_some());
+}
+
+#[tokio::test]
+async fn a_full_club_loaded_for_a_search_joins_the_full_schedule() {
+    let server = MockServer::start().await;
+    mount_list(&server, vec![full(1, 10), listed(2, 11), full(3, 12)]).await;
+    mount_detail(&server, 3, detail(3, "Searched", Some(now()))).await;
+    let details = refreshing(&server, RefreshConfig::default());
+    scan(&client(&server), &details, &scan_config(1))
+        .await
+        .unwrap();
+    assert_eq!(details.refresh_status().await.full.scheduled, 1);
+    assert_eq!(details.next_refresh(3).await, None);
+
+    details.get(3, Priority::Interactive).await.unwrap();
+    let status = details.refresh_status().await;
+    assert_eq!((status.full.scheduled, status.full.loaded), (2, 1));
+    assert!(details.next_refresh(3).await.is_some_and(|due| due > now()));
 }

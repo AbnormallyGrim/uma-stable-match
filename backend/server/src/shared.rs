@@ -377,16 +377,21 @@ impl SharedCache {
         }
     }
 
-    pub(crate) fn schedule(&self, config: &ScanConfig) -> Option<SharedSchedule> {
+    pub(crate) fn schedules(
+        &self,
+        config: &ScanConfig,
+    ) -> Option<(SharedSchedule, SharedSchedule)> {
         let Backend::Redis(redis) = &self.backend else {
             return None;
         };
         let keys = ScanKeys::new(config);
-        Some(SharedSchedule {
+        let schedule = |key: String| SharedSchedule {
             redis: redis.clone(),
-            key: keys.schedule,
-            lease: keys.refresher,
-        })
+            key,
+            lease: keys.refresher.clone(),
+        };
+        let full = format!("{}-full", keys.schedule);
+        Some((schedule(keys.schedule.clone()), schedule(full)))
     }
 
     /// The club list saved by the scan in progress for this scan window.

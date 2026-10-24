@@ -146,6 +146,11 @@ async fn full_status(State(state): State<AppState>) -> Json<Value> {
             "loaded": refresh.loaded,
             "due": refresh.due,
             "oldest_due_at": refresh.oldest_due.map(|due| timestamp(due.into())),
+            "full": {
+                "scheduled": refresh.full.scheduled,
+                "loaded": refresh.full.loaded,
+                "due": refresh.full.due,
+            },
         },
         "last_error": status.last_error.as_ref().map(last_error),
     }))
