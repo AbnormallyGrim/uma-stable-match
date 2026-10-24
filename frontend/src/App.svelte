@@ -10,6 +10,8 @@
   import SearchStatus from './lib/SearchStatus.svelte';
   import SiteFooter from './lib/SiteFooter.svelte';
   import { resultNotices } from './lib/states';
+  import { hasSeenTour, markTourSeen, TOUR_STEPS } from './lib/tour';
+  import Tour from './lib/Tour.svelte';
   import {
     DEFAULT_SEARCH,
     fromUrlParams,
@@ -30,6 +32,14 @@
   const RESULT_LIMIT = 100;
 
   let search = $state<RunnerState>({ status: { phase: 'idle' }, result: null });
+  // The tour starts on a first visit, unless the visitor arrived with a search to run; then it
+  // waits for a later visit.
+  let touring = $state(fromUrl === null && !hasSeenTour(storage));
+
+  function endTour() {
+    touring = false;
+    markTourSeen(storage);
+  }
 
   const runner = new SearchRunner({
     fetch: (query, signal) => fetchRecommendations({ ...query, limit: RESULT_LIMIT }, { signal }),
@@ -70,7 +80,7 @@
   });
 </script>
 
-<NavBar />
+<NavBar onhelp={() => (touring = true)} />
 
 <main>
   <div class="hero">
@@ -89,3 +99,7 @@
 </main>
 
 <SiteFooter />
+
+{#if touring}
+  <Tour steps={TOUR_STEPS} onclose={endTour} />
+{/if}

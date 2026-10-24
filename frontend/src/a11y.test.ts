@@ -2,7 +2,7 @@
 
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import axe from 'axe-core';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App.svelte';
 import type { Recommendations } from './lib/api';
@@ -13,6 +13,7 @@ import SearchStatus from './lib/SearchStatus.svelte';
 import { DEFAULT_SEARCH } from './lib/search';
 import { club, recommendations } from './lib/test-data';
 import ThemeToggle from './lib/ThemeToggle.svelte';
+import { TOUR_KEY } from './lib/tour';
 
 // axe's colour-contrast rule needs real rendering, so contrast.test.ts covers it instead.
 // The landmark (region) rule only applies to whole-page checks.
@@ -69,9 +70,14 @@ const withResults: Recommendations = recommendations({
   },
 });
 
+beforeEach(() => {
+  localStorage.setItem(TOUR_KEY, '1');
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
   window.history.replaceState(null, '', '/');
+  localStorage.clear();
 });
 
 describe('accessibility', () => {
@@ -79,6 +85,14 @@ describe('accessibility', () => {
     stubApi(() => json(withResults));
     render(App);
     await screen.findByRole('heading', { name: 'Uma Stable Match club finder' });
+    expect(await violations(document.body, true)).toEqual([]);
+  });
+
+  it('has no violations with the tour open', async () => {
+    localStorage.removeItem(TOUR_KEY);
+    stubApi(() => json(withResults));
+    render(App);
+    await screen.findByRole('dialog', { name: 'Welcome to Uma Stable Match' });
     expect(await violations(document.body, true)).toEqual([]);
   });
 

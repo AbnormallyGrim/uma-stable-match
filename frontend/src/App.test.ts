@@ -1,10 +1,11 @@
 // App tests with a stubbed fetch. All data is made up.
 
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App.svelte';
 import type { Recommendations } from './lib/api';
+import { TOUR_KEY } from './lib/tour';
 
 function recommendations(
   total: number,
@@ -53,9 +54,11 @@ function setUrl(search: string) {
 
 const trainerInput = () => screen.getByLabelText('Trainer ID', { selector: 'input#trainer-id' });
 
+// Returning visitors by default, so the tour doesn't cover the page.
 beforeEach(() => {
   setUrl('');
   localStorage.clear();
+  localStorage.setItem(TOUR_KEY, '1');
 });
 
 afterEach(() => {
@@ -127,7 +130,7 @@ describe('App', () => {
     const { unmount } = render(App);
     await fireEvent.input(trainerInput(), { target: { value: '123456789' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Find clubs' }));
-    expect(localStorage.length).toBe(0);
+    expect(localStorage.getItem('uma-stable-match:trainer-id')).toBeNull();
     await screen.findByRole('button', { name: 'Find clubs' });
 
     await fireEvent.click(screen.getByLabelText('Remember my trainer ID on this device'));
@@ -188,5 +191,36 @@ describe('App states', () => {
     render(App);
     expect(await screen.findByText('Too many searches')).toBeInTheDocument();
     expect(screen.getByText('Please wait 7 seconds before searching again.')).toBeInTheDocument();
+  });
+
+  it('starts the tour on a first visit, and not again once skipped', async () => {
+    localStorage.removeItem(TOUR_KEY);
+    stubApi(() => json(recommendations(0)));
+    const { unmount } = render(App);
+    const dialog = screen.getByRole('dialog', { name: 'Welcome to Uma Stable Match' });
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Skip tour' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(localStorage.getItem(TOUR_KEY)).toBe('1');
+    unmount();
+
+    render(App);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('waits with the tour when a visitor arrives with a search', () => {
+    localStorage.removeItem(TOUR_KEY);
+    setUrl('?pace=5000000');
+    stubApi(() => json(recommendations(1, 5_000_000)));
+    render(App);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(localStorage.getItem(TOUR_KEY)).toBeNull();
+  });
+
+  it('brings the tour back from the help button', async () => {
+    stubApi(() => json(recommendations(0)));
+    render(App);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: 'Take the tour' }));
+    expect(screen.getByRole('dialog', { name: 'Welcome to Uma Stable Match' })).toBeInTheDocument();
   });
 });

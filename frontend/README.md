@@ -56,7 +56,9 @@ src/lib/runner.ts             Search state machine: loading, retries and countdo
 src/lib/states.ts             Error messages and empty-result hints
 src/lib/HowToUse.svelte       Step-by-step instructions under the search form
 src/lib/SearchStatus.svelte   Loading, waiting and error messages
-src/lib/NavBar.svelte         Top bar: the brand, linking to the website, and the theme switch
+src/lib/NavBar.svelte         Top bar: the brand, linking to the website, the tour button and the theme switch
+src/lib/Tour.svelte           The product tour's overlay, highlight and instruction card
+src/lib/tour.ts               The tour's steps, and remembering that it was seen
 src/lib/ThemeToggle.svelte    System / Light / Dark switch, as icons with tooltips
 src/lib/theme.ts              Saving and applying the theme choice
 src/lib/SiteFooter.svelte     Tips, the logo, a link to report a problem, and the disclaimer
@@ -86,7 +88,17 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 
 ## Navbar
 
-`NavBar.svelte` is a bar across the top of the page, matching the website's at [umastable.com](https://umastable.com): the logo and "Uma Stable Match" on the left, linking back to the website, and the theme switch on the right. It stays at the top while scrolling, with a translucent, blurred background. The page's own heading, "Uma Stable Match club finder", is hidden visually and read by screen readers. On narrow screens a long title is cut short with an ellipsis rather than pushing the switch off the screen.
+`NavBar.svelte` is a bar across the top of the page, matching the website's at [umastable.com](https://umastable.com): the logo and "Uma Stable Match" on the left, linking back to the website, and on the right a round **?** button that starts the [product tour](#product-tour), then the theme switch. It stays at the top while scrolling, with a translucent, blurred background. The page's own heading, "Uma Stable Match club finder", is hidden visually and read by screen readers. On narrow screens a long title is cut short with an ellipsis rather than pushing the switch off the screen.
+
+## Product tour
+
+`Tour.svelte` walks visitors through the page, one part at a time. The steps are in `tour.ts`: a welcome; "Search by"; the trainer ID or pace field; balance scoring; the filters (full clubs, Discord, join style and playstyle); **Find clubs**; what the results show; "How to use"; the theme switch; and the **?** button.
+
+- **When it shows.** It starts on a visitor's first visit. Finishing or skipping it sets `uma-stable-match:tour-seen` in local storage, so it doesn't start again on that device. A visitor who arrives with a search in the link sees their results first, and gets the tour on a later visit instead. If storage is blocked, the tour never starts on its own, rather than on every visit. The **?** button in the navbar starts it again at any time.
+- **Highlighting.** Each step names the part it describes with a `data-tour` attribute, such as `data-tour="filters"` on the filter group in the form. The tour scrolls that part into view, dims the rest of the page with an SVG that has a rounded hole cut out around it, and draws an accent ring. Steps without a target, the welcome and the results, are centred. The card goes below the highlight if it fits, otherwise above it, and always stays on screen; it follows the highlight when the page scrolls or resizes. While the tour is open, the page underneath can't be clicked.
+- **Controls.** **Next** and **Back** move between steps, **Skip tour** ends it, and the last step has **Done**. A row of dots shows progress.
+- **Keyboard and screen readers.** The card is a modal dialog labelled by the step's title and described by its text. Focus moves to **Next** on each step and stays inside the card; Escape skips the tour, the left and right arrow keys step through it, and focus goes back to where it was afterwards.
+- **Keeping it current.** The steps quote the page's labels, so update `tour.ts` when they change, and add a `data-tour` attribute for any new step's target.
 
 ## Search form
 
@@ -232,6 +244,7 @@ Card descriptions are capped at `80ch` so they stay easy to read on wide screens
 | `accent-color` | Checkboxes, radio buttons and the slider follow the theme's accent |
 | `.check` | A checkbox and its label, aligned on one line |
 | `.switch` | A checkbox drawn as an on/off switch: a label holding the input (`role="switch"`), a `.track` span, then the text. Gold when on. Used for balance scoring, full clubs, Has Discord and remembering the trainer ID |
+| `.tooltip` | A themed tooltip under the element, from its `data-tooltip` text, on hover and keyboard focus. Used for the theme icons and the tour button, which also have accessible names |
 | `.segmented`, `.segmented.small` | A pill-shaped group of radio buttons, used for "Search by" and, with icons, the theme switch. The selected option is styled with `:has(input:checked)` |
 | `:focus-visible` | A 2px accent ring around whatever has keyboard focus |
 
@@ -272,11 +285,12 @@ When you add or change a colour token, add its pairs to the test. A failing pair
 - every search status
 - the theme switch
 - the open "How to use" section
+- the whole page with the product tour open
 
 Two axe rules are adjusted. The colour-contrast rule is off, because jsdom doesn't render, and the contrast test covers it instead. The landmark (region) rule only applies to the whole-page checks.
 
 **Keyboard:** everything works without a mouse.
-- Tab moves through the theme switch, "Search by", the form, the cards, the table search, the scrollable table and its column headers.
+- Tab moves through the tour button, the theme switch, "Search by", the form, the cards, the table search, the scrollable table and its column headers.
 - The arrow keys change radio groups, Enter submits a search, and Enter or Space sorts a column.
 - `:focus-visible` shows a ring on whatever has focus.
 
