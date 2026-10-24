@@ -183,6 +183,9 @@ async fn searches_are_logged_so_they_can_be_rerun() {
         .collect();
     assert_eq!(search["top_clubs"], format!("{top:?}"));
     assert!(search["duration_ms"].is_u64());
+    assert_eq!(search["shortlist_rank"], 102);
+    assert_eq!(search["pick_rank"], 102);
+    assert_eq!(search["pool_bottom"], true);
 
     assert_eq!(rejected, StatusCode::BAD_REQUEST);
     let failed = logs.lines("search failed");

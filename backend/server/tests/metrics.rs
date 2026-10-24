@@ -13,8 +13,9 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    app, install_metrics, metrics_router, AppState, Cache, ClubDetails, DetailConfig, KeySecret,
-    MatchSettings, PaceLookup, RateLimits, RedisUrl, SharedCache, SharedPool, DEFAULT_PACE_TTL,
+    app, install_metrics, metrics_router, scan, AppState, Cache, ClubDetails, DetailConfig,
+    KeySecret, MatchSettings, PaceLookup, RateLimits, RedisUrl, ScanConfig, SharedCache,
+    SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{
     ApiKey, Client, ClientConfig, ListCirclesRequest, Priority, RetryConfig,
@@ -337,4 +338,61 @@ async fn redis_failures_are_recorded() {
         "redis_op_duration_seconds_bucket",
         &[r#"op="get""#]
     ));
+}
+
+#[tokio::test]
+async fn searches_record_how_deep_they_go() {
+    let handle = handle();
+    let server = MockServer::start().await;
+    let fans: Vec<i64> = (0..10).map(|day| 100_000_000 + 4_000_000 * day).collect();
+    let members: Vec<_> = (0..10)
+        .map(|i| json!({ "viewer_id": 7000 + i, "year": 2026, "month": 3, "daily_fans": fans }))
+        .collect();
+    let circle = json!({
+        "circle_id": 900000401,
+        "name": "Depth Club",
+        "member_count": 10,
+        "join_style": 1,
+        "monthly_rank": 6_000,
+        "monthly_point": 20_000_000,
+        "last_updated": "2026-03-19T15:00:00Z",
+    });
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "circles": [circle] })))
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "900000401"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "circle": circle, "members": members })),
+        )
+        .mount(&server)
+        .await;
+    let client = client(server.uri());
+    let details = ClubDetails::new(&client, SharedPool::default(), DetailConfig::default()).0;
+    let config = ScanConfig {
+        rank_from: 1,
+        rank_to: 10_000,
+        ..ScanConfig::default()
+    };
+    scan(&client, &details, &config).await.unwrap();
+    let state = AppState {
+        details,
+        paces: PaceLookup::new(client, DEFAULT_PACE_TTL),
+        ..state()
+    };
+
+    let status = get(app(state, None), "/api/v1/recommendations?pace=4000000").await;
+    assert_eq!(status, StatusCode::OK);
+    let rendered = handle.render();
+    for name in ["search_shortlist_worst_rank", "search_pick_worst_rank"] {
+        assert!(
+            has(&rendered, &format!("{name}_bucket"), &[r#"le="7500""#]),
+            "missing {name}"
+        );
+    }
+    assert!(rendered
+        .lines()
+        .any(|l| l.starts_with("search_pool_bottom_total ")));
 }

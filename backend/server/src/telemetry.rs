@@ -7,7 +7,7 @@ use axum::middleware::Next;
 use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
-use metrics_exporter_prometheus::{BuildError, PrometheusBuilder, PrometheusHandle};
+use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder, PrometheusHandle};
 
 use crate::app::{status_router, AppState};
 use crate::refresher::utc_now;
@@ -16,6 +16,9 @@ const BUCKETS: &[f64] = &[
     0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 300.0, 900.0,
     1800.0, 3600.0,
 ];
+const RANK_BUCKETS: &[f64] = &[
+    1_000.0, 2_500.0, 5_000.0, 7_500.0, 10_000.0, 15_000.0, 20_000.0, 30_000.0, 45_000.0, 65_000.0,
+];
 const UPKEEP_EVERY: Duration = Duration::from_secs(5);
 
 /// Installs the global metrics recorder and returns the handle that renders it. Call it once,
@@ -23,6 +26,7 @@ const UPKEEP_EVERY: Duration = Duration::from_secs(5);
 pub fn install_metrics() -> Result<PrometheusHandle, BuildError> {
     let handle = PrometheusBuilder::new()
         .set_buckets(BUCKETS)?
+        .set_buckets_for_metric(Matcher::Suffix("_worst_rank".into()), RANK_BUCKETS)?
         .install_recorder()?;
     let upkeep = handle.clone();
     tokio::spawn(async move {

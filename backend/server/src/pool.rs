@@ -324,6 +324,14 @@ impl ClubPool {
         )
     }
 
+    /// The club with the slowest estimate that `filter` allows, if any.
+    pub fn slowest(&self, filter: ShortlistFilter) -> Option<u64> {
+        self.entries
+            .iter()
+            .find(|e| filter.allows(&e.club))
+            .map(|e| e.club.circle_id)
+    }
+
     /// Like [`ClubPool::shortlist`], with the clubs `filter` allows.
     pub fn shortlist_matching(&self, target: f64, k: usize, filter: ShortlistFilter) -> Vec<u64> {
         if k == 0 || !(target.is_finite() && target > 0.0) {

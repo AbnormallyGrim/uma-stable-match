@@ -288,6 +288,262 @@
       }
     },
     {
+      "id": 216,
+      "type": "timeseries",
+      "title": "How deep searches go (monthly rank)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 14
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (increase(search_shortlist_worst_rank_bucket[6h])))",
+          "legendFormat": "shortlist p50"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "histogram_quantile(0.9, sum by (le) (increase(search_shortlist_worst_rank_bucket[6h])))",
+          "legendFormat": "shortlist p90"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (increase(search_pick_worst_rank_bucket[6h])))",
+          "legendFormat": "top picks p50"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "histogram_quantile(0.9, sum by (le) (increase(search_pick_worst_rank_bucket[6h])))",
+          "legendFormat": "top picks p90"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 80,
+                "color": "red"
+              }
+            ]
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "description": "The worst monthly rank among each search's shortlisted clubs and among its top 10 picks, as quantiles over the past 6 hours. Higher means slower clubs were needed."
+    },
+    {
+      "id": 217,
+      "type": "stat",
+      "title": "Searches that reached the slowest clubs (7 days)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 14
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "100 * sum(increase(search_pool_bottom_total[7d])) / clamp_min(sum(increase(search_shortlist_worst_rank_count[7d])), 1)",
+          "legendFormat": "reached the bottom",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "blue"
+              }
+            ]
+          },
+          "decimals": 1,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "description": "Share of searches whose shortlist included the slowest club in the pool. A rising share means the scan window stops short of what slower trainers need."
+    },
+    {
+      "id": 218,
+      "type": "bargauge",
+      "title": "Searches by deepest shortlisted rank (7 days)",
+      "description": "How many searches' shortlists stayed within each monthly rank. Each bar counts searches whose worst shortlisted rank was at most that rank.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum by (le) (increase(search_shortlist_worst_rank_bucket[7d]))",
+          "legendFormat": "≤ {{le}}",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "displayMode": "basic",
+        "orientation": "vertical",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "auto",
+        "sizing": "auto",
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "maxVizHeight": 300
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "decimals": 0,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "blue"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 206,
       "type": "row",
       "title": "Errors",
@@ -296,7 +552,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 27
       },
       "panels": []
     },
@@ -312,7 +568,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 15
+        "y": 28
       },
       "targets": [
         {
@@ -442,7 +698,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 36
       },
       "targets": [
         {
@@ -571,7 +827,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 45
       },
       "panels": []
     },
@@ -587,7 +843,7 @@
         "h": 5,
         "w": 5,
         "x": 0,
-        "y": 33
+        "y": 46
       },
       "targets": [
         {
@@ -669,7 +925,7 @@
         "h": 5,
         "w": 6,
         "x": 5,
-        "y": 33
+        "y": 46
       },
       "targets": [
         {
@@ -755,7 +1011,7 @@
         "h": 5,
         "w": 7,
         "x": 11,
-        "y": 33
+        "y": 46
       },
       "targets": [
         {
@@ -818,7 +1074,7 @@
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 33
+        "y": 46
       },
       "targets": [
         {
@@ -882,7 +1138,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 38
+        "y": 51
       },
       "targets": [
         {
@@ -979,7 +1235,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 38
+        "y": 51
       },
       "targets": [
         {
@@ -1077,7 +1333,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 38
+        "y": 51
       },
       "targets": [
         {
@@ -1154,7 +1410,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 46
+        "y": 59
       },
       "targets": [
         {
@@ -1252,7 +1508,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 46
+        "y": 59
       },
       "targets": [
         {
@@ -1351,7 +1607,7 @@
         "h": 5,
         "w": 12,
         "x": 0,
-        "y": 54
+        "y": 67
       },
       "targets": [
         {
@@ -1437,7 +1693,7 @@
         "h": 5,
         "w": 12,
         "x": 12,
-        "y": 54
+        "y": 67
       },
       "targets": [
         {
@@ -1512,7 +1768,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 59
+        "y": 72
       },
       "panels": []
     },
@@ -1528,7 +1784,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 73
       },
       "targets": [
         {
@@ -1626,7 +1882,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 68
+        "y": 81
       },
       "targets": [
         {
@@ -1724,7 +1980,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 76
+        "y": 89
       },
       "targets": [
         {
@@ -1831,7 +2087,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 84
+        "y": 97
       },
       "targets": [
         {
@@ -1929,7 +2185,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 92
+        "y": 105
       },
       "targets": [
         {
@@ -2025,7 +2281,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 100
+        "y": 113
       },
       "panels": []
     },
@@ -2041,7 +2297,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 101
+        "y": 114
       },
       "targets": [
         {
@@ -2139,7 +2395,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 109
+        "y": 122
       },
       "targets": [
         {
@@ -2236,7 +2492,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 117
+        "y": 130
       },
       "targets": [
         {
@@ -2334,7 +2590,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 125
+        "y": 138
       },
       "targets": [
         {
@@ -2431,7 +2687,7 @@
         "h": 8,
         "w": 16,
         "x": 8,
-        "y": 125
+        "y": 138
       },
       "targets": [
         {
@@ -2491,7 +2747,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 133
+        "y": 146
       },
       "panels": []
     },
@@ -2507,7 +2763,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 134
+        "y": 147
       },
       "targets": [
         {
@@ -2604,7 +2860,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 142
+        "y": 155
       },
       "targets": [
         {
@@ -2702,7 +2958,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 150
+        "y": 163
       },
       "targets": [
         {
@@ -2805,7 +3061,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 158
+        "y": 171
       },
       "panels": []
     },
@@ -2821,7 +3077,7 @@
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 159
+        "y": 172
       },
       "targets": [
         {
@@ -2893,7 +3149,7 @@
         "h": 5,
         "w": 6,
         "x": 6,
-        "y": 159
+        "y": 172
       },
       "targets": [
         {
@@ -2965,7 +3221,7 @@
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 159
+        "y": 172
       },
       "targets": [
         {
@@ -3048,7 +3304,7 @@
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 159
+        "y": 172
       },
       "targets": [
         {
@@ -3120,7 +3376,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 164
+        "y": 177
       },
       "targets": [
         {
@@ -3236,7 +3492,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 164
+        "y": 177
       },
       "targets": [
         {
@@ -3345,7 +3601,7 @@
         "h": 8,
         "w": 4,
         "x": 0,
-        "y": 172
+        "y": 185
       },
       "targets": [
         {
@@ -3424,7 +3680,7 @@
         "h": 8,
         "w": 20,
         "x": 4,
-        "y": 172
+        "y": 185
       },
       "targets": [
         {
@@ -3522,7 +3778,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 180
+        "y": 193
       },
       "targets": [
         {
@@ -3616,7 +3872,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 189
+        "y": 202
       },
       "panels": []
     },
@@ -3632,7 +3888,7 @@
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 190
+        "y": 203
       },
       "targets": [
         {
@@ -3695,7 +3951,7 @@
         "h": 5,
         "w": 6,
         "x": 6,
-        "y": 190
+        "y": 203
       },
       "targets": [
         {
@@ -3758,7 +4014,7 @@
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 190
+        "y": 203
       },
       "targets": [
         {
@@ -3822,7 +4078,7 @@
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 190
+        "y": 203
       },
       "targets": [
         {
