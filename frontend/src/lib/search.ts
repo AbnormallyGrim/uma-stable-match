@@ -18,6 +18,8 @@ export interface SearchState {
   joinStyle: JoinStyle | null;
   /** The only playstyle code to search for, or `null` for any. */
   playstyle: number | null;
+  /** Only clubs whose description mentions Discord. */
+  hasDiscord: boolean;
   includeFull: boolean;
 }
 
@@ -43,6 +45,7 @@ export const DEFAULT_SEARCH: SearchState = {
   balanceWeight: DEFAULT_BALANCE_WEIGHT,
   joinStyle: null,
   playstyle: null,
+  hasDiscord: false,
   includeFull: false,
 };
 
@@ -52,6 +55,10 @@ export const TRAINER_ID_ERROR = 'Enter your trainer ID: 9 to 12 digits.';
 export const PACE_ERROR = 'Enter your daily fan gain in millions, such as 7.6.';
 /** The join styles a search can pick from, in display order. */
 export const JOIN_STYLES: JoinStyle[] = ['open', 'approval', 'closed'];
+
+/** Says why the Discord filter is only a best guess. */
+export const DISCORD_NOTE =
+  "Based on whether the club's description mentions Discord. Some clubs with a Discord won't show up, and some links may have expired.";
 
 /** Whether a join style or playstyle is picked, which leaves fewer clubs near the visitor's pace. */
 export function narrowsSearch(joinStyle: JoinStyle | null, playstyle: number | null): boolean {
@@ -86,6 +93,7 @@ export function validate(state: SearchState): Validation {
     balanceWeight: state.balance ? clampWeight(state.balanceWeight) : null,
     joinStyle: state.joinStyle,
     playstyle: state.playstyle,
+    hasDiscord: state.hasDiscord,
     includeFull: state.includeFull,
   };
   if (state.mode === 'trainer') {
@@ -131,6 +139,7 @@ export function fromUrlParams(params: URLSearchParams): SearchState | null {
     balanceWeight: balance ? clampWeight(parsedWeight) : DEFAULT_BALANCE_WEIGHT,
     joinStyle: JOIN_STYLES.find((style) => style === params.get('join_style')) ?? null,
     playstyle: playstyleFrom(params.get('playstyle')),
+    hasDiscord: params.get('has_discord') === 'true',
     includeFull: params.get('include_full') === 'true',
   };
   if (trainerId !== null && isTrainerId(trainerId)) {

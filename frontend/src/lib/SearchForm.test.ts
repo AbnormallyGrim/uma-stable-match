@@ -27,6 +27,7 @@ describe('SearchForm', () => {
         balanceWeight: null,
         joinStyle: null,
         playstyle: null,
+        hasDiscord: false,
         includeFull: false,
       },
       expect.objectContaining({ trainerId: '123456789012' }),
@@ -112,6 +113,17 @@ describe('SearchForm', () => {
     expect(screen.getByTestId('filter-warning')).toHaveTextContent('further from your pace');
     await submit();
     expect(onsearch.mock.lastCall?.[0]).toMatchObject({ playstyle: 12 });
+  });
+
+  it('passes Has Discord and explains it is a best guess', async () => {
+    const onsearch = setup({ trainerId: '123456789' });
+    expect(screen.queryByTestId('discord-warning')).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('switch', { name: 'Has Discord' }));
+    expect(screen.getByTestId('discord-warning')).toHaveTextContent(
+      "Some clubs with a Discord won't show up",
+    );
+    await submit();
+    expect(onsearch.mock.lastCall?.[0]).toMatchObject({ hasDiscord: true });
   });
 
   it('shows balance scoring and full clubs as switches', () => {
