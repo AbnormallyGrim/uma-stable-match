@@ -432,3 +432,15 @@ fn full_clubs_are_not_joinable() {
     assert!(!pool.is_joinable(2));
     assert!(!pool.is_joinable(3));
 }
+
+#[test]
+fn slowest_is_the_first_club_the_filter_allows() {
+    let pool = ClubPool::new([full(1, 100.0), closed(2, 200.0), listed(3, 300.0)]);
+    assert_eq!(pool.slowest(ShortlistFilter::default()), Some(3));
+    let all = ShortlistFilter {
+        include_closed: true,
+        include_full: true,
+    };
+    assert_eq!(pool.slowest(all), Some(1));
+    assert_eq!(ClubPool::default().slowest(all), None);
+}

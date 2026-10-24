@@ -330,6 +330,13 @@ impl ClubDetails {
         DateTime::from_timestamp_millis(due_ms)
     }
 
+    pub(crate) fn listed_rank(&self, circle_id: u64) -> Option<u32> {
+        read(&self.inner.listed)
+            .get(&circle_id)
+            .and_then(|c| c.monthly_rank)
+            .and_then(|r| u32::try_from(r).ok())
+    }
+
     /// A club's details, only if they're cached.
     pub async fn cached(&self, circle_id: u64) -> Option<Arc<Club>> {
         self.inner

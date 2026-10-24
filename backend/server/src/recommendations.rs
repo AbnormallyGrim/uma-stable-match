@@ -27,6 +27,7 @@ use crate::pool::{ShortlistFilter, DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO};
 
 const CLUB_URL: &str = "https://uma.moe/circles/";
 const DEFAULT_LIMIT: u32 = 50;
+const TOP_PICKS: usize = 10;
 
 /// Most club details one request fetches from uma.moe by default.
 pub const DEFAULT_FETCH_BUDGET: usize = 10;
@@ -67,6 +68,8 @@ pub(crate) struct Recommendations {
     updated_at: String,
     month: Option<String>,
     coverage: Coverage,
+    #[serde(skip)]
+    depth: SearchDepth,
     total: usize,
     clubs: Vec<Recommendation>,
     your_club: Option<YourClub>,
@@ -84,6 +87,13 @@ struct Coverage {
     shortlisted: usize,
     scored: usize,
     pending: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct SearchDepth {
+    shortlist_rank: Option<u32>,
+    pick_rank: Option<u32>,
+    pool_bottom: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -145,6 +155,18 @@ pub(crate) async fn recommendations(
     result
 }
 
+fn record_depth(depth: SearchDepth) {
+    if let Some(rank) = depth.shortlist_rank {
+        metrics::histogram!("search_shortlist_worst_rank").record(f64::from(rank));
+    }
+    if let Some(rank) = depth.pick_rank {
+        metrics::histogram!("search_pick_worst_rank").record(f64::from(rank));
+    }
+    if depth.pool_bottom {
+        metrics::counter!("search_pool_bottom_total").increment(1);
+    }
+}
+
 /// Logs one line per search with its query string and outcome, so it can be found and rerun.
 fn log_search(
     query: Option<&str>,
@@ -154,6 +176,7 @@ fn log_search(
     let duration_ms = u64::try_from(took.as_millis()).unwrap_or(u64::MAX);
     match result {
         Ok(Json(found)) => {
+            record_depth(found.depth);
             let top_clubs: Vec<u64> = found.clubs.iter().take(10).map(|c| c.circle_id).collect();
             tracing::info!(
                 query,
@@ -164,6 +187,9 @@ fn log_search(
                 shortlisted = found.coverage.shortlisted,
                 scored = found.coverage.scored,
                 pending = found.coverage.pending,
+                shortlist_rank = found.depth.shortlist_rank,
+                pick_rank = found.depth.pick_rank,
+                pool_bottom = found.depth.pool_bottom,
                 total = found.total,
                 top_clubs = ?top_clubs,
                 duration_ms,
@@ -260,7 +286,8 @@ async fn search(
         }
     };
     score_clubs(pace, &[], &options).map_err(|e| ApiError::bad_request(e.to_string()))?;
-    let (mut clubs, coverage) = load_clubs(&state.details, state.matching, pace, filter).await;
+    let (mut clubs, coverage, mut depth) =
+        load_clubs(&state.details, state.matching, pace, filter).await;
     if !include_full {
         let pool = state
             .details
@@ -272,6 +299,12 @@ async fn search(
     clubs.retain(|club| Some(club.circle_id) != own_club_id);
     let scored =
         score_clubs(pace, &clubs, &options).map_err(|e| ApiError::bad_request(e.to_string()))?;
+    depth.pick_rank = scored
+        .iter()
+        .filter(|s| s.club.open_spots() != Some(0))
+        .take(TOP_PICKS)
+        .filter_map(|s| s.club.monthly_rank)
+        .max();
     let your_club = match (trainer_id, own_club_id) {
         (Some(trainer_id), Some(circle_id)) => {
             own_club(
@@ -301,6 +334,7 @@ async fn search(
         updated_at: timestamp(updated_at),
         month,
         coverage,
+        depth,
         total: scored.len(),
         clubs: scored
             .iter()
@@ -359,12 +393,24 @@ async fn load_clubs(
     settings: MatchSettings,
     pace: f64,
     filter: ShortlistFilter,
-) -> (Vec<Club>, Coverage) {
-    let shortlist = details
-        .pool()
-        .read()
-        .unwrap_or_else(|e| e.into_inner())
-        .shortlist_matching(TARGET_MEDIAN_RATIO * pace, settings.shortlist_size, filter);
+) -> (Vec<Club>, Coverage, SearchDepth) {
+    let (shortlist, pool_bottom) = {
+        let pool = details.pool().read().unwrap_or_else(|e| e.into_inner());
+        let shortlist =
+            pool.shortlist_matching(TARGET_MEDIAN_RATIO * pace, settings.shortlist_size, filter);
+        let pool_bottom = pool
+            .slowest(filter)
+            .is_some_and(|id| shortlist.contains(&id));
+        (shortlist, pool_bottom)
+    };
+    let depth = SearchDepth {
+        shortlist_rank: shortlist
+            .iter()
+            .filter_map(|&id| details.listed_rank(id))
+            .max(),
+        pick_rank: None,
+        pool_bottom,
+    };
     let mut loaded: HashMap<u64, Arc<Club>> = details
         .cached_in_pool()
         .into_iter()
@@ -419,7 +465,7 @@ async fn load_clubs(
         scored: clubs.len(),
         pending,
     };
-    (clubs, coverage)
+    (clubs, coverage, depth)
 }
 
 enum PaceSource {
