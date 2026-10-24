@@ -1055,7 +1055,7 @@ async fn a_restarted_instance_scores_clubs_from_redis_without_fetching_them() {
 
     assert_eq!(
         body["coverage"],
-        json!({ "shortlisted": 3, "scored": 3, "pending": 0 })
+        json!({ "considered": 3, "shortlisted": 3, "scored": 3, "pending": 0 })
     );
     assert_eq!(restarted.queued(), 0);
     assert_eq!(calls(&server, "/api/v4/circles", None).await, 3);

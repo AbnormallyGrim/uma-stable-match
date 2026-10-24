@@ -114,7 +114,7 @@ Each search replaces the page URL's query with the same parameters the API uses,
 
 After a search, the page shows a summary and the top ten picks.
 
-- **Summary:** your pace, how many clubs were analysed (the API's `total`), and two stats about you from the returned clubs (`stats.ts`):
+- **Summary:** your pace, how many clubs were analysed (the API's `coverage.considered`: every club in the pool your options allow), and two stats about you from the returned clubs (`stats.ts`):
   - **Comfortable fits:** clubs where you'd sit 25% to 60% of the way down the members, the range fit aims for
   - **Typical place:** the middle of your place ÷ club size across the clubs, such as "Top 25%"
 
@@ -143,7 +143,7 @@ Tiers are shown with the game's own icons, D to SS, from [`src/assets/tiers/`](s
 
 ### Top results table
 
-Below the cards, the 100 best-fitting clubs are listed in a table, best fit first, under "Top N results" with the number returned, so it's clear these are the best matches rather than everything searched. The app asks the API for 100 clubs (`RESULT_LIMIT` in `App.svelte`), as clubs further down fit poorly. Searching and sorting work within those 100, while **Clubs analysed** in the summary still counts every scored club.
+Below the cards, the 100 best-fitting clubs are listed in a table, best fit first, under "Top N results" with the number returned, so it's clear these are the best matches rather than everything searched. The app asks the API for 100 clubs (`RESULT_LIMIT` in `App.svelte`), as clubs further down fit poorly. Searching and sorting work within those 100, while **Clubs analysed** in the summary counts every club compared with your pace.
 
 | Column | Sorts first by |
 |---|---|

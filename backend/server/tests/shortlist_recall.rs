@@ -26,11 +26,15 @@ fn normal(rng: &mut fastrand::Rng) -> f64 {
 }
 
 fn synthetic(seed: u64) -> Synthetic {
+    synthetic_pool(seed, CLUBS)
+}
+
+fn synthetic_pool(seed: u64, count: u64) -> Synthetic {
     let mut rng = fastrand::Rng::with_seed(seed);
     let (low, high) = (300_000f64.ln(), 9_000_000f64.ln());
     let mut clubs = Vec::new();
     let mut listed = Vec::new();
-    for id in 1..=CLUBS {
+    for id in 1..=count {
         let size = rng.u32(8..30);
         let ln_median = low + rng.f64() * (high - low);
         let sigma = 0.2 + rng.f64() * 0.6;
@@ -97,17 +101,22 @@ fn top_ids(pace: f64, clubs: &[Club], options: &ScoringOptions) -> Vec<u64> {
 }
 
 fn recalls(data: &Synthetic, pool: &ClubPool, options: &ScoringOptions) -> Vec<f64> {
+    recalls_scoring(data, pool, options, DEFAULT_SHORTLIST_SIZE)
+}
+
+fn recalls_scoring(
+    data: &Synthetic,
+    pool: &ClubPool,
+    options: &ScoringOptions,
+    scored: usize,
+) -> Vec<f64> {
     let (low, high) = (400_000f64.ln(), 8_000_000f64.ln());
     (0..40)
         .map(|i| (low + (high - low) * f64::from(i) / 39.0).exp())
         .map(|pace| {
             let exhaustive = top_ids(pace, &data.clubs, options);
             let shortlist: HashSet<u64> = pool
-                .shortlist(
-                    TARGET_MEDIAN_RATIO * pace,
-                    DEFAULT_SHORTLIST_SIZE,
-                    options.include_closed,
-                )
+                .shortlist(TARGET_MEDIAN_RATIO * pace, scored, options.include_closed)
                 .into_iter()
                 .collect();
             let candidates: Vec<Club> = data
@@ -152,4 +161,41 @@ fn shortlist_recall_with_closed_clubs() {
 #[test]
 fn shortlist_recall_with_balance_scoring() {
     assert_recall(ScoringOptions::default().with_balance_weight(0.5));
+}
+
+fn fully_cached_pool(data: &Synthetic) -> ClubPool {
+    let mut pool = ClubPool::new(data.listed.clone());
+    pool.set_exact_medians(
+        data.clubs
+            .iter()
+            .filter_map(|club| club_median(club).map(|median| (club.circle_id, median))),
+    );
+    pool
+}
+
+fn assert_scored_recall(options: ScoringOptions) {
+    for seed in [87, 88, 89] {
+        let data = synthetic_pool(seed, 3_000);
+        let pool = fully_cached_pool(&data);
+        let recalls = recalls_scoring(&data, &pool, &options, 2 * DEFAULT_SHORTLIST_SIZE);
+        let mean = recalls.iter().sum::<f64>() / recalls.len() as f64;
+        let worst = recalls.iter().copied().fold(f64::INFINITY, f64::min);
+        assert!(mean >= 0.99, "seed {seed}: mean recall@10 {mean:.3}");
+        assert!(worst >= 0.9, "seed {seed}: worst recall@10 {worst:.3}");
+    }
+}
+
+#[test]
+fn scoring_the_nearest_clubs_matches_scoring_every_club() {
+    assert_scored_recall(ScoringOptions::default());
+}
+
+#[test]
+fn scoring_the_nearest_clubs_with_closed_clubs() {
+    assert_scored_recall(ScoringOptions::default().with_include_closed(true));
+}
+
+#[test]
+fn scoring_the_nearest_clubs_with_balance_scoring() {
+    assert_scored_recall(ScoringOptions::default().with_balance_weight(0.5));
 }
