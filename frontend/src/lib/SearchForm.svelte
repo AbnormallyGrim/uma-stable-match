@@ -106,6 +106,10 @@
         <input type="checkbox" bind:checked={search.includeClosed} />
         Include closed clubs
       </label>
+      <label class="check">
+        <input type="checkbox" bind:checked={search.includeFull} />
+        Include full clubs
+      </label>
     </div>
   </div>
 

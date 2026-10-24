@@ -44,7 +44,12 @@ export interface YourClub extends Club {
 /** Response from `GET /api/v1/recommendations`. */
 export interface Recommendations {
   trainer: { trainer_id: number | null; pace_per_day: number };
-  options: { balance_weight: number | null; include_closed: boolean; limit: number };
+  options: {
+    balance_weight: number | null;
+    include_closed: boolean;
+    include_full: boolean;
+    limit: number;
+  };
   updated_at: string;
   /** Game month of the club data, `YYYY-MM`. */
   month: string | null;
@@ -63,6 +68,7 @@ export interface RecommendationQuery {
   source: PaceSource;
   balanceWeight?: number | null;
   includeClosed?: boolean;
+  includeFull?: boolean;
   limit?: number;
 }
 
@@ -112,6 +118,9 @@ export function recommendationParams(query: RecommendationQuery): URLSearchParam
   }
   if (query.includeClosed) {
     params.set('include_closed', 'true');
+  }
+  if (query.includeFull) {
+    params.set('include_full', 'true');
   }
   if (query.limit != null) {
     params.set('limit', String(query.limit));

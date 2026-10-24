@@ -13,6 +13,7 @@ export interface SearchState {
   balance: boolean;
   balanceWeight: number;
   includeClosed: boolean;
+  includeFull: boolean;
 }
 
 /** Validation messages by field. */
@@ -36,6 +37,7 @@ export const DEFAULT_SEARCH: SearchState = {
   balance: false,
   balanceWeight: DEFAULT_BALANCE_WEIGHT,
   includeClosed: false,
+  includeFull: false,
 };
 
 /** Shown when the trainer ID isn't 9 to 12 digits. */
@@ -70,6 +72,7 @@ export function validate(state: SearchState): Validation {
   const options = {
     balanceWeight: state.balance ? clampWeight(state.balanceWeight) : null,
     includeClosed: state.includeClosed,
+    includeFull: state.includeFull,
   };
   if (state.mode === 'trainer') {
     if (!isTrainerId(state.trainerId)) {
@@ -101,6 +104,9 @@ export function toUrlParams(query: RecommendationQuery): URLSearchParams {
   if (query.includeClosed) {
     params.set('include_closed', 'true');
   }
+  if (query.includeFull) {
+    params.set('include_full', 'true');
+  }
   return params;
 }
 
@@ -115,6 +121,7 @@ export function fromUrlParams(params: URLSearchParams): SearchState | null {
     balance,
     balanceWeight: balance ? clampWeight(parsedWeight) : DEFAULT_BALANCE_WEIGHT,
     includeClosed: params.get('include_closed') === 'true',
+    includeFull: params.get('include_full') === 'true',
   };
   if (trainerId !== null && isTrainerId(trainerId)) {
     return {

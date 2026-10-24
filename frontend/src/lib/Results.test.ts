@@ -24,7 +24,7 @@ describe('Results', () => {
   it("doesn't repeat the data age or the balance setting", () => {
     render(Results, {
       result: recommendations({
-        options: { balance_weight: 0.5, include_closed: false, limit: 50 },
+        options: { balance_weight: 0.5, include_closed: false, include_full: false, limit: 50 },
       }),
     });
     const summary = screen.getByTestId('result-summary');
@@ -81,6 +81,36 @@ describe('Results', () => {
     expect(screen.queryByTestId('your-club')).not.toBeInTheDocument();
   });
 
+  it('leaves full clubs out of the top picks but keeps them in the table', () => {
+    const clubs = [
+      club({ circle_id: 1, name: 'Full Club', url: 'https://uma.moe/circles/1', open_spots: 0 }),
+      club({ circle_id: 2, name: 'Open Club', url: 'https://uma.moe/circles/2' }),
+    ];
+    render(Results, { result: recommendations({ total: 2, clubs }) });
+    const picks = within(screen.getByRole('list')).getAllByRole('listitem');
+    expect(picks).toHaveLength(1);
+    expect(picks[0]).toHaveTextContent('Open Club');
+    const table = screen.getByRole('table');
+    expect(within(table).getByRole('link', { name: 'Full Club' })).toBeInTheDocument();
+    expect(within(table).getByText('Full')).toBeInTheDocument();
+  });
+
+  it('says when every match is full', () => {
+    const clubs = [club({ open_spots: 0 })];
+    render(Results, {
+      result: recommendations({
+        total: 1,
+        clubs,
+        options: { balance_weight: null, include_closed: false, include_full: true, limit: 100 },
+      }),
+    });
+    expect(screen.getByText(/Every matching club is full/)).toBeInTheDocument();
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.getByTestId('results-about')).toHaveTextContent(
+      'Full clubs (30 of 30 members) are in the table, but not the top picks',
+    );
+  });
+
   it('says when nothing matched', () => {
     render(Results, { result: recommendations() });
     expect(screen.getByText('No clubs matched your search.')).toBeInTheDocument();
@@ -91,7 +121,7 @@ describe('Results states', () => {
   it('suggests how to widen an empty search', () => {
     render(Results, {
       result: recommendations({
-        options: { balance_weight: 0.5, include_closed: false, limit: 100 },
+        options: { balance_weight: 0.5, include_closed: false, include_full: false, limit: 100 },
       }),
     });
     expect(screen.getByText('No clubs matched your search.')).toBeInTheDocument();

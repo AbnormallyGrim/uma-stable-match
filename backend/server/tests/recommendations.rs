@@ -104,13 +104,17 @@ fn clubs() -> Vec<Club> {
 }
 
 async fn scanned_cache() -> Scanned {
+    scanned_with(details()).await
+}
+
+async fn scanned_with(details: Vec<Value>) -> Scanned {
     let server = MockServer::start().await;
-    let listed: Vec<Value> = details().iter().map(|d| d["circle"].clone()).collect();
+    let listed: Vec<Value> = details.iter().map(|d| d["circle"].clone()).collect();
     Mock::given(path("/api/v4/circles/list"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "circles": listed })))
         .mount(&server)
         .await;
-    for d in details() {
+    for d in details {
         let id = d["circle"]["circle_id"].as_u64().unwrap();
         Mock::given(path("/api/v4/circles"))
             .and(query_param("circle_id", id.to_string()))
@@ -212,6 +216,10 @@ async fn rejects_invalid_input() {
             "?pace=5000000&include_closed=yes",
             "include_closed must be true or false",
         ),
+        (
+            "?pace=5000000&include_full=yes",
+            "include_full must be true or false",
+        ),
         ("?pace=5000000&balance=yes", "balance must be true or false"),
         (
             "?pace=5000000&balance=false&balance_weight=0.5",
@@ -299,6 +307,37 @@ async fn returns_club_details() {
     assert_eq!(club["last_month_rank"], 112);
     assert_eq!(club["comment"], "Made-up club");
     assert_eq!(club["ranked_members"], 10);
+}
+
+async fn with_full_club() -> Scanned {
+    let mut all = details();
+    all.push(detail(5, 1, 30, &paces(4.0 * M, 0.5 * M, 30)));
+    scanned_with(all).await
+}
+
+#[tokio::test]
+async fn leaves_full_clubs_out_by_default() {
+    let cache = with_full_club().await;
+    let (status, body) = get(&cache, "?pace=7600000").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(!ids(&body).contains(&5));
+    assert_eq!(body["options"]["include_full"], false);
+}
+
+#[tokio::test]
+async fn includes_full_clubs_on_request() {
+    let cache = with_full_club().await;
+    let (_, body) = get(&cache, "?pace=7600000&include_full=true").await;
+    assert!(ids(&body).contains(&5));
+    assert_eq!(body["options"]["include_full"], true);
+    let full = body["clubs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["circle_id"] == 5)
+        .unwrap();
+    assert_eq!(full["open_spots"], 0);
+    assert_eq!(full["club_size"], 30);
 }
 
 #[tokio::test]

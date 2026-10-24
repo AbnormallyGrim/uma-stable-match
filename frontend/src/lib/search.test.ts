@@ -65,6 +65,7 @@ describe('validate', () => {
         source: { trainerId: '123456789012' },
         balanceWeight: null,
         includeClosed: false,
+        includeFull: false,
       },
     });
   });
@@ -74,7 +75,12 @@ describe('validate', () => {
       validate(pace('7.6', { balance: true, balanceWeight: 0.75, includeClosed: true })),
     ).toEqual({
       ok: true,
-      query: { source: { pace: 7_600_000 }, balanceWeight: 0.75, includeClosed: true },
+      query: {
+        source: { pace: 7_600_000 },
+        balanceWeight: 0.75,
+        includeClosed: true,
+        includeFull: false,
+      },
     });
   });
 
@@ -108,6 +114,14 @@ describe('URL state', () => {
     const params = toUrlParams(result.query);
     expect(params.toString()).toBe('pace=7600000&include_closed=true');
     expect(fromUrlParams(params)).toEqual(pace('7.6', { includeClosed: true }));
+  });
+
+  it('round-trips full clubs', () => {
+    const result = validate(pace('7.6', { includeFull: true }));
+    if (!result.ok) throw new Error('expected a valid search');
+    const params = toUrlParams(result.query);
+    expect(params.toString()).toBe('pace=7600000&include_full=true');
+    expect(fromUrlParams(params)).toEqual(pace('7.6', { includeFull: true }));
   });
 
   it('ignores missing or invalid searches', () => {

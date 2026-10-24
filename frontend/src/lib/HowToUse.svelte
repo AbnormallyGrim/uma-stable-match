@@ -30,8 +30,9 @@
     </li>
     <li>
       <strong>Fine-tune, if you like.</strong> <strong>Balance scoring</strong> ranks clubs where a
-      few members carry everyone lower. <strong>Include closed clubs</strong> also shows clubs that aren't
-      recruiting right now.
+      few members carry everyone lower. <strong>Include closed clubs</strong> also shows clubs that
+      aren't recruiting right now. <strong>Include full clubs</strong> adds clubs with no open spot to
+      the table, to compare against.
     </li>
     <li>
       <strong>Pick a club.</strong> Start with the <strong>Top picks</strong>: the best fits are
