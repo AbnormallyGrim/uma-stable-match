@@ -337,6 +337,16 @@ With `trainer_id`, the server finds the trainer's club and their snapshot in it 
 - **IDs stay out of logs.** Trainer IDs never appear in log messages or error responses, only in the response to the trainer's own request. Failed lookups log only the HTTP status.
 - **No lookup without results.** Before the first scan has listed the clubs, the endpoint returns `503` without contacting uma.moe.
 
+#### The trainer's own club
+
+The lookup also notes the club it found the trainer in. That club is left out of `clubs` and returned as `your_club`, scored as if the trainer were joining it:
+
+- **Without their own row.** The trainer's snapshot is removed and the club counts as one member smaller, so `your_place` and `club_size` match a newcomer at their pace. `member_count` and `open_spots` still show the real club.
+- **Closed clubs count,** since the trainer is already in it. Full clubs, which aren't in the pool, are fetched through the detail cache like any other club.
+- **`result_rank`** is where it would sit among the scored clubs, from 1. Above `limit`, it's below the returned clubs.
+
+`your_club` is `null` for `pace` requests, when no club was found, when the club fails to load, or when it can't be scored, for example with fewer than 8 rankable members. A failed load is logged but never fails the search.
+
 #### Response
 
 Clubs with fewer than 8 rankable members aren't returned, and with balance scoring on, neither are clubs whose balance can't be measured.
@@ -377,7 +387,28 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
         "top3_share": 0.21
       }
     }
-  ]
+  ],
+  "your_club": {
+    "circle_id": 2,
+    "name": "Home Club",
+    "url": "https://uma.moe/circles/2",
+    "tier": "S",
+    "join_style": "closed",
+    "policy": 2,
+    "member_count": 30,
+    "open_spots": 0,
+    "monthly_rank": 40,
+    "last_month_rank": 38,
+    "comment": "Made-up description",
+    "your_place": 24,
+    "club_size": 30,
+    "ranked_members": 29,
+    "median_per_day": 11200000.0,
+    "fit": 0.4321,
+    "score": 0.4821,
+    "balance": null,
+    "result_rank": 37
+  }
 }
 ```
 
@@ -392,7 +423,8 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
 | `coverage.scored` | Clubs with member data that were scored, including cached clubs outside the shortlist |
 | `coverage.pending` | Shortlisted clubs still loading in the background. Above 0, searching again shortly can give more results |
 | `total` | How many clubs were scored, before `limit` |
-| `clubs` | Up to `limit` clubs, best first |
+| `clubs` | Up to `limit` clubs, best first. The trainer's own club is never one of them |
+| `your_club` | With `trainer_id`, the trainer's [own club](#the-trainers-own-club) with the same fields as `clubs`, plus `result_rank`. Otherwise `null` |
 
 - `join_style` is `open`, `approval`, `closed` or `null`. It's `null` when the style is unknown, including any new style the server doesn't recognise yet.
 - `tier` runs from `D` to `SS`, or is `null` when unknown.

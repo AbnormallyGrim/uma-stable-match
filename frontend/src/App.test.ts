@@ -19,6 +19,7 @@ function recommendations(
     coverage: { shortlisted: total, scored: total, pending: 0 },
     total,
     clubs: [],
+    your_club: null,
     ...extra,
   };
 }

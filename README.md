@@ -138,7 +138,7 @@ Club data refreshes automatically once a day, shortly after uma.moe's daily upda
 
 Above your top picks, a summary shows your pace, how many clubs were analysed, your **comfortable fits** (clubs where you'd sit 25–60% of the way down the members) and your **typical place** across your results, such as *Top 25%*.
 
-Full clubs (30 of 30 members) aren't shown, since there's no spot to join, so your own club won't appear if it's full. Matches are based on a club's typical member rather than its tier, so your best fits may be a tier or two below a high-tier club whose members are much faster than you.
+Full clubs (30 of 30 members) aren't shown, since there's no spot to join, and neither is your own club. When you search by trainer ID, a **Your club** card above the table shows where your club would sit among your results and compares its median, your place and its fit with your top pick. Matches are based on a club's typical member rather than its tier, so your best fits may be a tier or two below a high-tier club whose members are much faster than you.
 
 | Field | Meaning |
 |---|---|
