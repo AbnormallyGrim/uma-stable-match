@@ -68,6 +68,7 @@ src/lib/ResultsTable.svelte   Sortable, searchable table of the best fits
 src/lib/ResultsSummary.svelte Pace, clubs analysed, comfortable fits, typical place and data age
 src/lib/stats.ts              Comfortable fits and typical place, from the results
 src/lib/ClubCard.svelte       One top pick
+src/lib/YourClub.svelte       The trainer's own club, compared with the top pick
 src/lib/TierBadge.svelte      Tier icon, with a fallback for unknown tiers
 src/lib/test-data.ts          Made-up data for component tests
 src/app.css                   Global styles and light and dark colour tokens
@@ -125,7 +126,12 @@ After a search, the page shows a summary and the top ten picks.
 - **Notices:** under the summary, when they apply:
   - "*N more clubs are still loading. Search again in a minute for complete results.*" when the API's `coverage.pending` is above 0
   - "*These results are based on last month's data (February 2026), because the new game month has only just started.*" when `month` isn't the game month of `updated_at`
-- **Notes:** under the top picks, always shown, even with no matches: full clubs aren't shown, and a collapsed "Why not a higher-tier club?" explains that matches follow a club's typical member, not its tier. The FAQ on the marketing page answers the same two questions.
+- **Notes:** under the top picks, always shown, even with no matches: full clubs and your own club aren't in the results, and a collapsed "Why not a higher-tier club?" explains that matches follow a club's typical member, not its tier. The note points to the **Your club** card when there is one, and otherwise suggests a trainer ID search. The FAQ on the marketing page answers the same two questions.
+- **Your club:** when the response has `your_club`, a card between the notes and the table shows:
+  - the club's tier, name, rank, open spots and join style
+  - "Your club would be #37 in your results.", "fits you better than any of your results" at #1, or "would rank below your top 100" past the returned clubs, from `result_rank`
+  - its median against your pace
+  - a table of median, your place and fit (score with balance on), next to the top pick's when there is one
 - **Layout:** on narrow screens, up to 720 pixels wide, the numbers move below the club details, and the description and balance details stack.
 - **Screen readers:** after a search, only a short "Found N clubs" message is announced, followed by any notices, not the whole list. The text goes into a live region that's always on the page, because a notice that appears together with new results isn't reliably announced. Rank trends have spoken descriptions, such as "Up 16 places since last month".
 

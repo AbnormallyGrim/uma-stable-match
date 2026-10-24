@@ -4,7 +4,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 
 import Results from './Results.svelte';
-import { club, recommendations } from './test-data';
+import { club, recommendations, yourClub } from './test-data';
 
 describe('Results', () => {
   it('summarises the search', () => {
@@ -60,9 +60,25 @@ describe('Results', () => {
   it('explains missing full clubs and lower tiers, even with no matches', () => {
     render(Results, { result: recommendations() });
     const about = screen.getByTestId('results-about');
-    expect(about).toHaveTextContent("Full clubs (30 of 30 members) aren't shown");
+    expect(about).toHaveTextContent("Full clubs (30 of 30 members) aren't in the results");
+    expect(about).toHaveTextContent('search by trainer ID to see how it compares.');
     expect(within(about).getByText('Why not a higher-tier club?')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it("shows the trainer's own club when the search found it", () => {
+    render(Results, {
+      result: recommendations({ total: 1, clubs: [club()], your_club: yourClub() }),
+    });
+    expect(screen.getByTestId('your-club')).toHaveTextContent('Home Club');
+    expect(screen.getByTestId('results-about')).toHaveTextContent(
+      "it's compared with your top pick below.",
+    );
+  });
+
+  it('shows no own club card without one', () => {
+    render(Results, { result: recommendations({ total: 1, clubs: [club()] }) });
+    expect(screen.queryByTestId('your-club')).not.toBeInTheDocument();
   });
 
   it('says when nothing matched', () => {

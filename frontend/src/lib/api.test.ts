@@ -39,6 +39,7 @@ const recommendations: Recommendations = {
       balance: null,
     },
   ],
+  your_club: null,
 };
 
 function json(body: unknown, init: ResponseInit = {}): Response {

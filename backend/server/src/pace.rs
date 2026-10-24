@@ -33,17 +33,26 @@ pub enum PaceError {
 
 type Entries = HashMap<(u64, Option<Period>), (Instant, Outcome)>;
 
+/// A looked-up trainer: their pace and the club it was found in.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct TrainerPace {
+    /// Daily fan gain.
+    pub pace: f64,
+    /// The trainer's club, if the lookup found one.
+    pub circle_id: Option<u64>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 enum Outcome {
-    Pace(f64),
+    Pace(TrainerPace),
     NotFound,
     NotEnoughData,
 }
 
 impl Outcome {
-    fn into_result(self) -> Result<f64, PaceError> {
+    fn into_result(self) -> Result<TrainerPace, PaceError> {
         match self {
-            Self::Pace(pace) => Ok(pace),
+            Self::Pace(found) => Ok(found),
             Self::NotFound => Err(PaceError::NotFound),
             Self::NotEnoughData => Err(PaceError::NotEnoughData),
         }
@@ -85,11 +94,15 @@ impl PaceLookup {
         }
     }
 
-    /// The trainer's daily fan gain this month, or in `period` if given. For a given period it
-    /// falls back to the 7-day gain ÷ 7 when that month has too little data.
+    /// The trainer's daily fan gain and club this month, or in `period` if given. For a given
+    /// period it falls back to the 7-day gain ÷ 7 when that month has too little data.
     ///
     /// Found and not-found results are cached per month; uma.moe failures aren't.
-    pub async fn pace(&self, viewer_id: u64, period: Option<Period>) -> Result<f64, PaceError> {
+    pub async fn pace(
+        &self,
+        viewer_id: u64,
+        period: Option<Period>,
+    ) -> Result<TrainerPace, PaceError> {
         if let Some(outcome) = self.cached(viewer_id, period) {
             count_pace("memory");
             return outcome.into_result();
@@ -201,6 +214,7 @@ impl PaceLookup {
                             )
                         }),
                         viewer_id,
+                        Some(circle_id),
                     )
                 })
                 .map_err(|error| (error.origin(), error.to_string())),
@@ -213,6 +227,7 @@ impl PaceLookup {
                     .circle(&request)
                     .await
                     .map(|response| pace_from_response(&response, viewer_id))
+                    .map(|outcome| with_club(outcome, circle_id))
                     .map_err(|error| (error.origin(), error.to_string()))
             }
         };
@@ -252,8 +267,14 @@ impl PaceLookup {
                 return Err(PaceError::Upstream(error));
             }
         };
-        Ok(match gains.viewer(viewer_id).and_then(|r| r.gain_7d) {
-            Some(gain) if gain > 0 => Outcome::Pace(gain as f64 / 7.0),
+        let Some(row) = gains.viewer(viewer_id) else {
+            return Ok(outcome);
+        };
+        Ok(match row.gain_7d {
+            Some(gain) if gain > 0 => Outcome::Pace(TrainerPace {
+                pace: gain as f64 / 7.0,
+                circle_id: row.circle_id,
+            }),
             _ => outcome,
         })
     }
@@ -273,6 +294,16 @@ impl PaceLookup {
     }
 }
 
+fn with_club(outcome: Outcome, circle_id: u64) -> Outcome {
+    match outcome {
+        Outcome::Pace(found) => Outcome::Pace(TrainerPace {
+            circle_id: Some(circle_id),
+            ..found
+        }),
+        other => other,
+    }
+}
+
 fn count_pace(source: &'static str) {
     metrics::counter!("pace_lookups_total", "source" => source).increment(1);
 }
@@ -289,12 +320,14 @@ fn pace_from_response(response: &CircleResponse, viewer_id: u64) -> Outcome {
             .iter()
             .map(|m| (m.viewer_id, m.year, m.month, m.daily_fans.as_slice())),
         viewer_id,
+        Some(response.circle.circle_id).filter(|id| *id != 0),
     )
 }
 
 fn pace_of<'a>(
     members: impl Iterator<Item = (u64, Option<i32>, Option<i32>, &'a [i64])>,
     viewer_id: u64,
+    circle_id: Option<u64>,
 ) -> Outcome {
     let snapshot = members
         .filter(|(id, ..)| *id == viewer_id)
@@ -302,7 +335,7 @@ fn pace_of<'a>(
     match snapshot {
         None => Outcome::NotFound,
         Some((.., daily_fans)) => match daily_pace(daily_fans) {
-            Some(pace) if pace > 0.0 => Outcome::Pace(pace),
+            Some(pace) if pace > 0.0 => Outcome::Pace(TrainerPace { pace, circle_id }),
             _ => Outcome::NotEnoughData,
         },
     }

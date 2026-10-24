@@ -253,8 +253,8 @@ async fn instances_share_trainer_paces_under_hashed_keys() {
     let first = PaceLookup::new(client(&server), DEFAULT_PACE_TTL).with_shared(first_shared);
     let second =
         PaceLookup::new(client(&server), DEFAULT_PACE_TTL).with_shared(second_shared.clone());
-    assert_eq!(first.pace(trainer, None).await.unwrap(), 3_000_000.0);
-    assert_eq!(second.pace(trainer, None).await.unwrap(), 3_000_000.0);
+    assert_eq!(first.pace(trainer, None).await.unwrap().pace, 3_000_000.0);
+    assert_eq!(second.pace(trainer, None).await.unwrap().pace, 3_000_000.0);
 
     let key = second_shared.pace_key(trainer, None);
     assert!(!key.contains(&trainer.to_string()));

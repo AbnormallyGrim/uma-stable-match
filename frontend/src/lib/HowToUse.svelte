@@ -41,8 +41,8 @@
   </ol>
   <p class="note">
     Works with the global (English) version of the game. If your trainer ID isn't found, search by
-    your daily pace instead. Full clubs aren't shown, since there's no spot to join, so your own
-    club won't appear if it's full.
+    your daily pace instead. Full clubs and your own club aren't in the results. Search by trainer
+    ID to see how your club compares.
   </p>
 </details>
 

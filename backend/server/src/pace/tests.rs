@@ -12,10 +12,19 @@ fn member(viewer_id: u64, month: i32, daily_fans: Vec<i64>) -> CircleMember {
 }
 
 fn response(members: Vec<CircleMember>) -> CircleResponse {
-    CircleResponse {
+    let mut response = CircleResponse {
         members,
         ..Default::default()
-    }
+    };
+    response.circle.circle_id = 77;
+    response
+}
+
+fn found(pace: f64) -> Outcome {
+    Outcome::Pace(TrainerPace {
+        pace,
+        circle_id: Some(77),
+    })
 }
 
 #[test]
@@ -24,7 +33,7 @@ fn finds_the_trainers_pace() {
         member(1, 3, vec![10, 20, 30]),
         member(2, 3, vec![100, 400, 700]),
     ]);
-    assert_eq!(pace_from_response(&r, 2), Outcome::Pace(300.0));
+    assert_eq!(pace_from_response(&r, 2), found(300.0));
 }
 
 #[test]
@@ -33,7 +42,7 @@ fn uses_the_latest_month() {
         member(2, 3, vec![100, 200, 300]),
         member(2, 2, vec![100, 900, 1700]),
     ]);
-    assert_eq!(pace_from_response(&r, 2), Outcome::Pace(100.0));
+    assert_eq!(pace_from_response(&r, 2), found(100.0));
 }
 
 #[test]

@@ -1,7 +1,7 @@
 <!--
   @component
   The results view: summary, any notices, the top ten picks as cards, notes on full clubs and tiers,
-  then the returned clubs in a table.
+  the trainer's own club when found, then the returned clubs in a table.
 -->
 
 <script lang="ts">
@@ -10,6 +10,7 @@
   import ResultsSummary from './ResultsSummary.svelte';
   import ResultsTable from './ResultsTable.svelte';
   import { emptyHints, resultNotices } from './states';
+  import YourClub from './YourClub.svelte';
 
   const TOP_PICKS = 10;
 
@@ -55,8 +56,11 @@
 
   <div class="about" data-testid="results-about">
     <p>
-      Full clubs (30 of 30 members) aren't shown, since there's no spot to join. If your current
-      club is full, it won't appear here.
+      Full clubs (30 of 30 members) aren't in the results, since there's no spot to join. Your
+      current club isn't either:
+      {result.your_club
+        ? "it's compared with your top pick below."
+        : 'search by trainer ID to see how it compares.'}
     </p>
     <details>
       <summary>Why not a higher-tier club?</summary>
@@ -68,6 +72,16 @@
       </p>
     </details>
   </div>
+
+  {#if result.your_club}
+    <YourClub
+      own={result.your_club}
+      topPick={picks[0] ?? null}
+      pace={result.trainer.pace_per_day}
+      {count}
+      {balanceOn}
+    />
+  {/if}
 
   {#if picks.length > 0}
     <h3>Top {count} {count === 1 ? 'result' : 'results'}</h3>
