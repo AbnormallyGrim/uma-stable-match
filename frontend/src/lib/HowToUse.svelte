@@ -35,13 +35,14 @@
     </li>
     <li>
       <strong>Pick a club.</strong> Start with the <strong>Top picks</strong>: the best fits are
-      clubs where you'd sit around the middle of the members. Use <strong>All results</strong> to search
+      clubs where you'd sit around the middle of the members. Use <strong>Top results</strong> to search
       and sort more. Select a club's name to open its uma.moe page and contact the leader.
     </li>
   </ol>
   <p class="note">
     Works with the global (English) version of the game. If your trainer ID isn't found, search by
-    your daily pace instead.
+    your daily pace instead. Full clubs aren't shown, since there's no spot to join, so your own
+    club won't appear if it's full.
   </p>
 </details>
 

@@ -152,6 +152,6 @@ describe('ResultsTable', () => {
 
   it('can be scrolled with the keyboard', () => {
     setup();
-    expect(screen.getByRole('region', { name: 'All results' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('region', { name: 'Top results' })).toHaveAttribute('tabindex', '0');
   });
 });

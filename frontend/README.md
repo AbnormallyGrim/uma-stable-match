@@ -63,7 +63,7 @@ src/lib/BrandLogo.svelte      The logo, in the version for the current theme
 src/lib/api.ts                Typed API client
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
-src/lib/Results.svelte        Results view: summary, top picks and all results
+src/lib/Results.svelte        Results view: summary, top picks, notes and top results
 src/lib/ResultsTable.svelte   Sortable, searchable table of the best fits
 src/lib/ResultsSummary.svelte Pace, clubs analysed, comfortable fits, typical place and data age
 src/lib/stats.ts              Comfortable fits and typical place, from the results
@@ -125,6 +125,7 @@ After a search, the page shows a summary and the top ten picks.
 - **Notices:** under the summary, when they apply:
   - "*N more clubs are still loading. Search again in a minute for complete results.*" when the API's `coverage.pending` is above 0
   - "*These results are based on last month's data (February 2026), because the new game month has only just started.*" when `month` isn't the game month of `updated_at`
+- **Notes:** under the top picks, always shown, even with no matches: full clubs aren't shown, and a collapsed "Why not a higher-tier club?" explains that matches follow a club's typical member, not its tier. The FAQ on the marketing page answers the same two questions.
 - **Layout:** on narrow screens, up to 720 pixels wide, the numbers move below the club details, and the description and balance details stack.
 - **Screen readers:** after a search, only a short "Found N clubs" message is announced, followed by any notices, not the whole list. The text goes into a live region that's always on the page, because a notice that appears together with new results isn't reliably announced. Rank trends have spoken descriptions, such as "Up 16 places since last month".
 
@@ -132,9 +133,9 @@ After a search, the page shows a summary and the top ten picks.
 
 Tiers are shown with the game's own icons, D to SS, from [`src/assets/tiers/`](src/assets/tiers/README.md). They're © Cygames, Inc. and excluded from the MIT licence; that folder's README has the details. Each icon is under Vite's 4 kB inline limit, so it's bundled into the JavaScript as a data URL. A content security policy for the page must allow `img-src data:`.
 
-### All results table
+### Top results table
 
-Below the cards, the 100 best-fitting clubs are listed in a table, best fit first. The app asks the API for 100 clubs (`RESULT_LIMIT` in `App.svelte`), as clubs further down fit poorly. Searching and sorting work within those 100, while **Clubs analysed** in the summary still counts every scored club.
+Below the cards, the 100 best-fitting clubs are listed in a table, best fit first, under "Top N results" with the number returned, so it's clear these are the best matches rather than everything searched. The app asks the API for 100 clubs (`RESULT_LIMIT` in `App.svelte`), as clubs further down fit poorly. Searching and sorting work within those 100, while **Clubs analysed** in the summary still counts every scored club.
 
 | Column | Sorts first by |
 |---|---|
