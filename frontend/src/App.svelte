@@ -2,15 +2,14 @@
   import { onMount } from 'svelte';
 
   import { fetchRecommendations, type RecommendationQuery } from './lib/api';
-  import BrandLogo from './lib/BrandLogo.svelte';
   import HowToUse from './lib/HowToUse.svelte';
+  import NavBar from './lib/NavBar.svelte';
   import Results from './lib/Results.svelte';
   import { SearchRunner, type SearchState as RunnerState } from './lib/runner';
   import SearchForm from './lib/SearchForm.svelte';
   import SearchStatus from './lib/SearchStatus.svelte';
   import SiteFooter from './lib/SiteFooter.svelte';
   import { resultNotices } from './lib/states';
-  import ThemeToggle from './lib/ThemeToggle.svelte';
   import {
     DEFAULT_SEARCH,
     fromUrlParams,
@@ -71,15 +70,11 @@
   });
 </script>
 
+<NavBar />
+
 <main>
   <div class="hero">
-    <header>
-      <div class="brand">
-        <BrandLogo size={44} />
-        <h1>Uma Stable Match</h1>
-      </div>
-      <ThemeToggle />
-    </header>
+    <h1 class="visually-hidden">Uma Stable Match club finder</h1>
     <SearchForm {initial} remember={remembered !== null} {busy} {onsearch} />
     <HowToUse />
   </div>
@@ -94,26 +89,3 @@
 </main>
 
 <SiteFooter />
-
-<style>
-  header {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-  }
-
-  .brand {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    margin-top: 8px;
-  }
-
-  h1 {
-    margin: 0;
-    letter-spacing: -0.02em;
-  }
-</style>

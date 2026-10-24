@@ -49,4 +49,13 @@ describe('ThemeToggle', () => {
     await fireEvent.click(radios[2]!);
     expect(screen.getByLabelText('Dark')).toBeChecked();
   });
+
+  it('shows each choice as an icon with a tooltip', () => {
+    const { container } = render(ThemeToggle, { storage: localStorage });
+    const labels = [...container.querySelectorAll('label')];
+    expect(labels.map((label) => label.dataset.tooltip)).toEqual(['System', 'Light', 'Dark']);
+    for (const label of labels) {
+      expect(label.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    }
+  });
 });
