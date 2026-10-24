@@ -1,6 +1,8 @@
 /** Search form state: validation, page URL parameters and the remembered trainer ID. */
 
-import type { RecommendationQuery } from './api';
+import { setFilterParams } from './api';
+import type { JoinStyle, RecommendationQuery } from './api';
+import { PLAYSTYLES } from './format';
 
 /** Whether the visitor searches by trainer ID or by entering their pace. */
 export type SearchMode = 'trainer' | 'pace';
@@ -12,7 +14,10 @@ export interface SearchState {
   paceMillions: string;
   balance: boolean;
   balanceWeight: number;
-  includeClosed: boolean;
+  /** The only join style to search for, or `null` for the default. */
+  joinStyle: JoinStyle | null;
+  /** The only playstyle code to search for, or `null` for any. */
+  playstyle: number | null;
   includeFull: boolean;
 }
 
@@ -36,7 +41,8 @@ export const DEFAULT_SEARCH: SearchState = {
   paceMillions: '',
   balance: false,
   balanceWeight: DEFAULT_BALANCE_WEIGHT,
-  includeClosed: false,
+  joinStyle: null,
+  playstyle: null,
   includeFull: false,
 };
 
@@ -44,6 +50,13 @@ export const DEFAULT_SEARCH: SearchState = {
 export const TRAINER_ID_ERROR = 'Enter your trainer ID: 9 to 12 digits.';
 /** Shown when the pace isn't a positive number. */
 export const PACE_ERROR = 'Enter your daily fan gain in millions, such as 7.6.';
+/** The join styles a search can pick from, in display order. */
+export const JOIN_STYLES: JoinStyle[] = ['open', 'approval', 'closed'];
+
+/** Whether a join style or playstyle is picked, which leaves fewer clubs near the visitor's pace. */
+export function narrowsSearch(joinStyle: JoinStyle | null, playstyle: number | null): boolean {
+  return joinStyle !== null || playstyle !== null;
+}
 
 const REMEMBER_KEY = 'uma-stable-match:trainer-id';
 
@@ -71,7 +84,8 @@ export function parsePaceMillions(value: string): number | null {
 export function validate(state: SearchState): Validation {
   const options = {
     balanceWeight: state.balance ? clampWeight(state.balanceWeight) : null,
-    includeClosed: state.includeClosed,
+    joinStyle: state.joinStyle,
+    playstyle: state.playstyle,
     includeFull: state.includeFull,
   };
   if (state.mode === 'trainer') {
@@ -101,12 +115,7 @@ export function toUrlParams(query: RecommendationQuery): URLSearchParams {
   if (query.balanceWeight != null) {
     params.set('balance_weight', String(query.balanceWeight));
   }
-  if (query.includeClosed) {
-    params.set('include_closed', 'true');
-  }
-  if (query.includeFull) {
-    params.set('include_full', 'true');
-  }
+  setFilterParams(params, query);
   return params;
 }
 
@@ -120,7 +129,8 @@ export function fromUrlParams(params: URLSearchParams): SearchState | null {
   const shared = {
     balance,
     balanceWeight: balance ? clampWeight(parsedWeight) : DEFAULT_BALANCE_WEIGHT,
-    includeClosed: params.get('include_closed') === 'true',
+    joinStyle: JOIN_STYLES.find((style) => style === params.get('join_style')) ?? null,
+    playstyle: playstyleFrom(params.get('playstyle')),
     includeFull: params.get('include_full') === 'true',
   };
   if (trainerId !== null && isTrainerId(trainerId)) {
@@ -168,4 +178,9 @@ export function saveRememberedTrainerId(storage: Storage | undefined, trainerId:
 
 function clampWeight(weight: number): number {
   return Math.min(1, Math.max(0, weight));
+}
+
+function playstyleFrom(value: string | null): number | null {
+  const code = Number(value);
+  return value !== null && PLAYSTYLES.some(([known]) => known === code) ? code : null;
 }

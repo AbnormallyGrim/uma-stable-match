@@ -12,7 +12,14 @@ import {
 
 const recommendations: Recommendations = {
   trainer: { trainer_id: 123456789012, pace_per_day: 7_600_000 },
-  options: { balance_weight: null, include_closed: false, include_full: false, limit: 50 },
+  options: {
+    balance_weight: null,
+    include_closed: false,
+    include_full: false,
+    join_styles: null,
+    playstyles: null,
+    limit: 50,
+  },
   updated_at: '2026-03-18T09:00:00Z',
   month: '2026-03',
   coverage: { considered: 340, shortlisted: 1, scored: 1, pending: 0 },
@@ -78,12 +85,13 @@ describe('recommendationParams', () => {
     const params = recommendationParams({
       source: { pace: 7_600_000 },
       balanceWeight: 0.5,
-      includeClosed: true,
+      joinStyle: 'closed',
+      playstyle: 12,
       includeFull: true,
       limit: 10,
     });
     expect(params.toString()).toBe(
-      'pace=7600000&balance_weight=0.5&include_closed=true&include_full=true&limit=10',
+      'pace=7600000&balance_weight=0.5&join_style=closed&playstyle=12&include_full=true&limit=10',
     );
   });
 
@@ -91,7 +99,8 @@ describe('recommendationParams', () => {
     const params = recommendationParams({
       source: { pace: 5_000_000 },
       balanceWeight: null,
-      includeClosed: false,
+      joinStyle: null,
+      playstyle: null,
     });
     expect(params.toString()).toBe('pace=5000000');
   });

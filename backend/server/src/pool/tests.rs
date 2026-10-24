@@ -13,6 +13,7 @@ fn listed(circle_id: u64, raw_rate: f64) -> ListedClub {
         member_count: 20,
         join_style: Some(JoinStyle::Approval),
         raw_rate,
+        policy: None,
     }
 }
 
@@ -421,6 +422,7 @@ fn full_clubs_are_shortlisted_only_on_request() {
     let filter = ShortlistFilter {
         include_closed: false,
         include_full: true,
+        ..ShortlistFilter::default()
     };
     assert_eq!(pool.shortlist_matching(300.0, 2, filter), vec![2, 1]);
 }
@@ -440,7 +442,61 @@ fn slowest_is_the_first_club_the_filter_allows() {
     let all = ShortlistFilter {
         include_closed: true,
         include_full: true,
+        ..ShortlistFilter::default()
     };
     assert_eq!(pool.slowest(all), Some(1));
     assert_eq!(ClubPool::default().slowest(all), None);
+}
+
+fn styled(
+    circle_id: u64,
+    raw_rate: f64,
+    join_style: Option<JoinStyle>,
+    policy: Option<u32>,
+) -> ListedClub {
+    ListedClub {
+        join_style,
+        policy,
+        ..listed(circle_id, raw_rate)
+    }
+}
+
+#[test]
+fn join_style_filters_replace_include_closed() {
+    let pool = ClubPool::new([
+        styled(1, 100.0, Some(JoinStyle::Open), None),
+        styled(2, 200.0, Some(JoinStyle::Approval), None),
+        styled(3, 300.0, Some(JoinStyle::Closed), None),
+        styled(4, 400.0, None, None),
+    ]);
+    let only = |styles: &[JoinStyle]| ShortlistFilter {
+        join_styles: Some(styles.iter().fold(0, |m, s| m | join_style_bit(*s))),
+        ..ShortlistFilter::default()
+    };
+    let mut ids = pool.shortlist_matching(250.0, 10, only(&[JoinStyle::Closed]));
+    assert_eq!(ids, vec![3]);
+    ids = pool.shortlist_matching(250.0, 10, only(&[JoinStyle::Open, JoinStyle::Approval]));
+    ids.sort_unstable();
+    assert_eq!(ids, vec![1, 2]);
+    assert!(only(&[JoinStyle::Closed]).allows_closed());
+    assert!(!only(&[JoinStyle::Open]).allows_closed());
+    assert_eq!(pool.shortlist(250.0, 10, false).len(), 3);
+}
+
+#[test]
+fn playstyle_filters_keep_only_matching_clubs() {
+    let pool = ClubPool::new([
+        styled(1, 100.0, None, Some(2)),
+        styled(2, 200.0, None, Some(12)),
+        styled(3, 300.0, None, None),
+        styled(4, 400.0, None, Some(40)),
+    ]);
+    let filter = ShortlistFilter {
+        playstyles: Some((1 << 2) | (1 << 12)),
+        ..ShortlistFilter::default()
+    };
+    let mut ids = pool.shortlist_matching(250.0, 10, filter);
+    ids.sort_unstable();
+    assert_eq!(ids, vec![1, 2]);
+    assert_eq!(pool.eligible(filter), 2);
 }

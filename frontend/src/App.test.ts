@@ -13,7 +13,14 @@ function recommendations(
 ): Recommendations {
   return {
     trainer: { trainer_id: null, pace_per_day: pace },
-    options: { balance_weight: null, include_closed: false, include_full: false, limit: 50 },
+    options: {
+      balance_weight: null,
+      include_closed: false,
+      include_full: false,
+      join_styles: null,
+      playstyles: null,
+      limit: 50,
+    },
     updated_at: '2026-03-18T09:00:00Z',
     month: '2026-03',
     coverage: { considered: 340, shortlisted: total, scored: total, pending: 0 },
@@ -88,13 +95,13 @@ describe('App', () => {
   });
 
   it('runs a search from the URL on load', async () => {
-    setUrl('?pace=5000000&include_closed=true');
+    setUrl('?pace=5000000&join_style=closed');
     const { recommendationCalls } = stubApi(() => json(recommendations(1, 5_000_000)));
     render(App);
     expect(await screen.findByTestId('result-summary')).toHaveTextContent('5.0M/day');
     expect(screen.getByText('Found 1 club.')).toBeInTheDocument();
     expect(recommendationCalls()).toEqual([
-      '/api/v1/recommendations?pace=5000000&include_closed=true&limit=100',
+      '/api/v1/recommendations?pace=5000000&join_style=closed&limit=100',
     ]);
     expect(screen.getByLabelText('Daily fan gain (millions)')).toHaveValue('5');
   });

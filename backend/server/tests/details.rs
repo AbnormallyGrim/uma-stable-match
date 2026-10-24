@@ -31,6 +31,7 @@ fn pool(ids: &[u64]) -> SharedPool {
             member_count: 9,
             join_style: None,
             raw_rate: 1000.0,
+            policy: None,
         }
     }))))
 }

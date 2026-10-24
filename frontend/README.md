@@ -68,6 +68,7 @@ src/lib/ResultsTable.svelte   Sortable, searchable table of the best fits
 src/lib/ResultsSummary.svelte Pace, clubs analysed, comfortable fits, typical place and data age
 src/lib/stats.ts              Comfortable fits and typical place, from the results
 src/lib/ClubCard.svelte       One top pick
+src/lib/Dropdown.svelte       A themed single-choice dropdown, used for playstyle
 src/lib/YourClub.svelte       The trainer's own club, compared with the top pick
 src/lib/TierBadge.svelte      Tier icon, with a fallback for unknown tiers
 src/lib/test-data.ts          Made-up data for component tests
@@ -86,17 +87,23 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 
 The form sits in a card. The "Search by" switch is at the top, then the field on the left and the options on the right, with **Find clubs** at the bottom right. Below 720 pixels it becomes a single column, and the inputs and button use the full width.
 
-The form searches by **trainer ID** or by **daily pace**, with an optional **balance scoring** toggle and strength slider (0 to 1, in steps of 0.05) and **include closed clubs** and **include full clubs** checkboxes.
+The form searches by **trainer ID** or by **daily pace**, with an optional **balance scoring** switch and strength slider (0 to 1, in steps of 0.05), an **include full clubs** switch, **join style** buttons and a **playstyle** dropdown.
+
+- **Join style:** three pill buttons, Open, Approval and Closed, each with an icon. At most one is picked: picking another moves the choice, and picking the same one again clears it. The picked one takes its join style's colour, as on club cards. They're toggle buttons with `aria-pressed` in a labelled group.
+- **Playstyle:** a dropdown of uma.moe's playstyles, with **Any playstyle** selected by default. It's `Dropdown.svelte` rather than a native `<select>`, so the open list matches the site in both themes. It follows the ARIA select-only combobox pattern: focus stays on the button, which announces the highlighted option with `aria-activedescendant`. Arrow keys, Page Up and Down, Home and End move the highlight; Enter, Space or Tab picks it; Escape or a click outside closes the list; typing jumps to the next option starting with those letters.
+- **Layering:** the form card sits above the cards after it, so the open list isn't hidden behind "How to use".
+- **Warning:** while a join style or playstyle is picked, a note under the options says your best matches may be further from your pace.
 
 | Field | Accepted | Sent to the API as |
 |---|---|---|
 | Trainer ID | 9 to 12 digits; spaces and dashes are ignored | `trainer_id` |
 | Daily pace | A positive number of millions, such as `7.6` (a comma works as the decimal point) | `pace`, in fans per day |
 | Balance scoring | Off, or a strength from 0 to 1 | `balance_weight`, only when on |
-| Include closed clubs | On or off | `include_closed=true`, only when on |
+| Join style | One of open, approval and closed, or none | `join_style`, only when one is picked |
+| Playstyle | One of uma.moe's playstyles, or any | `playstyle`, only when one is picked |
 | Include full clubs | On or off | `include_full=true`, only when on |
 
-Only the field for the chosen mode is checked. An invalid field gets a message linked to it with `aria-describedby`, and nothing is sent.
+Only the field for the chosen mode is checked. An invalid field gets a message linked to it with `aria-describedby`, and nothing is sent. Links with an unknown or several join styles or playstyles open with none picked, as do older links with `include_closed=true`.
 
 ### How to use
 
@@ -125,6 +132,7 @@ After a search, the page shows a summary and the top ten picks.
   - **How you'd compare:** your place, the club's median per day, and the fit (or the score, with balance on)
   - **With balance on:** the balance score as a bar, passengers and top-three share. On wide screens they sit to the right of the description, so the card stays one row shorter
 - **Notices:** under the summary, when they apply:
+  - "*These results are filtered by join style or playstyle, so your best matches may be further from your pace than usual.*" when the API's `options` show a join style or playstyle filter
   - "*N more clubs are still loading. Search again in a minute for complete results.*" when the API's `coverage.pending` is above 0
   - "*These results are based on last month's data (February 2026), because the new game month has only just started.*" when `month` isn't the game month of `updated_at`
 - **Top picks:** the first ten clubs with an open spot. Full clubs are only in the table. If every match is full, the page says so instead of "No clubs matched", and the table still shows them.
@@ -213,6 +221,7 @@ Card descriptions are capped at `80ch` so they stay easy to read on wide screens
 | Text and search inputs | Padding, border and theme colours. `aria-invalid="true"` turns the border red |
 | `accent-color` | Checkboxes, radio buttons and the slider follow the theme's accent |
 | `.check` | A checkbox and its label, aligned on one line |
+| `.switch` | A checkbox drawn as an on/off switch: a label holding the input (`role="switch"`), a `.track` span, then the text. Gold when on. Used for balance scoring, full clubs and remembering the trainer ID |
 | `.segmented`, `.segmented.small` | A pill-shaped group of radio buttons, used for "Search by" and the theme switch. The selected option is styled with `:has(input:checked)` |
 | `:focus-visible` | A 2px accent ring around whatever has keyboard focus |
 
@@ -275,7 +284,7 @@ Two axe rules are adjusted. The colour-contrast rule is off, because jsdom doesn
 | Not enough data (422) | Wait a few days, or search by pace | None |
 | uma.moe unreachable (502), network error, timeout, other | A short explanation | **Try again** |
 | Invalid search (400) | The server's message | None |
-| No matches | "No clubs matched your search", with hints to include closed clubs or lower the balance strength, when those apply | – |
+| No matches | "No clubs matched your search", with hints to set playstyle back to any, pick Closed under join style, or lower the balance strength, when those apply | – |
 
 Starting a new search cancels any pending retry and any earlier request, so an old answer never replaces a newer one. Loading and waiting messages use `role="status"`, and errors use `role="alert"`. The dimming transition is turned off when the visitor prefers reduced motion.
 
