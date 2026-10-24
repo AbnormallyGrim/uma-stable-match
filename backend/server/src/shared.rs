@@ -718,10 +718,13 @@ struct ScanKeys {
 
 impl ScanKeys {
     fn new(config: &ScanConfig) -> Self {
-        let base = format!(
+        let mut base = format!(
             "{KEY_PREFIX}:scan:{}-{}-{}",
             config.rank_from, config.rank_to, config.max_details
         );
+        if config.last_rank() > config.rank_to {
+            base.push_str(&format!("-{}", config.last_rank()));
+        }
         Self {
             lock: format!("{base}:lock"),
             fresh: format!("{base}:fresh"),

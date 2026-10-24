@@ -27,6 +27,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to scan |
 | `SCAN_RANK_TO` | `900` | Worst monthly rank to scan |
 | `SCAN_MAX_DETAILS` | `200` | Most clubs whose member data is kept loaded, best rank first. Clubs past it load when a search needs them |
+| `SCAN_LOWER_RANK_TO` | none | Also list a [lower range](#lower-range) below `SCAN_RANK_TO`, down to this rank at most. Must be above `SCAN_RANK_TO`. Unset, only the rank window is listed |
 | `SCAN_INTERVAL_MINUTES` | none | Minutes between scans. Unset, the server scans again 30 minutes after uma.moe's next daily update; see [Cache and schedule](#cache-and-schedule) |
 | `DETAIL_CACHE_MINUTES` | none | Minutes between refreshes of a club's member data. Unset, each club refreshes after uma.moe's daily update; see [Refresher](#refresher) and [Club details](#club-details) |
 | `SHORTLIST_SIZE` | `120` | Clubs nearest your pace considered for each request |
@@ -55,17 +56,28 @@ The API key, `REDIS_URL` (which can hold a password) and `REDIS_KEY_SECRET` are 
 
 `scan` builds a new [club pool](#club-pool) and decides which clubs' details to keep loaded:
 
-1. List clubs by monthly rank, best first, 100 per page and up to `SCAN_RANK_TO`. Stop after a page whose last club is ranked `SCAN_RANK_TO` or worse, or after a short or empty page. As a safety stop, never list more than enough pages to reach `SCAN_RANK_TO`, plus one (10 pages with the defaults), so any window can be listed in full.
+1. List clubs by monthly rank, best first, 100 per page and up to `SCAN_RANK_TO`, or `SCAN_LOWER_RANK_TO` with a [lower range](#lower-range). Stop after a page whose last club is ranked that or worse, after a short or empty page, or in the lower range after a page whose last club has no fans this month. As a safety stop, never list more than enough pages to reach the last rank, plus one (10 pages with the defaults), so any window can be listed in full.
 2. Decide which month to use. Early in a game month the previous month is used instead; see [Early in the month](#early-in-the-month).
 3. Build a `ClubPool` from the clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO`. `ListedClub::from_circle` drops archived clubs, clubs with fewer than 8 members, and rows missing points, a member count or `last_updated`. Closed and full clubs are kept, so each request can include or exclude them.
 4. Copy in the exact medians of clubs that are still cached for that month, then swap the new pool in.
-5. Take up to `SCAN_MAX_DETAILS` joinable clubs from the pool, best rank first. If a club's details come back without club information, the listed details are used.
+5. Take up to `SCAN_MAX_DETAILS` joinable clubs in the rank window from the pool, best rank first. If a club's details come back without club information, the listed details are used.
    - **With a [refresher](#refresher)**, as the server always has: put them on its schedule, put up to `SCAN_MAX_DETAILS` full clubs on its [full-club schedule](#full-clubs), and finish. The refresher loads them.
    - **Without one**: prefetch their member data in the background lane, so visitors' requests go first. Full clubs are only loaded when a search includes them.
 
 While prefetching, a club whose details fail to load is logged and skipped. A failed list request fails the whole scan and leaves the previous pool in place. `Scan` returns the number of candidates (the pool size, full clubs included), how many clubs were prefetched (with a refresher, how many were already loaded), how many failed, the game month of the listed data, and when uma.moe last updated it (`updated_at`, the latest `last_updated` listed).
 
 With the client's default 500 ms rate limit, a default scan with a prefetch (without a refresher) takes about 80 seconds: around 9 list pages plus one lookup per candidate, about 150 at the time of writing. Clubs still cached from the previous scan aren't fetched again. Without the prefetch, a scan takes a few seconds.
+
+### Lower range
+
+With `SCAN_LOWER_RANK_TO` set, a scan also lists the clubs below `SCAN_RANK_TO`, for trainers slower than the rank window's clubs. Around rank 10,000 a typical member gains about 0.15M fans a day, and by rank 40,000 about 0.01M.
+
+- **Where it stops.** The list is sorted by monthly rank, so once a page ends with a club that has no fans this month, every later club has none either, and listing stops. It stops at `SCAN_LOWER_RANK_TO` at the latest. On the 2nd and 3rd of a game month fans are too few to tell, so the whole range down to `SCAN_LOWER_RANK_TO` is listed.
+- **Which clubs stay.** The same pool filters as the window, plus one more: a club in the lower range must have gained fans since uma.moe's previous daily snapshot (`monthly_point` above `yesterday_points`). Early in the month that check is skipped.
+- **Not refreshed yet.** Lower-range clubs aren't prefetched or put on the refresh schedule, including when a search loads them. A search loads them like any uncached club, and their details are cached like any other club's.
+- **Shared scans.** The scan's Redis keys add the last rank, `usm:v1:scan:<from>-<to>-<max>-<lower>:…`, so instances with a different lower range don't share.
+
+The scan's log line counts the lower-range clubs in the pool as `lower`.
 
 ## Club pool
 
@@ -228,7 +240,7 @@ With Redis, instances that have the same `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `S
 - **Failures.** A failed scan is published too: every instance records the same error, keeps its last results, and waits until the next scan is due.
 - **Missing data.** If a scan is marked current but its rows are gone from Redis, the instance scans on its own.
 
-The keys are `usm:v1:scan:<from>-<to>-<max>:lock`, `:fresh`, `:latest`, `:progress`, `:progress-id`, `:schedule`, `:schedule-full` and `:refresher`, so instances with different scan windows don't share.
+The keys are `usm:v1:scan:<from>-<to>-<max>:lock` (with `-<lower>` added after `<max>` when there's a [lower range](#lower-range)), `:fresh`, `:latest`, `:progress`, `:progress-id`, `:schedule`, `:schedule-full` and `:refresher`, so instances with different scan windows don't share.
 
 ### Redis tests
 

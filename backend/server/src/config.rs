@@ -117,6 +117,14 @@ pub enum ConfigError {
         /// `SCAN_RANK_TO`.
         to: u32,
     },
+    /// The lower range doesn't reach below the rank window.
+    #[error("SCAN_LOWER_RANK_TO ({lower}) must be above SCAN_RANK_TO ({to})")]
+    InvalidLowerRange {
+        /// `SCAN_LOWER_RANK_TO`.
+        lower: u32,
+        /// `SCAN_RANK_TO`.
+        to: u32,
+    },
 }
 
 impl Config {
@@ -163,6 +171,10 @@ impl Config {
             rank_from: number("SCAN_RANK_FROM", defaults.rank_from)?,
             rank_to: number("SCAN_RANK_TO", defaults.rank_to)?,
             max_details: number("SCAN_MAX_DETAILS", defaults.max_details)?,
+            lower_to: match get("SCAN_LOWER_RANK_TO") {
+                None => None,
+                Some(_) => Some(number("SCAN_LOWER_RANK_TO", 0)?),
+            },
             ..defaults
         };
         let scan_interval = match get("SCAN_INTERVAL_MINUTES") {
@@ -239,6 +251,12 @@ impl Config {
         if scan.rank_from > scan.rank_to {
             return Err(ConfigError::InvalidRankWindow {
                 from: scan.rank_from,
+                to: scan.rank_to,
+            });
+        }
+        if let Some(lower) = scan.lower_to.filter(|lower| *lower <= scan.rank_to) {
+            return Err(ConfigError::InvalidLowerRange {
+                lower,
                 to: scan.rank_to,
             });
         }

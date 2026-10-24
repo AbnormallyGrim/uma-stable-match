@@ -443,3 +443,35 @@ fn metrics_address_needs_an_ip_and_port() {
         assert_eq!(error, ConfigError::InvalidMetricsAddr(value.into()));
     }
 }
+
+#[test]
+fn reads_the_lower_range() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("SCAN_RANK_TO", "500"),
+        ("SCAN_LOWER_RANK_TO", "2000"),
+    ]))
+    .unwrap();
+    assert_eq!(config.scan.lower_to, Some(2000));
+    assert_eq!(config.scan.last_rank(), 2000);
+
+    let config = Config::from_lookup(lookup(&[("UMAMOE_API_KEY", "test-key")])).unwrap();
+    assert_eq!(config.scan.lower_to, None);
+}
+
+#[test]
+fn a_lower_range_above_the_window_fails() {
+    let error = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("SCAN_RANK_TO", "500"),
+        ("SCAN_LOWER_RANK_TO", "500"),
+    ]))
+    .unwrap_err();
+    assert_eq!(
+        error,
+        ConfigError::InvalidLowerRange {
+            lower: 500,
+            to: 500
+        }
+    );
+}
