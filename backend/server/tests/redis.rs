@@ -1060,3 +1060,42 @@ async fn a_restarted_instance_scores_clubs_from_redis_without_fetching_them() {
     assert_eq!(restarted.queued(), 0);
     assert_eq!(calls(&server, "/api/v4/circles", None).await, 3);
 }
+
+#[tokio::test]
+async fn full_clubs_have_their_own_shared_schedule() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let ids = [unique_id(), unique_id()];
+    let circles: Vec<_> = ids
+        .iter()
+        .zip([9, 30])
+        .enumerate()
+        .map(|(i, (id, members))| {
+            json!({
+                "circle_id": id,
+                "name": "Tiered Club",
+                "monthly_rank": 100 + i,
+                "member_count": members,
+                "monthly_point": 20_000_000,
+                "last_updated": "2026-03-19T15:00:00Z",
+            })
+        })
+        .collect();
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "circles": circles })))
+        .mount(&server)
+        .await;
+    mount_details(&server, &ids).await;
+    let config = scan_config();
+    let first = refreshing(&server, config, first_shared);
+    let second = refreshing(&server, config, redis().await.unwrap());
+    scan(&client(&server), &first, &config).await.unwrap();
+    first.get(ids[1], Priority::Interactive).await.unwrap();
+
+    let status = second.refresh_status().await;
+    assert_eq!(status.scheduled, 1);
+    assert_eq!((status.full.scheduled, status.full.loaded), (1, 1));
+    assert!(second.next_refresh(ids[1]).await.is_some());
+}

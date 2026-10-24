@@ -157,7 +157,13 @@ async fn status_before_first_scan() {
     assert_eq!(status["pool"]["clubs"], 0);
     assert_eq!(
         status["refresh"],
-        json!({ "scheduled": 0, "loaded": 0, "due": 0, "oldest_due_at": null })
+        json!({
+            "scheduled": 0,
+            "loaded": 0,
+            "due": 0,
+            "oldest_due_at": null,
+            "full": { "scheduled": 0, "loaded": 0, "due": 0 },
+        })
     );
 }
 

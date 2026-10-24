@@ -135,7 +135,7 @@ Go to **Dashboards → New → Import**, upload `observability/grafana-dashboard
 |---|---|
 | Searches | Searches in the last 24 hours, the same by status code, and searches per hour |
 | Errors | Warnings and errors logged per hour, and a table of them by the file and line that logged them. Each file links to [Axiom](#links-to-axiom) |
-| Scan | Phase, refresh counts (clubs loaded, scheduled and due), clubs listed, time since the last successful scan, scans finished, scan duration, club details loaded as a percentage of the scheduled clubs (in Redis with Redis), what the instance did when a scan was due, and how long the longest-waiting due club has waited |
+| Scan | Phase, refresh counts for joinable clubs (loaded, scheduled and due), clubs listed, time since the last successful scan, scans finished, scan duration, club details loaded as a percentage of the scheduled clubs (in Redis with Redis), what the instance did when a scan was due, how long the longest-waiting due club has waited, and the same counts and percentage loaded for full clubs |
 | uma.moe calls | Calls per second by status code and by endpoint and lane, response times, errors per minute by status, and time waiting for the 500 ms spacing |
 | Web traffic | Requests per second by route and status code, error responses, response times, rate-limited visitors and a count of each status code in the last hour |
 | Caches | Where trainer paces and club details came from (memory, Redis, uma.moe or an error), and the detail cache and background queue |

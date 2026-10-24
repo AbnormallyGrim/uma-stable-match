@@ -14,7 +14,7 @@ use uma_stable_match_umamoe_client::{Circle, CircleRequest, Client, Error, Prior
 
 use crate::calibration::club_median;
 use crate::pool::{ClubPool, Period};
-use crate::refresher::{utc_now, RefreshConfig, RefreshStatus, Refresher, Refreshing};
+use crate::refresher::{utc_now, RefreshConfig, RefreshStatus, Refresher, Refreshing, Tier};
 use crate::scanner::ScanConfig;
 use crate::shared::{club_key, SharedCache};
 
@@ -197,7 +197,7 @@ impl ClubDetails {
                 refreshing: config.refresher.then(|| {
                     Arc::new(Refreshing::new(
                         config.refresh,
-                        shared.schedule(&config.scan),
+                        shared.schedules(&config.scan),
                     ))
                 }),
                 shared,
@@ -309,11 +309,11 @@ impl ClubDetails {
             .await
     }
 
-    pub(crate) async fn schedule(&self, clubs: Vec<(u64, u32)>) {
+    pub(crate) async fn schedule(&self, joinable: Vec<(u64, u32)>, full: Vec<(u64, u32)>) {
         if let Some(refreshing) = &self.inner.refreshing {
             let pool = &self.inner.pool;
             refreshing
-                .replace(clubs, |id| read(pool).contains(id), utc_now())
+                .replace(joinable, full, |id| tier(&read(pool), id), utc_now())
                 .await;
         }
     }
@@ -529,15 +529,25 @@ async fn track(inner: &Inner, circle_id: u64, due: DateTime<Utc>) {
     let Some(refreshing) = &inner.refreshing else {
         return;
     };
-    if !read(&inner.pool).contains(circle_id) {
+    let Some(tier) = tier(&read(&inner.pool), circle_id) else {
         return;
-    }
+    };
     let rank = read(&inner.listed)
         .get(&circle_id)
         .and_then(|c| c.monthly_rank)
         .and_then(|r| u32::try_from(r).ok())
         .unwrap_or(u32::MAX);
-    refreshing.loaded(circle_id, rank, due).await;
+    refreshing.loaded(tier, circle_id, rank, due).await;
+}
+
+fn tier(pool: &ClubPool, circle_id: u64) -> Option<Tier> {
+    if pool.is_joinable(circle_id) {
+        Some(Tier::Joinable)
+    } else if pool.contains(circle_id) {
+        Some(Tier::Full)
+    } else {
+        None
+    }
 }
 
 fn count_detail(source: &'static str) {
