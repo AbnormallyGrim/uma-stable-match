@@ -35,7 +35,8 @@
       <strong>Closed</strong> for clubs that aren't recruiting right now, or one
       <strong>Playstyle</strong>, to see only those clubs. Pick it again, or choose
       <strong>Any playstyle</strong>, to go back. Either leaves fewer clubs to choose from, so your
-      best matches may be further from your pace.
+      best matches may be further from your pace. <strong>Has Discord</strong> keeps clubs whose description
+      mentions Discord, as a best guess.
     </li>
     <li>
       <strong>Pick a club.</strong> Start with the <strong>Top picks</strong>: the best fits are

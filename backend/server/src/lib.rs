@@ -32,8 +32,9 @@ pub use logging::{init_logging, InvalidLogFormat, LogFormat};
 pub use pace::{PaceError, PaceLookup, TrainerPace, DEFAULT_PACE_TTL};
 pub use pool::{
     elapsed_days, game_month, game_month_start, is_early_month, join_style_bit, jst,
-    last_month_rate, previous_game_month, previous_game_month_days, raw_rate, ClubPool, ListedClub,
-    Period, ShortlistFilter, DEFAULT_SHORTLIST_SIZE, EARLY_MONTH_DAYS, TARGET_MEDIAN_RATIO,
+    last_month_rate, mentions_discord, previous_game_month, previous_game_month_days, raw_rate,
+    ClubPool, ListedClub, Period, ShortlistFilter, DEFAULT_SHORTLIST_SIZE, EARLY_MONTH_DAYS,
+    TARGET_MEDIAN_RATIO,
 };
 pub use recommendations::{MatchSettings, DEFAULT_FETCH_BUDGET};
 pub use refresher::{RefreshConfig, RefreshStatus, Refresher, StoredTtl, TierStatus};

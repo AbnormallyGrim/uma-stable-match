@@ -23,7 +23,9 @@ use crate::app::AppState;
 use crate::details::ClubDetails;
 use crate::limits::Visitor;
 use crate::pace::PaceError;
-use crate::pool::{join_style_bit, ShortlistFilter, DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO};
+use crate::pool::{
+    join_style_bit, mentions_discord, ShortlistFilter, DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO,
+};
 
 const CLUB_URL: &str = "https://uma.moe/circles/";
 const DEFAULT_LIMIT: u32 = 50;
@@ -62,6 +64,7 @@ pub(crate) struct Params {
     include_full: Option<String>,
     join_style: Option<String>,
     playstyle: Option<String>,
+    has_discord: Option<String>,
     limit: Option<String>,
 }
 
@@ -114,6 +117,7 @@ struct OptionsView {
     include_full: bool,
     join_styles: Option<Vec<&'static str>>,
     playstyles: Option<Vec<u32>>,
+    has_discord: bool,
     limit: u32,
 }
 
@@ -130,6 +134,7 @@ struct Recommendation {
     monthly_rank: Option<u32>,
     last_month_rank: Option<u32>,
     comment: Option<String>,
+    has_discord: bool,
     your_place: u32,
     club_size: u32,
     ranked_members: usize,
@@ -272,6 +277,7 @@ async fn search(
         playstyles: playstyles
             .as_ref()
             .map(|codes| codes.iter().fold(0, |mask, code| mask | (1 << code))),
+        discord_only: parse_bool("has_discord", &params.has_discord)?.unwrap_or(false),
     };
     let include_closed = filter.allows_closed();
     let limit = match blank_to_none(&params.limit) {
@@ -350,6 +356,7 @@ async fn search(
             join_styles: join_styles
                 .map(|styles| styles.into_iter().map(join_style_name).collect()),
             playstyles,
+            has_discord: filter.discord_only,
             limit,
         },
         updated_at: timestamp(updated_at),
@@ -601,6 +608,7 @@ fn recommendation(scored: &ScoredClub<'_>) -> Recommendation {
         monthly_rank: club.monthly_rank,
         last_month_rank: club.last_month_rank,
         comment: club.comment.clone(),
+        has_discord: club.comment.as_deref().is_some_and(mentions_discord),
         your_place: scored.your_place,
         club_size: scored.club_size,
         ranked_members: scored.ranked_members,

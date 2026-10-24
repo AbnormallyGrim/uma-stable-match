@@ -2,6 +2,7 @@
 
 import { ApiError, type Recommendations } from './api';
 import { gameMonth, monthLabel } from './format';
+import { DISCORD_NOTE } from './search';
 
 /** A friendly error: a short title, what to do, and whether retrying can help. */
 export interface ErrorMessage {
@@ -78,6 +79,9 @@ function describeStatus(error: ApiError): ErrorMessage {
 /** Suggestions for widening a search that found nothing. */
 export function emptyHints(options: Recommendations['options']): string[] {
   const hints: string[] = [];
+  if (options.has_discord) {
+    hints.push('Turn off Has Discord.');
+  }
   if (options.playstyles !== null) {
     hints.push('Set playstyle back to any.');
   }
@@ -121,7 +125,10 @@ export function monthNotice(result: Pick<Recommendations, 'month' | 'updated_at'
 
 /** Every notice for a result, the month first. */
 export function resultNotices(result: Recommendations): string[] {
-  return [filterNotice(result.options), monthNotice(result), pendingNotice(result.coverage)].filter(
-    (notice): notice is string => notice !== null,
-  );
+  return [
+    filterNotice(result.options),
+    result.options.has_discord ? DISCORD_NOTE : null,
+    monthNotice(result),
+    pendingNotice(result.coverage),
+  ].filter((notice): notice is string => notice !== null);
 }
