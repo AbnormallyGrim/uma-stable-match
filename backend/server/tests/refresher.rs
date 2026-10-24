@@ -31,6 +31,7 @@ fn scan_config(max_details: u32) -> ScanConfig {
         rank_to: 50,
         max_details,
         page_size: 10,
+        lower_to: None,
     }
 }
 

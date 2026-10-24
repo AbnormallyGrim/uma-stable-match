@@ -23,6 +23,23 @@ pub struct ScanConfig {
     pub max_details: u32,
     /// Clubs per list page.
     pub page_size: u32,
+    /// List below `rank_to` down to this rank too, stopping early at the first page that ends with
+    /// a club with no fans this month. `None` lists only up to `rank_to`.
+    pub lower_to: Option<u32>,
+}
+
+impl ScanConfig {
+    /// The worst rank listed: `lower_to` when it's below `rank_to`, otherwise `rank_to`.
+    pub fn last_rank(&self) -> u32 {
+        self.lower_to
+            .filter(|lower| *lower > self.rank_to)
+            .unwrap_or(self.rank_to)
+    }
+
+    /// Whether `rank` is in the lower range, below `rank_to`.
+    pub fn is_lower(&self, rank: u32) -> bool {
+        rank > self.rank_to && rank <= self.last_rank()
+    }
 }
 
 impl Default for ScanConfig {
@@ -32,6 +49,7 @@ impl Default for ScanConfig {
             rank_to: 900,
             max_details: 200,
             page_size: 100,
+            lower_to: None,
         }
     }
 }
@@ -120,6 +138,7 @@ pub(crate) async fn load(
     let listed = rows.len();
     let Installed {
         candidates,
+        lower,
         ids,
         full_ids,
         month,
@@ -128,7 +147,7 @@ pub(crate) async fn load(
     if details.refreshes() {
         details.schedule(ids, full_ids).await;
         let prefetched = details.cached_in_pool().len();
-        tracing::info!(candidates, prefetched, "scan listed the clubs");
+        tracing::info!(candidates, lower, prefetched, "scan listed the clubs");
         return Scan {
             candidates,
             prefetched,
@@ -173,6 +192,7 @@ pub(crate) async fn load(
 
 pub(crate) struct Installed {
     candidates: usize,
+    lower: usize,
     ids: Vec<(u64, u32)>,
     full_ids: Vec<(u64, u32)>,
     month: Option<String>,
@@ -180,6 +200,10 @@ pub(crate) struct Installed {
 }
 
 pub(crate) fn install(details: &ClubDetails, rows: Vec<Circle>, config: &ScanConfig) -> Installed {
+    let rows: Vec<Circle> = rows
+        .into_iter()
+        .filter(|c| !config.is_lower(rank(c)) || gaining(c))
+        .collect();
     let snapshot = rows
         .iter()
         .filter_map(|c| c.last_updated.as_deref())
@@ -198,8 +222,17 @@ pub(crate) fn install(details: &ClubDetails, rows: Vec<Circle>, config: &ScanCon
     };
     let mut pool = ClubPool::new(rows.iter().filter_map(listed));
     let max = config.max_details as usize;
-    let ids = by_rank(&rows, |id| pool.is_joinable(id), max);
-    let full_ids = by_rank(&rows, |id| pool.contains(id) && !pool.is_joinable(id), max);
+    let main: Vec<Circle> = rows
+        .iter()
+        .filter(|c| !config.is_lower(rank(c)))
+        .cloned()
+        .collect();
+    let lower = rows
+        .iter()
+        .filter(|c| config.is_lower(rank(c)) && pool.contains(c.circle_id))
+        .count();
+    let ids = by_rank(&main, |id| pool.is_joinable(id), max);
+    let full_ids = by_rank(&main, |id| pool.contains(id) && !pool.is_joinable(id), max);
     details.set_period(period);
     details.set_listed(rows.into_iter().map(|c| (c.circle_id, c)));
     details.restore_exact_medians(&mut pool);
@@ -208,6 +241,7 @@ pub(crate) fn install(details: &ClubDetails, rows: Vec<Circle>, config: &ScanCon
     details.set_listing(SystemTime::now(), month.clone());
     Installed {
         candidates,
+        lower,
         ids,
         full_ids,
         month,
@@ -236,6 +270,17 @@ fn by_rank(rows: &[Circle], keep: impl Fn(u64) -> bool, max: usize) -> Vec<(u64,
     ranked
 }
 
+fn gaining(circle: &Circle) -> bool {
+    if listed_early(circle) {
+        return true;
+    }
+    let points = circle.monthly_point.unwrap_or(0);
+    points > 0
+        && circle
+            .yesterday_points
+            .is_none_or(|yesterday| points > yesterday)
+}
+
 fn rank(circle: &Circle) -> u32 {
     circle
         .monthly_rank
@@ -252,9 +297,10 @@ pub(crate) async fn list_candidates(
     config: &ScanConfig,
     cache: &Cache,
 ) -> Result<Vec<Circle>, ScanError> {
+    let last_rank = config.last_rank();
     let request = ListCirclesRequest {
         limit: Some(config.page_size),
-        max_rank: Some(config.rank_to),
+        max_rank: Some(last_rank),
         sort_by: Some(CircleSort::MonthlyRank),
         sort_dir: Some(SortDir::Asc),
         ..Default::default()
@@ -268,8 +314,9 @@ pub(crate) async fn list_candidates(
             .map_err(ScanError::List)?
             .circles;
         let Some(last) = rows.last() else { break };
-        let done = last.monthly_rank.unwrap_or(0) >= config.rank_to as i32
-            || rows.len() < config.page_size as usize;
+        let done = last.monthly_rank.unwrap_or(0) >= last_rank as i32
+            || rows.len() < config.page_size as usize
+            || out_of_fans(last, config);
 
         candidates.extend(rows.into_iter().filter(|c| in_window(c, config)));
         cache.update_progress(|p| p.listed = candidates.len());
@@ -284,7 +331,7 @@ pub(crate) async fn list_candidates(
 // one.
 fn max_pages(config: &ScanConfig) -> u32 {
     config
-        .rank_to
+        .last_rank()
         .div_ceil(config.page_size.max(1))
         .saturating_add(1)
 }
@@ -293,7 +340,26 @@ fn in_window(circle: &Circle, config: &ScanConfig) -> bool {
     circle
         .monthly_rank
         .and_then(|r| u32::try_from(r).ok())
-        .is_some_and(|r| (config.rank_from..=config.rank_to).contains(&r))
+        .is_some_and(|r| (config.rank_from..=config.last_rank()).contains(&r))
+}
+
+// In the lower range, a page ending with a club with no fans this month means every later club has
+// none either, since the list is sorted by monthly rank. Early in the month, fans are too few to
+// tell, so the lower range is listed down to `lower_to`.
+fn out_of_fans(last: &Circle, config: &ScanConfig) -> bool {
+    let in_lower = last
+        .monthly_rank
+        .and_then(|r| u32::try_from(r).ok())
+        .is_some_and(|r| r > config.rank_to);
+    in_lower && !listed_early(last) && last.monthly_point.unwrap_or(0) <= 0
+}
+
+fn listed_early(circle: &Circle) -> bool {
+    circle
+        .last_updated
+        .as_deref()
+        .and_then(|t| DateTime::parse_from_rfc3339(t).ok())
+        .is_some_and(|t| is_early_month(t.with_timezone(&Utc)))
 }
 
 #[cfg(test)]

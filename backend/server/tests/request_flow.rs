@@ -95,6 +95,7 @@ async fn flow(closed: &[u64], failing: &[u64], max_details: u32) -> Flow {
         rank_to: 900,
         max_details,
         page_size: 100,
+        lower_to: None,
     };
     let handle = tokio::spawn(run_scheduler(
         client(&server),
@@ -325,6 +326,7 @@ async fn serves_results_while_the_first_scan_loads() {
             rank_to: 900,
             max_details: 10,
             page_size: 100,
+            lower_to: None,
         },
         Some(Duration::from_secs(3600)),
         cache.clone(),

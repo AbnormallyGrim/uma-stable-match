@@ -29,6 +29,7 @@ fn config() -> ScanConfig {
         rank_to: 50,
         max_details: 10,
         page_size: 3,
+        lower_to: None,
     }
 }
 
@@ -476,6 +477,7 @@ async fn lists_past_a_hundred_pages_when_the_window_needs_it() {
         rank_to: 150,
         max_details: 0,
         page_size: 1,
+        lower_to: None,
     };
 
     let (result, details) = run(&server, &config).await;
@@ -497,9 +499,108 @@ async fn stops_at_the_page_cap_when_pages_never_end() {
         rank_to: 5,
         max_details: 0,
         page_size: 1,
+        lower_to: None,
     };
 
     run(&server, &config).await.0.unwrap();
 
     assert_eq!(list_calls(&server).await, 6);
+}
+
+fn lower_config() -> ScanConfig {
+    ScanConfig {
+        rank_from: 1,
+        rank_to: 3,
+        max_details: 10,
+        page_size: 3,
+        lower_to: Some(12),
+    }
+}
+
+async fn mount_lower_page(server: &MockServer, n: u32, circles: Vec<Value>, times: u64) {
+    Mock::given(path("/api/v4/circles/list"))
+        .and(query_param("page", n.to_string()))
+        .and(query_param("max_rank", "12"))
+        .respond_with(page(circles))
+        .expect(times)
+        .mount(server)
+        .await;
+}
+
+fn without_fans(id: u64, rank: i32) -> Value {
+    let mut row = listed(id, rank, 20);
+    row["monthly_point"] = json!(0);
+    row
+}
+
+fn stalled(id: u64, rank: i32) -> Value {
+    let mut row = listed(id, rank, 20);
+    row["yesterday_points"] = row["monthly_point"].clone();
+    row
+}
+
+#[tokio::test]
+async fn the_lower_range_stops_at_a_page_ending_without_fans() {
+    let server = MockServer::start().await;
+    mount_lower_page(
+        &server,
+        0,
+        vec![listed(1, 1, 20), listed(2, 2, 20), listed(3, 3, 20)],
+        1,
+    )
+    .await;
+    mount_lower_page(
+        &server,
+        1,
+        vec![listed(4, 4, 20), listed(5, 5, 20), without_fans(6, 6)],
+        1,
+    )
+    .await;
+    mount_lower_page(&server, 2, vec![listed(7, 7, 20)], 0).await;
+
+    let (scan, _) = run(&server, &lower_config()).await;
+    assert_eq!(scan.unwrap().candidates, 5);
+}
+
+#[tokio::test]
+async fn the_lower_range_stops_at_its_last_rank() {
+    let server = MockServer::start().await;
+    for n in 0..4 {
+        let rows = (1..=3)
+            .map(|i| {
+                let id = u64::from(n * 3 + i);
+                listed(id, id as i32, 20)
+            })
+            .collect();
+        mount_lower_page(&server, n, rows, 1).await;
+    }
+    mount_lower_page(&server, 4, vec![listed(13, 13, 20)], 0).await;
+
+    let (scan, _) = run(&server, &lower_config()).await;
+    assert_eq!(scan.unwrap().candidates, 12);
+}
+
+#[tokio::test]
+async fn the_lower_range_keeps_only_clubs_still_gaining_fans() {
+    let server = MockServer::start().await;
+    mount_lower_page(
+        &server,
+        0,
+        vec![stalled(1, 1), listed(2, 2, 20), listed(3, 3, 20)],
+        1,
+    )
+    .await;
+    mount_lower_page(&server, 1, vec![stalled(4, 4), listed(5, 5, 20)], 1).await;
+    for id in [1, 2, 3] {
+        mount_detail(&server, id, detail(id), 1).await;
+    }
+    for id in [4, 5] {
+        mount_detail(&server, id, detail(id), 0).await;
+    }
+
+    let (scan, details) = run(&server, &lower_config()).await;
+    assert_eq!(scan.unwrap().candidates, 4);
+    assert_eq!(ids(&details), vec![1, 2, 3]);
+    assert!(!details.pool().read().unwrap().contains(4));
+    assert!(details.pool().read().unwrap().contains(5));
 }

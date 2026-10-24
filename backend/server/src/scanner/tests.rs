@@ -144,9 +144,66 @@ fn the_page_cap_follows_the_rank_window() {
         rank_to,
         max_details: 10,
         page_size,
+        lower_to: None,
     };
     assert_eq!(max_pages(&config(900, 100)), 10);
     assert_eq!(max_pages(&config(10_000, 100)), 101);
     assert_eq!(max_pages(&config(64_036, 100)), 642);
     assert_eq!(max_pages(&config(5, 0)), 6);
+}
+
+fn lower(rank_to: u32, lower_to: Option<u32>) -> ScanConfig {
+    ScanConfig {
+        rank_to,
+        lower_to,
+        ..ScanConfig::default()
+    }
+}
+
+#[test]
+fn the_lower_range_starts_below_the_window() {
+    let config = lower(900, Some(2_000));
+    assert_eq!(config.last_rank(), 2_000);
+    assert!(!config.is_lower(900));
+    assert!(config.is_lower(901));
+    assert!(config.is_lower(2_000));
+    assert!(!config.is_lower(2_001));
+    assert_eq!(lower(900, None).last_rank(), 900);
+    assert_eq!(lower(900, Some(800)).last_rank(), 900);
+    assert!(!lower(900, None).is_lower(901));
+}
+
+fn row(rank: i32, points: i64, updated: &str) -> Circle {
+    Circle {
+        monthly_rank: Some(rank),
+        monthly_point: Some(points),
+        last_updated: Some(updated.into()),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn only_the_lower_range_stops_without_fans() {
+    let config = lower(900, Some(2_000));
+    let mid_month = "2026-03-19T15:00:00Z";
+    assert!(out_of_fans(&row(1_500, 0, mid_month), &config));
+    assert!(!out_of_fans(&row(1_500, 10, mid_month), &config));
+    assert!(!out_of_fans(&row(900, 0, mid_month), &config));
+    assert!(!out_of_fans(
+        &row(1_500, 0, "2026-03-02T15:00:00Z"),
+        &config
+    ));
+}
+
+#[test]
+fn early_in_the_month_every_lower_club_counts_as_gaining() {
+    let mut circle = row(1_500, 100, "2026-03-02T15:00:00Z");
+    circle.yesterday_points = Some(100);
+    assert!(gaining(&circle));
+    circle.last_updated = Some("2026-03-19T15:00:00Z".into());
+    assert!(!gaining(&circle));
+    circle.yesterday_points = Some(90);
+    assert!(gaining(&circle));
+    circle.yesterday_points = None;
+    assert!(gaining(&circle));
 }
