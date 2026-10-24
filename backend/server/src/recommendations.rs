@@ -23,7 +23,7 @@ use crate::app::AppState;
 use crate::details::ClubDetails;
 use crate::limits::Visitor;
 use crate::pace::PaceError;
-use crate::pool::{DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO};
+use crate::pool::{ShortlistFilter, DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO};
 
 const CLUB_URL: &str = "https://uma.moe/circles/";
 const DEFAULT_LIMIT: u32 = 50;
@@ -56,6 +56,7 @@ pub(crate) struct Params {
     balance: Option<String>,
     balance_weight: Option<String>,
     include_closed: Option<String>,
+    include_full: Option<String>,
     limit: Option<String>,
 }
 
@@ -95,6 +96,7 @@ struct TrainerView {
 struct OptionsView {
     balance_weight: Option<f64>,
     include_closed: bool,
+    include_full: bool,
     limit: u32,
 }
 
@@ -223,6 +225,11 @@ async fn search(
         _ => None,
     };
     let include_closed = parse_bool("include_closed", &params.include_closed)?.unwrap_or(false);
+    let include_full = parse_bool("include_full", &params.include_full)?.unwrap_or(false);
+    let filter = ShortlistFilter {
+        include_closed,
+        include_full,
+    };
     let limit = match blank_to_none(&params.limit) {
         None => DEFAULT_LIMIT,
         Some(value) => value
@@ -253,11 +260,16 @@ async fn search(
         }
     };
     score_clubs(pace, &[], &options).map_err(|e| ApiError::bad_request(e.to_string()))?;
-    let (mut clubs, coverage) =
-        load_clubs(&state.details, state.matching, pace, include_closed).await;
-    if let Some(circle_id) = own_club_id {
-        clubs.retain(|club| club.circle_id != circle_id);
+    let (mut clubs, coverage) = load_clubs(&state.details, state.matching, pace, filter).await;
+    if !include_full {
+        let pool = state
+            .details
+            .pool()
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
+        clubs.retain(|club| pool.is_joinable(club.circle_id));
     }
+    clubs.retain(|club| Some(club.circle_id) != own_club_id);
     let scored =
         score_clubs(pace, &clubs, &options).map_err(|e| ApiError::bad_request(e.to_string()))?;
     let your_club = match (trainer_id, own_club_id) {
@@ -283,6 +295,7 @@ async fn search(
         options: OptionsView {
             balance_weight,
             include_closed,
+            include_full,
             limit,
         },
         updated_at: timestamp(updated_at),
@@ -345,17 +358,13 @@ async fn load_clubs(
     details: &ClubDetails,
     settings: MatchSettings,
     pace: f64,
-    include_closed: bool,
+    filter: ShortlistFilter,
 ) -> (Vec<Club>, Coverage) {
     let shortlist = details
         .pool()
         .read()
         .unwrap_or_else(|e| e.into_inner())
-        .shortlist(
-            TARGET_MEDIAN_RATIO * pace,
-            settings.shortlist_size,
-            include_closed,
-        );
+        .shortlist_matching(TARGET_MEDIAN_RATIO * pace, settings.shortlist_size, filter);
     let mut loaded: HashMap<u64, Arc<Club>> = details
         .cached_in_pool()
         .into_iter()

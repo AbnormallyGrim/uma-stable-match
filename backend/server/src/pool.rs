@@ -110,8 +110,13 @@ pub struct ListedClub {
 }
 
 impl ListedClub {
-    /// Builds a pool entry, or `None` if the club is archived, full, too small to score or
-    /// missing data.
+    /// Whether the club has no open spot.
+    pub fn is_full(&self) -> bool {
+        self.member_count >= CLUB_CAP
+    }
+
+    /// Builds a pool entry, or `None` if the club is archived, too small to score, over the
+    /// member cap or missing data. Full clubs are kept.
     pub fn from_circle(circle: &Circle) -> Option<Self> {
         Self::build(circle, false)
     }
@@ -128,7 +133,7 @@ impl ListedClub {
         let member_count = circle
             .member_count
             .and_then(|n| u32::try_from(n).ok())
-            .filter(|n| (MIN_RANKED_MEMBERS as u32..CLUB_CAP).contains(n))?;
+            .filter(|n| (MIN_RANKED_MEMBERS as u32..=CLUB_CAP).contains(n))?;
         let at = DateTime::parse_from_rfc3339(circle.last_updated.as_deref()?)
             .ok()?
             .with_timezone(&Utc);
@@ -155,6 +160,22 @@ struct Entry {
     club: ListedClub,
     exact_median: Option<f64>,
     ln_estimate: f64,
+}
+
+/// Which clubs a shortlist may include. The default leaves out closed and full clubs.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ShortlistFilter {
+    /// Include clubs that aren't accepting members.
+    pub include_closed: bool,
+    /// Include clubs with no open spot.
+    pub include_full: bool,
+}
+
+impl ShortlistFilter {
+    fn allows(&self, club: &ListedClub) -> bool {
+        (self.include_closed || club.join_style != Some(JoinStyle::Closed))
+            && (self.include_full || !club.is_full())
+    }
 }
 
 /// Eligible clubs sorted by estimated median pace.
@@ -212,6 +233,13 @@ impl ClubPool {
     /// Whether the club is in the pool.
     pub fn contains(&self, circle_id: u64) -> bool {
         self.index.contains_key(&circle_id)
+    }
+
+    /// Whether the club is in the pool and has an open spot.
+    pub fn is_joinable(&self, circle_id: u64) -> bool {
+        self.index
+            .get(&circle_id)
+            .is_some_and(|&i| !self.entries[i].club.is_full())
     }
 
     /// Clubs whose exact median is known.
@@ -284,13 +312,25 @@ impl ClubPool {
     }
 
     /// IDs of the `k` clubs whose estimated median is nearest `target` in log space, nearest
-    /// first. Ties go to the lower ID.
+    /// first, leaving out full clubs. Ties go to the lower ID.
     pub fn shortlist(&self, target: f64, k: usize, include_closed: bool) -> Vec<u64> {
+        self.shortlist_matching(
+            target,
+            k,
+            ShortlistFilter {
+                include_closed,
+                include_full: false,
+            },
+        )
+    }
+
+    /// Like [`ClubPool::shortlist`], with the clubs `filter` allows.
+    pub fn shortlist_matching(&self, target: f64, k: usize, filter: ShortlistFilter) -> Vec<u64> {
         if k == 0 || !(target.is_finite() && target > 0.0) {
             return Vec::new();
         }
         let ln_target = target.ln();
-        let eligible = |e: &Entry| include_closed || e.club.join_style != Some(JoinStyle::Closed);
+        let eligible = |e: &Entry| filter.allows(&e.club);
 
         let split = self.entries.partition_point(|e| e.ln_estimate < ln_target);
         let (mut left, mut right) = (split, split);

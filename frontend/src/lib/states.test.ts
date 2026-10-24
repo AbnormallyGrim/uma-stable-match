@@ -55,6 +55,7 @@ describe('emptyHints', () => {
   const options = (balance_weight: number | null, include_closed: boolean) => ({
     balance_weight,
     include_closed,
+    include_full: false,
     limit: 100,
   });
 

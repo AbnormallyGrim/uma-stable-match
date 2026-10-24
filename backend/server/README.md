@@ -57,13 +57,13 @@ The API key, `REDIS_URL` (which can hold a password) and `REDIS_KEY_SECRET` are 
 
 1. List clubs by monthly rank, best first, 100 per page and up to `SCAN_RANK_TO`. Stop after a page whose last club is ranked `SCAN_RANK_TO` or worse, or after a short or empty page. As a safety stop, never list more than enough pages to reach `SCAN_RANK_TO`, plus one (10 pages with the defaults), so any window can be listed in full.
 2. Decide which month to use. Early in a game month the previous month is used instead; see [Early in the month](#early-in-the-month).
-3. Build a `ClubPool` from the clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO`. `ListedClub::from_circle` drops archived clubs, full clubs, clubs with fewer than 8 members, and rows missing points, a member count or `last_updated`. Closed clubs are kept, so each request can include or exclude them.
+3. Build a `ClubPool` from the clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO`. `ListedClub::from_circle` drops archived clubs, clubs with fewer than 8 members, and rows missing points, a member count or `last_updated`. Closed and full clubs are kept, so each request can include or exclude them.
 4. Copy in the exact medians of clubs that are still cached for that month, then swap the new pool in.
-5. Take up to `SCAN_MAX_DETAILS` clubs from the pool, best rank first. If a club's details come back without club information, the listed details are used.
+5. Take up to `SCAN_MAX_DETAILS` joinable clubs from the pool, best rank first. Full clubs are skipped, so they're only loaded when a search includes them. If a club's details come back without club information, the listed details are used.
    - **With a [refresher](#refresher)**, as the server always has: put them on its schedule and finish. The refresher loads them.
    - **Without one**: prefetch their member data in the background lane, so visitors' requests go first.
 
-While prefetching, a club whose details fail to load is logged and skipped. A failed list request fails the whole scan and leaves the previous pool in place. `Scan` returns the number of candidates (the pool size), how many clubs were prefetched (with a refresher, how many were already loaded), how many failed, the game month of the listed data, and when uma.moe last updated it (`updated_at`, the latest `last_updated` listed).
+While prefetching, a club whose details fail to load is logged and skipped. A failed list request fails the whole scan and leaves the previous pool in place. `Scan` returns the number of candidates (the pool size, full clubs included), how many clubs were prefetched (with a refresher, how many were already loaded), how many failed, the game month of the listed data, and when uma.moe last updated it (`updated_at`, the latest `last_updated` listed).
 
 With the client's default 500 ms rate limit, a default scan with a prefetch (without a refresher) takes about 80 seconds: around 9 list pages plus one lookup per candidate, about 150 at the time of writing. Clubs still cached from the previous scan aren't fetched again. Without the prefetch, a scan takes a few seconds.
 
@@ -96,7 +96,7 @@ The scan decides the month from the list's snapshot time (`is_early_month`), so 
 raw rate = monthly_point ÷ elapsed days ÷ member_count
 ```
 
-The raw rate estimates the club's **mean** daily gain per member. Clubs are left out when they're archived, full, have fewer than 8 members, or are missing points, a member count or a valid `last_updated`, and before a full day of the month has passed. Closed clubs stay in the pool, so each request can include or exclude them.
+The raw rate estimates the club's **mean** daily gain per member. Clubs are left out when they're archived, have fewer than 8 members, or are missing points, a member count or a valid `last_updated`, and before a full day of the month has passed. Closed and full clubs stay in the pool, so each request can include or exclude them.
 
 ### Calibration
 
@@ -111,13 +111,13 @@ estimated median = exact median if known, otherwise c × raw rate
 
 ### Shortlist
 
-`ClubPool::shortlist(target, k, include_closed)` returns the `k` clubs whose estimated median is nearest `target`, which is normally `TARGET_MEDIAN_RATIO` (0.85) × your pace. Distance is measured in log space, so half and double the target are equally far:
+`ClubPool::shortlist_matching(target, k, filter)` returns the `k` clubs whose estimated median is nearest `target`, which is normally `TARGET_MEDIAN_RATIO` (0.85) × your pace. Distance is measured in log space, so half and double the target are equally far:
 
 ```text
 distance = |ln(estimated median ÷ target)|
 ```
 
-The pool is sorted once by estimate. A query binary-searches to the target and walks outwards in both directions, skipping closed clubs unless they're included. That costs O(log n + k). Ties go to the lower club ID, and a property test checks that the result always matches sorting every club by distance. Clubs are re-sorted only when exact medians are added, not for each query.
+The pool is sorted once by estimate. A query binary-searches to the target and walks outwards in both directions, skipping the clubs `filter` leaves out: closed clubs unless `include_closed`, and full clubs unless `include_full`. `ClubPool::shortlist(target, k, include_closed)` is a shorthand that always leaves full clubs out. That costs O(log n + k). Ties go to the lower club ID, and a property test checks that the result always matches sorting every club by distance. Clubs are re-sorted only when exact medians are added, not for each query.
 
 ### Shortlist size
 
@@ -309,6 +309,7 @@ There's no public status endpoint. The page takes the data's age from each searc
 | `balance` | No | `false` | `true` turns on balance scoring at weight 0.5 |
 | `balance_weight` | No | | Balance strength, from 0 to 1. Setting it turns balance scoring on |
 | `include_closed` | No | `false` | `true` to include clubs that aren't accepting members |
+| `include_full` | No | `false` | `true` to include clubs with no open spot |
 | `limit` | No | `50` | Most clubs to return |
 
 `balance=false` together with `balance_weight` is rejected, because the request contradicts itself.
@@ -316,10 +317,10 @@ There's no public status endpoint. The page takes the data's age from each searc
 #### Choosing clubs
 
 1. Check the pace and balance weight. An invalid request fails before anything is fetched.
-2. Shortlist the `SHORTLIST_SIZE` clubs whose estimated median is nearest `0.85 ×` your pace. Closed clubs are left out unless `include_closed=true`.
+2. Shortlist the `SHORTLIST_SIZE` clubs whose estimated median is nearest `0.85 ×` your pace. Closed clubs are left out unless `include_closed=true`, and full clubs unless `include_full=true`.
 3. Take every cached club in the pool. With Redis, read the uncached shortlisted clubs from it in one `MGET`, and keep those not yet due for a refresh in memory. Then fetch up to `REQUEST_FETCH_BUDGET` of the rest from uma.moe in the interactive lane, nearest first. Requests that need the same club share one fetch.
 4. Queue the other uncached shortlisted clubs, and any that failed, for background loading.
-5. Score every loaded club in the pool, not only the shortlist.
+5. Score every loaded club in the pool, not only the shortlist. Without `include_full=true`, full clubs are dropped first, judged by the pool's latest list data rather than their cached details, which can be a day old.
 
 Cached clubs are always scored exactly, so the shortlist only decides which uncached clubs to load. Once every club is cached, which is the normal case when `SCAN_MAX_DETAILS` is at least the pool size, results are the same as scoring the whole pool. `coverage` says how complete a response is.
 
@@ -342,7 +343,7 @@ With `trainer_id`, the server finds the trainer's club and their snapshot in it 
 The lookup also notes the club it found the trainer in. That club is left out of `clubs` and returned as `your_club`, scored as if the trainer were joining it:
 
 - **Without their own row.** The trainer's snapshot is removed and the club counts as one member smaller, so `your_place` and `club_size` match a newcomer at their pace. `member_count` and `open_spots` still show the real club.
-- **Closed clubs count,** since the trainer is already in it. Full clubs, which aren't in the pool, are fetched through the detail cache like any other club.
+- **Closed and full clubs count,** since the trainer is already in it. Its details come through the detail cache like any other club's.
 - **`result_rank`** is where it would sit among the scored clubs, from 1. Above `limit`, it's below the returned clubs.
 
 `your_club` is `null` for `pace` requests, when no club was found, when the club fails to load, or when it can't be scored, for example with fewer than 8 rankable members. A failed load is logged but never fails the search.
@@ -354,7 +355,7 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
 ```json
 {
   "trainer": { "trainer_id": 123456789012, "pace_per_day": 7600000.0 },
-  "options": { "balance_weight": 0.5, "include_closed": false, "limit": 50 },
+  "options": { "balance_weight": 0.5, "include_closed": false, "include_full": false, "limit": 50 },
   "updated_at": "2026-03-18T09:00:00Z",
   "month": "2026-03",
   "coverage": { "shortlisted": 102, "scored": 113, "pending": 0 },
@@ -440,7 +441,7 @@ Errors come back as `{"error": "..."}`:
 
 | Status | When |
 |---|---|
-| `400` | Any of these:<br>• the query string can't be read, for example because a parameter is repeated<br>• neither or both of `trainer_id` and `pace` are given<br>• `trainer_id` isn't a trainer ID<br>• `pace` isn't a number above zero<br>• `balance_weight` isn't a number from 0 to 1<br>• `balance=false` is given with `balance_weight`<br>• `balance` or `include_closed` isn't `true` or `false`<br>• `limit` isn't a positive whole number |
+| `400` | Any of these:<br>• the query string can't be read, for example because a parameter is repeated<br>• neither or both of `trainer_id` and `pace` are given<br>• `trainer_id` isn't a trainer ID<br>• `pace` isn't a number above zero<br>• `balance_weight` isn't a number from 0 to 1<br>• `balance=false` is given with `balance_weight`<br>• `balance`, `include_closed` or `include_full` isn't `true` or `false`<br>• `limit` isn't a positive whole number |
 | `404` | uma.moe doesn't know the trainer, or they aren't in their club's data |
 | `422` | The trainer has too little fan data this month to work out a pace |
 | `502` | uma.moe couldn't be reached for the trainer lookup |
@@ -566,7 +567,7 @@ Then open <http://localhost:9464/status>.
 | `scanning` | Whether a scan is running. With Redis, also while waiting for another instance's scan |
 | `scan` | The running scan's progress, or `null` when no scan is running. See below |
 | `last_scan.clubs` | Clubs whose member data was already loaded when the scan finished listing |
-| `last_scan.candidates` | Clubs in the pool after the scan's filters |
+| `last_scan.candidates` | Clubs in the pool after the scan's filters, full clubs included |
 | `last_scan.month` | Game month of the listed data, `YYYY-MM` |
 | `pool.clubs` | Clubs in the current pool |
 | `pool.exact_medians` | Pool clubs whose exact median is known from loaded details |

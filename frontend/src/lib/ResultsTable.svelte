@@ -215,7 +215,9 @@
           </td>
           <td>{club.monthly_rank ?? '–'}</td>
           <td>{club.last_month_rank ?? '–'}</td>
-          <td>{spots(club)}</td>
+          <td>
+            {#if club.open_spots === 0}<span class="full">Full</span>{:else}{spots(club)}{/if}
+          </td>
           <td>{joinStyleLabel(club.join_style) ?? '–'}</td>
           <td>{formatPerDay(club.median_per_day)}</td>
           <td>{formatPlace(club.your_place, club.club_size)}</td>
@@ -338,5 +340,14 @@
     padding: 16px;
     color: var(--muted);
     text-align: center;
+  }
+
+  .full {
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--closed) 15%, transparent);
+    color: var(--closed);
+    font-size: 0.6875rem;
+    font-weight: 500;
   }
 </style>

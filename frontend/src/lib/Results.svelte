@@ -21,7 +21,7 @@
 
   let { result, stale = false }: Props = $props();
 
-  const picks = $derived(result.clubs.slice(0, TOP_PICKS));
+  const picks = $derived(result.clubs.filter((club) => club.open_spots !== 0).slice(0, TOP_PICKS));
   const balanceOn = $derived(result.options.balance_weight !== null);
   const hints = $derived(emptyHints(result.options));
   const notices = $derived(resultNotices(result));
@@ -36,7 +36,9 @@
   {/each}
 
   <h3>Top picks</h3>
-  {#if picks.length === 0}
+  {#if picks.length === 0 && count > 0}
+    <p>Every matching club is full. They're listed below, but there's no spot to join.</p>
+  {:else if picks.length === 0}
     <p>No clubs matched your search.</p>
     {#if hints.length > 0}
       <p>You could try:</p>
@@ -56,8 +58,10 @@
 
   <div class="about" data-testid="results-about">
     <p>
-      Full clubs (30 of 30 members) aren't in the results, since there's no spot to join. Your
-      current club isn't either:
+      {result.options.include_full
+        ? "Full clubs (30 of 30 members) are in the table, but not the top picks, since there's no spot to join."
+        : "Full clubs (30 of 30 members) aren't in the results, since there's no spot to join."}
+      Your current club is never listed here:
       {result.your_club
         ? "it's compared with your top pick below."
         : 'search by trainer ID to see how it compares.'}
@@ -83,7 +87,7 @@
     />
   {/if}
 
-  {#if picks.length > 0}
+  {#if count > 0}
     <h3>Top {count} {count === 1 ? 'result' : 'results'}</h3>
     <ResultsTable clubs={result.clubs} {balanceOn} includeClosed={result.options.include_closed} />
   {/if}
