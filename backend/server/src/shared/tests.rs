@@ -130,3 +130,22 @@ fn schedule_scores_stay_exact_as_floats() {
     assert!(value < 1 << 53);
     assert_eq!(value as f64 as u64, value);
 }
+
+#[test]
+fn reads_redis_info() {
+    let info = "# Memory\r\nused_memory:56900000\r\nused_memory_human:54.26M\r\nmaxmemory:314572800\r\n\r\n# Stats\r\nexpired_keys:120\r\nevicted_keys:3\r\n\r\n# Keyspace\r\ndb0:keys=4988,expires=4986,avg_ttl=150000000,subexpiry=0\r\ndb1:keys=2,expires=2,avg_ttl=50000000,subexpiry=0\r\n";
+    let stats = RedisStats::parse(info);
+    assert_eq!(stats.keys, 4990);
+    assert_eq!(stats.expiring, 4988);
+    assert_eq!(stats.used_memory, 56_900_000);
+    assert_eq!(stats.max_memory, 314_572_800);
+    assert_eq!(stats.expired, 120);
+    assert_eq!(stats.evicted, 3);
+    let expected = (150_000_000u64 * 4986 + 50_000_000 * 2) / 4988;
+    assert_eq!(stats.average_ttl, Duration::from_millis(expected));
+}
+
+#[test]
+fn reads_an_empty_redis_info() {
+    assert_eq!(RedisStats::parse("# Keyspace\r\n"), RedisStats::default());
+}
