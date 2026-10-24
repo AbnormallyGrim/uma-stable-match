@@ -25,7 +25,7 @@
   </div>
   <div class="stat">
     <dt>Clubs analysed</dt>
-    <dd>{result.total}</dd>
+    <dd>{result.coverage.considered}</dd>
   </div>
   <div class="stat">
     <dt>Comfortable fits</dt>

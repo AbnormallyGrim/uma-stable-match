@@ -28,6 +28,8 @@ use crate::pool::{ShortlistFilter, DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO};
 const CLUB_URL: &str = "https://uma.moe/circles/";
 const DEFAULT_LIMIT: u32 = 50;
 const TOP_PICKS: usize = 10;
+// Each search scores this many times `shortlist_size` nearest clubs, if they're cached.
+const SCORED_PER_SHORTLISTED: usize = 2;
 
 /// Most club details one request fetches from uma.moe by default.
 pub const DEFAULT_FETCH_BUDGET: usize = 10;
@@ -84,6 +86,7 @@ struct YourClub {
 
 #[derive(Debug, Serialize)]
 struct Coverage {
+    considered: usize,
     shortlisted: usize,
     scored: usize,
     pending: usize,
@@ -184,6 +187,7 @@ fn log_search(
                 trainer_id = found.trainer.trainer_id,
                 pace_per_day = found.trainer.pace_per_day,
                 month = found.month.as_deref(),
+                considered = found.coverage.considered,
                 shortlisted = found.coverage.shortlisted,
                 scored = found.coverage.scored,
                 pending = found.coverage.pending,
@@ -394,39 +398,42 @@ async fn load_clubs(
     pace: f64,
     filter: ShortlistFilter,
 ) -> (Vec<Club>, Coverage, SearchDepth) {
-    let (shortlist, pool_bottom) = {
+    let (nearest, slowest, considered) = {
         let pool = details.pool().read().unwrap_or_else(|e| e.into_inner());
-        let shortlist =
-            pool.shortlist_matching(TARGET_MEDIAN_RATIO * pace, settings.shortlist_size, filter);
-        let pool_bottom = pool
-            .slowest(filter)
-            .is_some_and(|id| shortlist.contains(&id));
-        (shortlist, pool_bottom)
+        let nearest = pool.shortlist_matching(
+            TARGET_MEDIAN_RATIO * pace,
+            settings.shortlist_size * SCORED_PER_SHORTLISTED,
+            filter,
+        );
+        (nearest, pool.slowest(filter), pool.eligible(filter))
     };
+    let shortlist = &nearest[..settings.shortlist_size.min(nearest.len())];
     let depth = SearchDepth {
         shortlist_rank: shortlist
             .iter()
             .filter_map(|&id| details.listed_rank(id))
             .max(),
         pick_rank: None,
-        pool_bottom,
+        pool_bottom: slowest.is_some_and(|id| shortlist.contains(&id)),
     };
-    let mut loaded: HashMap<u64, Arc<Club>> = details
-        .cached_in_pool()
-        .into_iter()
-        .map(|club| (club.circle_id, club))
-        .collect();
-
-    let misses: Vec<u64> = shortlist
+    let mut loaded: HashMap<u64, Arc<Club>> = HashMap::new();
+    for &circle_id in &nearest {
+        if let Some(club) = details.cached(circle_id).await {
+            loaded.insert(circle_id, club);
+        }
+    }
+    let uncached: Vec<u64> = nearest
         .iter()
         .copied()
         .filter(|id| !loaded.contains_key(id))
         .collect();
-    for club in details.load_shared(&misses).await {
+    for club in details.load_shared(&uncached).await {
         loaded.insert(club.circle_id, club);
     }
-    let misses: Vec<u64> = misses
-        .into_iter()
+
+    let misses: Vec<u64> = shortlist
+        .iter()
+        .copied()
         .filter(|id| !loaded.contains_key(id))
         .collect();
     let (fetch, later) = misses.split_at(settings.fetch_budget.min(misses.len()));
@@ -461,6 +468,7 @@ async fn load_clubs(
     let mut clubs: Vec<Club> = loaded.into_values().map(|c| Club::clone(&c)).collect();
     clubs.sort_by_key(|c| (c.monthly_rank.unwrap_or(u32::MAX), c.circle_id));
     let coverage = Coverage {
+        considered,
         shortlisted: shortlist.len(),
         scored: clubs.len(),
         pending,

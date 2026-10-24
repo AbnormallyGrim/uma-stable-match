@@ -324,6 +324,14 @@ impl ClubPool {
         )
     }
 
+    /// How many clubs `filter` allows.
+    pub fn eligible(&self, filter: ShortlistFilter) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| filter.allows(&e.club))
+            .count()
+    }
+
     /// The club with the slowest estimate that `filter` allows, if any.
     pub fn slowest(&self, filter: ShortlistFilter) -> Option<u64> {
         self.entries

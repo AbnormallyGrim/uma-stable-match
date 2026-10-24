@@ -13,10 +13,16 @@ describe('Results', () => {
       club({ circle_id: 2, your_place: 2, club_size: 20 }),
       club({ circle_id: 3, your_place: 12, club_size: 20 }),
     ];
-    render(Results, { result: recommendations({ total: 42, clubs }) });
+    render(Results, {
+      result: recommendations({
+        total: 42,
+        coverage: { considered: 4321, shortlisted: 120, scored: 42, pending: 0 },
+        clubs,
+      }),
+    });
     const summary = screen.getByTestId('result-summary');
     expect(within(summary).getByText('7.6M/day')).toBeInTheDocument();
-    expect(within(summary).getByText('42')).toBeInTheDocument();
+    expect(within(summary).getByText('4321')).toBeInTheDocument();
     expect(within(summary).getByText('2')).toBeInTheDocument();
     expect(within(summary).getByText('Top 35%')).toBeInTheDocument();
   });
@@ -145,7 +151,9 @@ describe('Results states', () => {
 
   it('says how many clubs are still loading', () => {
     render(Results, {
-      result: recommendations({ coverage: { shortlisted: 10, scored: 6, pending: 4 } }),
+      result: recommendations({
+        coverage: { considered: 340, shortlisted: 10, scored: 6, pending: 4 },
+      }),
     });
     expect(screen.getByTestId('result-notice')).toHaveTextContent(
       '4 more clubs are still loading. Search again in a minute for complete results.',
