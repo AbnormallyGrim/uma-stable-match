@@ -238,7 +238,7 @@ async fn filters_before_the_cap() {
     config.max_details = 2;
     let (scan, details) = run(&server, &config).await;
     let scan = scan.unwrap();
-    assert_eq!(scan.candidates, 3);
+    assert_eq!(scan.candidates, 4);
     assert_eq!(ids(&details), vec![4, 5]);
 }
 
@@ -372,9 +372,10 @@ async fn a_new_scan_replaces_the_pool_and_reuses_cached_details() {
     scan(&client(&server), &details, &config()).await.unwrap();
     assert_eq!(ids(&details), vec![1, 2]);
     let second = scan(&client(&server), &details, &config()).await.unwrap();
-    assert_eq!(second.candidates, 2);
+    assert_eq!(second.candidates, 3);
     assert_eq!(second.prefetched, 2);
-    assert_eq!(ids(&details), vec![2, 3]);
+    assert_eq!(ids(&details), vec![1, 2, 3]);
+    assert!(!details.pool().read().unwrap().is_joinable(1));
     assert!(details.cached(1).await.is_some());
 }
 

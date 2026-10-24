@@ -58,7 +58,7 @@ const balancedClubs = [1, 2, 3].map((id) =>
 const withResults: Recommendations = recommendations({
   total: 3,
   clubs: balancedClubs,
-  options: { balance_weight: 0.5, include_closed: true, limit: 100 },
+  options: { balance_weight: 0.5, include_closed: true, include_full: false, limit: 100 },
 });
 
 afterEach(() => {

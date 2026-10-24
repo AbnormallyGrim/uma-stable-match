@@ -221,7 +221,7 @@ pub(crate) fn scan_period(at: DateTime<Utc>) -> Period {
 fn prefetch_ids(rows: &[Circle], pool: &ClubPool, max: usize) -> Vec<(u64, u32)> {
     let mut ranked: Vec<(u64, u32)> = rows
         .iter()
-        .filter(|c| pool.contains(c.circle_id))
+        .filter(|c| pool.is_joinable(c.circle_id))
         .map(|c| (c.circle_id, rank(c)))
         .collect();
     ranked.sort_by_key(|&(id, rank)| (rank, id));

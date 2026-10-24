@@ -13,7 +13,7 @@ function recommendations(
 ): Recommendations {
   return {
     trainer: { trainer_id: null, pace_per_day: pace },
-    options: { balance_weight: null, include_closed: false, limit: 50 },
+    options: { balance_weight: null, include_closed: false, include_full: false, limit: 50 },
     updated_at: '2026-03-18T09:00:00Z',
     month: '2026-03',
     coverage: { shortlisted: total, scored: total, pending: 0 },

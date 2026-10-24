@@ -115,8 +115,9 @@ fn listed_club_filters() {
     };
     assert!(with(|c| c.archived = Some(true)).is_none());
     assert!(with(|c| c.archived = Some(false)).is_some());
-    assert!(with(|c| c.member_count = Some(30)).is_none());
-    assert!(with(|c| c.member_count = Some(29)).is_some());
+    assert!(with(|c| c.member_count = Some(31)).is_none());
+    assert!(with(|c| c.member_count = Some(30)).is_some_and(|club| club.is_full()));
+    assert!(with(|c| c.member_count = Some(29)).is_some_and(|club| !club.is_full()));
     assert!(with(|c| c.member_count = Some(8)).is_some());
     assert!(with(|c| c.member_count = Some(7)).is_none());
     assert!(with(|c| c.member_count = Some(-1)).is_none());
@@ -402,6 +403,32 @@ fn listed_club_from_last_month() {
     c.last_month_point = None;
     assert!(ListedClub::from_circle_last_month(&c).is_none());
     c.last_month_point = Some(56_000_000);
-    c.member_count = Some(30);
+    c.member_count = Some(31);
     assert!(ListedClub::from_circle_last_month(&c).is_none());
+}
+
+fn full(circle_id: u64, raw_rate: f64) -> ListedClub {
+    ListedClub {
+        member_count: CLUB_CAP,
+        ..listed(circle_id, raw_rate)
+    }
+}
+
+#[test]
+fn full_clubs_are_shortlisted_only_on_request() {
+    let pool = ClubPool::new([listed(1, 100.0), full(2, 300.0), listed(3, 1000.0)]);
+    assert_eq!(pool.shortlist(300.0, 2, true), vec![1, 3]);
+    let filter = ShortlistFilter {
+        include_closed: false,
+        include_full: true,
+    };
+    assert_eq!(pool.shortlist_matching(300.0, 2, filter), vec![2, 1]);
+}
+
+#[test]
+fn full_clubs_are_not_joinable() {
+    let pool = ClubPool::new([listed(1, 100.0), full(2, 300.0)]);
+    assert!(pool.is_joinable(1));
+    assert!(!pool.is_joinable(2));
+    assert!(!pool.is_joinable(3));
 }

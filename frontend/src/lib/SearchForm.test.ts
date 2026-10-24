@@ -22,7 +22,12 @@ describe('SearchForm', () => {
     });
     await submit();
     expect(onsearch).toHaveBeenCalledWith(
-      { source: { trainerId: '123456789012' }, balanceWeight: null, includeClosed: false },
+      {
+        source: { trainerId: '123456789012' },
+        balanceWeight: null,
+        includeClosed: false,
+        includeFull: false,
+      },
       expect.objectContaining({ trainerId: '123456789012' }),
       false,
     );
@@ -76,6 +81,13 @@ describe('SearchForm', () => {
     await submit();
     expect(onsearch.mock.lastCall?.[0]).toMatchObject({ includeClosed: true });
     expect(onsearch.mock.lastCall?.[2]).toBe(true);
+  });
+
+  it('passes include full', async () => {
+    const onsearch = setup({ trainerId: '123456789' });
+    await fireEvent.click(screen.getByLabelText('Include full clubs'));
+    await submit();
+    expect(onsearch.mock.lastCall?.[0]).toMatchObject({ includeFull: true });
   });
 
   it('starts from the initial search', () => {

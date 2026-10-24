@@ -1,4 +1,5 @@
 use super::*;
+use uma_stable_match_scoring::CLUB_CAP;
 use uma_stable_match_umamoe_client::{ApiErrorBody, StatusCode};
 
 fn circle(monthly_rank: Option<i32>) -> Circle {
@@ -78,6 +79,17 @@ fn prefetch_skips_clubs_outside_the_pool_and_repeats() {
         prefetch_ids(&rows, &pool, 10),
         vec![(2, 5), (1, 9), (3, u32::MAX)]
     );
+}
+
+#[test]
+fn prefetch_skips_full_clubs() {
+    let full = ListedClub {
+        member_count: CLUB_CAP,
+        ..listed(2, 200.0)
+    };
+    let pool = ClubPool::new([listed(1, 100.0), full]);
+    let rows = vec![ranked(2, Some(1)), ranked(1, Some(2))];
+    assert_eq!(prefetch_ids(&rows, &pool, 10), vec![(1, 2)]);
 }
 
 #[test]

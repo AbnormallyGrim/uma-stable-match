@@ -123,7 +123,7 @@ docker compose up -d
 1. Open Uma Stable Match in your browser. New to it? Open **How to use** under the search form for step-by-step instructions, including where to find your trainer ID and daily pace.
 2. Enter your **trainer ID**, or switch to **Daily pace** and enter your daily fan gain in millions. Tick **Remember my trainer ID on this device** to have it filled in next time.
 3. Optionally turn on **Balance scoring** and adjust its strength (0–1). Higher values push clubs with many low contributors further down.
-4. Optionally tick **Include closed clubs** to also see clubs that aren't recruiting.
+4. Optionally tick **Include closed clubs** to also see clubs that aren't recruiting, or **Include full clubs** to add clubs with no open spot to the table for comparison. Full clubs never appear as top picks.
 5. Select **Find clubs**. The search is saved in the page's address, so you can bookmark or share it.
 6. Browse **Top picks**, or use **Top results** to search and sort the 100 best fits.
 7. Select a club's name to open its uma.moe page in a new tab, then contact the leader.
@@ -138,7 +138,7 @@ Club data refreshes automatically once a day, shortly after uma.moe's daily upda
 
 Above your top picks, a summary shows your pace, how many clubs were analysed, your **comfortable fits** (clubs where you'd sit 25–60% of the way down the members) and your **typical place** across your results, such as *Top 25%*.
 
-Full clubs (30 of 30 members) aren't shown, since there's no spot to join, and neither is your own club. When you search by trainer ID, a **Your club** card above the table shows where your club would sit among your results and compares its median, your place and its fit with your top pick. Matches are based on a club's typical member rather than its tier, so your best fits may be a tier or two below a high-tier club whose members are much faster than you.
+Full clubs (30 of 30 members) aren't shown unless you tick **Include full clubs**, since there's no spot to join. Your own club is never in the results. When you search by trainer ID, a **Your club** card above the table shows where your club would sit among your results and compares its median, your place and its fit with your top pick. Matches are based on a club's typical member rather than its tier, so your best fits may be a tier or two below a high-tier club whose members are much faster than you.
 
 | Field | Meaning |
 |---|---|
@@ -222,6 +222,7 @@ GET /api/v1/recommendations
 | `balance` | no | `false` | `true` turns on balance scoring at strength 0.5 |
 | `balance_weight` | no | | Balance strength, 0–1. Setting it turns balance on |
 | `include_closed` | no | `false` | Include closed clubs |
+| `include_full` | no | `false` | Include full clubs |
 | `limit` | no | `50` | Maximum number of clubs returned |
 
 Example:
@@ -233,7 +234,7 @@ curl "http://localhost:8080/api/v1/recommendations?trainer_id=123456789012&balan
 ```json
 {
   "trainer": { "trainer_id": 123456789012, "pace_per_day": 7620000 },
-  "options": { "balance_weight": 0.6, "include_closed": false, "limit": 1 },
+  "options": { "balance_weight": 0.6, "include_closed": false, "include_full": false, "limit": 1 },
   "updated_at": "2026-10-19T08:00:00Z",
   "month": "2026-10",
   "coverage": { "shortlisted": 102, "scored": 113, "pending": 0 },

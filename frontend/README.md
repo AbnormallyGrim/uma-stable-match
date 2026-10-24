@@ -86,7 +86,7 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 
 The form sits in a card. The "Search by" switch is at the top, then the field on the left and the options on the right, with **Find clubs** at the bottom right. Below 720 pixels it becomes a single column, and the inputs and button use the full width.
 
-The form searches by **trainer ID** or by **daily pace**, with an optional **balance scoring** toggle and strength slider (0 to 1, in steps of 0.05) and an **include closed clubs** checkbox.
+The form searches by **trainer ID** or by **daily pace**, with an optional **balance scoring** toggle and strength slider (0 to 1, in steps of 0.05) and **include closed clubs** and **include full clubs** checkboxes.
 
 | Field | Accepted | Sent to the API as |
 |---|---|---|
@@ -94,6 +94,7 @@ The form searches by **trainer ID** or by **daily pace**, with an optional **bal
 | Daily pace | A positive number of millions, such as `7.6` (a comma works as the decimal point) | `pace`, in fans per day |
 | Balance scoring | Off, or a strength from 0 to 1 | `balance_weight`, only when on |
 | Include closed clubs | On or off | `include_closed=true`, only when on |
+| Include full clubs | On or off | `include_full=true`, only when on |
 
 Only the field for the chosen mode is checked. An invalid field gets a message linked to it with `aria-describedby`, and nothing is sent.
 
@@ -126,7 +127,8 @@ After a search, the page shows a summary and the top ten picks.
 - **Notices:** under the summary, when they apply:
   - "*N more clubs are still loading. Search again in a minute for complete results.*" when the API's `coverage.pending` is above 0
   - "*These results are based on last month's data (February 2026), because the new game month has only just started.*" when `month` isn't the game month of `updated_at`
-- **Notes:** under the top picks, always shown, even with no matches: full clubs and your own club aren't in the results, and a collapsed "Why not a higher-tier club?" explains that matches follow a club's typical member, not its tier. The note points to the **Your club** card when there is one, and otherwise suggests a trainer ID search. The FAQ on the marketing page answers the same two questions.
+- **Top picks:** the first ten clubs with an open spot. Full clubs are only in the table. If every match is full, the page says so instead of "No clubs matched", and the table still shows them.
+- **Notes:** under the top picks, always shown, even with no matches: full clubs aren't in the results (or, with **Include full clubs**, are only in the table), your own club never is, and a collapsed "Why not a higher-tier club?" explains that matches follow a club's typical member, not its tier. The note points to the **Your club** card when there is one, and otherwise suggests a trainer ID search. The FAQ on the marketing page answers the same two questions.
 - **Your club:** when the response has `your_club`, a card between the notes and the table shows:
   - the club's tier, name, rank, open spots and join style
   - "Your club would be #37 in your results.", "fits you better than any of your results" at #1, or "would rank below your top 100" past the returned clubs, from `result_rank`
@@ -160,6 +162,7 @@ Below the cards, the 100 best-fitting clubs are listed in a table, best fit firs
 - **Sorting:** select a column header to sort by it. Select it again to reverse the order. Missing values always sort last, and ties keep pick order. Each header is a button with `aria-sort`, so sorting works by keyboard and screen readers announce it.
 - **Search:** filters by club name as you type. "Showing X of Y clubs" updates as you go.
 - **Hide closed clubs:** only appears when the search included closed clubs, and is on by default.
+- **Full clubs:** with **Include full clubs**, their Open spots cell shows a red "Full" tag. The `#` column still counts them, so it can differ from the top-pick numbers.
 - **Narrow screens:** the table scrolls sideways inside its own region. The region can be focused, so it also scrolls with the keyboard. That needs a `svelte-ignore` for Svelte's `a11y_no_noninteractive_tabindex` rule, because axe requires scrollable regions to be focusable. On a desktop the table fits without scrolling, even with balance columns.
 
 ### Themes
