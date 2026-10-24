@@ -15,7 +15,7 @@ export const TOUR_KEY = 'uma-stable-match:tour-seen';
 export const TOUR_STEPS: TourStep[] = [
   {
     title: 'Welcome to Uma Stable Match',
-    body: 'Find clubs where your daily fan gain fits and members pull their weight. This quick tour shows you around; it takes under a minute.',
+    body: 'Find clubs where your daily fan gain fits and members pull their weight. This quick tour shows you around.',
   },
   {
     target: 'search-by',
