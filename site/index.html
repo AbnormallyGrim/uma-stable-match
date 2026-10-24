@@ -11,7 +11,19 @@
     <link rel="canonical" href="https://umastable.com/" />
     <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png" />
     <link rel="apple-touch-icon" href="images/apple-touch-icon.png" />
-    <meta name="theme-color" content="#0f1217" />
+    <meta name="theme-color" content="#eef1f5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1217" media="(prefers-color-scheme: dark)" />
+    <!-- Applies a saved theme before the page renders, so it never flashes the wrong one. -->
+    <script>
+        try {
+            const theme = localStorage.getItem('uma-stable-match:theme');
+            if (theme === 'light' || theme === 'dark') {
+                document.documentElement.dataset.theme = theme;
+            }
+        } catch {
+            document.documentElement.removeAttribute('data-theme');
+        }
+    </script>
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Uma Stable Match" />
@@ -124,16 +136,60 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
+        /* Colours follow the web app's palette. Each is light-dark(light, dark); color-scheme picks
+           one, and the theme switch can force it with data-theme on <html>. */
         :root {
-            --bg-color: #0f1217;
-            --card-bg: #181d26;
-            --card-hover: #1f2633;
-            --border-color: #27303f;
-            --text-main: #f0f4f8;
-            --text-muted: #94a3b8;
-            --accent-gold: #d4af37;
-            --accent-gold-hover: #c29f2e;
-            --accent-silver: #e2e8f0;
+            color-scheme: light dark;
+            --bg-color: light-dark(#eef1f5, #0f1217);
+            --card-bg: light-dark(#ffffff, #181d26);
+            --border-color: light-dark(rgb(20 33 61 / 12%), #27303f);
+            --border-strong: light-dark(rgb(20 33 61 / 22%), rgb(255 255 255 / 18%));
+            --surface: light-dark(#e6eaf0, rgb(255 255 255 / 6%));
+            --text-main: light-dark(#14213d, #f0f4f8);
+            --text-muted: light-dark(#526077, #94a3b8);
+            --accent-gold: light-dark(#806210, #d4af37);
+            --accent-gold-hover: light-dark(#6b520d, #c29f2e);
+            --accent-silver: light-dark(#334155, #e2e8f0);
+            --on-accent: light-dark(#ffffff, #0f1217);
+            --heading-top: light-dark(#14213d, #ffffff);
+            --heading-bottom: light-dark(#334155, #cbd5e1);
+            --shadow: light-dark(rgb(20 33 61 / 14%), rgb(0 0 0 / 45%));
+            --hero-image: url('images/hero-light.webp');
+        }
+
+        :root[data-theme='light'] {
+            color-scheme: light;
+        }
+
+        :root[data-theme='dark'] {
+            color-scheme: dark;
+            --hero-image: url('images/hero.webp');
+        }
+
+        .only-dark {
+            display: none;
+        }
+
+        :root[data-theme='dark'] .only-dark {
+            display: revert;
+        }
+
+        :root[data-theme='dark'] .only-light {
+            display: none;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme='light']) {
+                --hero-image: url('images/hero.webp');
+            }
+
+            :root:not([data-theme='light']) .only-dark {
+                display: revert;
+            }
+
+            :root:not([data-theme='light']) .only-light {
+                display: none;
+            }
         }
 
         * {
@@ -168,8 +224,8 @@
         }
 
         .navbar {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            background-color: rgba(15, 18, 23, 0.85);
+            border-bottom: 1px solid var(--border-color);
+            background-color: color-mix(in srgb, var(--bg-color) 85%, transparent);
             backdrop-filter: blur(12px);
             position: sticky;
             top: 0;
@@ -243,6 +299,77 @@
             background-color: var(--border-color);
         }
 
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+        }
+
+        /* System / Light / Dark switch, as in the web app: a pill of icon buttons with tooltips. */
+        .theme-switch {
+            display: inline-flex;
+            gap: 2px;
+            padding: 2px;
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+        }
+
+        .theme-switch label {
+            position: relative;
+            display: inline-flex;
+            padding: 6px 9px;
+            border-radius: 999px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .theme-switch label:has(input:checked) {
+            background: var(--card-bg);
+            color: var(--text-main);
+            box-shadow: 0 0 0 1px var(--border-color);
+        }
+
+        .theme-switch input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .theme-switch label:has(input:focus-visible) {
+            outline: 2px solid var(--accent-gold);
+            outline-offset: 1px;
+        }
+
+        .theme-switch label::after {
+            position: absolute;
+            z-index: 1;
+            top: calc(100% + 8px);
+            left: 50%;
+            padding: 3px 8px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-strong);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+            color: var(--text-main);
+            font-size: 0.75rem;
+            white-space: nowrap;
+            content: attr(data-tooltip);
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, -2px);
+            transition: opacity 0.12s, transform 0.12s;
+        }
+
+        .theme-switch label:hover::after,
+        .theme-switch label:has(input:focus-visible)::after {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
         .container {
             max-width: 1050px;
             margin: 0 auto;
@@ -255,9 +382,9 @@
             padding: 6rem 0 5rem;
             text-align: center;
             background:
-                    radial-gradient(circle at 50% 30%, rgba(15, 18, 23, 0.45) 0%, rgba(15, 18, 23, 0.85) 60%, var(--bg-color) 100%),
-                    linear-gradient(180deg, rgba(15, 18, 23, 0.6) 0%, rgba(15, 18, 23, 0.3) 40%, var(--bg-color) 100%),
-                    url('images/hero.webp') center 25%/cover no-repeat;
+                    radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--bg-color) 45%, transparent) 0%, color-mix(in srgb, var(--bg-color) 85%, transparent) 60%, var(--bg-color) 100%),
+                    linear-gradient(180deg, color-mix(in srgb, var(--bg-color) 60%, transparent) 0%, color-mix(in srgb, var(--bg-color) 30%, transparent) 40%, var(--bg-color) 100%),
+                    var(--hero-image) center 25%/cover no-repeat;
         }
 
 
@@ -267,7 +394,7 @@
             line-height: 1.2;
             letter-spacing: -0.8px;
             margin-bottom: 1.25rem;
-            background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+            background: linear-gradient(180deg, var(--heading-top) 0%, var(--heading-bottom) 100%);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -301,8 +428,8 @@
 
         .btn-primary {
             background-color: var(--accent-gold);
-            color: #0f1217;
-            box-shadow: 0 4px 14px rgba(212, 175, 55, 0.25);
+            color: var(--on-accent);
+            box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-gold) 25%, transparent);
         }
 
         .btn-primary:hover {
@@ -311,7 +438,7 @@
         }
 
         .btn-secondary {
-            background-color: rgba(24, 29, 38, 0.9);
+            background-color: color-mix(in srgb, var(--card-bg) 90%, transparent);
             color: var(--text-main);
             border: 1px solid var(--border-color);
             backdrop-filter: blur(8px);
@@ -359,9 +486,9 @@
             overflow: hidden;
             background-color: var(--card-bg);
             box-shadow:
-                    0 0 0 1px rgba(212, 175, 55, 0.08),
-                    0 24px 60px rgba(0, 0, 0, 0.45),
-                    0 0 80px rgba(212, 175, 55, 0.06);
+                    0 0 0 1px color-mix(in srgb, var(--accent-gold) 8%, transparent),
+                    0 24px 60px var(--shadow),
+                    0 0 80px color-mix(in srgb, var(--accent-gold) 6%, transparent);
         }
 
         .showcase-frame img {
@@ -392,7 +519,7 @@
         }
 
         .card:hover {
-            border-color: rgba(212, 175, 55, 0.4);
+            border-color: color-mix(in srgb, var(--accent-gold) 40%, transparent);
             transform: translateY(-3px);
         }
 
@@ -432,7 +559,7 @@
         }
 
         .field:hover {
-            border-color: rgba(212, 175, 55, 0.4);
+            border-color: color-mix(in srgb, var(--accent-gold) 40%, transparent);
             transform: translateY(-3px);
         }
 
@@ -484,7 +611,7 @@
         }
 
         .faq details[open] {
-            border-color: rgba(212, 175, 55, 0.35);
+            border-color: color-mix(in srgb, var(--accent-gold) 35%, transparent);
         }
 
         .faq summary {
@@ -550,7 +677,7 @@
         }
 
         footer .btn-primary {
-            color: #0f1217;
+            color: var(--on-accent);
         }
 
         footer .btn-secondary {
@@ -593,9 +720,23 @@
             }
         }
 
-        @media (max-width: 360px) {
+        /* Phones: the logo stands in for the title, so the app button and theme switch fit. */
+        @media (max-width: 480px) {
             .brand-title {
-                white-space: normal;
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                overflow: hidden;
+                clip: rect(0 0 0 0);
+                white-space: nowrap;
+            }
+
+            .nav-links {
+                gap: 0.6rem;
+            }
+
+            .theme-switch label {
+                padding: 6px 7px;
             }
         }
 
@@ -606,7 +747,8 @@
 
             .btn,
             .card,
-            .field {
+            .field,
+            .theme-switch label::after {
                 transition: none;
             }
 
@@ -623,13 +765,32 @@
 <nav class="navbar" aria-label="Main">
     <div class="nav-container">
         <a href="#" class="brand">
-            <img src="images/logo.webp" alt="" width="42" height="42" class="nav-logo" />
+            <img src="images/logo-light.webp" alt="" width="42" height="42" class="nav-logo only-light" />
+            <img src="images/logo.webp" alt="" width="42" height="42" class="nav-logo only-dark" />
             <span class="brand-title">Uma Stable Match</span>
         </a>
         <div class="nav-links">
             <a href="#how-it-works" class="nav-link">How it works</a>
             <a href="#faq" class="nav-link">FAQ</a>
             <a href="https://app.umastable.com" class="nav-btn">Open app</a>
+            <fieldset class="theme-switch">
+                <legend class="visually-hidden">Theme</legend>
+                <label data-tooltip="System">
+                    <input type="radio" name="theme" value="system" />
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.75" y="2.5" width="12.5" height="8.5" rx="1.5" /><path d="M5.5 14h5M8 11v3" /></svg>
+                    <span class="visually-hidden">System</span>
+                </label>
+                <label data-tooltip="Light">
+                    <input type="radio" name="theme" value="light" />
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3" /><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M3.4 12.6l1.06-1.06M11.54 4.46l1.06-1.06" /></svg>
+                    <span class="visually-hidden">Light</span>
+                </label>
+                <label data-tooltip="Dark">
+                    <input type="radio" name="theme" value="dark" />
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7Z" /></svg>
+                    <span class="visually-hidden">Dark</span>
+                </label>
+            </fieldset>
         </div>
     </div>
 </nav>
@@ -802,6 +963,39 @@
         <p>Umamusume: Pretty Derby and all related names, characters, artwork and trademarks belong to Cygames, Inc. Game artwork in the screenshots, including club tier icons, is © Cygames, Inc. and is used non-commercially in line with Cygames' <a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener">Fan-Created Content Guidelines</a>. Club and trainer data comes from <a href="https://uma.moe" target="_blank" rel="noopener">uma.moe</a>.</p>
     </div>
 </footer>
+
+<script>
+    // The theme switch: shows the saved choice, applies a new one and remembers it, like the web app.
+    (() => {
+        const key = 'uma-stable-match:theme';
+        const root = document.documentElement;
+        let saved = 'system';
+        try {
+            saved = localStorage.getItem(key) || 'system';
+        } catch {
+            saved = 'system';
+        }
+        for (const input of document.querySelectorAll('.theme-switch input')) {
+            input.checked = input.value === saved;
+            input.addEventListener('change', () => {
+                if (input.value === 'system') {
+                    delete root.dataset.theme;
+                } else {
+                    root.dataset.theme = input.value;
+                }
+                try {
+                    if (input.value === 'system') {
+                        localStorage.removeItem(key);
+                    } else {
+                        localStorage.setItem(key, input.value);
+                    }
+                } catch {
+                    return;
+                }
+            });
+        }
+    })();
+</script>
 
 
 </body>

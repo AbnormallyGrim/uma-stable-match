@@ -56,7 +56,8 @@ src/lib/runner.ts             Search state machine: loading, retries and countdo
 src/lib/states.ts             Error messages and empty-result hints
 src/lib/HowToUse.svelte       Step-by-step instructions under the search form
 src/lib/SearchStatus.svelte   Loading, waiting and error messages
-src/lib/ThemeToggle.svelte    System / Light / Dark switch
+src/lib/NavBar.svelte         Top bar: the brand, linking to the website, and the theme switch
+src/lib/ThemeToggle.svelte    System / Light / Dark switch, as icons with tooltips
 src/lib/theme.ts              Saving and applying the theme choice
 src/lib/SiteFooter.svelte     Tips, the logo, a link to report a problem, and the disclaimer
 src/lib/BrandLogo.svelte      The logo, in the version for the current theme
@@ -82,6 +83,10 @@ src/contrast.test.ts          WCAG AA contrast for every colour token pair
 src/setup-tests.ts            Adds jest-dom matchers to Vitest
 vite.config.ts                Vite, the /api proxy and Vitest settings
 ```
+
+## Navbar
+
+`NavBar.svelte` is a bar across the top of the page, matching the website's at [umastable.com](https://umastable.com): the logo and "Uma Stable Match" on the left, linking back to the website, and the theme switch on the right. It stays at the top while scrolling, with a translucent, blurred background. The page's own heading, "Uma Stable Match club finder", is hidden visually and read by screen readers. On narrow screens a long title is cut short with an ellipsis rather than pushing the switch off the screen.
 
 ## Search form
 
@@ -185,7 +190,9 @@ Colours are CSS custom properties in `src/app.css`, and components only use thes
 
 `light-dark()` needs Chrome or Edge 123, Firefox 120 or Safari 17.5, or newer.
 
-The **System / Light / Dark** switch in the header (`ThemeToggle.svelte`) sets the attribute. It saves Light or Dark in local storage under `uma-stable-match:theme`, and choosing System deletes it. It's a group of radio buttons labelled "Theme", so arrow keys and screen readers work, and keyboard focus shows a ring.
+The **System / Light / Dark** switch in the navbar (`ThemeToggle.svelte`) sets the attribute. It saves Light or Dark in local storage under `uma-stable-match:theme`, and choosing System deletes it. It's a group of radio buttons labelled "Theme", so arrow keys and screen readers work, and keyboard focus shows a ring. Each choice is an icon (a monitor, a sun and a moon) with its name hidden for screen readers, and a themed tooltip shows the name on hover or keyboard focus.
+
+The website at umastable.com has the same switch and palette, with the same storage key. Browsers keep storage per site, though, so a choice made on one isn't carried over to the other.
 
 `public/theme-init.js` applies a saved theme before the page renders, so it never flashes the wrong theme while the app loads. `index.html` loads it from its own file because the server's content security policy blocks inline scripts. Vite copies it into `dist/` unchanged, so it isn't hashed and browsers revalidate it on each visit.
 
@@ -195,8 +202,8 @@ The palette follows the project's logo and website: navy with a gold accent in t
 
 The logo and the background artwork each have a light and a dark version in `src/assets/brand/`, made from the originals in [`docs/images/`](../docs/images/): `logo.jpeg`, `hero.jpeg` and their `-light` versions.
 
-- **Logo.** `BrandLogo.svelte` shows the logo in the header and the footer. It renders both versions, and the `.only-light` and `.only-dark` classes in `app.css` show the one for the current theme, whether it comes from the system or the theme switch.
-- **Background.** The header and search form sit in a `.hero` section. Its `::before` shows the wide artwork (`--hero`), dimmed by `--hero-opacity` and faded to transparent towards its edges with a radial mask, so no box shows whatever the image's background colour. It's anchored to the top of the section, and up to 720 pixels wide to the bottom, so on phones it sits behind the form rather than the title. It stays inside the section, so it never shows behind results or the footer.
+- **Logo.** `BrandLogo.svelte` shows the logo in the navbar and the footer. It renders both versions, and the `.only-light` and `.only-dark` classes in `app.css` show the one for the current theme, whether it comes from the system or the theme switch.
+- **Background.** The search form and "How to use" sit in a `.hero` section. Its `::before` shows the wide artwork (`--hero`), dimmed by `--hero-opacity` and faded to transparent towards its edges with a radial mask, so no box shows whatever the image's background colour. It's anchored to the top of the section, and up to 720 pixels wide to the bottom, so on phones it sits behind the form rather than the title. It stays inside the section, so it never shows behind results or the footer.
 - **Search form.** The form's card is translucent with a slight blur, so the artwork shows through it.
 - **Alignment.** The light and dark artwork are aligned so their outlines lie on top of each other. Keep them aligned when replacing either: measure the drawing in both, and scale and centre the light version to match.
 - **Icons.** `public/favicon-32.png` and `public/apple-touch-icon.png` are the dark logo at 32 and 180 pixels.
@@ -222,7 +229,7 @@ Card descriptions are capped at `80ch` so they stay easy to read on wide screens
 | `accent-color` | Checkboxes, radio buttons and the slider follow the theme's accent |
 | `.check` | A checkbox and its label, aligned on one line |
 | `.switch` | A checkbox drawn as an on/off switch: a label holding the input (`role="switch"`), a `.track` span, then the text. Gold when on. Used for balance scoring, full clubs and remembering the trainer ID |
-| `.segmented`, `.segmented.small` | A pill-shaped group of radio buttons, used for "Search by" and the theme switch. The selected option is styled with `:has(input:checked)` |
+| `.segmented`, `.segmented.small` | A pill-shaped group of radio buttons, used for "Search by" and, with icons, the theme switch. The selected option is styled with `:has(input:checked)` |
 | `:focus-visible` | A 2px accent ring around whatever has keyboard focus |
 
 ### Footer
