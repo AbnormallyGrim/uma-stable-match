@@ -69,3 +69,68 @@ async fn visitor_fetches_give_up_on_a_long_retry_after() {
     assert_eq!(error.status(), Some(StatusCode::TOO_MANY_REQUESTS));
     assert!(started.elapsed() < Duration::from_secs(5));
 }
+
+fn stored_club(id: u64, gain: i64) -> Club {
+    let members: Vec<_> = (1..=9)
+        .map(|i| {
+            let fans: Vec<i64> = (0..4).map(|day| 100_000_000 + gain * i * day).collect();
+            serde_json::json!({ "viewer_id": 7000 + i, "year": 2026, "month": 3, "daily_fans": fans })
+        })
+        .collect();
+    let response: uma_stable_match_umamoe_client::CircleResponse = serde_json::from_value(
+        serde_json::json!({ "circle": { "circle_id": id, "name": "Stored Club", "member_count": 9 }, "members": members }),
+    )
+    .unwrap();
+    Club::from(response)
+}
+
+// Needs Redis: runs only when `REDIS_TEST_URL` is set, as in `tests/redis.rs`.
+#[tokio::test]
+async fn clubs_read_from_redis_set_their_exact_medians() {
+    let Some(url) = std::env::var("REDIS_TEST_URL")
+        .ok()
+        .and_then(|url| crate::shared::RedisUrl::parse(&url))
+    else {
+        eprintln!("skipped: set REDIS_TEST_URL to run the Redis tests");
+        return;
+    };
+    let secret = crate::shared::KeySecret::parse("made-up-secret-made-up-secret-0002").unwrap();
+    let shared = SharedCache::connect(&url, secret).await.unwrap();
+    let ids: Vec<u64> = (0..3)
+        .map(|_| fastrand::u64(100_000_000_000..900_000_000_000))
+        .collect();
+    let due = (utc_now() + chrono::TimeDelta::hours(1)).timestamp_millis();
+    let mut expected = Vec::new();
+    for (i, &id) in ids.iter().enumerate() {
+        let club = stored_club(id, 100 * (i as i64 + 1));
+        expected.push(crate::calibration::club_median(&club).unwrap());
+        let stored = Stored {
+            club,
+            last_updated: None,
+            due_ms: Some(due),
+        };
+        shared
+            .set(&club_key(id, None), &stored, Duration::from_secs(60))
+            .await;
+    }
+    let pool = SharedPool::new(RwLock::new(ClubPool::new(ids.iter().map(|&circle_id| {
+        crate::pool::ListedClub {
+            circle_id,
+            member_count: 9,
+            join_style: None,
+            policy: None,
+            discord: false,
+            raw_rate: 1000.0,
+        }
+    }))));
+    let client = Client::new(ClientConfig::new(ApiKey::new("test-key"))).unwrap();
+    let (details, _loader) =
+        ClubDetails::with_shared(&client, pool, DetailConfig::default(), shared);
+
+    assert_eq!(details.load_shared(&ids).await.len(), 3);
+    let pool = details.pool().read().unwrap();
+    assert_eq!(pool.exact_medians(), 3);
+    for (&id, median) in ids.iter().zip(expected) {
+        assert_eq!(pool.estimated_median(id), Some(median));
+    }
+}
