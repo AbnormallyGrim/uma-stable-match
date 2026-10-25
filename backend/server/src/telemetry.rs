@@ -8,6 +8,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder, PrometheusHandle};
+use tracing::Instrument;
 
 use crate::app::{status_router, AppState};
 use crate::refresher::utc_now;
@@ -61,8 +62,21 @@ pub fn metrics_router(handle: PrometheusHandle, state: AppState) -> Router {
 pub(crate) async fn track_requests(request: Request, next: Next) -> Response {
     let route = route_label(&request);
     let method = request.method().as_str().to_owned();
+    let span = tracing::info_span!(
+        "request",
+        otel.name = format!("{method} {route}"),
+        otel.kind = "server",
+        otel.status_code = tracing::field::Empty,
+        http.request.method = method,
+        http.route = route,
+        http.response.status_code = tracing::field::Empty,
+    );
     let started = Instant::now();
-    let response = next.run(request).await;
+    let response = next.run(request).instrument(span.clone()).await;
+    span.record("http.response.status_code", response.status().as_u16());
+    if response.status().is_server_error() {
+        span.record("otel.status_code", "error");
+    }
     let status = response.status().as_u16().to_string();
     metrics::histogram!("http_request_duration_seconds", "route" => route.clone(), "method" => method.clone())
         .record(started.elapsed().as_secs_f64());

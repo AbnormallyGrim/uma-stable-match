@@ -27,7 +27,7 @@ impl<'a> MakeWriter<'a> for Captured {
 
 fn capture(format: LogFormat, log: impl FnOnce()) -> String {
     let captured = Captured::default();
-    let subscriber = subscriber(format, EnvFilter::new("info"), captured.clone());
+    let subscriber = subscriber(format, EnvFilter::new("info"), captured.clone(), None);
     tracing::subscriber::with_default(subscriber, log);
     let bytes = captured.0.lock().unwrap().clone();
     String::from_utf8(bytes).unwrap()
@@ -160,6 +160,7 @@ async fn failed_umamoe_requests_are_logged_once_with_their_origin() {
         LogFormat::Json,
         EnvFilter::new("info"),
         captured.clone(),
+        None,
     ));
     client
         .circle(&CircleRequest::by_circle_id(1))
@@ -194,7 +195,7 @@ fn warnings_and_errors_are_counted_by_where_they_were_logged() {
     let handle = recorder.handle();
     metrics::with_local_recorder(&recorder, || {
         let captured = Captured::default();
-        let subscriber = subscriber(LogFormat::Json, EnvFilter::new("info"), captured);
+        let subscriber = subscriber(LogFormat::Json, EnvFilter::new("info"), captured, None);
         tracing::subscriber::with_default(subscriber, || {
             tracing::warn!("club refresh failed");
             tracing::warn!(target: "hyper", "connection reset");

@@ -2,11 +2,16 @@
 
 use std::backtrace::Backtrace;
 
+use opentelemetry_sdk::trace::SdkTracer;
 use tracing::{Event, Level, Subscriber};
+use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
+use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
+
+use crate::traces::TraceExport;
 
 /// How log lines are written, from `LOG_FORMAT`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -40,10 +45,16 @@ impl LogFormat {
 }
 
 /// Sends logs to stdout in `format`, filtered by `RUST_LOG` (default `info`), and logs panics with a
-/// stack trace. Call it once.
-pub fn init_logging(format: LogFormat) {
+/// stack trace. With `traces`, spans are exported too, but log lines aren't. Call it once.
+pub fn init_logging(format: LogFormat, traces: Option<&TraceExport>) {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    subscriber(format, filter, std::io::stdout).init();
+    subscriber(
+        format,
+        filter,
+        std::io::stdout,
+        traces.map(TraceExport::tracer),
+    )
+    .init();
     std::panic::set_hook(Box::new(log_panic));
 }
 
@@ -64,31 +75,47 @@ fn log_panic(info: &std::panic::PanicHookInfo<'_>) {
     );
 }
 
-fn subscriber<W>(
+pub(crate) fn subscriber<W>(
     format: LogFormat,
     filter: EnvFilter,
     writer: W,
+    tracer: Option<SdkTracer>,
 ) -> Box<dyn Subscriber + Send + Sync>
 where
     W: for<'a> MakeWriter<'a> + Send + Sync + 'static,
 {
-    let builder = tracing_subscriber::fmt()
-        .with_env_filter(filter)
+    let lines = tracing_subscriber::fmt::layer()
         .with_writer(writer)
         .with_file(true)
         .with_line_number(true);
-    match format {
-        LogFormat::Text => Box::new(builder.finish().with(CountProblems)),
-        LogFormat::Json => Box::new(
-            builder
-                .json()
-                .flatten_event(true)
-                .with_current_span(false)
-                .with_span_list(false)
-                .finish()
-                .with(CountProblems),
-        ),
-    }
+    let lines = match format {
+        LogFormat::Text => lines.boxed(),
+        LogFormat::Json => lines
+            .json()
+            .flatten_event(true)
+            .with_current_span(false)
+            .with_span_list(false)
+            .boxed(),
+    };
+    Box::new(
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(lines)
+            .with(CountProblems)
+            .with(export_spans(tracer)),
+    )
+}
+
+// Events stay out of exported spans, so traces never hold what log lines do.
+fn export_spans<S>(tracer: Option<SdkTracer>) -> Option<impl Layer<S>>
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+{
+    tracer.map(|tracer| {
+        tracing_opentelemetry::layer()
+            .with_tracer(tracer)
+            .with_filter(filter_fn(|metadata| metadata.is_span()))
+    })
 }
 
 /// Counts every warning and error as `log_events_total`, by level and the file and line that logged

@@ -8,7 +8,7 @@ use tokio::sync::watch;
 use uma_stable_match_server::{
     app, init_logging, install_metrics, metrics_router, run_scheduler, AppState, Cache,
     ClubDetails, Config, DetailConfig, LogFormat, PaceLookup, RateLimits, RefreshConfig,
-    SharedCache, SharedPool,
+    SharedCache, SharedPool, TraceExport,
 };
 use uma_stable_match_umamoe_client::{Client, ClientConfig};
 
@@ -16,10 +16,24 @@ use uma_stable_match_umamoe_client::{Client, ClientConfig};
 async fn main() -> ExitCode {
     dotenvy::dotenv().ok();
     let log_format = LogFormat::from_env();
-    init_logging(log_format.clone().unwrap_or_default());
+    let traces = TraceExport::from_env();
+    init_logging(
+        log_format.clone().unwrap_or_default(),
+        traces.as_ref().ok().and_then(Option::as_ref),
+    );
     if let Err(error) = log_format {
         tracing::error!("{error}");
         return ExitCode::FAILURE;
+    }
+    let traces = match traces {
+        Ok(traces) => traces,
+        Err(error) => {
+            tracing::error!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if traces.is_some() {
+        tracing::info!("exporting traces over OTLP");
     }
 
     let config = match Config::from_env() {
@@ -158,6 +172,9 @@ async fn main() -> ExitCode {
     })
     .await;
     scheduler.await.ok();
+    if let Some(traces) = traces {
+        traces.shutdown();
+    }
 
     if let Err(error) = served {
         tracing::error!("server error: {error}");

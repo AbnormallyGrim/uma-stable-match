@@ -205,6 +205,7 @@ Set these in `.env`. Only `UMAMOE_API_KEY` is required; [`.env.example`](.env.ex
 | `REDIS_KEY_SECRET` | *(none)* | Required with `REDIS_URL`: at least 32 characters, the same on every server. Looked-up trainer IDs are stored in Redis only as a hash keyed with it |
 | `METRICS_ADDR` | *(none)* | Optional. An address such as `127.0.0.1:9464` to serve Prometheus metrics on, apart from the web page. See the [server README](backend/server/README.md#metrics) |
 | `METRICS_PORT` | *(none)* | Docker only. Turns metrics on and publishes them on this port of your computer, such as `9464`. Compose ignores `METRICS_ADDR` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | *(none)* | Optional. An OTLP/HTTP address such as `http://127.0.0.1:4318` to send traces to. See the [server README](backend/server/README.md#traces) |
 
 ## API
 
