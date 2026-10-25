@@ -594,7 +594,7 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 
 `scan_last_success_timestamp_seconds` and the `pool_*`, `detail_*` and `refresh_*` values are read from the server each time `/metrics` is requested. With Redis, the `refresh_*` and `redis_club_ttl_*` values come from one script over the shared schedule, so every instance reports the same, and the other `redis_*` gauges come from one `INFO` call; the detail cache settles its pending work first, so `detail_cache_clubs` is exact. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
 
-To watch these on a dashboard, [observability/README.md](../../observability/README.md) sets up Prometheus and Grafana locally, with a ready-made dashboard.
+To watch these on a dashboard, [observability/README.md](../../observability/README.md) sets up Prometheus and Grafana locally, with ready-made dashboards.
 
 ## Traces
 
