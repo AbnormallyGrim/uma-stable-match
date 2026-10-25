@@ -25,6 +25,9 @@ primary_region = "iad"
   SCAN_MAX_DETAILS = "5000"
   # Below the window, for slower trainers: down to this rank, or to the first clubs with no fans.
   SCAN_LOWER_RANK_TO = "15000"
+  # Scores twice this many clubs per search. The wide window packs thousands of clubs near slower
+  # paces, so the default 120 misses some of the best fits there.
+  SHORTLIST_SIZE = "480"
 
 [http_service]
   internal_port = 8080

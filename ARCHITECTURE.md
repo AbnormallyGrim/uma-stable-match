@@ -97,7 +97,7 @@ The private `/status`, on the metrics address, reports the running scan's phase 
 1. **Pace:** taken from the request, or worked out from the trainer's fans in their club, found through uma.moe's monthly rankings, and cached for `TRAINER_CACHE_MINUTES`.
 2. **Shortlist:** the `SHORTLIST_SIZE` clubs (120) whose estimated median is nearest 0.85 × the pace.
 3. **Load:** the clubs nearest the pace, twice the shortlist, are read from memory or Redis. Up to `REQUEST_FETCH_BUDGET` (10) uncached shortlisted clubs are fetched in the **interactive lane** while the visitor waits; the rest are queued for the background loader.
-4. **Score:** only those clubs are scored with the scoring crate, so a search costs the same however large the pool is. Clubs further away can't fit well, so results match scoring every club once the cache is warm. The trainer's own club is left out.
+4. **Score:** only those clubs are scored with the scoring crate, so a search costs the same however large the pool is. Clubs further away rarely fit well, so once the cache is warm results nearly always match scoring every club. Large pools need a larger shortlist for that; see the [server README](backend/server/README.md#choosing-clubs). The trainer's own club is left out.
 5. **Own club:** for a trainer lookup, their club is scored separately as if they were joining it, without their own member row.
 6. **Respond:** ranked clubs, the trainer's own club, `coverage` (considered, shortlisted, scored, still loading) and the data's `month`.
 

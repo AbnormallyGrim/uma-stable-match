@@ -361,7 +361,7 @@ There's no public status endpoint. The page takes the data's age from each searc
 4. Queue the other uncached shortlisted clubs, and any that failed, for background loading.
 5. Score the loaded clubs. Without `include_full=true`, full clubs are dropped first, judged by the pool's latest list data rather than their cached details, which can be a day old.
 
-Only these clubs are copied and scored, so a search costs the same however large the pool is. Clubs further from your pace can't fit well, so this gives the same results as scoring every club: on three synthetic pools of 3,000 clubs with exact medians, the normal case once the refresher has loaded them, the top 10 matches scoring every club (mean recall 1.0, or 0.9975 with closed clubs). `coverage` says how complete a response is.
+Only these clubs are copied and scored, so a search costs the same however large the pool is. Clubs further from your pace rarely fit well: on three synthetic pools of 3,000 clubs with exact medians, the normal case once the refresher has loaded them, the top 10 matches scoring every club (mean recall 1.0, or 0.9975 with closed clubs). A large real pool packs many clubs near the same pace, so it needs a larger shortlist. On about 14,000 real clubs (ranks 1 to 15,000) with exact medians, across 40 paces from 0.05M to 6M a day, a shortlist of 120 gives a mean recall of 0.87 (0.84 with balance), and one of 480 gives 0.98 (0.99). The public instance sets `SHORTLIST_SIZE` to 480 in `fly.toml`. `coverage` says how complete a response is.
 
 #### Looking up a trainer
 
