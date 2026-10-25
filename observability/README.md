@@ -1,6 +1,6 @@
-# Local metrics dashboard
+# Local metrics dashboards
 
-A Prometheus config and a Grafana dashboard for watching a server you run yourself: scan progress, uma.moe calls by status code, the server's own requests, caches, Redis and the club pool. Everything runs on your computer and listens on `127.0.0.1` only.
+A Prometheus config and four Grafana dashboards for watching a server you run yourself: scan progress, uma.moe calls by status code, the server's own requests, caches, Redis and the club pool. Everything runs on your computer and listens on `127.0.0.1` only.
 
 ```text
 server (/metrics on 127.0.0.1:9464)  ←  Prometheus (127.0.0.1:9090)  ←  Grafana (127.0.0.1:3000)
@@ -9,9 +9,12 @@ server (/metrics on 127.0.0.1:9464)  ←  Prometheus (127.0.0.1:9090)  ←  Graf
 | File | What it is |
 |---|---|
 | `prometheus.yml` | Scrapes the server's metrics from `127.0.0.1:9464` every 5 seconds |
-| `grafana-dashboard.json` | The dashboard to import. It asks which Prometheus data source to use and your Axiom organization ID |
+| `dashboard-overview.json` | Searches, health at a glance, web traffic and logged errors. It asks which Prometheus data source to use and your Axiom organization ID |
+| `dashboard-search-quality.json` | How deep into the rankings searches go, and the club pool |
+| `dashboard-data-pipeline.json` | Scans, refreshes, caches and calls to uma.moe |
+| `dashboard-redis.json` | Redis keys, memory, TTLs, timings and errors |
 
-For traces, see [Traces](#traces). The metrics themselves are described in the [server README](../backend/server/README.md#metrics). On Fly.io, the `[metrics]` section of `fly.toml` sends them to Fly's managed Prometheus instead, and the same dashboard can be imported into Fly's Grafana at [fly-metrics.net](https://fly-metrics.net).
+For traces, see [Traces](#traces). The metrics themselves are described in the [server README](../backend/server/README.md#metrics). On Fly.io, the `[metrics]` section of `fly.toml` sends them to Fly's managed Prometheus instead, and the same dashboards can be imported into Fly's Grafana at [fly-metrics.net](https://fly-metrics.net).
 
 ## 1. Install Prometheus and Grafana
 
@@ -125,30 +128,34 @@ Prometheus keeps its data in `observability/data/`, which git ignores. At <http:
 
 In Grafana, go to **Connections → Data sources → Add data source → Prometheus**. Set the URL to `http://localhost:9090`, then click **Save & test**.
 
-## 7. Import the dashboard
+## 7. Import the dashboards
 
-Go to **Dashboards → New → Import**, upload `observability/grafana-dashboard.json`, choose the Prometheus data source from step 6, enter your **Axiom organization ID** (the part after `app.axiom.co/` in your Axiom URLs; leave it empty without Axiom), and click **Import**. Importing it again later replaces the dashboard rather than adding a copy.
+For each `observability/dashboard-*.json` file, go to **Dashboards → New → Import**, upload the file, choose the Prometheus data source from step 6, and click **Import**. The Overview also asks for your **Axiom organization ID** (the part after `app.axiom.co/` in your Axiom URLs; leave it empty without Axiom). Importing a file again later replaces that dashboard rather than adding a copy. The Overview replaces the single dashboard from earlier versions.
 
-## What the dashboard shows
+Every dashboard links to the other three at the top, keeping the time range. The links find the dashboards by their `uma-stable-match` tag.
 
-| Row | Panels |
-|---|---|
-| Searches | Searches in the last 24 hours, the same by status code, searches per hour, how deep into the rankings searches go (worst shortlisted and top-pick rank, median and 90th percentile), the share of searches that reached the slowest clubs in the pool, and searches by deepest shortlisted rank |
-| Errors | Warnings and errors logged per hour, and a table of them by the file and line that logged them. Each file links to [Axiom](#links-to-axiom) |
-| Scan | Phase, refresh counts for joinable clubs (loaded, scheduled and due), clubs listed, time since the last successful scan, scans finished, scan duration, club details loaded as a percentage of the scheduled clubs (in Redis with Redis), what the instance did when a scan was due, how long the longest-waiting due club has waited, and the same counts and percentage loaded for full clubs and for the lower range |
-| uma.moe calls | Calls per second by status code and by endpoint and lane, response times, errors per minute by status, and time waiting for the 500 ms spacing |
-| Web traffic | Requests per second by route and status code, error responses, response times, rate-limited visitors and a count of each status code in the last hour |
-| Caches | Where trainer paces and club details came from (memory, Redis, uma.moe or an error), and the detail cache and background queue |
-| Redis | Clubs stored in Redis out of those scheduled, keys and keys with a TTL, memory used against the limit, when the stored club details expire (soonest and average), TTLs over time, keys expired and evicted per hour, up or down, operation times and errors |
-| Club pool | Clubs in the pool, clubs with an exact median, and the calibration factor and samples |
+## What the dashboards show
 
-Per-hour bars line up with whole hours, so they fill in once there's an hour of data. Some panels stay empty until something happens: the Redis row needs `REDIS_URL`, error panels need errors, and rates need about a minute of data.
+| Dashboard | Row | Panels |
+|---|---|---|
+| Overview | Searches | Searches in the last 24 hours, the same by status code, and searches per hour |
+| | Health | Redis up or down, time since the last successful scan, and uma.moe calls without a 2xx answer in the last hour |
+| | Web traffic | Requests per second by route and status code, error responses, response times, rate-limited visitors and a count of each status code in the last hour |
+| | Errors | Warnings and errors logged per hour, and a table of them by the file and line that logged them. Each file links to [Axiom](#links-to-axiom) |
+| Search quality | Search depth | How deep into the rankings searches go (worst shortlisted and top-pick rank, median and 90th percentile), the share of searches that reached the slowest clubs in the pool, and searches by deepest shortlisted rank |
+| | Club pool | Clubs in the pool, clubs with an exact median, and the calibration factor and samples |
+| Data pipeline | Scan and refresh | Phase, refresh counts for joinable clubs (loaded, scheduled and due), clubs listed, time since the last successful scan, scans finished, scan duration, club details loaded as a percentage of the scheduled clubs (in Redis with Redis), what the instance did when a scan was due, how long the longest-waiting due club has waited, and the same counts and percentage loaded for full clubs and for the lower range |
+| | Caches | Where trainer paces and club details came from (memory, Redis, uma.moe or an error), and the detail cache and background queue |
+| | uma.moe calls | Calls per second by status code and by endpoint and lane, response times, errors per minute by status, and time waiting for the 500 ms spacing |
+| Redis | Redis | Keys and keys with a TTL, memory used against the limit, when the stored club details expire (soonest and average), TTLs over time, keys expired and evicted per hour, up or down, operation times and errors |
+
+Per-hour bars line up with whole hours, so they fill in once there's an hour of data. Some panels stay empty until something happens: Redis panels need `REDIS_URL`, error panels need errors, and rates need about a minute of data.
 
 ### Links to Axiom
 
-With logs in [Axiom](https://axiom.co), the dashboard links straight to them. Each file in the Errors table opens Axiom with a query for that log line over the dashboard's time range, showing every occurrence with its message, error, origin and any trainer, club or request query. **Warnings and errors in Axiom**, at the top of the dashboard, opens all of them.
+With logs in [Axiom](https://axiom.co), the Overview links straight to them. Each file in the Errors table opens Axiom with a query for that log line over the dashboard's time range, showing every occurrence with its message, error, origin and any trainer, club or request query. **Warnings and errors in Axiom**, at the top of the Overview, opens all of them.
 
-The links use the Axiom organization ID entered on import and the **Axiom dataset** box at the top of the dashboard (`uma-stable-match` by default). Axiom opens a query from a link's `initForm` parameter: URL-encoded JSON with the APL query in `apl` and the time range in `queryOptions`.
+The links use the Axiom organization ID entered on import and the **Axiom dataset** box at the top of the Overview (`uma-stable-match` by default). Axiom opens a query from a link's `initForm` parameter: URL-encoded JSON with the APL query in `apl` and the time range in `queryOptions`.
 
 ## Traces
 
@@ -178,8 +185,8 @@ To start again with no history, delete `observability/data/`.
 |---|---|
 | The target is `DOWN` | The server isn't running, or metrics are off. Check the `curl` command from step 4 |
 | `address already in use` | Another program uses that port. Pick another `METRICS_PORT`, or another `--web.listen-address`, and update `prometheus.yml` or the Grafana data source to match |
-| The dashboard shows "No data" everywhere | The Grafana data source points somewhere else, or Prometheus isn't running. Use **Save & test** on the data source |
+| A dashboard shows "No data" everywhere | The Grafana data source points somewhere else, or Prometheus isn't running. Use **Save & test** on the data source |
 
-## Changing the dashboard
+## Changing a dashboard
 
-Edit it in Grafana, then export it with **Export → Export as JSON**, turning on the option to export for sharing externally. That keeps the data source as a choice made on import, rather than your own data source's ID. Check the file holds nothing from your own instance, such as user IDs, before replacing `grafana-dashboard.json`.
+Edit it in Grafana, then export it with **Export → Export as JSON**, turning on the option to export for sharing externally. That keeps the data source as a choice made on import, rather than your own data source's ID. Check the file holds nothing from your own instance, such as user IDs or your Axiom organization ID, before replacing its `dashboard-*.json` file.

@@ -115,7 +115,7 @@ docker compose up -d
 - **`PORT` in `.env` picks the port on your computer.** Inside the container the server always listens on `0.0.0.0:8080`, so Compose ignores `HOST` and `FRONTEND_DIR` from `.env`.
 - **Logs:** `docker compose logs -f`.
 - **Locked down:** the container runs as a non-root user, on a read-only file system, with no Linux capabilities. The image holds only the server and the built web page, in a minimal [distroless](https://github.com/GoogleContainerTools/distroless) base. Your `.env` is never copied into it; Compose passes the settings in when the container starts.
-- **Optional metrics:** add `METRICS_PORT=9464` to `.env` to serve metrics to this computer only, for a local Prometheus and Grafana; see the [metrics dashboard guide](observability/README.md).
+- **Optional metrics:** add `METRICS_PORT=9464` to `.env` to serve metrics to this computer only, for a local Prometheus and Grafana; see the [metrics dashboards guide](observability/README.md).
 - **Optional Redis:** to try the [shared cache](backend/server/README.md#shared-cache), add `REDIS_URL=redis://redis:6379` and a `REDIS_KEY_SECRET` of at least 32 characters to `.env`, then start with `docker compose --profile redis up -d` (and stop with `docker compose --profile redis down`). Redis holds up to 512 MB and keeps its data in the `redis-data` volume, so club data survives restarts (`docker compose --profile redis down -v` deletes it). It isn't reachable from outside Compose, and is locked down like the server. Without the profile it doesn't run; if `REDIS_URL` is set without it, the server stops because it can't reach Redis.
 
 ## Usage
@@ -302,7 +302,7 @@ These rules can change, so check in-game if something doesn't match.
 | [Rust](https://rustup.rs), stable. `rust-toolchain.toml` picks the version and adds rustfmt and clippy | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` | `winget install Rustlang.Rustup`, or `rustup-init.exe` from [rustup.rs](https://rustup.rs) | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
 | A C compiler. Building the server compiles C code for TLS | `xcode-select --install` | Visual Studio Build Tools with **Desktop development with C++**; the Rust installer offers to install them | `sudo apt install build-essential` (Debian, Ubuntu) or `sudo dnf install gcc gcc-c++ make` (Fedora) |
 | [Node.js](https://nodejs.org) 22.22.2 or newer, 24.15 or newer, or 26 or newer | `brew install node` | `winget install OpenJS.NodeJS.LTS`, or the installer from [nodejs.org](https://nodejs.org/en/download) | [nvm](https://github.com/nvm-sh/nvm#installing-and-updating), then `nvm install --lts`. Distribution packages are often too old |
-You also need Git, and optionally Docker to build and run the image; see [Installing Git and Docker](#installing-git-and-docker). To run the Redis tests you need Redis too; the server README shows [how to run it on each platform](backend/server/README.md#redis-tests). For the optional metrics dashboard, [observability/README.md](observability/README.md) covers installing Prometheus and Grafana.
+You also need Git, and optionally Docker to build and run the image; see [Installing Git and Docker](#installing-git-and-docker). To run the Redis tests you need Redis too; the server README shows [how to run it on each platform](backend/server/README.md#redis-tests). For the optional metrics dashboards, [observability/README.md](observability/README.md) covers installing Prometheus and Grafana.
 
 Check the versions with `rustc --version` and `node --version`.
 
@@ -345,7 +345,7 @@ docker build -t uma-stable-match .
 
 ### Metrics dashboard
 
-To see what a running server is doing, such as scan progress, uma.moe calls by status code, caches and Redis, set up Prometheus and Grafana locally and import the dashboard. [observability/README.md](observability/README.md) walks through it step by step.
+To see what a running server is doing, such as scan progress, uma.moe calls by status code, caches and Redis, set up Prometheus and Grafana locally and import the dashboards. [observability/README.md](observability/README.md) walks through it step by step.
 
 ### Test
 
