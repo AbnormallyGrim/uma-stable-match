@@ -468,6 +468,13 @@ impl ClubDetails {
         clubs
     }
 
+    /// Copies the current pool's exact medians into `pool`, such as a freshly scanned one for the
+    /// same month. Returns how many were set.
+    pub fn carry_exact_medians(&self, pool: &mut ClubPool) -> usize {
+        let medians: Vec<(u64, f64)> = read(&self.inner.pool).known_exact_medians().collect();
+        pool.set_exact_medians(medians)
+    }
+
     /// Copies the exact medians of cached clubs into `pool`, such as a freshly scanned one.
     /// Returns how many were set.
     pub fn restore_exact_medians(&self, pool: &mut ClubPool) -> usize {
