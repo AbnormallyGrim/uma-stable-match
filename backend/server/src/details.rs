@@ -363,12 +363,15 @@ impl ClubDetails {
         let found = inner.shared.get_many::<Stored>(&keys).await;
         let now = utc_now();
         let mut clubs = Vec::new();
+        let mut medians = Vec::new();
         for (&circle_id, stored) in ids.iter().zip(found) {
             let Some(stored) = stored.filter(|s| s.is_current(now)) else {
                 continue;
             };
             count_detail("redis");
-            record_median(inner, &stored.club, circle_id, period);
+            if let Some(median) = club_median(&stored.club) {
+                medians.push((circle_id, median));
+            }
             let entry = inner
                 .cache
                 .entry((circle_id, period))
@@ -377,6 +380,8 @@ impl ClubDetails {
                 .into_value();
             clubs.push(entry.club);
         }
+        // One batch, as each update recalibrates and re-sorts the whole pool.
+        record_medians(inner, medians, period);
         clubs
     }
 
@@ -587,9 +592,17 @@ fn count_detail(source: &'static str) {
 
 fn record_median(inner: &Inner, club: &Club, circle_id: u64, period: Option<Period>) {
     if let Some(median) = club_median(club) {
-        if *read(&inner.period) == period {
-            write(&inner.pool).set_exact_median(circle_id, median);
-        }
+        record_medians(inner, [(circle_id, median)], period);
+    }
+}
+
+fn record_medians(
+    inner: &Inner,
+    medians: impl IntoIterator<Item = (u64, f64)>,
+    period: Option<Period>,
+) {
+    if *read(&inner.period) == period {
+        write(&inner.pool).set_exact_medians(medians);
     }
 }
 
