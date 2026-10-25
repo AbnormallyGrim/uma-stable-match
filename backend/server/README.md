@@ -40,6 +40,9 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `REDIS_URL` | none | A `redis://` or `rediss://` URL to share club details, trainer paces and scans with other instances. Unset, everything stays in this instance's memory. See [Shared cache](#shared-cache) |
 | `REDIS_KEY_SECRET` | none | Required with `REDIS_URL`: at least 32 characters, the same on every instance. Keys the hash that replaces trainer IDs in Redis |
 | `METRICS_ADDR` | none | IP address and port to serve Prometheus metrics and the full [status](#status) on, such as `127.0.0.1:9464`. Unset, no metrics are recorded. See [Metrics](#metrics) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | none | OTLP/HTTP base URL to send traces to, such as `http://127.0.0.1:4318`. Unset, no traces are recorded. See [Traces](#traces) |
+| `OTEL_EXPORTER_OTLP_HEADERS` | none | Headers for each export, such as `Authorization=Basic%20<token>`, with spaces written as `%20` |
+| `OTEL_SERVICE_NAME` | `uma-stable-match` | The service name traces are filed under |
 
 Blank values count as unset. These stop the server at startup, with an error message and exit code 1:
 
@@ -49,8 +52,9 @@ Blank values count as unset. These stop the server at startup, with an error mes
 - a `FRONTEND_DIR` without an `index.html`
 - a `REDIS_URL` without a `redis://` or `rediss://` scheme, a missing or short `REDIS_KEY_SECRET`, or a Redis that can't be reached within 5 seconds
 - a `METRICS_ADDR` that isn't an IP address and port, or that can't be listened on
+- an `OTEL_EXPORTER_OTLP_ENDPOINT` that isn't a valid URL
 
-The API key, `REDIS_URL` (which can hold a password) and `REDIS_KEY_SECRET` are never logged, never included in errors and are redacted in `Debug` output. `.env` is git-ignored; never commit it.
+The API key, `REDIS_URL` (which can hold a password), `REDIS_KEY_SECRET` and `OTEL_EXPORTER_OTLP_HEADERS` are never logged, never included in errors and are redacted in `Debug` output. `.env` is git-ignored; never commit it.
 
 ## Scanner
 
@@ -592,6 +596,14 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 
 To watch these on a dashboard, [observability/README.md](../../observability/README.md) sets up Prometheus and Grafana locally, with a ready-made dashboard.
 
+## Traces
+
+With `OTEL_EXPORTER_OTLP_ENDPOINT` set, the server sends spans over OTLP/HTTP to `<endpoint>/v1/traces`, for a trace store such as Grafana Tempo. Unset, or with `OTEL_SDK_DISABLED=true`, nothing is recorded. The other standard `OTEL_*` settings work too, such as `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` for the full traces URL, `OTEL_TRACES_SAMPLER` and `OTEL_BSP_SCHEDULE_DELAY`.
+
+Each request gets a `request` span named after its method and route pattern, such as `GET /api/v1/recommendations`, with `http.request.method`, `http.route` and `http.response.status_code`. Server errors mark the span as failed. Spans are sent in batches, and the last batch is sent on [shutdown](#shutdown).
+
+Spans hold their own fields only. Log lines aren't attached to them, so trainer IDs and query strings stay out of traces, and spans never include IP addresses. See [observability/README.md](../../observability/README.md#traces) to view traces locally.
+
 ## Status
 
 With `METRICS_ADDR` set, the metrics address also serves `GET /status`: the scan, the club pool, the caches and the refresh schedule, as JSON. Like `/metrics`, it's never on the app's port. Each request counts the refresh schedule in Redis, so keep the address private. On Fly.io, reach it through the private network:
@@ -675,4 +687,4 @@ While a scan runs, `scan` looks like this:
 
 ## Shutdown
 
-Ctrl+C or SIGTERM (as sent by `docker stop`) stops accepting new connections, including on the metrics address, and cancels any running scan. In-flight requests finish, and then the server exits.
+Ctrl+C or SIGTERM (as sent by `docker stop`) stops accepting new connections, including on the metrics address, and cancels any running scan. In-flight requests finish, any spans still waiting are sent, and then the server exits.

@@ -17,6 +17,7 @@ mod scanner;
 mod scheduler;
 mod shared;
 mod telemetry;
+mod traces;
 
 pub use app::{app, router, status_router, AppState};
 pub use cache::{Cache, CacheStatus, ScanFailure, ScanPhase, ScanProgress, Snapshot};
@@ -42,3 +43,4 @@ pub use scanner::{scan, Scan, ScanConfig, ScanError};
 pub use scheduler::run_scheduler;
 pub use shared::{club_key, KeySecret, RedisUrl, SharedCache, SharedCacheError};
 pub use telemetry::{install_metrics, metrics_router};
+pub use traces::{TraceExport, TraceExportError};

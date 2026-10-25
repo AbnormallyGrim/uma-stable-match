@@ -11,7 +11,7 @@ server (/metrics on 127.0.0.1:9464)  ←  Prometheus (127.0.0.1:9090)  ←  Graf
 | `prometheus.yml` | Scrapes the server's metrics from `127.0.0.1:9464` every 5 seconds |
 | `grafana-dashboard.json` | The dashboard to import. It asks which Prometheus data source to use and your Axiom organization ID |
 
-The metrics themselves are described in the [server README](../backend/server/README.md#metrics). On Fly.io, the `[metrics]` section of `fly.toml` sends them to Fly's managed Prometheus instead, and the same dashboard can be imported into Fly's Grafana at [fly-metrics.net](https://fly-metrics.net).
+For traces, see [Traces](#traces). The metrics themselves are described in the [server README](../backend/server/README.md#metrics). On Fly.io, the `[metrics]` section of `fly.toml` sends them to Fly's managed Prometheus instead, and the same dashboard can be imported into Fly's Grafana at [fly-metrics.net](https://fly-metrics.net).
 
 ## 1. Install Prometheus and Grafana
 
@@ -149,6 +149,20 @@ Per-hour bars line up with whole hours, so they fill in once there's an hour of 
 With logs in [Axiom](https://axiom.co), the dashboard links straight to them. Each file in the Errors table opens Axiom with a query for that log line over the dashboard's time range, showing every occurrence with its message, error, origin and any trainer, club or request query. **Warnings and errors in Axiom**, at the top of the dashboard, opens all of them.
 
 The links use the Axiom organization ID entered on import and the **Axiom dataset** box at the top of the dashboard (`uma-stable-match` by default). Axiom opens a query from a link's `initForm` parameter: URL-encoded JSON with the APL query in `apl` and the time range in `queryOptions`.
+
+## Traces
+
+Grafana's `otel-lgtm` image runs Grafana with Tempo in one container, ready to receive traces. It needs [Docker](https://docs.docker.com/get-docker/), and uses port 3001 so it doesn't clash with the Grafana above:
+
+```bash
+docker run --rm --name otel-lgtm -p 127.0.0.1:3001:3000 -p 127.0.0.1:4318:4318 grafana/otel-lgtm
+```
+
+Add `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318` to `.env` and restart the server. With Docker Compose, use `http://host.docker.internal:4318` instead.
+
+Open <http://localhost:3001> and go to **Drilldown → Traces**. It ranks span names by duration, and opening a trace shows its spans as a waterfall. Run a few searches first: spans are sent every few seconds. Stop it with Ctrl+C; it keeps no data.
+
+The spans themselves are described in the [server README](../backend/server/README.md#traces).
 
 ## Stopping
 
