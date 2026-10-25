@@ -380,6 +380,56 @@ async fn a_new_scan_replaces_the_pool_and_reuses_cached_details() {
     assert!(details.cached(1).await.is_some());
 }
 
+#[tokio::test]
+async fn a_new_scan_keeps_the_previous_pools_medians() {
+    let server = MockServer::start().await;
+    mount_page(&server, 0, vec![listed(1, 12, 20), listed(2, 13, 20)]).await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+
+    let details = details(&server);
+    scan(&client(&server), &details, &config()).await.unwrap();
+    // Recorded earlier, but no longer cached.
+    details.pool().write().unwrap().set_exact_median(1, 123.0);
+    server.reset().await;
+    mount_page(&server, 0, vec![listed(1, 12, 20), listed(2, 13, 20)]).await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+    scan(&client(&server), &details, &config()).await.unwrap();
+
+    let pool = details.pool().read().unwrap();
+    assert_eq!(pool.estimated_median(1), Some(123.0));
+    assert_eq!(pool.exact_medians(), 1);
+}
+
+#[tokio::test]
+async fn a_new_month_drops_the_previous_pools_medians() {
+    let server = MockServer::start().await;
+    mount_page(&server, 0, vec![listed(1, 12, 20)]).await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+
+    let details = details(&server);
+    scan(&client(&server), &details, &config()).await.unwrap();
+    details.pool().write().unwrap().set_exact_median(1, 123.0);
+    server.reset().await;
+    mount_page(&server, 0, vec![early(1, 12)]).await;
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+    let second = scan(&client(&server), &details, &config()).await.unwrap();
+
+    assert_eq!(second.month.as_deref(), Some("2026-02"));
+    assert_eq!(details.pool().read().unwrap().exact_medians(), 0);
+}
+
 fn early(id: u64, rank: i32) -> Value {
     let mut row = listed(id, rank, 20);
     row["last_updated"] = json!("2026-03-02T15:00:00Z");

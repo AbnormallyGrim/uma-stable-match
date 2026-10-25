@@ -305,6 +305,13 @@ impl ClubPool {
             .count()
     }
 
+    /// Every known exact median, as `(circle_id, median)`.
+    pub fn known_exact_medians(&self) -> impl Iterator<Item = (u64, f64)> + '_ {
+        self.entries
+            .iter()
+            .filter_map(|e| e.exact_median.map(|median| (e.club.circle_id, median)))
+    }
+
     /// A club's median daily pace: exact if known, otherwise calibrated from its raw rate.
     pub fn estimated_median(&self, circle_id: u64) -> Option<f64> {
         let entry = &self.entries[*self.index.get(&circle_id)?];

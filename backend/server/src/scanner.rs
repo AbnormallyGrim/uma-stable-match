@@ -238,6 +238,11 @@ pub(crate) fn install(details: &ClubDetails, rows: Vec<Circle>, config: &ScanCon
     let lower = lower_ids.len();
     let ids = by_rank(&main, |id| pool.is_joinable(id), max);
     let full_ids = by_rank(&main, |id| pool.contains(id) && !pool.is_joinable(id), max);
+    // The cache drops clubs as they come due, just before the daily scan, so the previous pool
+    // holds most medians. Another month's medians don't apply.
+    if details.listing().is_some_and(|(_, listed)| listed == month) {
+        details.carry_exact_medians(&mut pool);
+    }
     details.set_period(period);
     details.set_listed(rows.into_iter().map(|c| (c.circle_id, c)));
     details.restore_exact_medians(&mut pool);
