@@ -9,6 +9,8 @@ use reqwest::header::{HeaderValue, ACCEPT};
 use reqwest::{StatusCode, Url};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use tracing::field::Empty;
+use tracing::{Instrument, Span};
 
 use crate::config::{ClientConfig, RetryConfig};
 use crate::error::{ApiErrorBody, Error};
@@ -140,9 +142,28 @@ impl Client {
         T: DeserializeOwned,
         Q: Serialize + ?Sized,
     {
+        let span = in_trace(|| {
+            tracing::info_span!(
+                "umamoe",
+                otel.name = format!("GET {path}"),
+                otel.kind = "client",
+                otel.status_code = Empty,
+                endpoint = path,
+                lane = lane_label(self.priority),
+                attempts = Empty,
+                http.response.status_code = Empty,
+            )
+        });
         let mut attempts = 0;
-        let result = self.send(path, query, &mut attempts).await;
+        let result = self
+            .send(path, query, &mut attempts)
+            .instrument(span.clone())
+            .await;
+        span.record("attempts", attempts);
         if let Err(error) = &result {
+            if error.status() != Some(StatusCode::NOT_FOUND) {
+                span.record("otel.status_code", "error");
+            }
             self.log_failure(path, query, attempts, error);
         }
         result
@@ -192,7 +213,11 @@ impl Client {
         let mut retries = 0;
         loop {
             let waiting = Instant::now();
-            let acquired = self.limiter.acquire_within(self.priority, max_pause).await;
+            let acquired = self
+                .limiter
+                .acquire_within(self.priority, max_pause)
+                .instrument(in_trace(|| tracing::info_span!("umamoe queue")))
+                .await;
             metrics::histogram!("umamoe_queue_wait_seconds", "lane" => lane)
                 .record(waiting.elapsed().as_secs_f64());
             if let Err(retry_in) = acquired {
@@ -208,6 +233,9 @@ impl Client {
                 .header(ACCEPT, "application/json")
                 .send()
                 .await;
+            if let Ok(response) = &result {
+                Span::current().record("http.response.status_code", response.status().as_u16());
+            }
             let status = match &result {
                 Ok(response) => response.status().as_u16().to_string(),
                 Err(e) => transport_label(e).to_owned(),
@@ -258,9 +286,20 @@ impl Client {
                 return Err(error);
             }
             let delay = retry::delay(&self.retry, retries, retry_after, fastrand::f64());
-            tokio::time::sleep(delay).await;
+            tokio::time::sleep(delay)
+                .instrument(in_trace(|| tracing::info_span!("umamoe backoff")))
+                .await;
             retries += 1;
         }
+    }
+}
+
+// Spans only join a trace already under way, so background calls don't start traces of their own.
+fn in_trace(span: impl FnOnce() -> Span) -> Span {
+    if Span::current().is_none() {
+        Span::none()
+    } else {
+        span()
     }
 }
 

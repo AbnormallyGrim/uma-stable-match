@@ -9,6 +9,8 @@ use moka::future::Cache;
 use moka::Expiry;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
+use tracing::field::Empty;
+use tracing::{Instrument, Span};
 use uma_stable_match_scoring::Club;
 use uma_stable_match_umamoe_client::{Circle, CircleRequest, Client, Error, Priority};
 
@@ -17,6 +19,7 @@ use crate::pool::{ClubPool, Period};
 use crate::refresher::{utc_now, RefreshConfig, RefreshStatus, Refresher, Refreshing, Tier};
 use crate::scanner::ScanConfig;
 use crate::shared::{club_key, SharedCache};
+use crate::traces::in_trace;
 
 /// The club pool, shared between requests and the detail cache.
 pub type SharedPool = Arc<RwLock<ClubPool>>;
@@ -217,6 +220,11 @@ impl ClubDetails {
     /// club share a single fetch. Failed fetches aren't cached. A shared copy past its next refresh
     /// is fetched again, but still served if that fetch fails.
     pub async fn get(&self, circle_id: u64, priority: Priority) -> Result<Arc<Club>, Arc<Error>> {
+        let span = in_trace(|| tracing::info_span!("club details", circle_id, source = Empty));
+        self.load(circle_id, priority).instrument(span).await
+    }
+
+    async fn load(&self, circle_id: u64, priority: Priority) -> Result<Arc<Club>, Arc<Error>> {
         let inner = &self.inner;
         let period = self.period();
         if let Some(entry) = inner.cache.get(&(circle_id, period)).await {
@@ -574,6 +582,7 @@ fn tier(inner: &Inner, circle_id: u64) -> Option<Tier> {
 
 fn count_detail(source: &'static str) {
     metrics::counter!("club_detail_lookups_total", "source" => source).increment(1);
+    Span::current().record("source", source);
 }
 
 fn record_median(inner: &Inner, club: &Club, circle_id: u64, period: Option<Period>) {

@@ -13,10 +13,12 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sha2::Sha256;
 use tokio::time::timeout;
+use tracing::{Instrument, Span};
 
 use crate::pool::Period;
 use crate::refresher::StoredTtl;
 use crate::scanner::ScanConfig;
+use crate::traces::in_trace;
 
 const KEY_PREFIX: &str = "usm:v1";
 const MIN_SECRET_LEN: usize = 32;
@@ -126,7 +128,9 @@ impl RedisBackend {
     ) -> Option<T> {
         let mut conn = self.conn.clone();
         let started = Instant::now();
-        let reply = timeout(limit, invocation.invoke_async(&mut conn)).await;
+        let reply = timeout(limit, invocation.invoke_async(&mut conn))
+            .instrument(redis_span("script"))
+            .await;
         observe("script", started);
         match reply {
             Ok(Ok(value)) => {
@@ -147,7 +151,9 @@ impl RedisBackend {
     async fn query<T: FromRedisValue>(&self, cmd: &Cmd, limit: Duration) -> Option<T> {
         let mut conn = self.conn.clone();
         let started = Instant::now();
-        let reply = timeout(limit, cmd.query_async(&mut conn)).await;
+        let reply = timeout(limit, cmd.query_async(&mut conn))
+            .instrument(redis_span("schedule"))
+            .await;
         observe("schedule", started);
         match reply {
             Ok(Ok(value)) => {
@@ -227,7 +233,9 @@ impl SharedCache {
         };
         let mut conn = redis.conn.clone();
         let started = Instant::now();
-        let reply = timeout(limit, conn.get::<_, Option<Vec<u8>>>(key)).await;
+        let reply = timeout(limit, conn.get::<_, Option<Vec<u8>>>(key))
+            .instrument(redis_span("get"))
+            .await;
         observe("get", started);
         match reply {
             Ok(Ok(value)) => {
@@ -259,10 +267,13 @@ impl SharedCache {
         mget.arg(keys);
         let mut conn = redis.conn.clone();
         let started = Instant::now();
+        let span = redis_span("mget");
+        span.record("db.operation.batch.size", keys.len());
         let reply = timeout(
             OP_TIMEOUT,
             mget.query_async::<Vec<Option<Vec<u8>>>>(&mut conn),
         )
+        .instrument(span)
         .await;
         observe("mget", started);
         match reply {
@@ -330,6 +341,7 @@ impl SharedCache {
             OP_TIMEOUT,
             conn.pset_ex::<_, _, ()>(key, bytes, millis(ttl)),
         )
+        .instrument(redis_span("set"))
         .await;
         observe("set", started);
         match reply {
@@ -881,6 +893,19 @@ impl RedisStats {
         }
         stats
     }
+}
+
+fn redis_span(op: &'static str) -> Span {
+    in_trace(|| {
+        tracing::info_span!(
+            "redis",
+            otel.name = format!("redis {op}"),
+            otel.kind = "client",
+            db.system.name = "redis",
+            db.operation.name = op,
+            db.operation.batch.size = tracing::field::Empty,
+        )
+    })
 }
 
 fn observe(op: &'static str, started: Instant) {

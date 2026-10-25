@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use tracing::field::Empty;
+use tracing::{Instrument, Span};
 use uma_stable_match_scoring::daily_pace;
 use uma_stable_match_umamoe_client::{
     CircleRequest, CircleResponse, Client, Error, Priority, RankingsGainsRequest,
@@ -13,6 +15,7 @@ use uma_stable_match_umamoe_client::{
 use crate::details::{ClubDetails, VISITOR_MAX_PAUSE};
 use crate::pool::Period;
 use crate::shared::SharedCache;
+use crate::traces::in_trace;
 
 /// How long a looked-up pace is reused.
 pub const DEFAULT_PACE_TTL: Duration = Duration::from_secs(10 * 60);
@@ -103,6 +106,11 @@ impl PaceLookup {
         viewer_id: u64,
         period: Option<Period>,
     ) -> Result<TrainerPace, PaceError> {
+        let span = in_trace(|| tracing::info_span!("pace lookup", source = Empty));
+        self.find(viewer_id, period).instrument(span).await
+    }
+
+    async fn find(&self, viewer_id: u64, period: Option<Period>) -> Result<TrainerPace, PaceError> {
         if let Some(outcome) = self.cached(viewer_id, period) {
             count_pace("memory");
             return outcome.into_result();
@@ -306,6 +314,7 @@ fn with_club(outcome: Outcome, circle_id: u64) -> Outcome {
 
 fn count_pace(source: &'static str) {
     metrics::counter!("pace_lookups_total", "source" => source).increment(1);
+    Span::current().record("source", source);
 }
 
 /// `period` as `YYYY-MM` for logs, or `None` for the current month.

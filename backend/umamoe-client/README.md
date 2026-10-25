@@ -201,6 +201,10 @@ Each call records metrics through the [`metrics`](https://docs.rs/metrics) facad
 
 `endpoint` is the API path, such as `/api/v4/circles`, never the full URL, so trainer IDs and other query values don't appear in labels. `lane` is `interactive` or `background`.
 
+## Traces
+
+Inside a [`tracing`](https://docs.rs/tracing) span, each call adds an `umamoe` span named like `GET /api/v4/circles`, with `endpoint`, `lane`, `attempts` and `http.response.status_code`, and `umamoe queue` and `umamoe backoff` spans for the waits. Outside a span, calls add none. Query strings are never recorded.
+
 ## Parity tests
 
 `tests/parity.rs` checks that the scoring crate gives the same results as the original prototype, the Python script this project grew from. It loads `tests/fixtures/parity/clubs.json` through `CircleResponse`, converts it to `Club` and compares the results with `expected.json`:
