@@ -602,6 +602,21 @@ With `OTEL_EXPORTER_OTLP_ENDPOINT` set, the server sends spans over OTLP/HTTP to
 
 Each request gets a `request` span named after its method and route pattern, such as `GET /api/v1/recommendations`, with `http.request.method`, `http.route` and `http.response.status_code`. Server errors mark the span as failed. Spans are sent in batches, and the last batch is sent on [shutdown](#shutdown).
 
+A search adds a span for each step inside its `request` span:
+
+| Span | Fields | Covers |
+|---|---|---|
+| `pace lookup` | `source`: `memory`, `redis`, `umamoe` or `error` | Finding a trainer's pace, for a trainer search |
+| `load clubs` | `shortlisted`, `memory`, `redis`, `fetched`, `failed`, `pending` | Loading the clubs nearest the pace: how many came from each place, and how many shortlisted clubs are still loading |
+| `shortlist` | | Picking the nearest clubs from the pool |
+| `club details` | `circle_id`, `source`: `memory`, `redis`, `umamoe`, `stale` or `error` | Loading one club, such as a shortlisted club fetched while the visitor waits |
+| `score` | `clubs` | Scoring the loaded clubs |
+| `your club` | | Scoring the trainer's own club |
+| `umamoe` | `endpoint`, `lane`, `attempts`, `http.response.status_code` | One uma.moe call, named like `GET /api/v4/circles`, including retries. Its `umamoe queue` and `umamoe backoff` children are the waits for the request spacing and between retries |
+| `redis` | `db.operation.name`, `db.operation.batch.size` for `mget` | One Redis call, named like `redis mget` |
+
+`club details`, `umamoe` and `redis` spans only join a trace that's under way, so the scanner, refresher and background loader don't start traces of their own.
+
 Spans hold their own fields only. Log lines aren't attached to them, so trainer IDs and query strings stay out of traces, and spans never include IP addresses. See [observability/README.md](../../observability/README.md#traces) to view traces locally.
 
 ## Status

@@ -4,6 +4,7 @@ use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp::{ExporterBuildError, SpanExporter};
 use opentelemetry_sdk::trace::{SdkTracer, SdkTracerProvider};
 use opentelemetry_sdk::Resource;
+use tracing::Span;
 
 const SERVICE_NAME: &str = "uma-stable-match";
 const TRACER_NAME: &str = "uma-stable-match-server";
@@ -56,6 +57,16 @@ impl TraceExport {
         if let Err(error) = self.provider.shutdown() {
             tracing::warn!("could not flush traces: {error}");
         }
+    }
+}
+
+/// `span()` inside a trace that's under way, otherwise a disabled span, so background work doesn't
+/// start traces of its own.
+pub(crate) fn in_trace(span: impl FnOnce() -> Span) -> Span {
+    if Span::current().is_none() {
+        Span::none()
+    } else {
+        span()
     }
 }
 
