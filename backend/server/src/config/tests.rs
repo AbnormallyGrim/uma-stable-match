@@ -19,6 +19,7 @@ fn defaults() {
     assert_eq!(config.scan, ScanConfig::default());
     assert_eq!(config.scan_interval, None);
     assert_eq!(config.detail_cache, None);
+    assert_eq!(config.detail_cache_mb, DEFAULT_DETAIL_CACHE_MB);
     assert_eq!(config.matching, MatchSettings::default());
     assert_eq!(config.trainer_cache, Duration::from_secs(10 * 60));
     assert_eq!(config.rate_limit_per_minute, 30);
@@ -289,6 +290,34 @@ fn reads_detail_cache() {
     ]))
     .unwrap();
     assert_eq!(config.detail_cache, Some(Duration::from_secs(90 * 60)));
+}
+
+#[test]
+fn reads_detail_cache_size() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("DETAIL_CACHE_MB", "384"),
+    ]))
+    .unwrap();
+    assert_eq!(config.detail_cache_mb, 384);
+}
+
+#[test]
+fn invalid_detail_cache_size_fails() {
+    for value in ["0", "-5", "abc"] {
+        let error = Config::from_lookup(lookup(&[
+            ("UMAMOE_API_KEY", "test-key"),
+            ("DETAIL_CACHE_MB", value),
+        ]))
+        .unwrap_err();
+        assert_eq!(
+            error,
+            ConfigError::InvalidNumber {
+                name: "DETAIL_CACHE_MB",
+                value: value.into()
+            }
+        );
+    }
 }
 
 #[test]

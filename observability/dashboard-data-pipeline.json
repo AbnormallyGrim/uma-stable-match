@@ -1398,6 +1398,15 @@
           },
           "expr": "detail_queue_clubs",
           "legendFormat": "queued clubs"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "detail_cache_bytes",
+          "legendFormat": "cached bytes"
         }
       ],
       "options": {
@@ -1469,7 +1478,24 @@
             }
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cached bytes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
       }
     },
     {

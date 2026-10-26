@@ -118,7 +118,7 @@ async fn main() -> ExitCode {
         &client,
         SharedPool::default(),
         DetailConfig {
-            max_clubs: window * 2,
+            max_bytes: u64::from(config.detail_cache_mb) * 1024 * 1024,
             queue_size: window as usize,
             refresh,
             refresher: true,

@@ -40,7 +40,7 @@ fn default_config() {
     let config = DetailConfig::default();
     assert_eq!(config.refresh, RefreshConfig::default());
     assert!(!config.refresher);
-    assert!(config.max_clubs > 0);
+    assert!(config.max_bytes > 0);
     assert!(config.queue_size > 0);
 }
 
@@ -133,4 +133,53 @@ async fn clubs_read_from_redis_set_their_exact_medians() {
     for (&id, median) in ids.iter().zip(expected) {
         assert_eq!(pool.estimated_median(id), Some(median));
     }
+}
+
+#[test]
+fn club_weight_grows_with_member_data() {
+    let empty = Club::new(1, "Empty Club");
+    let full = stored_club(1, 100);
+    assert!(club_weight(&full) > club_weight(&empty));
+    let fans: usize = full.members.iter().map(|m| m.daily_fans.len()).sum();
+    assert!(club_weight(&full) as usize >= fans * size_of::<i64>());
+}
+
+#[tokio::test]
+async fn cache_stays_within_its_byte_limit() {
+    let server = MockServer::start().await;
+    for id in 1..=6u64 {
+        let members: Vec<_> = (1..=9i64)
+            .map(|i| {
+                let fans: Vec<i64> = (0..4).map(|day| 100_000_000 + 100 * i * day).collect();
+                serde_json::json!({ "viewer_id": 7000 + i, "year": 2026, "month": 3, "daily_fans": fans })
+            })
+            .collect();
+        Mock::given(path("/api/v4/circles"))
+            .and(wiremock::matchers::query_param("circle_id", id.to_string()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "circle": { "circle_id": id, "name": "Weighed Club", "member_count": 9 },
+                "members": members,
+            })))
+            .mount(&server)
+            .await;
+    }
+    let client = Client::new(ClientConfig {
+        base_url: server.uri(),
+        min_interval: Duration::ZERO,
+        ..ClientConfig::new(ApiKey::new("test-key"))
+    })
+    .unwrap();
+    let max_bytes = 2 * u64::from(club_weight(&stored_club(1, 100))) + 1;
+    let config = DetailConfig {
+        max_bytes,
+        ..DetailConfig::default()
+    };
+    let (details, _loader) = ClubDetails::new(&client, SharedPool::default(), config);
+
+    for id in 1..=6 {
+        details.get(id, Priority::Interactive).await.unwrap();
+        details.settle().await;
+    }
+    assert!(details.cached_bytes() <= max_bytes);
+    assert!(details.cached_clubs() < 6);
 }

@@ -123,6 +123,7 @@ async fn record_state(state: &AppState) {
 
     state.details.settle().await;
     metrics::gauge!("detail_cache_clubs").set(state.details.cached_clubs() as f64);
+    metrics::gauge!("detail_cache_bytes").set(state.details.cached_bytes() as f64);
     metrics::gauge!("detail_queue_clubs").set(state.details.queued() as f64);
 
     let refresh = state.details.refresh_status().await;

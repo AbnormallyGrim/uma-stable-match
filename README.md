@@ -189,6 +189,7 @@ Set these in `.env`. Only `UMAMOE_API_KEY` is required; [`.env.example`](.env.ex
 | `PORT` | `8080` | Port the web page and API run on. With Docker, the port on your computer |
 | `SCAN_INTERVAL_MINUTES` | *(none)* | How often the club list refreshes, in minutes. Unset, it refreshes once a day after uma.moe updates its data |
 | `DETAIL_CACHE_MINUTES` | *(none)* | Minutes between refreshes of a club's member data. Unset, each club refreshes once a day after uma.moe updates its data |
+| `DETAIL_CACHE_MB` | `256` | Most megabytes of club member data kept in memory. Clubs beyond that are read again when needed |
 | `SHORTLIST_SIZE` | `120` | Clubs nearest your pace considered for each search |
 | `REQUEST_FETCH_BUDGET` | `10` | Most clubs loaded from uma.moe while you wait. The rest load in the background |
 | `SCAN_RANK_FROM` | `80` | Best monthly rank to include |
