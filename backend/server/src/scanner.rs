@@ -145,6 +145,7 @@ pub(crate) async fn load(
         month,
         updated_at,
     } = install(details, rows, config);
+    details.restore_shared_medians().await;
     if details.refreshes() {
         details.schedule([ids, full_ids, lower_ids]).await;
         let prefetched = details.cached_in_pool().len();

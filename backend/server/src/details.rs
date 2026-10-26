@@ -25,6 +25,8 @@ use crate::traces::in_trace;
 pub type SharedPool = Arc<RwLock<ClubPool>>;
 
 const KEEP_AFTER_DUE: Duration = Duration::from_secs(24 * 60 * 60);
+// Each load renews the whole month's medians, so they outlast any gap between loads.
+const KEEP_MEDIANS: Duration = Duration::from_secs(4 * 24 * 60 * 60);
 /// Longest `Retry-After` pause a visitor's request waits out; longer ones fail straight away.
 pub(crate) const VISITOR_MAX_PAUSE: Duration = Duration::from_secs(30);
 
@@ -238,7 +240,7 @@ impl ClubDetails {
                 let stale = match inner.shared.get::<Stored>(&key).await {
                     Some(stored) if stored.is_current(utc_now()) => {
                         count_detail("redis");
-                        record_median(inner, &stored.club, circle_id, period);
+                        record_median(inner, &stored.club, circle_id, period).await;
                         return Ok(Entry::from(stored));
                     }
                     stale => stale,
@@ -250,7 +252,7 @@ impl ClubDetails {
                             return Err(error);
                         };
                         count_detail("stale");
-                        record_median(inner, &stored.club, circle_id, period);
+                        record_median(inner, &stored.club, circle_id, period).await;
                         stored.due_ms = Some((utc_now() + inner.timing.retry).timestamp_millis());
                         Ok(Entry::from(stored))
                     }
@@ -381,7 +383,7 @@ impl ClubDetails {
             clubs.push(entry.club);
         }
         // One batch, as each update recalibrates and re-sorts the whole pool.
-        record_medians(inner, medians, period);
+        record_medians(inner, medians, period).await;
         clubs
     }
 
@@ -475,6 +477,24 @@ impl ClubDetails {
         pool.set_exact_medians(medians)
     }
 
+    /// Copies the exact medians stored in the shared cache for the listed month into the pool,
+    /// for clubs it has none for, such as after a restart. Returns how many were set.
+    pub async fn restore_shared_medians(&self) -> usize {
+        let Some(month) = listed_month(&self.inner) else {
+            return 0;
+        };
+        let stored = self.inner.shared.medians(&month).await;
+        if stored.is_empty() || listed_month(&self.inner).as_ref() != Some(&month) {
+            return 0;
+        }
+        let mut pool = write(&self.inner.pool);
+        let missing: Vec<(u64, f64)> = stored
+            .into_iter()
+            .filter(|(id, _)| pool.contains(*id) && !pool.has_exact_median(*id))
+            .collect();
+        pool.set_exact_medians(missing)
+    }
+
     /// Copies the exact medians of cached clubs into `pool`, such as a freshly scanned one.
     /// Returns how many were set.
     pub fn restore_exact_medians(&self, pool: &mut ClubPool) -> usize {
@@ -534,7 +554,7 @@ async fn fetch(
     if club.circle_id == 0 {
         club.circle_id = circle_id;
     }
-    record_median(inner, &club, circle_id, period);
+    record_median(inner, &club, circle_id, period).await;
     let now = utc_now();
     let mut due = inner.timing.next_refresh(
         last_updated.and_then(|t| DateTime::from_timestamp(t, 0)),
@@ -597,20 +617,28 @@ fn count_detail(source: &'static str) {
     Span::current().record("source", source);
 }
 
-fn record_median(inner: &Inner, club: &Club, circle_id: u64, period: Option<Period>) {
+async fn record_median(inner: &Inner, club: &Club, circle_id: u64, period: Option<Period>) {
     if let Some(median) = club_median(club) {
-        record_medians(inner, [(circle_id, median)], period);
+        record_medians(inner, vec![(circle_id, median)], period).await;
     }
 }
 
-fn record_medians(
-    inner: &Inner,
-    medians: impl IntoIterator<Item = (u64, f64)>,
-    period: Option<Period>,
-) {
-    if *read(&inner.period) == period {
-        write(&inner.pool).set_exact_medians(medians);
+// Into the pool and the shared cache, so a restarted instance starts with them.
+async fn record_medians(inner: &Inner, medians: Vec<(u64, f64)>, period: Option<Period>) {
+    if *read(&inner.period) != period {
+        return;
     }
+    write(&inner.pool).set_exact_medians(medians.iter().copied());
+    if let Some(month) = listed_month(inner) {
+        inner
+            .shared
+            .store_medians(&month, &medians, KEEP_MEDIANS)
+            .await;
+    }
+}
+
+fn listed_month(inner: &Inner) -> Option<String> {
+    read(&inner.listing).as_ref()?.1.clone()
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {

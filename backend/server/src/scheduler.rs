@@ -153,6 +153,7 @@ pub async fn run_scheduler(
                         let started = saved.started();
                         let listed = saved.rows.len();
                         install(&details, saved.rows, &config);
+                        details.restore_shared_medians().await;
                         cache.update_progress(|p| {
                             p.started_at = Some(started);
                             p.listed = listed;

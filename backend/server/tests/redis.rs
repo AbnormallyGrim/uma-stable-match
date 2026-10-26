@@ -441,6 +441,10 @@ async fn a_failed_shared_scan_is_reported_by_every_instance() {
 }
 
 fn listed_clubs(clubs: &[(u64, i64)]) -> ResponseTemplate {
+    listed_clubs_at(clubs, "2026-03-19T15:00:00Z")
+}
+
+fn listed_clubs_at(clubs: &[(u64, i64)], last_updated: &str) -> ResponseTemplate {
     let circles: Vec<_> = clubs
         .iter()
         .enumerate()
@@ -451,7 +455,7 @@ fn listed_clubs(clubs: &[(u64, i64)]) -> ResponseTemplate {
                 "monthly_rank": 100 + i,
                 "member_count": 9,
                 "monthly_point": points,
-                "last_updated": "2026-03-19T15:00:00Z",
+                "last_updated": last_updated,
             })
         })
         .collect();
@@ -1061,6 +1065,59 @@ async fn a_restarted_instance_scores_clubs_from_redis_without_fetching_them() {
     );
     assert_eq!(restarted.queued(), 0);
     assert_eq!(calls(&server, "/api/v4/circles", None).await, 3);
+}
+
+// Loads three clubs on one instance, then scans on a restarted one whose listing was updated at
+// `relisted_at`.
+async fn restarted_after_loading(relisted_at: &str) -> Option<(ClubDetails, [u64; 3])> {
+    let first_shared = redis().await?;
+    let server = MockServer::start().await;
+    let ids = [unique_id(), unique_id(), unique_id()];
+    let clubs = [
+        (ids[0], 10_000_000),
+        (ids[1], 20_000_000),
+        (ids[2], 30_000_000),
+    ];
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(listed_clubs(&clubs))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles/list"))
+        .respond_with(listed_clubs_at(&clubs, relisted_at))
+        .mount(&server)
+        .await;
+    mount_details(&server, &ids).await;
+    let config = scan_config();
+    let first = refreshing(&server, config, first_shared);
+    scan(&client(&server), &first, &config).await.unwrap();
+    for id in ids {
+        first.get(id, Priority::Interactive).await.unwrap();
+    }
+
+    let restarted = refreshing(&server, config, redis().await.unwrap());
+    scan(&client(&server), &restarted, &config).await.unwrap();
+    assert_eq!(restarted.cached_clubs(), 0);
+    assert_eq!(calls(&server, "/api/v4/circles", None).await, 3);
+    Some((restarted, ids))
+}
+
+#[tokio::test]
+async fn a_restarted_instance_starts_with_the_exact_medians_in_redis() {
+    let Some((restarted, ids)) = restarted_after_loading("2026-03-20T15:00:00Z").await else {
+        return;
+    };
+    let pool = restarted.pool().read().unwrap();
+    assert_eq!(pool.exact_medians(), 3);
+    assert_eq!(pool.estimated_median(ids[0]), Some(500.0));
+}
+
+#[tokio::test]
+async fn a_restarted_instance_ignores_another_months_medians() {
+    let Some((restarted, _)) = restarted_after_loading("2026-04-19T15:00:00Z").await else {
+        return;
+    };
+    assert_eq!(restarted.pool().read().unwrap().exact_medians(), 0);
 }
 
 #[tokio::test]
