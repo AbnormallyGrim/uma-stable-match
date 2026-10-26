@@ -28,6 +28,9 @@ pub const DEFAULT_TRAINER_LOOKUPS_PER_MINUTE: u32 = 10;
 /// progress can be resumed, when `SCAN_INTERVAL_MINUTES` isn't set.
 pub const DEFAULT_SCAN_INTERVAL_MINUTES: u32 = 180;
 
+/// Megabytes of club details kept in memory when `DETAIL_CACHE_MB` isn't set.
+pub const DEFAULT_DETAIL_CACHE_MB: u32 = 256;
+
 /// Server settings. `Debug` output redacts the API key.
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -44,6 +47,8 @@ pub struct Config {
     /// How often club details are refreshed, from `DETAIL_CACHE_MINUTES`. `None` follows uma.moe's
     /// daily update.
     pub detail_cache: Option<Duration>,
+    /// Most megabytes of club details kept in memory, from `DETAIL_CACHE_MB`.
+    pub detail_cache_mb: u32,
     /// Shortlist and fetch settings, from `SHORTLIST_SIZE` and `REQUEST_FETCH_BUDGET`.
     pub matching: MatchSettings,
     /// How long a trainer's pace is reused, from `TRAINER_CACHE_MINUTES`.
@@ -189,6 +194,7 @@ impl Config {
                 u64::from(number("DETAIL_CACHE_MINUTES", 0)?) * 60,
             )),
         };
+        let detail_cache_mb = number("DETAIL_CACHE_MB", DEFAULT_DETAIL_CACHE_MB)?;
         let match_defaults = MatchSettings::default();
         let matching = MatchSettings {
             shortlist_size: number("SHORTLIST_SIZE", match_defaults.shortlist_size as u32)?
@@ -268,6 +274,7 @@ impl Config {
             scan,
             scan_interval,
             detail_cache,
+            detail_cache_mb,
             matching,
             trainer_cache,
             rate_limit_per_minute,

@@ -23,10 +23,11 @@ pub use app::{app, router, status_router, AppState};
 pub use cache::{Cache, CacheStatus, ScanFailure, ScanPhase, ScanProgress, Snapshot};
 pub use calibration::{club_median, Calibration, MIN_CALIBRATION_SAMPLES};
 pub use config::{
-    Config, ConfigError, DEFAULT_HOST, DEFAULT_PORT, DEFAULT_RATE_LIMIT_PER_MINUTE,
-    DEFAULT_SCAN_INTERVAL_MINUTES, DEFAULT_TRAINER_LOOKUPS_PER_MINUTE,
+    Config, ConfigError, DEFAULT_DETAIL_CACHE_MB, DEFAULT_HOST, DEFAULT_PORT,
+    DEFAULT_RATE_LIMIT_PER_MINUTE, DEFAULT_SCAN_INTERVAL_MINUTES,
+    DEFAULT_TRAINER_LOOKUPS_PER_MINUTE,
 };
-pub use details::{BackgroundLoader, ClubDetails, DetailConfig, SharedPool};
+pub use details::{club_weight, BackgroundLoader, ClubDetails, DetailConfig, SharedPool};
 pub use frontend::CONTENT_SECURITY;
 pub use limits::RateLimits;
 pub use logging::{init_logging, InvalidLogFormat, LogFormat};

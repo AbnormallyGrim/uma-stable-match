@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::field::Empty;
 use tracing::{Instrument, Span};
-use uma_stable_match_scoring::Club;
+use uma_stable_match_scoring::{Club, MemberSnapshot};
 use uma_stable_match_umamoe_client::{Circle, CircleRequest, Client, Error, Priority};
 
 use crate::calibration::club_median;
@@ -33,8 +33,8 @@ pub(crate) const VISITOR_MAX_PAUSE: Duration = Duration::from_secs(30);
 /// Detail cache settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DetailConfig {
-    /// Most clubs kept in the cache.
-    pub max_clubs: u64,
+    /// Most bytes of club details kept in the cache, as weighed by [`club_weight`].
+    pub max_bytes: u64,
     /// Most clubs waiting for a background load.
     pub queue_size: usize,
     /// When each club is next refreshed. Details expire from memory then, and stay in the shared
@@ -50,7 +50,7 @@ pub struct DetailConfig {
 impl Default for DetailConfig {
     fn default() -> Self {
         Self {
-            max_clubs: 2_000,
+            max_bytes: 32 * 1024 * 1024,
             queue_size: 1_000,
             refresh: RefreshConfig::default(),
             refresher: false,
@@ -86,6 +86,22 @@ struct Entry {
     club: Arc<Club>,
     last_updated: Option<i64>,
     due_ms: i64,
+}
+
+/// Approximate bytes a club's details take in memory.
+pub fn club_weight(club: &Club) -> u32 {
+    let members: usize = club
+        .members
+        .iter()
+        .map(|m| m.daily_fans.capacity() * size_of::<i64>())
+        .sum();
+    let bytes = size_of::<Entry>()
+        + size_of::<Club>()
+        + club.name.capacity()
+        + club.comment.as_ref().map_or(0, String::capacity)
+        + club.members.capacity() * size_of::<MemberSnapshot>()
+        + members;
+    u32::try_from(bytes).unwrap_or(u32::MAX)
 }
 
 #[derive(Serialize, Deserialize)]
@@ -181,7 +197,8 @@ impl ClubDetails {
         shared: SharedCache,
     ) -> (Self, BackgroundLoader) {
         let cache = Cache::builder()
-            .max_capacity(config.max_clubs)
+            .max_capacity(config.max_bytes)
+            .weigher(|_, entry: &Entry| club_weight(&entry.club))
             .expire_after(UntilDue {
                 keep: config.refresher && !shared.is_enabled(),
             })
@@ -426,6 +443,11 @@ impl ClubDetails {
     /// Approximate number of cached clubs.
     pub fn cached_clubs(&self) -> u64 {
         self.inner.cache.entry_count()
+    }
+
+    /// Approximate bytes of cached club details, as weighed by [`club_weight`].
+    pub fn cached_bytes(&self) -> u64 {
+        self.inner.cache.weighted_size()
     }
 
     pub(crate) fn shared(&self) -> &SharedCache {

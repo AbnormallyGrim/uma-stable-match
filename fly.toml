@@ -57,8 +57,8 @@ primary_region = "iad"
   port = 9464
   path = "/metrics"
 
-# Room for the wide scan window's club data. Raise it if `fly logs` shows the machine running out
-# of memory.
+# Room for the club data of the wide scan window, which `DETAIL_CACHE_MB` caps at 256 MB by
+# default. Raise both together if the cache fills up.
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "512mb"
+  memory = "1024mb"
