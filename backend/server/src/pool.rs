@@ -305,6 +305,13 @@ impl ClubPool {
             .count()
     }
 
+    /// Whether the club's exact median is known.
+    pub fn has_exact_median(&self, circle_id: u64) -> bool {
+        self.index
+            .get(&circle_id)
+            .is_some_and(|&i| self.entries[i].exact_median.is_some())
+    }
+
     /// Every known exact median, as `(circle_id, median)`.
     pub fn known_exact_medians(&self) -> impl Iterator<Item = (u64, f64)> + '_ {
         self.entries

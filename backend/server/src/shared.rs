@@ -149,12 +149,21 @@ impl RedisBackend {
     }
 
     async fn query<T: FromRedisValue>(&self, cmd: &Cmd, limit: Duration) -> Option<T> {
+        self.query_as("schedule", cmd, limit).await
+    }
+
+    async fn query_as<T: FromRedisValue>(
+        &self,
+        op: &'static str,
+        cmd: &Cmd,
+        limit: Duration,
+    ) -> Option<T> {
         let mut conn = self.conn.clone();
         let started = Instant::now();
         let reply = timeout(limit, cmd.query_async(&mut conn))
-            .instrument(redis_span("schedule"))
+            .instrument(redis_span(op))
             .await;
-        observe("schedule", started);
+        observe(op, started);
         match reply {
             Ok(Ok(value)) => {
                 self.up();
@@ -349,6 +358,41 @@ impl SharedCache {
             Ok(Err(error)) => redis.down(&kind(&error)),
             Err(_) => redis.down("timed out"),
         }
+    }
+
+    /// Records clubs' exact medians for a game month (`YYYY-MM`), keeping them for `ttl` after the
+    /// last write. Failures are ignored.
+    pub(crate) async fn store_medians(&self, month: &str, medians: &[(u64, f64)], ttl: Duration) {
+        let Backend::Redis(redis) = &self.backend else {
+            return;
+        };
+        if medians.is_empty() {
+            return;
+        }
+        let script = Script::new(MEDIANS_SCRIPT);
+        let mut invocation = script.prepare_invoke();
+        invocation.key(medians_key(month)).arg(millis(ttl));
+        for (circle_id, median) in medians {
+            invocation.arg(circle_id).arg(median);
+        }
+        redis.invoke::<i64>(&invocation, OP_TIMEOUT).await;
+    }
+
+    /// The exact medians stored for a game month (`YYYY-MM`), or none without Redis or if it
+    /// doesn't answer.
+    pub(crate) async fn medians(&self, month: &str) -> Vec<(u64, f64)> {
+        let Backend::Redis(redis) = &self.backend else {
+            return Vec::new();
+        };
+        let mut all = redis::cmd("HGETALL");
+        all.arg(medians_key(month));
+        redis
+            .query_as::<Vec<(String, String)>>("hgetall", &all, SNAPSHOT_TIMEOUT)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|(id, median)| Some((id.parse().ok()?, median.parse().ok()?)))
+            .collect()
     }
 
     /// Decides in one Redis script whether this instance scans, waits, or loads a published scan.
@@ -830,6 +874,14 @@ local due = redis.call('ZCOUNT', KEYS[1], '-inf', ARGV[3])
 return {#ids, loaded, due, expiring, shortest, total}
 ";
 
+const MEDIANS_SCRIPT: &str = r"
+for i = 2, #ARGV, 2 do
+  redis.call('HSET', KEYS[1], ARGV[i], ARGV[i + 1])
+end
+redis.call('PEXPIRE', KEYS[1], ARGV[1])
+return 1
+";
+
 const RESCHEDULE_SCRIPT: &str = r"
 local old = redis.call('ZSCORE', KEYS[1], ARGV[1])
 if not old then
@@ -926,6 +978,10 @@ fn millis(duration: Duration) -> u64 {
 /// Shared-cache key for a club's details in a month (`None` = the current game month).
 pub fn club_key(circle_id: u64, period: Option<Period>) -> String {
     format!("{KEY_PREFIX}:club:{circle_id}:{}", period_part(period))
+}
+
+fn medians_key(month: &str) -> String {
+    format!("{KEY_PREFIX}:medians:{month}")
 }
 
 fn period_part(period: Option<Period>) -> String {
