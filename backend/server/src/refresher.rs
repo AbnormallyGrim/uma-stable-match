@@ -498,12 +498,10 @@ impl Refresher {
                 .await
                 .unwrap_or(now + config.recheck),
             Err(error) => {
-                let status = error.status();
-
                 tracing::warn!(
                     circle_id,
                     origin = error.origin(),
-                    ?status,
+                    status = ?error.status(),
                     %error,
                     "club refresh failed; retrying later"
                 );
