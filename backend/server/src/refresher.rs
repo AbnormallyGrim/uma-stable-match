@@ -498,7 +498,13 @@ impl Refresher {
                 .await
                 .unwrap_or(now + config.recheck),
             Err(error) => {
-                tracing::warn!(circle_id, origin = error.origin(), %error, "club refresh failed; retrying later");
+                tracing::warn!(
+                    circle_id,
+                    origin = error.origin(),
+                    status = ?error.status(),
+                    %error,
+                    "club refresh failed; retrying later"
+                );
                 now + config.retry
             }
         };
