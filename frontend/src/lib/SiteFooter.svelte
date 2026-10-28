@@ -5,10 +5,17 @@
 -->
 
 <script lang="ts">
+  import carats from '../assets/carats/carats.webp';
   import BrandLogo from './BrandLogo.svelte';
 
   const REPO = 'https://github.com/AbnormallyGrim/uma-stable-match';
   const KOFI = 'https://ko-fi.com/L5P6299MV1';
+  const FREE_CARATS = 'https://youtu.be/dQw4w9WgXcQ';
+
+  let { today = new Date() }: { today?: Date } = $props();
+  const open = (url: string) => window.open(url, '_blank', 'noopener,noreferrer');
+
+  const aprilFools = $derived(today.getMonth() === 3 && today.getDate() === 1);
 </script>
 
 <footer class="site-footer">
@@ -41,10 +48,15 @@
     </div>
 
     <nav aria-label="Project links">
-      <a href="{REPO}/issues" target="_blank" rel="noopener noreferrer">Report a problem</a>
-      <a class="kofi" href={KOFI} target="_blank" rel="noopener noreferrer"
-        ><span aria-hidden="true">🥕</span> Buy me a carrot</a
+      <button type="button" onclick={() => open(`${REPO}/issues`)}>Report a problem</button>
+      <button type="button" class="kofi" onclick={() => open(KOFI)}
+        ><span aria-hidden="true">🥕</span> Buy me a carrot</button
       >
+      {#if aprilFools}
+        <button type="button" class="carats" onclick={() => open(FREE_CARATS)}
+          ><img src={carats} alt="" width="20" height="20" /> Free carats</button
+        >
+      {/if}
     </nav>
     <p class="support">Optional tips help cover hosting. Every feature stays free.</p>
 
@@ -141,7 +153,9 @@
     justify-content: center;
   }
 
-  nav a {
+  nav button {
+    font: inherit;
+    cursor: pointer;
     padding: 6px 14px;
     background: var(--card);
     border: 1px solid var(--border);
@@ -151,20 +165,79 @@
     text-decoration: none;
   }
 
-  nav a:hover {
+  nav button:hover {
     border-color: var(--accent);
     color: var(--accent);
   }
 
-  nav a.kofi {
+  nav button.kofi {
     background: var(--accent);
     border-color: var(--accent);
     color: var(--on-accent);
   }
 
-  nav a.kofi:hover {
+  nav button.kofi:hover {
     background: color-mix(in srgb, var(--accent) 88%, var(--text));
     color: var(--on-accent);
+  }
+
+  nav button.carats {
+    --rainbow: linear-gradient(
+      90deg,
+      #ff3b3b,
+      #ff9f1c,
+      #ffe600,
+      #2ecc71,
+      #19b5fe,
+      #7b61ff,
+      #ff3bd4,
+      #ff3b3b
+    );
+
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    border: 2px solid transparent;
+    background:
+      linear-gradient(var(--card), var(--card)) padding-box,
+      var(--rainbow) border-box 0 0 / 200% 100%;
+    animation: rainbow-slide 4s linear infinite;
+  }
+
+  nav button.carats::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--rainbow) 0 0 / 200% 100%;
+    filter: blur(10px);
+    opacity: 0.6;
+    animation: rainbow-slide 4s linear infinite;
+  }
+
+  nav button.carats:hover {
+    color: var(--text);
+  }
+
+  nav button.carats img {
+    width: 20px;
+    height: 20px;
+  }
+
+  @keyframes rainbow-slide {
+    to {
+      background-position: 200% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    nav button.carats,
+    nav button.carats::before {
+      animation: none;
+    }
   }
 
   .support {
