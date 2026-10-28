@@ -130,6 +130,7 @@ impl Flow {
             matching,
             paces: PaceLookup::new(client(&self.server), DEFAULT_PACE_TTL),
             limits: RateLimits::new(10_000, 10_000, false),
+            human: Default::default(),
         };
         let response = router(state)
             .oneshot(

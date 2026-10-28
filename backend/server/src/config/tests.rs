@@ -504,3 +504,43 @@ fn a_lower_range_above_the_window_fails() {
         }
     );
 }
+
+#[test]
+fn the_human_check_is_off_unless_both_keys_are_set() {
+    let base = ("UMAMOE_API_KEY", "test-key");
+    let config = Config::from_lookup(lookup(&[base])).unwrap();
+    assert!(config.human.is_none());
+    assert!(!config.human_check().is_enabled());
+
+    let config = Config::from_lookup(lookup(&[
+        base,
+        ("TURNSTILE_SECRET_KEY", "made-up-secret"),
+        ("TOKEN_SIGNING_KEY", &"k".repeat(32)),
+    ]))
+    .unwrap();
+    assert!(config.human_check().is_enabled());
+    assert!(!format!("{config:?}").contains("made-up-secret"));
+}
+
+#[test]
+fn rejects_a_partial_or_short_human_check() {
+    let base = ("UMAMOE_API_KEY", "test-key");
+    for vars in [
+        vec![base, ("TURNSTILE_SECRET_KEY", "made-up-secret")],
+        vec![base, ("TOKEN_SIGNING_KEY", &"k".repeat(32))],
+    ] {
+        assert_eq!(
+            Config::from_lookup(lookup(&vars)).unwrap_err(),
+            ConfigError::IncompleteHumanCheck
+        );
+    }
+    assert_eq!(
+        Config::from_lookup(lookup(&[
+            base,
+            ("TURNSTILE_SECRET_KEY", "made-up-secret"),
+            ("TOKEN_SIGNING_KEY", "too-short"),
+        ]))
+        .unwrap_err(),
+        ConfigError::InvalidTokenSigningKey
+    );
+}

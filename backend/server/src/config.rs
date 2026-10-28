@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use uma_stable_match_umamoe_client::ApiKey;
 
+use crate::human::{HumanCheck, SigningKey, TurnstileSecret};
 use crate::pace::DEFAULT_PACE_TTL;
 use crate::recommendations::MatchSettings;
 use crate::scanner::ScanConfig;
@@ -66,6 +67,9 @@ pub struct Config {
     /// Secret for hashing trainer IDs in Redis keys, from `REDIS_KEY_SECRET`. Set whenever
     /// `redis_url` is.
     pub redis_key_secret: Option<KeySecret>,
+    /// Turnstile and token keys, from `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY`. `None` turns
+    /// the human check off.
+    pub human: Option<(TurnstileSecret, SigningKey)>,
     /// Address to serve Prometheus metrics on, from `METRICS_ADDR`. `None` records no metrics.
     pub metrics_addr: Option<SocketAddr>,
 }
@@ -95,6 +99,12 @@ pub enum ConfigError {
     /// `REDIS_KEY_SECRET` is shorter than 32 characters. The value isn't shown.
     #[error("REDIS_KEY_SECRET must be at least 32 characters")]
     InvalidRedisKeySecret,
+    /// `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY` aren't set together.
+    #[error("TURNSTILE_SECRET_KEY and TOKEN_SIGNING_KEY must be set together")]
+    IncompleteHumanCheck,
+    /// `TOKEN_SIGNING_KEY` is shorter than 32 characters. The value isn't shown.
+    #[error("TOKEN_SIGNING_KEY must be at least 32 characters")]
+    InvalidTokenSigningKey,
     /// `METRICS_ADDR` isn't an IP address with a port from 1 to 65535.
     #[error("METRICS_ADDR must be an IP address and port, such as 127.0.0.1:9464, got {0:?}")]
     InvalidMetricsAddr(String),
@@ -133,6 +143,14 @@ pub enum ConfigError {
 }
 
 impl Config {
+    /// The human check these settings describe.
+    pub fn human_check(&self) -> HumanCheck {
+        match &self.human {
+            Some((secret, key)) => HumanCheck::new(secret.clone(), key.clone()),
+            None => HumanCheck::default(),
+        }
+    }
+
     /// Reads settings from environment variables.
     pub fn from_env() -> Result<Self, ConfigError> {
         Self::from_lookup(|name| std::env::var(name).ok())
@@ -244,6 +262,14 @@ impl Config {
                 Some(KeySecret::parse(&value).ok_or(ConfigError::InvalidRedisKeySecret)?)
             }
         };
+        let human = match (get("TURNSTILE_SECRET_KEY"), get("TOKEN_SIGNING_KEY")) {
+            (None, None) => None,
+            (Some(secret), Some(key)) => Some((
+                TurnstileSecret::parse(&secret).ok_or(ConfigError::IncompleteHumanCheck)?,
+                SigningKey::parse(&key).ok_or(ConfigError::InvalidTokenSigningKey)?,
+            )),
+            _ => return Err(ConfigError::IncompleteHumanCheck),
+        };
         let metrics_addr = match get("METRICS_ADDR") {
             None => None,
             Some(value) => Some(
@@ -283,6 +309,7 @@ impl Config {
             frontend_dir,
             redis_url,
             redis_key_secret,
+            human,
             metrics_addr,
         })
     }

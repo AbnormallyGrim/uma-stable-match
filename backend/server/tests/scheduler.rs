@@ -48,6 +48,7 @@ fn app(cache: Cache, details: ClubDetails) -> AppState {
         cache,
         details,
         matching: MatchSettings::default(),
+        human: Default::default(),
         paces: PaceLookup::new(offline(), DEFAULT_PACE_TTL),
         limits: RateLimits::new(10_000, 10_000, false),
     }

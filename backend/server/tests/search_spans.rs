@@ -116,6 +116,7 @@ async fn scanned() -> (AppState, Client) {
         cache,
         details,
         matching: MatchSettings::default(),
+        human: Default::default(),
         paces: PaceLookup::new(client.clone(), DEFAULT_PACE_TTL),
         limits: RateLimits::new(10_000, 10_000, false),
     };
