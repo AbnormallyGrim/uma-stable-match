@@ -131,6 +131,7 @@ fn app(server: &MockServer, (cache, details): (Cache, ClubDetails), ttl: Duratio
         cache,
         details,
         matching: MatchSettings::default(),
+        human: Default::default(),
         paces: PaceLookup::new(client(server), ttl),
         limits: RateLimits::new(10_000, 10_000, false),
     }

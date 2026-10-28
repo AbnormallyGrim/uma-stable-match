@@ -39,6 +39,7 @@ fn app((cache, details): Scanned) -> AppState {
         cache,
         details,
         matching: MatchSettings::default(),
+        human: Default::default(),
         paces: PaceLookup::new(offline(), DEFAULT_PACE_TTL),
         limits: RateLimits::new(10_000, 10_000, false),
     }

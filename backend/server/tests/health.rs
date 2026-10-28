@@ -20,6 +20,7 @@ fn app(cache: Cache) -> AppState {
         cache,
         details: ClubDetails::new(&client, SharedPool::default(), DetailConfig::default()).0,
         matching: MatchSettings::default(),
+        human: Default::default(),
         paces: PaceLookup::new(client, DEFAULT_PACE_TTL),
         limits: RateLimits::new(10_000, 10_000, false),
     }

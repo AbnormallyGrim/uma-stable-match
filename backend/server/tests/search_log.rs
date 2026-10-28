@@ -99,6 +99,7 @@ async fn scanned() -> AppState {
         cache,
         details,
         matching: MatchSettings::default(),
+        human: Default::default(),
         paces: PaceLookup::new(client, DEFAULT_PACE_TTL),
         limits: RateLimits::new(10_000, 10_000, false),
     }

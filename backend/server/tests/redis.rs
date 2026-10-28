@@ -1046,6 +1046,7 @@ async fn a_restarted_instance_scores_clubs_from_redis_without_fetching_them() {
         },
         paces: PaceLookup::new(client(&server), DEFAULT_PACE_TTL),
         limits: RateLimits::new(10_000, 10_000, false),
+        human: Default::default(),
     };
     let response = router(state)
         .oneshot(

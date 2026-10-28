@@ -7,6 +7,7 @@ mod calibration;
 mod config;
 mod details;
 mod frontend;
+mod human;
 mod limits;
 mod logging;
 mod pace;
@@ -29,6 +30,7 @@ pub use config::{
 };
 pub use details::{club_weight, BackgroundLoader, ClubDetails, DetailConfig, SharedPool};
 pub use frontend::CONTENT_SECURITY;
+pub use human::{HumanCheck, SigningKey, TurnstileSecret, TOKEN_LIFETIME};
 pub use limits::RateLimits;
 pub use logging::{init_logging, InvalidLogFormat, LogFormat};
 pub use pace::{PaceError, PaceLookup, TrainerPace, DEFAULT_PACE_TTL};

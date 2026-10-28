@@ -40,6 +40,8 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `FRONTEND_DIR` | none | Built frontend to serve, such as `frontend/dist`. Unset, the server serves only the API |
 | `REDIS_URL` | none | A `redis://` or `rediss://` URL to share club details, trainer paces and scans with other instances. Unset, everything stays in this instance's memory. See [Shared cache](#shared-cache) |
 | `REDIS_KEY_SECRET` | none | Required with `REDIS_URL`: at least 32 characters, the same on every instance. Keys the hash that replaces trainer IDs in Redis |
+| `TURNSTILE_SECRET_KEY` | none | Cloudflare Turnstile's secret key. Set it with `TOKEN_SIGNING_KEY` to turn on the [human check](#human-check). Unset, the check is off |
+| `TOKEN_SIGNING_KEY` | none | Required with `TURNSTILE_SECRET_KEY`: at least 32 characters, the same on every instance. Signs the tokens the human check issues |
 | `METRICS_ADDR` | none | IP address and port to serve Prometheus metrics and the full [status](#status) on, such as `127.0.0.1:9464`. Unset, no metrics are recorded. See [Metrics](#metrics) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none | OTLP/HTTP base URL to send traces to, such as `http://127.0.0.1:4318`. Unset, no traces are recorded. See [Traces](#traces) |
 | `OTEL_EXPORTER_OTLP_HEADERS` | none | Headers for each export, such as `Authorization=Basic%20<token>`, with spaces written as `%20` |
@@ -52,10 +54,11 @@ Blank values count as unset. These stop the server at startup, with an error mes
 - a scan, cache or rate limit setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO`
 - a `FRONTEND_DIR` without an `index.html`
 - a `REDIS_URL` without a `redis://` or `rediss://` scheme, a missing or short `REDIS_KEY_SECRET`, or a Redis that can't be reached within 5 seconds
+- only one of `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY`, or a `TOKEN_SIGNING_KEY` under 32 characters
 - a `METRICS_ADDR` that isn't an IP address and port, or that can't be listened on
 - an `OTEL_EXPORTER_OTLP_ENDPOINT` that isn't a valid URL
 
-The API key, `REDIS_URL` (which can hold a password), `REDIS_KEY_SECRET` and `OTEL_EXPORTER_OTLP_HEADERS` are never logged, never included in errors and are redacted in `Debug` output. `.env` is git-ignored; never commit it.
+The API key, `REDIS_URL` (which can hold a password), `REDIS_KEY_SECRET`, `TURNSTILE_SECRET_KEY`, `TOKEN_SIGNING_KEY` and `OTEL_EXPORTER_OTLP_HEADERS` are never logged, never included in errors and are redacted in `Debug` output. `.env` is git-ignored; never commit it.
 
 ## Scanner
 
@@ -515,6 +518,22 @@ Visitors are identified by IP address:
 
 IP addresses are kept in memory only while they're being limited, and they're never logged.
 
+### Human check
+
+With `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY` set, a visitor trades a [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) response for a short-lived token. Unset, the endpoint answers `404`, so local development and self-hosting need nothing. This step only issues tokens; the recommendations endpoint doesn't require one yet.
+
+`POST /api/v1/challenge` takes `{"response": "<Turnstile response>"}` and shares the [request limit](#rate-limits).
+
+| Status | Meaning |
+|---|---|
+| `200` | `{"token": "...", "expires_in": 600}`. The token is the expiry time and an HMAC-SHA256 tag keyed by `TOKEN_SIGNING_KEY`, and holds nothing about the visitor |
+| `400` | `response` is empty or over 2,048 bytes |
+| `403` | Turnstile rejected the response |
+| `404` | The human check is off |
+| `502` | Cloudflare didn't answer within 5 seconds, or answered with an error |
+
+Only the response and the secret key go to Cloudflare, not the visitor's address. The metric `human_checks_total` counts `passed`, `failed` and `unavailable` results.
+
 ## Logs
 
 Logs go to stdout. With `LOG_FORMAT=json`, each line is a JSON object with the timestamp, level, message, module (`target`) and the source file and line that logged it (`filename`, `line_number`), plus the event's own fields, such as `circle_id` and `error`:
@@ -560,6 +579,7 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `search_shortlist_worst_rank` | histogram | | Per search, the worst monthly rank among the shortlisted clubs. Buckets from 1,000 to 65,000 |
 | `search_pick_worst_rank` | histogram | | Per search, the worst monthly rank among the top ten picks with an open spot |
 | `search_pool_bottom_total` | counter | | Searches whose shortlist reached the slowest club in the pool. Divided by `search_shortlist_worst_rank_count`, it's the share of searches the scan window was too short for |
+| `human_checks_total` | counter | `result`: `passed`, `failed` or `unavailable` | [Human check](#human-check) attempts |
 | `rate_limited_total` | counter | `limit`: `requests` or `trainer_lookups` | Requests turned away by a [rate limit](#rate-limits) |
 | `scan_phase` | gauge | | `0` idle or waiting for another instance's scan, `1` listing clubs, `2` loading club details |
 | `scan_listed_clubs` | gauge | | Clubs in the rank window listed so far in this scan |

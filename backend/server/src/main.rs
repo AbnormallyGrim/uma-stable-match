@@ -148,6 +148,7 @@ async fn main() -> ExitCode {
         limits,
         details,
         matching: config.matching,
+        human: config.human_check(),
     };
     if let Some((handle, listener)) = metrics {
         let mut stopped = stop.subscribe();

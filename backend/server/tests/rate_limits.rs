@@ -41,6 +41,7 @@ fn app(cache: Cache, details: ClubDetails, base_url: String, limits: RateLimits)
         cache,
         details,
         matching: MatchSettings::default(),
+        human: Default::default(),
         paces: PaceLookup::new(client(base_url), DEFAULT_PACE_TTL),
         limits,
     })
