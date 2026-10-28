@@ -1,11 +1,13 @@
 // SiteFooter component tests.
 
-import { render, screen, within } from '@testing-library/svelte';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import SiteFooter from './SiteFooter.svelte';
 
 describe('SiteFooter', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it('is the page footer landmark with the disclaimer', () => {
     render(SiteFooter);
     const footer = screen.getByRole('contentinfo');
@@ -29,22 +31,48 @@ describe('SiteFooter', () => {
     }
   });
 
-  it('links to the issue tracker and Ko-fi', () => {
+  it('opens the issue tracker and Ko-fi in a new tab from buttons, with no link to preview', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
     render(SiteFooter);
     const nav = screen.getByRole('navigation', { name: 'Project links' });
-    const links = within(nav).getAllByRole('link');
-    expect(links).toHaveLength(2);
-    expect(links[0]).toHaveAccessibleName('Report a problem');
-    expect(links[0]).toHaveAttribute(
-      'href',
+    expect(within(nav).queryAllByRole('link')).toHaveLength(0);
+    const buttons = within(nav).getAllByRole('button');
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]).toHaveAccessibleName('Report a problem');
+    expect(buttons[1]).toHaveAccessibleName('Buy me a carrot');
+    await fireEvent.click(buttons[0]!);
+    await fireEvent.click(buttons[1]!);
+    expect(open).toHaveBeenNthCalledWith(
+      1,
       'https://github.com/AbnormallyGrim/uma-stable-match/issues',
+      '_blank',
+      'noopener,noreferrer',
     );
-    expect(links[1]).toHaveAccessibleName('Buy me a carrot');
-    expect(links[1]).toHaveAttribute('href', 'https://ko-fi.com/L5P6299MV1');
-    for (const link of links) {
-      expect(link).toHaveAttribute('target', '_blank');
-      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(open).toHaveBeenNthCalledWith(
+      2,
+      'https://ko-fi.com/L5P6299MV1',
+      '_blank',
+      'noopener,noreferrer',
+    );
+  });
+
+  it('shows the Free carats button only on 1 April', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const nav = () => screen.getByRole('navigation', { name: 'Project links' });
+    for (const today of [new Date(2026, 2, 31), new Date(2026, 3, 2), new Date(2026, 9, 28)]) {
+      const { unmount } = render(SiteFooter, { today });
+      expect(within(nav()).queryByRole('button', { name: 'Free carats' })).toBeNull();
+      unmount();
     }
+    render(SiteFooter, { today: new Date(2026, 3, 1, 23, 59) });
+    const buttons = within(nav()).getAllByRole('button');
+    expect(buttons[1]).toHaveAccessibleName('Buy me a carrot');
+    await fireEvent.click(within(nav()).getByRole('button', { name: 'Free carats' }));
+    expect(open).toHaveBeenCalledWith(
+      'https://youtu.be/dQw4w9WgXcQ',
+      '_blank',
+      'noopener,noreferrer',
+    );
   });
 
   it('says tips only cover hosting', () => {
