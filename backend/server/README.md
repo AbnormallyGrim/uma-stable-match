@@ -40,8 +40,9 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `FRONTEND_DIR` | none | Built frontend to serve, such as `frontend/dist`. Unset, the server serves only the API |
 | `REDIS_URL` | none | A `redis://` or `rediss://` URL to share club details, trainer paces and scans with other instances. Unset, everything stays in this instance's memory. See [Shared cache](#shared-cache) |
 | `REDIS_KEY_SECRET` | none | Required with `REDIS_URL`: at least 32 characters, the same on every instance. Keys the hash that replaces trainer IDs in Redis |
-| `TURNSTILE_SECRET_KEY` | none | Cloudflare Turnstile's secret key. Set it with `TOKEN_SIGNING_KEY` to turn on the [human check](#human-check). Unset, the check is off |
-| `TOKEN_SIGNING_KEY` | none | Required with `TURNSTILE_SECRET_KEY`: at least 32 characters, the same on every instance. Signs the tokens the human check issues |
+| `TURNSTILE_SITE_KEY` | none | Cloudflare Turnstile's public site key, which the web app uses to show the challenge. Set it with the next two to turn on the [human check](#human-check). Unset, the check is off |
+| `TURNSTILE_SECRET_KEY` | none | Required with `TURNSTILE_SITE_KEY`: Turnstile's secret key |
+| `TOKEN_SIGNING_KEY` | none | Required with `TURNSTILE_SITE_KEY`: at least 32 characters, the same on every instance. Signs the tokens the human check issues |
 | `METRICS_ADDR` | none | IP address and port to serve Prometheus metrics and the full [status](#status) on, such as `127.0.0.1:9464`. Unset, no metrics are recorded. See [Metrics](#metrics) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none | OTLP/HTTP base URL to send traces to, such as `http://127.0.0.1:4318`. Unset, no traces are recorded. See [Traces](#traces) |
 | `OTEL_EXPORTER_OTLP_HEADERS` | none | Headers for each export, such as `Authorization=Basic%20<token>`, with spaces written as `%20` |
@@ -54,7 +55,7 @@ Blank values count as unset. These stop the server at startup, with an error mes
 - a scan, cache or rate limit setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO`
 - a `FRONTEND_DIR` without an `index.html`
 - a `REDIS_URL` without a `redis://` or `rediss://` scheme, a missing or short `REDIS_KEY_SECRET`, or a Redis that can't be reached within 5 seconds
-- only one of `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY`, or a `TOKEN_SIGNING_KEY` under 32 characters
+- only some of `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY`, or a `TOKEN_SIGNING_KEY` under 32 characters
 - a `METRICS_ADDR` that isn't an IP address and port, or that can't be listened on
 - an `OTEL_EXPORTER_OTLP_ENDPOINT` that isn't a valid URL
 
@@ -521,9 +522,11 @@ IP addresses are kept in memory only while they're being limited, and they're ne
 
 ### Human check
 
-With `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY` set, a visitor trades a [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) response for a short-lived token. Unset, the endpoint answers `404`, so local development and self-hosting need nothing.
+With `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY` set, a visitor trades a [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) response for a short-lived token. Unset, the endpoint answers `404`, so local development and self-hosting need nothing.
 
 When it's on, `/api/v1/recommendations` needs the token in an `Authorization: Bearer <token>` header and answers `401` without a valid, unexpired one. Health, `/status` and the frontend's files stay open. A request is rate limited before its token is checked.
+
+`GET /api/v1/challenge` returns `{"site_key": "..."}` for the web app, or `404` when the check is off, which tells the app no token is needed.
 
 `POST /api/v1/challenge` takes `{"response": "<Turnstile response>"}` and shares the [request limit](#rate-limits).
 

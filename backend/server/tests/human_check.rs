@@ -30,6 +30,7 @@ fn app(human: HumanCheck) -> Router {
 
 fn check(server: &MockServer) -> HumanCheck {
     HumanCheck::new(
+        "made-up-site-key",
         TurnstileSecret::parse("made-up-secret").unwrap(),
         SigningKey::parse(&"k".repeat(32)).unwrap(),
     )
@@ -174,6 +175,7 @@ async fn a_token_from_another_key_is_turned_away() {
     let server = cloudflare(true).await;
     let (_, body) = challenge(app(check(&server)), r#"{"response":"made-up-response"}"#).await;
     let other = HumanCheck::new(
+        "made-up-site-key",
         TurnstileSecret::parse("made-up-secret").unwrap(),
         SigningKey::parse(&"o".repeat(32)).unwrap(),
     );
@@ -200,4 +202,27 @@ async fn recommendations_need_no_token_when_the_check_is_off() {
         recommendations(app(HumanCheck::default()), None).await,
         StatusCode::SERVICE_UNAVAILABLE
     );
+}
+
+#[tokio::test]
+async fn the_site_key_is_served_when_the_check_is_on_and_not_found_when_off() {
+    let get = |human: HumanCheck| async move {
+        let response = app(human)
+            .oneshot(
+                Request::get("/api/v1/challenge")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = response.status();
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        (status, serde_json::from_slice::<Value>(&bytes).unwrap())
+    };
+    let server = cloudflare(true).await;
+    let (status, body) = get(check(&server)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, json!({ "site_key": "made-up-site-key" }));
+    let (status, _) = get(HumanCheck::default()).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }

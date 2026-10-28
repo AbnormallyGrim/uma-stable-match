@@ -86,7 +86,7 @@ export interface RecommendationQuery {
 }
 
 /** Why a request failed. */
-export type ApiErrorKind = 'http' | 'network' | 'timeout' | 'invalid-response';
+export type ApiErrorKind = 'http' | 'network' | 'timeout' | 'invalid-response' | 'human-check';
 
 /** A failed API request. `status` and `retryAfter` (seconds) are set for `http` errors. */
 export class ApiError extends Error {
@@ -113,6 +113,8 @@ export interface RequestOptions {
   signal?: AbortSignal;
   timeoutMs?: number;
   fetch?: typeof fetch;
+  /** Gets the token the API needs when its human check is on. Without it, no token is sent. */
+  human?: { token(): Promise<string | null>; invalidate(): void };
 }
 
 /** How long a request may take before it fails with a `timeout` error. */
@@ -157,17 +159,29 @@ export function setFilterParams(params: URLSearchParams, query: RecommendationQu
  *
  * Throws `ApiError`, or the caller's abort error when `signal` is aborted.
  */
-export function fetchRecommendations(
+export async function fetchRecommendations(
   query: RecommendationQuery,
   options: RequestOptions = {},
 ): Promise<Recommendations> {
-  return getJson<Recommendations>(
-    `/api/v1/recommendations?${recommendationParams(query)}`,
-    options,
-  );
+  const path = `/api/v1/recommendations?${recommendationParams(query)}`;
+  const { human } = options;
+  if (!human) {
+    return getJson<Recommendations>(path, options, null);
+  }
+  const token = await human.token();
+  try {
+    return await getJson<Recommendations>(path, options, token);
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 401) {
+      throw error;
+    }
+    // The token expired or was refused: get a new one and try once more.
+    human.invalidate();
+    return getJson<Recommendations>(path, options, await human.token());
+  }
 }
 
-async function getJson<T>(path: string, options: RequestOptions): Promise<T> {
+async function getJson<T>(path: string, options: RequestOptions, token: string | null): Promise<T> {
   options.signal?.throwIfAborted();
   const fetchFn = options.fetch ?? globalThis.fetch;
   const controller = new AbortController();
@@ -183,7 +197,9 @@ async function getJson<T>(path: string, options: RequestOptions): Promise<T> {
     let response: Response;
     try {
       response = await fetchFn(path, {
-        headers: { Accept: 'application/json' },
+        headers: token
+          ? { Accept: 'application/json', Authorization: `Bearer ${token}` }
+          : { Accept: 'application/json' },
         signal: controller.signal,
       });
     } catch (error) {

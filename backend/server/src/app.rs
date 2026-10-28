@@ -7,7 +7,7 @@ use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::middleware::{from_fn, from_fn_with_state, Next};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{any, get, post};
+use axum::routing::{any, get};
 use axum::{Json, Router};
 use serde_json::{json, Value};
 use tower_http::catch_panic::CatchPanicLayer;
@@ -16,7 +16,7 @@ use crate::api_error::ApiError;
 use crate::cache::{Cache, ScanFailure, ScanPhase, Snapshot};
 use crate::details::ClubDetails;
 use crate::frontend;
-use crate::human::{challenge, require_human, HumanCheck};
+use crate::human::{challenge, require_human, site_key, HumanCheck};
 use crate::limits::{limit_requests, RateLimits};
 use crate::pace::PaceLookup;
 use crate::recommendations::{recommendations, MatchSettings};
@@ -55,7 +55,9 @@ pub fn router(state: AppState) -> Router {
         )
         .route(
             "/api/v1/challenge",
-            post(challenge).route_layer(from_fn_with_state(state.clone(), limit_requests)),
+            get(site_key)
+                .post(challenge)
+                .route_layer(from_fn_with_state(state.clone(), limit_requests)),
         )
         .route("/api", any(api_not_found))
         .route("/api/{*rest}", any(api_not_found))
