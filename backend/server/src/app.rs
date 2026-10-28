@@ -16,7 +16,7 @@ use crate::api_error::ApiError;
 use crate::cache::{Cache, ScanFailure, ScanPhase, Snapshot};
 use crate::details::ClubDetails;
 use crate::frontend;
-use crate::human::{challenge, HumanCheck};
+use crate::human::{challenge, require_human, HumanCheck};
 use crate::limits::{limit_requests, RateLimits};
 use crate::pace::PaceLookup;
 use crate::recommendations::{recommendations, MatchSettings};
@@ -49,7 +49,9 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/health", get(health))
         .route(
             "/api/v1/recommendations",
-            get(recommendations).route_layer(from_fn_with_state(state.clone(), limit_requests)),
+            get(recommendations)
+                .route_layer(from_fn_with_state(state.clone(), require_human))
+                .route_layer(from_fn_with_state(state.clone(), limit_requests)),
         )
         .route(
             "/api/v1/challenge",

@@ -494,6 +494,7 @@ Errors come back as `{"error": "..."}`:
 | Status | When |
 |---|---|
 | `400` | Any of these:<br>• the query string can't be read, for example because a parameter is repeated<br>• neither or both of `trainer_id` and `pace` are given<br>• `trainer_id` isn't a trainer ID<br>• `pace` isn't a number above zero<br>• `balance_weight` isn't a number from 0 to 1<br>• `balance=false` is given with `balance_weight`<br>• `balance`, `include_closed`, `include_full` or `has_discord` isn't `true` or `false`<br>• `join_style` names something other than `open`, `approval` and `closed`<br>• `playstyle` isn't a list of codes from 1 to 31<br>• `limit` isn't a positive whole number |
+| `401` | The [human check](#human-check) is on and the `Authorization: Bearer` token is missing, invalid or expired |
 | `404` | uma.moe doesn't know the trainer, or they aren't in their club's data |
 | `422` | The trainer has too little fan data this month to work out a pace |
 | `502` | uma.moe couldn't be reached for the trainer lookup |
@@ -520,7 +521,9 @@ IP addresses are kept in memory only while they're being limited, and they're ne
 
 ### Human check
 
-With `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY` set, a visitor trades a [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) response for a short-lived token. Unset, the endpoint answers `404`, so local development and self-hosting need nothing. This step only issues tokens; the recommendations endpoint doesn't require one yet.
+With `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY` set, a visitor trades a [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) response for a short-lived token. Unset, the endpoint answers `404`, so local development and self-hosting need nothing.
+
+When it's on, `/api/v1/recommendations` needs the token in an `Authorization: Bearer <token>` header and answers `401` without a valid, unexpired one. Health, `/status` and the frontend's files stay open. A request is rate limited before its token is checked.
 
 `POST /api/v1/challenge` takes `{"response": "<Turnstile response>"}` and shares the [request limit](#rate-limits).
 
@@ -532,7 +535,7 @@ With `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY` set, a visitor trades a [Clo
 | `404` | The human check is off |
 | `502` | Cloudflare didn't answer within 5 seconds, or answered with an error |
 
-Only the response and the secret key go to Cloudflare, not the visitor's address. The metric `human_checks_total` counts `passed`, `failed` and `unavailable` results.
+Only the response and the secret key go to Cloudflare, not the visitor's address. The metric `human_checks_total` counts `passed`, `failed` and `unavailable` challenges, and `token_missing` for requests turned away without a valid token.
 
 ## Logs
 
@@ -579,7 +582,7 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `search_shortlist_worst_rank` | histogram | | Per search, the worst monthly rank among the shortlisted clubs. Buckets from 1,000 to 65,000 |
 | `search_pick_worst_rank` | histogram | | Per search, the worst monthly rank among the top ten picks with an open spot |
 | `search_pool_bottom_total` | counter | | Searches whose shortlist reached the slowest club in the pool. Divided by `search_shortlist_worst_rank_count`, it's the share of searches the scan window was too short for |
-| `human_checks_total` | counter | `result`: `passed`, `failed` or `unavailable` | [Human check](#human-check) attempts |
+| `human_checks_total` | counter | `result`: `passed`, `failed`, `unavailable` or `token_missing` | [Human check](#human-check) challenges, and requests turned away without a token |
 | `rate_limited_total` | counter | `limit`: `requests` or `trainer_lookups` | Requests turned away by a [rate limit](#rate-limits) |
 | `scan_phase` | gauge | | `0` idle or waiting for another instance's scan, `1` listing clubs, `2` loading club details |
 | `scan_listed_clubs` | gauge | | Clubs in the rank window listed so far in this scan |

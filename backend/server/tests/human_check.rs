@@ -130,3 +130,74 @@ async fn the_challenge_is_not_found_when_the_check_is_off() {
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+async fn recommendations(app: Router, authorization: Option<&str>) -> StatusCode {
+    let mut request = Request::get("/api/v1/recommendations?pace=500");
+    if let Some(value) = authorization {
+        request = request.header("authorization", value);
+    }
+    app.oneshot(request.body(Body::empty()).unwrap())
+        .await
+        .unwrap()
+        .status()
+}
+
+#[tokio::test]
+async fn recommendations_need_a_valid_token_when_the_check_is_on() {
+    let server = cloudflare(true).await;
+    let human = check(&server);
+    let (_, body) = challenge(app(human.clone()), r#"{"response":"made-up-response"}"#).await;
+    let token = body["token"].as_str().unwrap();
+
+    for authorization in [
+        None,
+        Some(""),
+        Some("Bearer "),
+        Some("Bearer made-up-token"),
+        Some(token),
+    ] {
+        assert_eq!(
+            recommendations(app(human.clone()), authorization).await,
+            StatusCode::UNAUTHORIZED,
+            "{authorization:?}"
+        );
+    }
+    // A valid token gets past the check; the first scan hasn't listed any clubs yet.
+    assert_eq!(
+        recommendations(app(human), Some(&format!("Bearer {token}"))).await,
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+}
+
+#[tokio::test]
+async fn a_token_from_another_key_is_turned_away() {
+    let server = cloudflare(true).await;
+    let (_, body) = challenge(app(check(&server)), r#"{"response":"made-up-response"}"#).await;
+    let other = HumanCheck::new(
+        TurnstileSecret::parse("made-up-secret").unwrap(),
+        SigningKey::parse(&"o".repeat(32)).unwrap(),
+    );
+    let token = format!("Bearer {}", body["token"].as_str().unwrap());
+    assert_eq!(
+        recommendations(app(other), Some(&token)).await,
+        StatusCode::UNAUTHORIZED
+    );
+}
+
+#[tokio::test]
+async fn health_stays_open_when_the_check_is_on() {
+    let server = cloudflare(true).await;
+    let health = app(check(&server))
+        .oneshot(Request::get("/api/v1/health").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(health.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn recommendations_need_no_token_when_the_check_is_off() {
+    assert_eq!(
+        recommendations(app(HumanCheck::default()), None).await,
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+}
