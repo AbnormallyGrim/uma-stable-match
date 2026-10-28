@@ -7,6 +7,7 @@ primary_region = "iad"
   dockerfile = "Dockerfile"
 
 # The API key is never set here: it's a Fly secret (`fly secrets`).
+# So are the human check's keys, TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY and TOKEN_SIGNING_KEY.
 # Traces are on when the OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_EXPORTER_OTLP_HEADERS secrets are set.
 # HOST, PORT and FRONTEND_DIR come from the Dockerfile.
 [env]

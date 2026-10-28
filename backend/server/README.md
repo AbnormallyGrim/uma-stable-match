@@ -317,7 +317,7 @@ Every response, from the API and the frontend alike, carries these headers:
 
 | Header | Value |
 |---|---|
-| `Content-Security-Policy` | `CONTENT_SECURITY`: scripts, styles, fonts and requests only from the site itself, images also from `data:` URLs, no plugins, and no framing |
+| `Content-Security-Policy` | `CONTENT_SECURITY`: scripts, styles, fonts and requests only from the site itself, images also from `data:` URLs, no plugins, and no framing of the page. Scripts and frames are also allowed from `https://challenges.cloudflare.com`, for the [human check](#human-check) |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `no-referrer` |
 | `X-Frame-Options` | `DENY` |
@@ -539,6 +539,18 @@ When it's on, `/api/v1/recommendations` needs the token in an `Authorization: Be
 | `502` | Cloudflare didn't answer within 5 seconds, or answered with an error |
 
 Only the response and the secret key go to Cloudflare, not the visitor's address. The metric `human_checks_total` counts `passed`, `failed` and `unavailable` challenges, and `token_missing` for requests turned away without a valid token.
+
+#### Turning it on at Fly.io
+
+Create a Turnstile widget in Cloudflare's dashboard for `app.umastable.com`. Cloudflare gives you a site key, which is public, and a secret key. A free account is enough, and the domain doesn't have to use Cloudflare's DNS.
+
+Deploy the version of the web app that runs the challenge first. Then set all three, which restarts the machine:
+
+```bash
+fly secrets set TURNSTILE_SITE_KEY=<site key> TURNSTILE_SECRET_KEY=<secret key> TOKEN_SIGNING_KEY=$(openssl rand -hex 32)
+```
+
+Setting them before that version is live makes every search fail with `401`. To turn the check off, unset them with `fly secrets unset TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY TOKEN_SIGNING_KEY`. With more than one instance, give each the same `TOKEN_SIGNING_KEY`. The content security policy already allows Turnstile's script and frame, and nothing else from Cloudflare.
 
 ## Logs
 
