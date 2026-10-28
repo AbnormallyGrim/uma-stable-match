@@ -13,6 +13,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use hmac::{Hmac, KeyInit, Mac};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use sha2::Sha256;
 
 use crate::api_error::ApiError;
@@ -69,6 +70,7 @@ pub struct HumanCheck {
 
 #[derive(Debug)]
 struct Enabled {
+    site_key: String,
     secret: TurnstileSecret,
     key: SigningKey,
     client: reqwest::Client,
@@ -93,13 +95,15 @@ enum VerifyError {
 
 impl HumanCheck {
     /// A check that signs tokens with `key` after Turnstile accepts a response made with `secret`.
-    pub fn new(secret: TurnstileSecret, key: SigningKey) -> Self {
+    /// `site_key` is Turnstile's public key, which the web app needs to show the challenge.
+    pub fn new(site_key: impl Into<String>, secret: TurnstileSecret, key: SigningKey) -> Self {
         let client = reqwest::Client::builder()
             .timeout(VERIFY_TIMEOUT)
             .build()
             .expect("the HTTP client builds with default settings");
         Self {
             enabled: Some(Arc::new(Enabled {
+                site_key: site_key.into(),
                 secret,
                 key,
                 client,
@@ -114,6 +118,7 @@ impl HumanCheck {
             return self;
         };
         let enabled = Arc::new(Enabled {
+            site_key: enabled.site_key.clone(),
             secret: enabled.secret.clone(),
             key: enabled.key.clone(),
             client: enabled.client.clone(),
@@ -231,6 +236,17 @@ pub(crate) async fn require_human(
         "a human check token is required; get one from /api/v1/challenge",
     )
     .into_response()
+}
+
+/// Serves `GET /api/v1/challenge`: Turnstile's public site key, for the web app.
+pub(crate) async fn site_key(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+    match &state.human.enabled {
+        Some(enabled) => Ok(Json(json!({ "site_key": enabled.site_key }))),
+        None => Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "the human check is off",
+        )),
+    }
 }
 
 /// Serves `POST /api/v1/challenge`: trades a Turnstile response for a token.

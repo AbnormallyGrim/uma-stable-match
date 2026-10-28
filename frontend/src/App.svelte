@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
 
   import { fetchRecommendations, type RecommendationQuery } from './lib/api';
+  import { HumanCheck } from './lib/human';
   import HowToUse from './lib/HowToUse.svelte';
   import NavBar from './lib/NavBar.svelte';
   import Results from './lib/Results.svelte';
@@ -41,8 +42,11 @@
     markTourSeen(storage);
   }
 
+  const human = new HumanCheck();
+
   const runner = new SearchRunner({
-    fetch: (query, signal) => fetchRecommendations({ ...query, limit: RESULT_LIMIT }, { signal }),
+    fetch: (query, signal) =>
+      fetchRecommendations({ ...query, limit: RESULT_LIMIT }, { signal, human }),
     onchange: (state) => {
       search = state;
     },

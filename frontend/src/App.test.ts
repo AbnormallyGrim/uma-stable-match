@@ -34,8 +34,20 @@ function recommendations(
 }
 
 function stubApi(recommendations: () => Response) {
+  // Anything but recommendations is a 404, as for a server with the human check off.
   const fetch = vi.fn<typeof globalThis.fetch>(
-    () => new Promise((resolve) => setTimeout(() => resolve(recommendations()), 10)),
+    (input) =>
+      new Promise((resolve) =>
+        setTimeout(
+          () =>
+            resolve(
+              String(input).startsWith('/api/v1/recommendations')
+                ? recommendations()
+                : new Response(JSON.stringify({ error: 'not found' }), { status: 404 }),
+            ),
+          10,
+        ),
+      ),
   );
   vi.stubGlobal('fetch', fetch);
   const recommendationCalls = () =>

@@ -514,6 +514,7 @@ fn the_human_check_is_off_unless_both_keys_are_set() {
 
     let config = Config::from_lookup(lookup(&[
         base,
+        ("TURNSTILE_SITE_KEY", "made-up-site-key"),
         ("TURNSTILE_SECRET_KEY", "made-up-secret"),
         ("TOKEN_SIGNING_KEY", &"k".repeat(32)),
     ]))
@@ -527,6 +528,7 @@ fn rejects_a_partial_or_short_human_check() {
     let base = ("UMAMOE_API_KEY", "test-key");
     for vars in [
         vec![base, ("TURNSTILE_SECRET_KEY", "made-up-secret")],
+        vec![base, ("TURNSTILE_SITE_KEY", "made-up-site-key")],
         vec![base, ("TOKEN_SIGNING_KEY", &"k".repeat(32))],
     ] {
         assert_eq!(
@@ -537,6 +539,7 @@ fn rejects_a_partial_or_short_human_check() {
     assert_eq!(
         Config::from_lookup(lookup(&[
             base,
+            ("TURNSTILE_SITE_KEY", "made-up-site-key"),
             ("TURNSTILE_SECRET_KEY", "made-up-secret"),
             ("TOKEN_SIGNING_KEY", "too-short"),
         ]))

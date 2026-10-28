@@ -49,6 +49,11 @@ describe('describeError', () => {
     expect(describeError(new ApiError('invalid-response', 'x'))).toMatchObject({
       canRetry: true,
     });
+    expect(describeError(new ApiError('human-check', 'The check failed. Try again.'))).toEqual({
+      title: "We couldn't confirm you're a person",
+      detail: 'The check failed. Try again.',
+      canRetry: true,
+    });
     expect(describeError(http(500, 'internal error'))).toEqual({
       title: 'Something went wrong',
       detail: 'internal error',

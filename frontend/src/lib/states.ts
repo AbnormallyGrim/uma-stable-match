@@ -42,6 +42,12 @@ export function describeError(error: unknown): ErrorMessage {
         detail: 'The server sent an unexpected response. Try again in a moment.',
         canRetry: true,
       };
+    case 'human-check':
+      return {
+        title: "We couldn't confirm you're a person",
+        detail: error.message,
+        canRetry: true,
+      };
     case 'http':
       return describeStatus(error);
   }

@@ -64,6 +64,7 @@ src/lib/theme.ts              Saving and applying the theme choice
 src/lib/SiteFooter.svelte     Tips, the logo, a link to report a problem, and the disclaimer
 src/lib/BrandLogo.svelte      The logo, in the version for the current theme
 src/lib/api.ts                Typed API client
+src/lib/human.ts              The human check: Turnstile challenge and API token
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
 src/lib/Results.svelte        Results view: summary, top picks, notes and top results
@@ -364,8 +365,19 @@ try {
 | `network` | The server couldn't be reached | `null` | `Could not reach the server.` |
 | `timeout` | No answer within the timeout | `null` | `The server took too long to respond.` |
 | `invalid-response` | A success response that isn't JSON | `null` | `The server sent an unexpected response.` |
+| `human-check` | The human check couldn't be completed | The server's status, or `null` | A short message to show |
 
 `retryAfter` holds the response's `Retry-After` header in seconds, or `null` without one. The server sends it with `429` responses.
+
+### Human check
+
+`src/lib/human.ts` gets the token the server asks for when its [human check](../backend/server/README.md#human-check) is on. The first search asks `GET /api/v1/challenge` for Turnstile's site key. A `404` means the check is off, and the page never asks again or loads anything from Cloudflare.
+
+- **Challenge:** the page loads Turnstile's script from `challenges.cloudflare.com` only then. The widget stays hidden unless the visitor has to interact. It's shown in a `.human-check` box at the bottom of the page and removed afterwards.
+- **Token:** the response is traded at `POST /api/v1/challenge` for a token, kept in memory (never stored) and sent to `/api/v1/recommendations` as `Authorization: Bearer`. A new one is fetched 30 seconds before it expires.
+- **Retry:** a `401` clears the token, fetches a new one and repeats the search once.
+- **Failure:** a challenge that fails, times out after 60 seconds or can't load shows "We couldn't confirm you're a person", with a retry.
+- **Needs the CSP:** the page can only load the script and widget if the server's content security policy allows `challenges.cloudflare.com`.
 
 ## Tooling
 

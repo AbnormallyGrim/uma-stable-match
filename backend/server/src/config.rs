@@ -67,9 +67,9 @@ pub struct Config {
     /// Secret for hashing trainer IDs in Redis keys, from `REDIS_KEY_SECRET`. Set whenever
     /// `redis_url` is.
     pub redis_key_secret: Option<KeySecret>,
-    /// Turnstile and token keys, from `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY`. `None` turns
-    /// the human check off.
-    pub human: Option<(TurnstileSecret, SigningKey)>,
+    /// Turnstile's site and secret keys and the token signing key, from `TURNSTILE_SITE_KEY`,
+    /// `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY`. `None` turns the human check off.
+    pub human: Option<(String, TurnstileSecret, SigningKey)>,
     /// Address to serve Prometheus metrics on, from `METRICS_ADDR`. `None` records no metrics.
     pub metrics_addr: Option<SocketAddr>,
 }
@@ -99,8 +99,8 @@ pub enum ConfigError {
     /// `REDIS_KEY_SECRET` is shorter than 32 characters. The value isn't shown.
     #[error("REDIS_KEY_SECRET must be at least 32 characters")]
     InvalidRedisKeySecret,
-    /// `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY` aren't set together.
-    #[error("TURNSTILE_SECRET_KEY and TOKEN_SIGNING_KEY must be set together")]
+    /// `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY` aren't set together.
+    #[error("TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY and TOKEN_SIGNING_KEY must be set together")]
     IncompleteHumanCheck,
     /// `TOKEN_SIGNING_KEY` is shorter than 32 characters. The value isn't shown.
     #[error("TOKEN_SIGNING_KEY must be at least 32 characters")]
@@ -146,7 +146,7 @@ impl Config {
     /// The human check these settings describe.
     pub fn human_check(&self) -> HumanCheck {
         match &self.human {
-            Some((secret, key)) => HumanCheck::new(secret.clone(), key.clone()),
+            Some((site, secret, key)) => HumanCheck::new(site.clone(), secret.clone(), key.clone()),
             None => HumanCheck::default(),
         }
     }
@@ -262,9 +262,14 @@ impl Config {
                 Some(KeySecret::parse(&value).ok_or(ConfigError::InvalidRedisKeySecret)?)
             }
         };
-        let human = match (get("TURNSTILE_SECRET_KEY"), get("TOKEN_SIGNING_KEY")) {
-            (None, None) => None,
-            (Some(secret), Some(key)) => Some((
+        let human = match (
+            get("TURNSTILE_SITE_KEY"),
+            get("TURNSTILE_SECRET_KEY"),
+            get("TOKEN_SIGNING_KEY"),
+        ) {
+            (None, None, None) => None,
+            (Some(site), Some(secret), Some(key)) => Some((
+                site,
                 TurnstileSecret::parse(&secret).ok_or(ConfigError::IncompleteHumanCheck)?,
                 SigningKey::parse(&key).ok_or(ConfigError::InvalidTokenSigningKey)?,
             )),
