@@ -17,9 +17,10 @@ use tower::ServiceExt;
 use tower_http::services::{ServeDir, ServeFile};
 
 /// The `Content-Security-Policy` header sent with every response.
-pub const CONTENT_SECURITY: &str = "default-src 'self'; script-src 'self'; style-src 'self'; \
-img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; \
-form-action 'self'; frame-ancestors 'none'";
+pub const CONTENT_SECURITY: &str = "default-src 'self'; \
+script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; \
+connect-src 'self'; font-src 'self'; frame-src https://challenges.cloudflare.com; \
+object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 const IMMUTABLE: &str = "public, max-age=31536000, immutable";
 const REVALIDATE: &str = "no-cache";

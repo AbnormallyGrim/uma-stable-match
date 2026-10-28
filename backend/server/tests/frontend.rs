@@ -166,9 +166,20 @@ async fn adds_security_headers_everywhere() {
 }
 
 #[tokio::test]
-async fn csp_allows_only_same_origin_and_inline_data_images() {
-    assert!(CONTENT_SECURITY.contains("script-src 'self'"));
+async fn csp_allows_only_same_origin_inline_data_images_and_turnstile() {
+    assert!(CONTENT_SECURITY.contains("script-src 'self' https://challenges.cloudflare.com;"));
+    assert!(CONTENT_SECURITY.contains("frame-src https://challenges.cloudflare.com;"));
+    assert!(CONTENT_SECURITY.contains("connect-src 'self';"));
     assert!(!CONTENT_SECURITY.contains("unsafe-inline"));
+    assert!(!CONTENT_SECURITY.contains("unsafe-eval"));
+    assert!(!CONTENT_SECURITY.contains('*'));
+    // Cloudflare is only for scripts and frames, so Turnstile's host appears twice.
+    assert_eq!(
+        CONTENT_SECURITY
+            .matches("challenges.cloudflare.com")
+            .count(),
+        2
+    );
     assert!(CONTENT_SECURITY.contains("img-src 'self' data:"));
     assert!(CONTENT_SECURITY.contains("frame-ancestors 'none'"));
 }
