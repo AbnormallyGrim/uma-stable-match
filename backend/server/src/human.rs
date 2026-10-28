@@ -5,8 +5,11 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use axum::extract::State;
+use axum::extract::{Request, State};
+use axum::http::header::AUTHORIZATION;
 use axum::http::StatusCode;
+use axum::middleware::Next;
+use axum::response::{IntoResponse, Response};
 use axum::Json;
 use hmac::{Hmac, KeyInit, Mac};
 use serde::{Deserialize, Serialize};
@@ -205,6 +208,29 @@ pub(crate) struct Challenge {
 pub(crate) struct Token {
     token: String,
     expires_in: u64,
+}
+
+/// Turns away requests without a valid `Authorization: Bearer` token. Lets everything through when
+/// the check is off.
+pub(crate) async fn require_human(
+    State(state): State<AppState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let token = request
+        .headers()
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "));
+    if token.is_some_and(|token| state.human.is_valid(token)) || !state.human.is_enabled() {
+        return next.run(request).await;
+    }
+    metrics::counter!("human_checks_total", "result" => "token_missing").increment(1);
+    ApiError::new(
+        StatusCode::UNAUTHORIZED,
+        "a human check token is required; get one from /api/v1/challenge",
+    )
+    .into_response()
 }
 
 /// Serves `POST /api/v1/challenge`: trades a Turnstile response for a token.
