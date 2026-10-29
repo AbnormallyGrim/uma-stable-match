@@ -6,8 +6,8 @@
     <meta name="google-site-verification" content="BIx7D0OpYQ2yMT9gEnTwrzaO_pAQWdLAYKrOUS7O0S0" />
     <meta name="msvalidate.01" content="4CD97545A94DE8E95BF7FB4D87A90193" />
 
-    <title>Uma Stable Match: Umamusume Club Finder &amp; Club Matcher</title>
-    <meta name="description" content="Free Umamusume club finder and club matcher. Compares your daily fan gain with every club that has an open spot and ranks the clubs where you'd fit." />
+    <title data-i18n="meta.title">Uma Stable Match: Umamusume Club Finder &amp; Club Matcher</title>
+    <meta name="description" data-i18n-attr="content:meta.description" content="Free Umamusume club finder and club matcher. Compares your daily fan gain with every club that has an open spot and ranks the clubs where you'd fit." />
     <link rel="canonical" href="https://umastable.com/" />
     <!-- The same content as Markdown, for agents. Also served for requests that send Accept: text/markdown. -->
     <link rel="alternate" type="text/markdown" href="/index.md" />
@@ -370,6 +370,35 @@
         .theme-switch label:has(input:focus-visible)::after {
             opacity: 1;
             transform: translate(-50%, 0);
+        }
+
+        /* Round translate button, shown only when Japanese is enabled. Icon: Bootstrap Icons (MIT). */
+        .lang-switch {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .lang-switch[hidden] {
+            display: none;
+        }
+
+        .lang-switch:hover {
+            background: var(--card-bg);
+            color: var(--text-main);
+        }
+
+        .lang-switch:focus-visible {
+            outline: 2px solid var(--accent-gold);
+            outline-offset: 1px;
         }
 
         .container {
@@ -764,7 +793,7 @@
 </head>
 <body>
 
-<nav class="navbar" aria-label="Main">
+<nav class="navbar" data-i18n-attr="aria-label:nav.label" aria-label="Main">
     <div class="nav-container">
         <a href="#" class="brand">
             <img src="images/logo-light.webp" alt="" width="42" height="42" class="nav-logo only-light" />
@@ -772,25 +801,28 @@
             <span class="brand-title">Uma Stable Match</span>
         </a>
         <div class="nav-links">
-            <a href="#how-it-works" class="nav-link">How it works</a>
-            <a href="#faq" class="nav-link">FAQ</a>
-            <a href="https://app.umastable.com" class="nav-btn">Open app</a>
+            <a href="#how-it-works" class="nav-link" data-i18n="nav.how">How it works</a>
+            <a href="#faq" class="nav-link" data-i18n="nav.faq">FAQ</a>
+            <a href="https://app.umastable.com" class="nav-btn" data-i18n="nav.app">Open app</a>
+            <button type="button" class="lang-switch" id="lang-switch" hidden aria-label="Switch to Japanese (日本語)" title="Switch to Japanese (日本語)" data-i18n-attr="aria-label:lang.switch;title:lang.switch">
+                <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M4.545 6.714 4.11 8H3l1.862-5h1.284L8 8H6.833l-.435-1.286zm1.634-.736L5.5 3.956h-.049l-.679 2.022z"/><path d="M0 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zm7.138 9.995q.289.451.63.846c-.748.575-1.673 1.001-2.768 1.292.178.217.451.635.555.867 1.125-.359 2.08-.844 2.886-1.494.777.665 1.739 1.165 2.93 1.472.133-.254.414-.673.629-.89-1.125-.253-2.057-.694-2.82-1.284.681-.747 1.222-1.651 1.621-2.757H14V8h-3v1.047h.765c-.318.844-.74 1.546-1.272 2.13a6 6 0 0 1-.415-.492 2 2 0 0 1-.94.31"/></svg>
+            </button>
             <fieldset class="theme-switch">
-                <legend class="visually-hidden">Theme</legend>
-                <label data-tooltip="System">
+                <legend class="visually-hidden" data-i18n="theme.label">Theme</legend>
+                <label data-i18n-attr="data-tooltip:theme.system" data-tooltip="System">
                     <input type="radio" name="theme" value="system" />
                     <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.75" y="2.5" width="12.5" height="8.5" rx="1.5" /><path d="M5.5 14h5M8 11v3" /></svg>
-                    <span class="visually-hidden">System</span>
+                    <span class="visually-hidden" data-i18n="theme.system">System</span>
                 </label>
-                <label data-tooltip="Light">
+                <label data-i18n-attr="data-tooltip:theme.light" data-tooltip="Light">
                     <input type="radio" name="theme" value="light" />
                     <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3" /><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M3.4 12.6l1.06-1.06M11.54 4.46l1.06-1.06" /></svg>
-                    <span class="visually-hidden">Light</span>
+                    <span class="visually-hidden" data-i18n="theme.light">Light</span>
                 </label>
-                <label data-tooltip="Dark">
+                <label data-i18n-attr="data-tooltip:theme.dark" data-tooltip="Dark">
                     <input type="radio" name="theme" value="dark" />
                     <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7Z" /></svg>
-                    <span class="visually-hidden">Dark</span>
+                    <span class="visually-hidden" data-i18n="theme.dark">Dark</span>
                 </label>
             </fieldset>
         </div>
@@ -799,12 +831,12 @@
 
 <header class="hero">
     <div class="container">
-        <h1>Stop guessing. Find your ideal Umamusume club.</h1>
-        <p>Uma Stable Match is a free Umamusume club finder and club matching tool. It compares your daily fan gain with every club that has an open spot, and ranks the clubs where your pace fits and members pull their weight.</p>
+        <h1 data-i18n="hero.title">Stop guessing. Find your ideal Umamusume club.</h1>
+        <p data-i18n="hero.body">Uma Stable Match is a free Umamusume club finder and club matching tool. It compares your daily fan gain with every club that has an open spot, and ranks the clubs where your pace fits and members pull their weight.</p>
 
         <div class="cta-group">
-            <a href="https://app.umastable.com" class="btn btn-primary">Find your club</a>
-            <a href="#how-it-works" class="btn btn-secondary">How it works</a>
+            <a href="https://app.umastable.com" class="btn btn-primary" data-i18n="hero.cta">Find your club</a>
+            <a href="#how-it-works" class="btn btn-secondary" data-i18n="hero.how">How it works</a>
         </div>
     </div>
 </header>
@@ -814,96 +846,96 @@
 
     <section aria-labelledby="see-it">
         <div class="section-title">
-            <h2 id="see-it">Your best-fitting clubs, ranked</h2>
-            <p>Enter your trainer ID or daily fan gain and get your top picks, with each club's rank, open spots, join style and where you'd place among its members.</p>
+            <h2 id="see-it" data-i18n="see.title">Your best-fitting clubs, ranked</h2>
+            <p data-i18n="see.body">Enter your trainer ID or daily fan gain and get your top picks, with each club's rank, open spots, join style and where you'd place among its members.</p>
         </div>
         <figure class="showcase">
             <div class="showcase-frame">
                 <img src="images/results.webp" width="1200" height="1044" loading="lazy" decoding="async"
-                     alt="Uma Stable Match results: a daily pace of 6 million fans, a summary of the clubs analysed, and top picks showing each club's tier, rank and trend, open spots, join style, your place among its members, median daily gain, balance and passengers." />
+                     data-i18n-attr="alt:see.alt" alt="Uma Stable Match results: a daily pace of 6 million fans, a summary of the clubs analysed, and top picks showing each club's tier, rank and trend, open spots, join style, your place among its members, median daily gain, balance and passengers." />
             </div>
-            <figcaption>Example results, shown with made-up clubs.</figcaption>
+            <figcaption data-i18n="see.caption">Example results, shown with made-up clubs.</figcaption>
         </figure>
     </section>
 
     <section id="how-it-works" aria-labelledby="how-title">
         <div class="section-title">
-            <h2 id="how-title">How the club matching works</h2>
-            <p>Club leaderboards show how big a club is, not whether it's right for you. Uma Stable Match looks at the members.</p>
+            <h2 id="how-title" data-i18n="how.title">How the club matching works</h2>
+            <p data-i18n="how.body">Club leaderboards show how big a club is, not whether it's right for you. Uma Stable Match looks at the members.</p>
         </div>
 
         <div class="grid-3">
             <div class="card">
                 <div class="card-icon" aria-hidden="true">🎯</div>
-                <h3>Matched to your fan pace</h3>
-                <p>Your daily fan gain is compared with each club's current members. The best matches are clubs where you'd sit around the middle: secure enough not to be cut, without carrying everyone else.</p>
+                <h3 data-i18n="how.pace.title">Matched to your fan pace</h3>
+                <p data-i18n="how.pace.body">Your daily fan gain is compared with each club's current members. The best matches are clubs where you'd sit around the middle: secure enough not to be cut, without carrying everyone else.</p>
             </div>
             <div class="card">
                 <div class="card-icon" aria-hidden="true">⚖️</div>
-                <h3>Members who pull their weight</h3>
-                <p>Balance scoring looks at how evenly fans are spread across members and how many are passengers, so clubs where a few members carry everyone can rank lower.</p>
+                <h3 data-i18n="how.weight.title">Members who pull their weight</h3>
+                <p data-i18n="how.weight.body">Balance scoring looks at how evenly fans are spread across members and how many are passengers, so clubs where a few members carry everyone can rank lower.</p>
             </div>
             <div class="card">
                 <div class="card-icon" aria-hidden="true">📈</div>
-                <h3>Open, active clubs</h3>
-                <p>Only clubs (circles) with an open spot are compared, unless you choose otherwise. Only current members count, so players who've left don't skew a club's numbers.</p>
+                <h3 data-i18n="how.open.title">Open, active clubs</h3>
+                <p data-i18n="how.open.body">Only clubs (circles) with an open spot are compared, unless you choose otherwise. Only current members count, so players who've left don't skew a club's numbers.</p>
             </div>
         </div>
     </section>
 
     <section aria-labelledby="results-title">
         <div class="section-title">
-            <h2 id="results-title">Everything you need to choose</h2>
-            <p>Search and sort your 100 best fits, then open a club's uma.moe page and contact its leader.</p>
+            <h2 id="results-title" data-i18n="results.title">Everything you need to choose</h2>
+            <p data-i18n="results.body">Search and sort your 100 best fits, then open a club's uma.moe page and contact its leader.</p>
         </div>
         <figure class="showcase">
             <div class="showcase-frame">
                 <img src="images/results-table.webp" width="1600" height="757" loading="lazy" decoding="async"
-                     alt="The top results table, listing clubs with their tier, rank, last month's rank, open spots, join style, median daily gain, your place, balance, passengers, top-3 share and score." />
+                     data-i18n-attr="alt:results.alt" alt="The top results table, listing clubs with their tier, rank, last month's rank, open spots, join style, median daily gain, your place, balance, passengers, top-3 share and score." />
             </div>
-            <figcaption>The top results table, shown with made-up clubs.</figcaption>
+            <figcaption data-i18n="results.caption">The top results table, shown with made-up clubs.</figcaption>
         </figure>
         <dl class="fields">
             <div class="field">
-                <dt>Your place</dt>
+                <dt data-i18n="field.0.name">Your place</dt>
                 <dd>
-                    <span class="field-value">8 of 30</span>
-                    <span class="field-note">Where you'd rank among the club's current members.</span>
+                    <span class="field-value" data-i18n="field.0.value">8 of 30</span>
+                    <span class="field-note" data-i18n="field.0.note">Where you'd rank among the club's current members.</span>
                 </dd>
             </div>
             <div class="field">
-                <dt>Median per day</dt>
+                <dt data-i18n="field.1.name">Median per day</dt>
                 <dd>
-                    <span class="field-value">5.3M/day</span>
-                    <span class="field-note">The typical member's daily fan gain this month.</span>
+                    <span class="field-value" data-i18n="field.1.value">5.3M/day</span>
+                    <span class="field-note" data-i18n="field.1.note">The typical member's daily fan gain this month.</span>
                 </dd>
             </div>
             <div class="field">
-                <dt>Rank and tier</dt>
+                <dt data-i18n="field.2.name">Rank and tier</dt>
                 <dd>
-                    <span class="field-value">Rank 163 ▲30</span>
-                    <span class="field-note">The club's monthly rank, its change since last month, and its tier from D to SS.</span>
+                    <span class="field-value" data-i18n="field.2.value">Rank 163 ▲30</span>
+                    <span class="field-note" data-i18n="field.2.note">The club's monthly rank, its change since last month, and its tier from D to SS.</span>
                 </dd>
             </div>
             <div class="field">
-                <dt>Join style</dt>
+                <dt data-i18n="field.3.name">Join style</dt>
                 <dd>
-                    <span class="field-value">Open · Approval</span>
-                    <span class="field-note">Join instantly, or wait for the leader to accept you. Closed clubs are only shown if you pick Closed.</span>
+                    <span class="field-value" data-i18n="field.3.value">Open · Approval</span>
+                    <span class="field-note" data-i18n="field.3.note">Join instantly, or wait for the leader to accept you. Closed clubs are only shown if you pick Closed.</span>
                 </dd>
             </div>
             <div class="field">
-                <dt>Balance</dt>
+                <dt data-i18n="field.4.name">Balance</dt>
                 <dd>
-                    <span class="field-value">86/100</span>
-                    <span class="field-note">How evenly members contribute. Higher is better.</span>
+                    <span class="field-value" data-i18n="field.4.value">86/100</span>
+                    <span class="field-note" data-i18n="field.4.note">How evenly members contribute. Higher is better.</span>
                 </dd>
             </div>
             <div class="field">
-                <dt>Passengers</dt>
+                <dt data-i18n="field.5.name">Passengers</dt>
                 <dd>
-                    <span class="field-value">0 of 27</span>
-                    <span class="field-note">Members gaining under 1M fans a day, or under a quarter of the club's median.</span>
+                    <span class="field-value" data-i18n="field.5.value">0 of 27</span>
+                    <span class="field-note" data-i18n="field.5.note">Members gaining under 1M fans a day, or under a quarter of the club's median.</span>
                 </dd>
             </div>
         </dl>
@@ -912,40 +944,40 @@
 
     <section id="faq" aria-labelledby="faq-title">
         <div class="section-title">
-            <h2 id="faq-title">Frequently asked questions</h2>
+            <h2 id="faq-title" data-i18n="faq.title">Frequently asked questions</h2>
         </div>
         <div class="faq">
             <details>
-                <summary>How do I find a good club in Umamusume?</summary>
-                <p>Look for a club with an open spot whose members gain fans at about your pace, where you'd sit around the middle of the members and most members pull their weight. Uma Stable Match does this comparison for you across every club in its rank range and ranks the best fits.</p>
+                <summary data-i18n="faq.0.q">How do I find a good club in Umamusume?</summary>
+                <p data-i18n="faq.0.a">Look for a club with an open spot whose members gain fans at about your pace, where you'd sit around the middle of the members and most members pull their weight. Uma Stable Match does this comparison for you across every club in its rank range and ranks the best fits.</p>
             </details>
             <details>
-                <summary>Why isn't my club in the results?</summary>
-                <p>Full clubs (30 of 30 members) aren't shown unless you tick Include full clubs, and never as top picks, since there's no spot to join. Your current club isn't in the results either, but searching by your trainer ID shows how it compares.</p>
+                <summary data-i18n="faq.1.q">Why isn't my club in the results?</summary>
+                <p data-i18n="faq.1.a">Full clubs (30 of 30 members) aren't shown unless you tick Include full clubs, and never as top picks, since there's no spot to join. Your current club isn't in the results either, but searching by your trainer ID shows how it compares.</p>
             </details>
             <details>
-                <summary>Why am I recommended a lower-tier club than mine?</summary>
-                <p>A club's tier comes from its total fans, which its fastest members drive. Uma Stable Match matches your pace to a club's typical member instead, so you land in clubs where you'd sit around the middle. If you're well below a high-tier club's typical member, your best fits may be a tier or two lower.</p>
+                <summary data-i18n="faq.2.q">Why am I recommended a lower-tier club than mine?</summary>
+                <p data-i18n="faq.2.a">A club's tier comes from its total fans, which its fastest members drive. Uma Stable Match matches your pace to a club's typical member instead, so you land in clubs where you'd sit around the middle. If you're well below a high-tier club's typical member, your best fits may be a tier or two lower.</p>
             </details>
             <details>
-                <summary>Is Uma Stable Match official?</summary>
-                <p>No. It's an unofficial, non-commercial fan tool, not affiliated with, endorsed by, or sponsored by uma.moe or Cygames, Inc.</p>
+                <summary data-i18n="faq.3.q">Is Uma Stable Match official?</summary>
+                <p data-i18n="faq.3.a">No. It's an unofficial, non-commercial fan tool, not affiliated with, endorsed by, or sponsored by uma.moe or Cygames, Inc.</p>
             </details>
             <details>
-                <summary>Where does the club data come from?</summary>
-                <p>From <a href="https://uma.moe" target="_blank" rel="noopener">uma.moe</a>'s club and trainer data. Each club refreshes once a day, shortly after uma.moe's daily update.</p>
+                <summary data-i18n="faq.4.q">Where does the club data come from?</summary>
+                <p data-i18n="faq.4.a">From <a href="https://uma.moe" target="_blank" rel="noopener">uma.moe</a>'s club and trainer data. Each club refreshes once a day, shortly after uma.moe's daily update.</p>
             </details>
             <details>
-                <summary>Is it free?</summary>
-                <p>Yes. Uma Stable Match is free and open source under the MIT license.</p>
+                <summary data-i18n="faq.5.q">Is it free?</summary>
+                <p data-i18n="faq.5.a">Yes. Uma Stable Match is free and open source under the MIT license.</p>
             </details>
             <details>
-                <summary>What do I need to use it?</summary>
-                <p>Your trainer ID, the 9 to 12 digit number found in-game under Menu, then Profile, or your daily fan gain. There's nothing to install and no account to create.</p>
+                <summary data-i18n="faq.6.q">What do I need to use it?</summary>
+                <p data-i18n="faq.6.a">Your trainer ID, the 9 to 12 digit number found in-game under Menu, then Profile, or your daily fan gain. There's nothing to install and no account to create.</p>
             </details>
             <details>
-                <summary>Can I use it in my browser without installing anything?</summary>
-                <p>Yes. Open the club finder at <a href="https://app.umastable.com">app.umastable.com</a> on your phone or computer, and enter your trainer ID or daily fan gain.</p>
+                <summary data-i18n="faq.7.q">Can I use it in my browser without installing anything?</summary>
+                <p data-i18n="faq.7.a">Yes. Open the club finder at <a href="https://app.umastable.com">app.umastable.com</a> on your phone or computer, and enter your trainer ID or daily fan gain.</p>
             </details>
         </div>
     </section>
@@ -955,14 +987,14 @@
 <footer>
     <div class="container">
         <div class="footer-actions">
-            <a href="https://ko-fi.com/L5P6299MV1" class="btn btn-primary" target="_blank" rel="noopener"><span aria-hidden="true">🥕</span> Buy me a carrot</a>
+            <a href="https://ko-fi.com/L5P6299MV1" class="btn btn-primary" target="_blank" rel="noopener"><span aria-hidden="true">🥕</span> <span data-i18n="footer.kofi">Buy me a carrot</span></a>
             <a href="https://github.com/AbnormallyGrim/uma-stable-match" class="btn btn-secondary" target="_blank" rel="noopener">
                 <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>
-                View on GitHub
+                <span data-i18n="footer.github">View on GitHub</span>
             </a>
         </div>
-        <p>Uma Stable Match is an unofficial, non-commercial fan project and is not affiliated with, endorsed by, or sponsored by uma.moe or Cygames, Inc.</p>
-        <p>Umamusume: Pretty Derby and all related names, characters, artwork and trademarks belong to Cygames, Inc. Game artwork in the screenshots, including club tier icons, is © Cygames, Inc. and is used non-commercially in line with Cygames' <a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener">Fan-Created Content Guidelines</a>. Club and trainer data comes from <a href="https://uma.moe" target="_blank" rel="noopener">uma.moe</a>.</p>
+        <p data-i18n="footer.unofficial">Uma Stable Match is an unofficial, non-commercial fan project and is not affiliated with, endorsed by, or sponsored by uma.moe or Cygames, Inc.</p>
+        <p data-i18n="footer.trademark">Umamusume: Pretty Derby and all related names, characters, artwork and trademarks belong to Cygames, Inc. Game artwork in the screenshots, including club tier icons, is © Cygames, Inc. and is used non-commercially in line with Cygames' <a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener">Fan-Created Content Guidelines</a>. Club and trainer data comes from <a href="https://uma.moe" target="_blank" rel="noopener">uma.moe</a>.</p>
     </div>
 </footer>
 
@@ -999,6 +1031,139 @@
     })();
 </script>
 
+
+<script>
+    // The language button. English is the page as written; Japanese swaps in the text below.
+    (() => {
+        // Feature flag: set to true to offer the Japanese translation, once the Japanese data is in.
+        const JAPANESE_ENABLED = false;
+
+        const key = 'uma-stable-match:language';
+        const ja = {
+            'meta.title': 'Uma Stable Match: ウマ娘 サークル検索・サークルマッチ',
+            'meta.description': 'ウマ娘のサークル検索・マッチングツール(無料)。あなたの1日のファン獲得数と、空きのある全サークルのメンバーを比べ、ぴったり合うサークルを順位付けします。',
+            'nav.label': 'メインメニュー',
+            'nav.how': 'しくみ',
+            'nav.faq': 'よくある質問',
+            'nav.app': 'アプリを開く',
+            'lang.switch': '英語に切り替え (English)',
+            'theme.label': 'テーマ',
+            'theme.system': 'システム',
+            'theme.light': 'ライト',
+            'theme.dark': 'ダーク',
+            'hero.title': 'もう迷わない。ウマ娘のぴったりのサークルを見つけよう。',
+            'hero.body': 'Uma Stable Matchは、無料のウマ娘サークル検索・マッチングツールです。あなたの1日のファン獲得数と、空きのある全サークルを比べ、ペースが合い、メンバーが偏りなく貢献しているサークルを順位付けします。',
+            'hero.cta': 'サークルを探す',
+            'hero.how': 'しくみ',
+            'see.title': 'あなたにぴったりのサークルを順位付け',
+            'see.body': 'トレーナーIDか1日のファン獲得数を入力すると、おすすめのサークルが表示されます。各サークルの順位、空き枠、加入方法、メンバーの中でのあなたの順位も確認できます。',
+            'see.alt': 'Uma Stable Matchの結果画面。1日のペースは600万ファン。調べたサークルの概要と、おすすめのサークルが表示されています。各サークルのティア、順位と変動、空き枠、加入方法、メンバーの中でのあなたの順位、1日の中央値、バランス、おんぶ組が確認できます。',
+            'see.caption': '結果の例(サークルは架空のものです)。',
+            'how.title': 'サークルマッチのしくみ',
+            'how.body': 'サークルのランキングでわかるのはサークルの大きさで、あなたに合うかどうかではありません。Uma Stable Matchはメンバーに注目します。',
+            'how.pace.title': 'あなたのファン獲得ペースに合わせる',
+            'how.pace.body': 'あなたの1日のファン獲得数を、各サークルの現在のメンバーと比べます。いちばん合うのは、あなたが真ん中あたりに入れるサークルです。切られる心配がなく、かといって他のメンバーを支え続ける必要もありません。',
+            'how.weight.title': 'みんながしっかり貢献しているメンバー',
+            'how.weight.body': 'バランス評価では、ファン数がメンバーにどれだけ均等に分かれているか、おんぶ組が何人いるかを見ます。一部のメンバーが全員を支えているサークルは、順位が下がることがあります。',
+            'how.open.title': '空きがあり、活発なサークル',
+            'how.open.body': '空きのあるサークルだけを比べます(条件を変えない限り)。現在のメンバーだけを数えるので、抜けたプレイヤーがサークルの数字を狂わせることはありません。',
+            'results.title': '選ぶのに必要な情報がすべて',
+            'results.body': '上位100件を検索・並べ替えして、サークルのuma.moeページを開き、サークルマスターに連絡できます。',
+            'results.alt': '上位の結果の表。各サークルのティア、順位、先月の順位、空き枠、加入方法、1日の中央値、あなたの順位、バランス、おんぶ組、上位3人の割合、スコアが並んでいます。',
+            'results.caption': '上位の結果の表(サークルは架空のものです)。',
+            'field.0.name': 'あなたの順位',
+            'field.0.value': '30人中8位',
+            'field.0.note': '現在のメンバーの中でのあなたの順位。',
+            'field.1.name': '1日あたりの中央値',
+            'field.1.value': '5.3M/日',
+            'field.1.note': '今月の典型的なメンバーの1日のファン獲得数。',
+            'field.2.name': '順位とティア',
+            'field.2.value': '163位 ▲30',
+            'field.2.note': 'サークルの月間順位、先月からの変動、そしてDからSSまでのティア。',
+            'field.3.name': '加入方法',
+            'field.3.value': '自由加入 · 承認制',
+            'field.3.note': 'すぐに加入できるか、サークルマスターの承認を待つか。募集停止のサークルは、「募集停止」を選んだときだけ表示されます。',
+            'field.4.name': 'バランス',
+            'field.4.value': '86/100',
+            'field.4.note': 'メンバーの貢献がどれだけ均等か。高いほど良い値です。',
+            'field.5.name': 'おんぶ組',
+            'field.5.value': '27人中0人',
+            'field.5.note': '1日のファン獲得数が100万未満、またはサークルの中央値の4分の1未満のメンバー。',
+            'faq.title': 'よくある質問',
+            'faq.0.q': 'ウマ娘で良いサークルはどう探せばいいですか?',
+            'faq.0.a': '空きがあり、メンバーのファン獲得ペースがあなたと近く、あなたがメンバーの真ん中あたりに入れて、ほとんどのメンバーがしっかり貢献しているサークルを探しましょう。Uma Stable Matchは、対象の順位帯にあるすべてのサークルでこの比較を行い、いちばん合うサークルを順位付けします。',
+            'faq.1.q': '自分のサークルが結果に出ないのはなぜですか?',
+            'faq.1.a': '満員(30人中30人)のサークルは、「満員のサークルも含める」にチェックしない限り表示されず、加入できる枠がないため、おすすめにも出ません。現在のサークルも結果には含まれませんが、トレーナーIDで検索すると比較できます。',
+            'faq.2.q': '自分のサークルより低いティアのサークルをすすめられるのはなぜですか?',
+            'faq.2.a': 'サークルのティアは合計ファン数で決まり、上位メンバーの獲得数に大きく左右されます。Uma Stable Matchはあなたのペースをサークルの典型的なメンバーと比べるので、あなたが真ん中あたりに入れるサークルが選ばれます。上位ティアのサークルの典型的なメンバーよりあなたのペースがかなり低い場合は、1〜2ティア下のサークルが最適になることがあります。',
+            'faq.3.q': 'Uma Stable Matchは公式のものですか?',
+            'faq.3.a': 'いいえ。非公式の非営利ファンツールで、uma.moeおよび株式会社Cygamesとは提携しておらず、公認・後援も受けていません。',
+            'faq.4.q': 'サークルのデータはどこから来ていますか?',
+            'faq.4.a': '<a href="https://uma.moe" target="_blank" rel="noopener">uma.moe</a>のサークルとトレーナーのデータです。各サークルは、uma.moeの毎日の更新の少しあとに、1日1回更新されます。',
+            'faq.5.q': '無料ですか?',
+            'faq.5.a': 'はい。Uma Stable Matchは無料で、MITライセンスのオープンソースです。',
+            'faq.6.q': '使うのに何が必要ですか?',
+            'faq.6.a': 'トレーナーID(ゲーム内の「メニュー」→「プロフィール」にある9〜12桁の数字)か、1日のファン獲得数です。インストールもアカウント作成も必要ありません。',
+            'faq.7.q': 'インストールせずにブラウザで使えますか?',
+            'faq.7.a': 'はい。スマートフォンやパソコンで<a href="https://app.umastable.com">app.umastable.com</a>を開き、トレーナーIDか1日のファン獲得数を入力してください。',
+            'footer.kofi': 'にんじんをおごる',
+            'footer.github': 'GitHubで見る',
+            'footer.unofficial': 'Uma Stable Matchは非公式の非営利ファンプロジェクトです。uma.moeおよび株式会社Cygamesとは提携しておらず、公認・後援も受けていません。',
+            'footer.trademark': 'ウマ娘 プリティーダービーの名称、キャラクター、アートワーク、商標は株式会社Cygamesに帰属します。スクリーンショットに含まれるゲームのアートワーク(サークルのティアアイコンを含む)は© Cygames, Inc.のもので、Cygamesの<a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener">二次創作ガイドライン</a>に沿って非営利で使用しています。サークルとトレーナーのデータは<a href="https://uma.moe" target="_blank" rel="noopener">uma.moe</a>から取得しています。',
+        };
+
+        // The page's own English, kept so a switch back restores it.
+        const texts = new Map();
+        const attributes = new Map();
+
+        function apply(lang) {
+            document.documentElement.lang = lang;
+            for (const el of document.querySelectorAll('[data-i18n]')) {
+                const prop = el.tagName === 'TITLE' ? 'textContent' : 'innerHTML';
+                if (!texts.has(el)) {
+                    texts.set(el, el[prop]);
+                }
+                el[prop] = lang === 'ja' ? ja[el.dataset.i18n] : texts.get(el);
+            }
+            for (const el of document.querySelectorAll('[data-i18n-attr]')) {
+                for (const pair of el.dataset.i18nAttr.split(';')) {
+                    const [name, id] = pair.split(':');
+                    if (!attributes.has(el)) {
+                        attributes.set(el, {});
+                    }
+                    const original = attributes.get(el);
+                    original[name] ??= el.getAttribute(name);
+                    el.setAttribute(name, lang === 'ja' ? ja[id] : original[name]);
+                }
+            }
+        }
+
+        if (!JAPANESE_ENABLED) {
+            return;
+        }
+        let saved = 'en';
+        try {
+            saved = localStorage.getItem(key) === 'ja' ? 'ja' : 'en';
+        } catch {
+            saved = 'en';
+        }
+        const button = document.getElementById('lang-switch');
+        button.hidden = false;
+        let lang = saved;
+        if (lang === 'ja') {
+            apply('ja');
+        }
+        button.addEventListener('click', () => {
+            lang = lang === 'en' ? 'ja' : 'en';
+            apply(lang);
+            try {
+                localStorage.setItem(key, lang);
+            } catch {
+                return;
+            }
+        });
+    })();
+</script>
 
 </body>
 </html>
