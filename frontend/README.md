@@ -394,7 +394,7 @@ try {
 
 ## Language
 
-The Japanese translation is behind the server's `ENABLE_JAPANESE` setting, off by default. At startup the app asks `GET /api/v1/features`; if the answer is missing or fails, it stays in English. With it on, a translate button appears in the top bar and the saved choice (`uma-stable-match:language` in local storage, `en` or `ja`) is shown, and a visitor with no saved choice gets English.
+The Japanese translation is behind the server's `ENABLE_JAPANESE` setting, off by default. At startup the app asks `GET /api/v1/features`; if the answer is missing or fails, it stays in English. With it on, a translate button appears in the top bar and the saved choice (`en` or `ja`) is shown, and a visitor with no saved choice gets English. The choice is saved in a `uma-stable-match-language` cookie on `umastable.com`, so it carries over to the website and back, and in local storage under `uma-stable-match:language`. The cookie wins when both are set; local storage covers choices made before the cookie existed, and hosts such as `localhost`, where the cookie stays on that host.
 
 ### Messages
 

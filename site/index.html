@@ -1039,6 +1039,8 @@
         const JAPANESE_ENABLED = false;
 
         const key = 'uma-stable-match:language';
+        // Shared with app.umastable.com, whose local storage this page can't read.
+        const cookie = 'uma-stable-match-language';
         const ja = {
             'meta.title': 'Uma Stable Match: ウマ娘 サークル検索・サークルマッチ',
             'meta.description': 'ウマ娘のサークル検索・マッチングツール(無料)。あなたの1日のファン獲得数と、空きのある全サークルのメンバーを比べ、ぴったり合うサークルを順位付けします。',
@@ -1123,7 +1125,7 @@
                 if (!texts.has(el)) {
                     texts.set(el, el[prop]);
                 }
-                el[prop] = lang === 'ja' ? ja[el.dataset.i18n] : texts.get(el);
+                el[prop] = (lang === 'ja' && ja[el.dataset.i18n]) || texts.get(el);
             }
             for (const el of document.querySelectorAll('[data-i18n-attr]')) {
                 for (const pair of el.dataset.i18nAttr.split(';')) {
@@ -1133,7 +1135,7 @@
                     }
                     const original = attributes.get(el);
                     original[name] ??= el.getAttribute(name);
-                    el.setAttribute(name, lang === 'ja' ? ja[id] : original[name]);
+                    el.setAttribute(name, (lang === 'ja' && ja[id]) || original[name]);
                 }
             }
         }
@@ -1141,12 +1143,32 @@
         if (!JAPANESE_ENABLED) {
             return;
         }
-        let saved = 'en';
-        try {
-            saved = localStorage.getItem(key) === 'ja' ? 'ja' : 'en';
-        } catch {
-            saved = 'en';
+        function load() {
+            const shared = document.cookie.split('; ').find((pair) => pair.startsWith(cookie + '='));
+            if (shared === cookie + '=en' || shared === cookie + '=ja') {
+                return shared.slice(-2);
+            }
+            try {
+                return localStorage.getItem(key) === 'ja' ? 'ja' : 'en';
+            } catch {
+                return 'en';
+            }
         }
+
+        function save(lang) {
+            const host = location.hostname;
+            const shared = host === 'umastable.com' || host.endsWith('.umastable.com');
+            document.cookie = cookie + '=' + lang + '; Path=/; Max-Age=31536000; SameSite=Lax' +
+                (shared ? '; Domain=umastable.com' : '') +
+                (location.protocol === 'https:' ? '; Secure' : '');
+            try {
+                localStorage.setItem(key, lang);
+            } catch {
+                return;
+            }
+        }
+
+        const saved = load();
         const button = document.getElementById('lang-switch');
         button.hidden = false;
         let lang = saved;
@@ -1156,11 +1178,7 @@
         button.addEventListener('click', () => {
             lang = lang === 'en' ? 'ja' : 'en';
             apply(lang);
-            try {
-                localStorage.setItem(key, lang);
-            } catch {
-                return;
-            }
+            save(lang);
         });
     })();
 </script>
