@@ -617,6 +617,7 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `http_request_duration_seconds` | histogram | `route`, `method` | Time to answer a request |
 | `search_shortlist_worst_rank` | histogram | | Per search, the worst monthly rank among the shortlisted clubs. Buckets from 1,000 to 65,000 |
 | `search_pick_worst_rank` | histogram | | Per search, the worst monthly rank among the top ten picks with an open spot |
+| `searches_total` | counter | | Successful searches since launch. It is read from Redis on each scrape, where the total never expires, so it survives restarts and is the same for every instance. Absent without Redis; see [Search total](#search-total) |
 | `search_pool_bottom_total` | counter | | Searches whose shortlist reached the slowest club in the pool. Divided by `search_shortlist_worst_rank_count`, it's the share of searches the scan window was too short for |
 | `human_checks_total` | counter | `result`: `passed`, `failed`, `unavailable` or `token_missing` | [Human check](#human-check) challenges, and requests turned away without a token |
 | `rate_limited_total` | counter | `limit`: `requests` or `trainer_lookups` | Requests turned away by a [rate limit](#rate-limits) |
@@ -646,7 +647,7 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `refresh_lower_scheduled_clubs`, `refresh_lower_loaded_clubs`, `refresh_lower_due_clubs` | gauge | | The same counts for the [lower-range schedule](#lower-range-clubs) |
 | `redis_up` | gauge | | `1` while Redis answers, `0` after a failure. Absent without Redis |
 | `redis_errors_total` | counter | `reason` | Failed or timed-out Redis operations, by the kind of failure |
-| `redis_op_duration_seconds` | histogram | `op`: `get`, `mget`, `set`, `script`, `schedule`, `hgetall` or `info` | Time per Redis operation, failures included |
+| `redis_op_duration_seconds` | histogram | `op`: `get`, `mget`, `set`, `script`, `schedule`, `hgetall`, `incr` or `info` | Time per Redis operation, failures included |
 | `redis_keys`, `redis_keys_expiring` | gauge | | Every key in Redis, and how many have a TTL |
 | `redis_average_ttl_seconds` | gauge | | Redis's average TTL across the keys that have one |
 | `redis_memory_used_bytes`, `redis_memory_max_bytes` | gauge | | Memory Redis uses, and its `maxmemory` limit (`0` for none) |
@@ -655,6 +656,18 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `log_events_total` | counter | `level`: `warn` or `error`; `file`, `line` | Warnings and errors logged, by where in the code they were logged. Other libraries' lines have an empty `file` and `line` |
 
 `scan_last_success_timestamp_seconds` and the `pool_*`, `detail_*` and `refresh_*` values are read from the server each time `/metrics` is requested. With Redis, the `refresh_*` and `redis_club_ttl_*` values come from one script over the shared schedule, so every instance reports the same, and the other `redis_*` gauges come from one `INFO` call; the detail cache settles its pending work first, so `detail_cache_clubs` is exact. Histograms use buckets from 1 ms to 1 hour. The `umamoe_*` metrics come from the uma.moe client; its [README](../umamoe-client/README.md#metrics) describes them in full.
+
+### Search total
+
+With Redis, each successful search adds one to the `usm:v1:searches` key. It has no TTL, and `volatile-lru` only evicts keys that expire. It is one integer updated in place. Searches that fail or are rejected aren't counted.
+
+To start the total at a number from before it existed, add it once with `INCRBY`, which stays correct even if searches have already counted. For Fly.io, open the proxy with `fly proxy 6379:6379 -a uma-stable-match-redis`, then in another terminal:
+
+```bash
+redis-cli -a "$REDIS_PASSWORD" INCRBY usm:v1:searches 1000
+```
+
+Replace `1000` with the number to add. Prometheus can give one close to the true count since launch: `sum(increase(http_requests_total{route="/api/v1/recommendations",status="200"}[30d]))`.
 
 To watch these on a dashboard, [observability/README.md](../../observability/README.md) sets up Prometheus and Grafana locally, with ready-made dashboards.
 

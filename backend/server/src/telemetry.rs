@@ -149,6 +149,10 @@ async fn record_state(state: &AppState) {
         metrics::gauge!("redis_club_ttl_average_seconds").set(ttl.average.as_secs_f64());
     }
 
+    if let Some(total) = state.details.shared().searches().await {
+        metrics::counter!("searches_total").absolute(total);
+    }
+
     if let Some(stats) = state.details.shared().stats().await {
         metrics::gauge!("redis_keys").set(stats.keys as f64);
         metrics::gauge!("redis_keys_expiring").set(stats.expiring as f64);

@@ -84,14 +84,14 @@
     {
       "id": 203,
       "type": "stat",
-      "title": "Searches in the last 24 hours",
+      "title": "Amount of Searches",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 5,
-        "w": 6,
+        "w": 8,
         "x": 0,
         "y": 1
       },
@@ -102,8 +102,69 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(increase(http_requests_total{route=\"/api/v1/recommendations\"}[24h]))",
+          "expr": "sum(increase(http_requests_total{route=\"/api/v1/recommendations\"}[$__range]))",
           "legendFormat": "searches",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "blue"
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 206,
+      "type": "stat",
+      "title": "Searches since launch",
+      "description": "Every successful search since launch, kept in Redis, so it ignores the time range. Empty without Redis.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "max(searches_total)",
+          "legendFormat": "total",
           "instant": true,
           "range": false
         }
@@ -144,15 +205,15 @@
     {
       "id": 204,
       "type": "stat",
-      "title": "Searches in the last 24 hours by status",
+      "title": "Searches by status",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "h": 5,
-        "w": 18,
-        "x": 6,
+        "w": 8,
+        "x": 16,
         "y": 1
       },
       "targets": [
@@ -162,7 +223,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (status) (increase(http_requests_total{route=\"/api/v1/recommendations\"}[24h]))",
+          "expr": "sum by (status) (increase(http_requests_total{route=\"/api/v1/recommendations\"}[$__range]))",
           "legendFormat": "{{status}}",
           "instant": true,
           "range": false
@@ -222,9 +283,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (status) (increase(http_requests_total{route=\"/api/v1/recommendations\"}[1h]))",
+          "expr": "sum by (status) (rate(http_requests_total{route=\"/api/v1/recommendations\"}[$__rate_interval]) * 300)",
           "legendFormat": "{{status}}",
-          "interval": "1h"
+          "interval": "5m",
+          "range": true
         }
       ],
       "options": {
@@ -944,7 +1006,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (status) (increase(http_requests_total[1h]))",
+          "expr": "sum by (status) (increase(http_requests_total[$__range]))",
           "legendFormat": "{{status}}",
           "instant": true,
           "range": false
