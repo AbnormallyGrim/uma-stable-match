@@ -15,6 +15,10 @@ export const en = {
   'nav.label': 'Main',
   'nav.tour': 'Take the tour',
 
+  'language.label': 'Language',
+  'language.en': 'English',
+  'language.ja': '日本語',
+
   'theme.label': 'Theme',
   'theme.system': 'System',
   'theme.light': 'Light',
@@ -213,7 +217,8 @@ export const en = {
   'yourClub.topPick': 'Top pick',
   'yourClub.note': ({ name, score }: { name: string; score: string }) =>
     `Top pick: ${name}. A lower ${score} is better.`,
-  'yourClub.scoreWord': ({ balanced }: { balanced: boolean }) => (balanced ? 'score' : 'fit'),
+  'yourClub.scoreWord': ({ balanced }: { balanced: boolean }): string =>
+    balanced ? 'score' : 'fit',
 
   'tour.step': ({ n, total }: { n: number; total: number }) => `Step ${n} of ${total}`,
   'tour.skip': 'Skip tour',

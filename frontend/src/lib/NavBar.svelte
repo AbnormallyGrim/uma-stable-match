@@ -8,6 +8,7 @@
 <script lang="ts">
   import BrandLogo from './BrandLogo.svelte';
   import { t } from './i18n';
+  import LanguageToggle from './LanguageToggle.svelte';
   import ThemeToggle from './ThemeToggle.svelte';
 
   interface Props {
@@ -51,6 +52,7 @@
           <circle cx="8" cy="11.5" r=".5" fill="currentColor" stroke="none" />
         </svg>
       </button>
+      <LanguageToggle />
       <ThemeToggle />
     </div>
   </div>
