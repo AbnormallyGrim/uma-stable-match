@@ -8,6 +8,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
 
+  import { t } from './i18n';
   import type { TourStep } from './tour';
 
   interface Props {
@@ -165,7 +166,7 @@
     style:top="{position.top}px"
     style:left="{position.left}px"
   >
-    <p class="count">Step {index + 1} of {steps.length}</p>
+    <p class="count">{t('tour.step', { n: index + 1, total: steps.length })}</p>
     <h2 id="tour-title">{step.title}</h2>
     <p id="tour-body">{step.body}</p>
     <div class="dots" aria-hidden="true">
@@ -175,14 +176,14 @@
     </div>
     <div class="actions">
       {#if !last}
-        <button type="button" class="skip" onclick={close}>Skip tour</button>
+        <button type="button" class="skip" onclick={close}>{t('tour.skip')}</button>
       {/if}
       <span class="spacer"></span>
       {#if index > 0}
-        <button type="button" onclick={() => go(index - 1)}>Back</button>
+        <button type="button" onclick={() => go(index - 1)}>{t('tour.back')}</button>
       {/if}
       <button type="button" class="primary" onclick={() => (last ? close() : go(index + 1))}
-        >{last ? 'Done' : 'Next'}</button
+        >{last ? t('tour.done') : t('tour.next')}</button
       >
     </div>
   </div>

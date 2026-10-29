@@ -1,6 +1,7 @@
 /** Statistics about the visitor across their results, for the results summary. */
 
 import type { Club } from './api';
+import { t } from './i18n';
 
 const COMFORT_FROM = 0.25;
 const COMFORT_TO = 0.6;
@@ -29,5 +30,7 @@ export function typicalPlace(clubs: Club[]): number | null {
 
 /** A place share as `Top 46%`, never below `Top 1%`, or a dash for `null`. */
 export function formatTopShare(share: number | null): string {
-  return share === null ? '–' : `Top ${Math.max(1, Math.round(share * 100))}%`;
+  return share === null
+    ? '–'
+    : t('format.topShare', { percent: Math.max(1, Math.round(share * 100)) });
 }

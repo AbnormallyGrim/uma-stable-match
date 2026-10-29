@@ -7,6 +7,7 @@
 
 <script lang="ts">
   import BrandLogo from './BrandLogo.svelte';
+  import { t } from './i18n';
   import ThemeToggle from './ThemeToggle.svelte';
 
   interface Props {
@@ -19,19 +20,19 @@
   const WEBSITE = 'https://umastable.com';
 </script>
 
-<nav class="navbar" aria-label="Main">
+<nav class="navbar" aria-label={t('nav.label')}>
   <div class="inner">
     <a class="brand" href={WEBSITE}>
       <BrandLogo size={40} />
-      <span class="title">Uma Stable Match</span>
+      <span class="title">{t('app.name')}</span>
     </a>
     <div class="tools">
       <button
         type="button"
         class="help tooltip"
-        data-tooltip="Take the tour"
+        data-tooltip={t('nav.tour')}
         data-tour="help"
-        aria-label="Take the tour"
+        aria-label={t('nav.tour')}
         onclick={onhelp}
       >
         <svg

@@ -1,7 +1,7 @@
 /** Search state machine: loading, retries, countdowns and errors. Framework-free, so it's easy to test. */
 
 import { ApiError, type RecommendationQuery, type Recommendations } from './api';
-import { SCAN_STILL_LOADING, describeError, type ErrorMessage } from './states';
+import { describeError, scanStillLoading, type ErrorMessage } from './states';
 
 /** Seconds to wait before each retry while the first scan runs (about 2 minutes in total). */
 export const RETRY_DELAYS = [5, 10, 20, 30, 30, 30];
@@ -111,7 +111,7 @@ export class SearchRunner {
     if (error instanceof ApiError && error.status === 503) {
       const delay = this.delays[this.attempt];
       if (delay === undefined) {
-        this.update({ phase: 'error', message: SCAN_STILL_LOADING });
+        this.update({ phase: 'error', message: scanStillLoading() });
         return;
       }
       this.attempt += 1;

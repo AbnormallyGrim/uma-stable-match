@@ -5,8 +5,6 @@ import { describe, expect, it } from 'vitest';
 import type { JoinStyle } from './api';
 import {
   DEFAULT_SEARCH,
-  PACE_ERROR,
-  TRAINER_ID_ERROR,
   fromUrlParams,
   isTrainerId,
   loadRememberedTrainerId,
@@ -29,6 +27,9 @@ const pace = (paceMillions: string, extra: Partial<SearchState> = {}): SearchSta
   paceMillions,
   ...extra,
 });
+
+const TRAINER_ID_ERROR = 'Enter your trainer ID: 9 to 12 digits.';
+const PACE_ERROR = 'Enter your daily fan gain in millions, such as 7.6.';
 
 describe('trainer IDs', () => {
   it('accepts 9 to 12 digits, ignoring spaces and dashes', () => {

@@ -61,6 +61,8 @@ src/lib/Tour.svelte           The product tour's overlay, highlight and instruct
 src/lib/tour.ts               The tour's steps, and remembering that it was seen
 src/lib/ThemeToggle.svelte    System / Light / Dark switch, as icons with tooltips
 src/lib/theme.ts              Saving and applying the theme choice
+src/lib/i18n.ts               `t()`, which looks up a message in the language being shown
+src/lib/messages/en.ts        Every message in English, and the shape other languages follow
 src/lib/language.ts           Saving the language choice, and which language to show
 src/lib/language.svelte.ts    The language shown right now, shared by every component
 src/lib/SiteFooter.svelte     Tips, the logo, a link to report a problem, and the disclaimer
@@ -391,3 +393,7 @@ try {
 ## Language
 
 The Japanese translation is behind the server's `ENABLE_JAPANESE` setting, off by default. At startup the app asks `GET /api/v1/features`; if the answer is missing or fails, it stays in English. With it on, the saved choice (`uma-stable-match:language` in local storage, `en` or `ja`) is shown, and a visitor with no saved choice gets English.
+
+### Messages
+
+Every piece of text the app shows is a message in `src/lib/messages/en.ts`, looked up with `t('key')`, or `t('key', { n })` for a message with values. A message is a string, or a function when it has numbers or plurals. Call `t()` where the text is shown, never in a module-level constant, so it follows a language switch. A few messages hold markup (the how-to steps and the footer) and are shown with `{@html}`; they are first-party text, so never put visitor input in one. A language without a catalog shows English.

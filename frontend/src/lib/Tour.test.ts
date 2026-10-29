@@ -3,7 +3,7 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 
-import { hasSeenTour, markTourSeen, TOUR_KEY, TOUR_STEPS } from './tour';
+import { hasSeenTour, markTourSeen, TOUR_KEY, tourSteps } from './tour';
 import Tour from './Tour.svelte';
 
 const steps = [
@@ -88,12 +88,12 @@ describe('tour storage', () => {
   });
 
   it('starts with a welcome and ends on the help button', () => {
-    expect(TOUR_STEPS[0]!.target).toBeUndefined();
-    expect(TOUR_STEPS.at(-1)!.target).toBe('help');
+    expect(tourSteps()[0]!.target).toBeUndefined();
+    expect(tourSteps().at(-1)!.target).toBe('help');
   });
 
   it('only highlights parts of the page that exist', () => {
-    const targets = TOUR_STEPS.flatMap((step) => (step.target ? [step.target] : []));
+    const targets = tourSteps().flatMap((step) => (step.target ? [step.target] : []));
     expect(targets).toEqual([
       'search-by',
       'search-field',

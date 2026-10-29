@@ -14,7 +14,9 @@
     joinStyleLabel,
     playstyleLabel,
     rankTrend,
+    spotsLabel,
   } from './format';
+  import { t } from './i18n';
   import TierBadge from './TierBadge.svelte';
 
   interface Props {
@@ -28,19 +30,13 @@
   const trend = $derived(rankTrend(club.monthly_rank, club.last_month_rank));
   const joinStyle = $derived(joinStyleLabel(club.join_style));
   const playstyle = $derived(playstyleLabel(club.policy));
-  const spots = $derived(
-    club.open_spots === null
-      ? null
-      : club.open_spots === 0
-        ? 'Full'
-        : `${club.open_spots} open ${club.open_spots === 1 ? 'spot' : 'spots'}`,
-  );
+  const spots = $derived(spotsLabel(club.open_spots));
   const medal = $derived(position <= 3 ? `p${position}` : '');
 </script>
 
 <article class="card {medal}" aria-labelledby="club-{club.circle_id}">
   <div class="head">
-    <div class="pick" aria-label="Pick {position}">{position}</div>
+    <div class="pick" aria-label={t('club.pick', { n: position })}>{position}</div>
     <TierBadge tier={club.tier} />
     <div class="info">
       <a
@@ -53,7 +49,7 @@
       <div class="line">
         {#if club.monthly_rank !== null}
           <span>
-            Rank {club.monthly_rank}
+            {t('club.rank', { rank: club.monthly_rank })}
             {#if trend.label}
               <span class="trend {trend.kind}" title={trend.description}>
                 <span aria-hidden="true">{trend.label}</span>
@@ -66,21 +62,21 @@
         {#if joinStyle}<span class="tag join {club.join_style}">{joinStyle}</span>{/if}
         {#if playstyle}<span class="tag policy">{playstyle}</span>{/if}
         {#if club.has_discord}
-          <span class="tag discord" title="The description mentions Discord">Discord</span>
+          <span class="tag discord" title={t('club.discordTitle')}>{t('club.discord')}</span>
         {/if}
       </div>
     </div>
     <dl class="nums">
       <div>
-        <dt>You'd be</dt>
+        <dt>{t('club.youdBe')}</dt>
         <dd>{formatPlace(club.your_place, club.club_size)}</dd>
       </div>
       <div>
-        <dt>Median</dt>
+        <dt>{t('club.median')}</dt>
         <dd>{formatPerDay(club.median_per_day)}</dd>
       </div>
       <div>
-        <dt>{balanceOn ? 'Score' : 'Fit'}</dt>
+        <dt>{balanceOn ? t('club.score') : t('club.fit')}</dt>
         <dd>{formatScore(balanceOn ? club.score : club.fit)}</dd>
       </div>
     </dl>
@@ -95,7 +91,7 @@
       {#if club.balance}
         <dl class="balance">
           <div class="bar-row">
-            <dt>Balance</dt>
+            <dt>{t('club.balance')}</dt>
             <dd>
               <span class="bar" aria-hidden="true"><i style:width="{club.balance.score}%"></i></span
               >
@@ -103,11 +99,11 @@
             </dd>
           </div>
           <div>
-            <dt>Passengers</dt>
+            <dt>{t('club.passengers')}</dt>
             <dd>{formatPlace(club.balance.passengers, club.balance.counted)}</dd>
           </div>
           <div>
-            <dt>Top 3 share</dt>
+            <dt>{t('club.top3Share')}</dt>
             <dd>{formatPercent(club.balance.top3_share)}</dd>
           </div>
         </dl>

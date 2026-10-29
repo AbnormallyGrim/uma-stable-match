@@ -6,6 +6,7 @@
 <script lang="ts">
   import type { Recommendations } from './api';
   import { formatPerDay, formatUpdated } from './format';
+  import { t } from './i18n';
   import { comfortableFits, formatTopShare, typicalPlace } from './stats';
 
   interface Props {
@@ -20,24 +21,24 @@
 
 <dl class="stats" data-testid="result-summary">
   <div class="stat">
-    <dt>Your pace</dt>
+    <dt>{t('summary.pace')}</dt>
     <dd>{formatPerDay(result.trainer.pace_per_day)}</dd>
   </div>
   <div class="stat">
-    <dt>Clubs analysed</dt>
+    <dt>{t('summary.analysed')}</dt>
     <dd>{result.coverage.considered}</dd>
   </div>
   <div class="stat">
-    <dt>Comfortable fits</dt>
-    <dd title="Clubs where you'd sit 25% to 60% of the way down the members">{fits}</dd>
+    <dt>{t('summary.comfortable')}</dt>
+    <dd title={t('summary.comfortableTitle')}>{fits}</dd>
   </div>
   <div class="stat">
-    <dt>Typical place</dt>
-    <dd title="Your middle place across these clubs">{typical}</dd>
+    <dt>{t('summary.typical')}</dt>
+    <dd title={t('summary.typicalTitle')}>{typical}</dd>
   </div>
 </dl>
 <p class="data-age" data-testid="data-age">
-  Club data updated
+  {t('summary.updated')}
   <time datetime={result.updated_at} title={result.updated_at}
     >{formatUpdated(result.updated_at)}</time
   >.

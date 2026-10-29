@@ -6,7 +6,8 @@
 
 <script lang="ts">
   import type { Club, YourClub } from './api';
-  import { formatPerDay, formatPlace, formatScore, joinStyleLabel } from './format';
+  import { formatPerDay, formatPlace, formatScore, joinStyleLabel, spotsLabel } from './format';
+  import { t } from './i18n';
   import TierBadge from './TierBadge.svelte';
 
   interface Props {
@@ -20,29 +21,23 @@
   let { own, topPick, pace, count, balanceOn }: Props = $props();
 
   const joinStyle = $derived(joinStyleLabel(own.join_style));
-  const spots = $derived(
-    own.open_spots === null
-      ? null
-      : own.open_spots === 0
-        ? 'Full'
-        : `${own.open_spots} open ${own.open_spots === 1 ? 'spot' : 'spots'}`,
-  );
+  const spots = $derived(spotsLabel(own.open_spots));
   const verdict = $derived(
     own.result_rank === 1
-      ? 'Your club fits you better than any of your results.'
+      ? t('yourClub.best')
       : own.result_rank <= count
-        ? `Your club would be #${own.result_rank} in your results.`
-        : `Your club would rank below your top ${count}.`,
+        ? t('yourClub.rank', { rank: own.result_rank })
+        : t('yourClub.below', { n: count }),
   );
-  const scoreLabel = $derived(balanceOn ? 'Score' : 'Fit');
+  const scoreLabel = $derived(balanceOn ? t('club.score') : t('club.fit'));
   const rows = $derived([
     {
-      label: 'Median',
+      label: t('club.median'),
       own: formatPerDay(own.median_per_day),
       top: topPick && formatPerDay(topPick.median_per_day),
     },
     {
-      label: "You'd be",
+      label: t('club.youdBe'),
       own: formatPlace(own.your_place, own.club_size),
       top: topPick && formatPlace(topPick.your_place, topPick.club_size),
     },
@@ -55,13 +50,14 @@
 </script>
 
 <section class="your-club" aria-labelledby="your-club-heading" data-testid="your-club">
-  <h3 id="your-club-heading">Your club</h3>
+  <h3 id="your-club-heading">{t('yourClub.heading')}</h3>
   <div class="head">
     <TierBadge tier={own.tier} />
     <div class="info">
       <a class="name" href={own.url} target="_blank" rel="noopener noreferrer">{own.name}</a>
       <div class="line">
-        {#if own.monthly_rank !== null}<span>Rank {own.monthly_rank}</span>{/if}
+        {#if own.monthly_rank !== null}<span>{t('club.rank', { rank: own.monthly_rank })}</span
+          >{/if}
         {#if spots}<span>{spots}</span>{/if}
         {#if joinStyle}<span class="tag join {own.join_style}">{joinStyle}</span>{/if}
       </div>
@@ -69,16 +65,16 @@
   </div>
 
   <p class="verdict">
-    {verdict} Its typical member gains {formatPerDay(own.median_per_day)}, against your
-    {formatPerDay(pace)}.
+    {verdict}
+    {t('yourClub.typical', { own: formatPerDay(own.median_per_day), pace: formatPerDay(pace) })}
   </p>
 
   <table>
     <thead>
       <tr>
         <td></td>
-        <th scope="col">Your club</th>
-        {#if topPick}<th scope="col">Top pick</th>{/if}
+        <th scope="col">{t('yourClub.heading')}</th>
+        {#if topPick}<th scope="col">{t('yourClub.topPick')}</th>{/if}
       </tr>
     </thead>
     <tbody>
@@ -92,7 +88,12 @@
     </tbody>
   </table>
   {#if topPick}
-    <p class="note">Top pick: {topPick.name}. A lower {scoreLabel.toLowerCase()} is better.</p>
+    <p class="note">
+      {t('yourClub.note', {
+        name: topPick.name,
+        score: t('yourClub.scoreWord', { balanced: balanceOn }),
+      })}
+    </p>
   {/if}
 </section>
 

@@ -3,9 +3,11 @@
 
   import type { JoinStyle, RecommendationQuery } from './api';
   import Dropdown from './Dropdown.svelte';
-  import { joinStyleLabel, PLAYSTYLES } from './format';
+  import { joinStyleLabel, playstyles } from './format';
+  import { t } from './i18n';
+  import { language } from './language.svelte';
   import {
-    DISCORD_NOTE,
+    discordNote,
     JOIN_STYLES,
     narrowsSearch,
     validate,
@@ -27,10 +29,16 @@
   let search = $state<SearchState>(untrack(() => ({ ...initial })));
   let remember = $state(untrack(() => rememberInitially));
   let errors = $state<SearchErrors>({});
-  const PLAYSTYLE_OPTIONS: { value: number | null; label: string }[] = [
-    { value: null, label: 'Any playstyle' },
-    ...PLAYSTYLES.map(([code, label]) => ({ value: code, label })),
-  ];
+  const playstyleOptions = $derived<{ value: number | null; label: string }[]>([
+    { value: null, label: t('form.anyPlaystyle') },
+    ...playstyles().map(([code, label]) => ({ value: code, label })),
+  ]);
+
+  // Messages already on screen are in the old language, so they go on a switch.
+  $effect(() => {
+    void language.current;
+    untrack(() => (errors = {}));
+  });
 
   const narrowed = $derived(narrowsSearch(search.joinStyle, search.playstyle));
 
@@ -51,23 +59,23 @@
   }
 </script>
 
-<form class="search" onsubmit={submit} novalidate aria-label="Find clubs">
+<form class="search" onsubmit={submit} novalidate aria-label={t('form.label')}>
   <fieldset class="segmented" data-tour="search-by">
-    <legend class="visually-hidden">Search by</legend>
+    <legend class="visually-hidden">{t('form.searchBy')}</legend>
     <label>
       <input type="radio" name="mode" value="trainer" bind:group={search.mode} />
-      Trainer ID
+      {t('form.trainerId')}
     </label>
     <label>
       <input type="radio" name="mode" value="pace" bind:group={search.mode} />
-      Daily pace
+      {t('form.dailyPace')}
     </label>
   </fieldset>
 
   <div class="row">
     {#if search.mode === 'trainer'}
       <div class="field" data-tour="search-field">
-        <label class="label" for="trainer-id">Trainer ID</label>
+        <label class="label" for="trainer-id">{t('form.trainerId')}</label>
         <input
           id="trainer-id"
           name="trainer_id"
@@ -84,12 +92,12 @@
         <label class="switch">
           <input type="checkbox" role="switch" bind:checked={remember} />
           <span class="track" aria-hidden="true"></span>
-          Remember my trainer ID on this device
+          {t('form.remember')}
         </label>
       </div>
     {:else}
       <div class="field" data-tour="search-field">
-        <label class="label" for="pace">Daily fan gain (millions)</label>
+        <label class="label" for="pace">{t('form.paceLabel')}</label>
         <input
           id="pace"
           name="pace"
@@ -111,10 +119,10 @@
         <label class="switch">
           <input type="checkbox" role="switch" bind:checked={search.balance} />
           <span class="track" aria-hidden="true"></span>
-          Balance scoring
+          {t('form.balanceScoring')}
         </label>
         <label class="slider-label" for="balance-weight"
-          >Balance strength: {search.balanceWeight.toFixed(2)}</label
+          >{t('form.balanceStrength', { value: search.balanceWeight.toFixed(2) })}</label
         >
         <input
           id="balance-weight"
@@ -130,15 +138,15 @@
         <label class="switch">
           <input type="checkbox" role="switch" bind:checked={search.includeFull} />
           <span class="track" aria-hidden="true"></span>
-          Include full clubs
+          {t('form.includeFull')}
         </label>
         <label class="switch">
           <input type="checkbox" role="switch" bind:checked={search.hasDiscord} />
           <span class="track" aria-hidden="true"></span>
-          Has Discord
+          {t('form.hasDiscord')}
         </label>
 
-        <span class="label" id="join-style-label">Join style</span>
+        <span class="label" id="join-style-label">{t('form.joinStyle')}</span>
         <div class="join-styles" role="group" aria-labelledby="join-style-label">
           {#each JOIN_STYLES as style (style)}
             <button
@@ -175,30 +183,29 @@
           {/each}
         </div>
 
-        <span class="label" id="playstyle-label">Playstyle</span>
+        <span class="label" id="playstyle-label">{t('form.playstyle')}</span>
         <Dropdown
           id="playstyle"
           labelledby="playstyle-label"
-          options={PLAYSTYLE_OPTIONS}
+          options={playstyleOptions}
           bind:value={search.playstyle}
         />
 
         {#if narrowed}
           <p class="warning" data-testid="filter-warning">
-            Filtering by join style or playstyle leaves fewer clubs to choose from, so your best
-            matches may be further from your pace than usual.
+            {t('form.filterWarning')}
           </p>
         {/if}
       </div>
       {#if search.hasDiscord}
-        <p class="warning" data-testid="discord-warning">{DISCORD_NOTE}</p>
+        <p class="warning" data-testid="discord-warning">{discordNote()}</p>
       {/if}
     </div>
   </div>
 
   <div class="actions">
     <button class="primary" data-tour="find" type="submit" disabled={busy}
-      >{busy ? 'Searching…' : 'Find clubs'}</button
+      >{busy ? t('form.searching') : t('form.find')}</button
     >
   </div>
 </form>

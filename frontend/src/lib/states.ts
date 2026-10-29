@@ -2,7 +2,8 @@
 
 import { ApiError, type Recommendations } from './api';
 import { gameMonth, monthLabel } from './format';
-import { DISCORD_NOTE } from './search';
+import { t } from './i18n';
+import { discordNote } from './search';
 
 /** A friendly error: a short title, what to do, and whether retrying can help. */
 export interface ErrorMessage {
@@ -11,43 +12,57 @@ export interface ErrorMessage {
   canRetry: boolean;
 }
 
+// The text is looked up when it's read, so a message on screen follows a language switch.
+function message(title: () => string, detail: () => string, canRetry: boolean): ErrorMessage {
+  return {
+    get title() {
+      return title();
+    },
+    get detail() {
+      return detail();
+    },
+    canRetry,
+  };
+}
+
+const generic = (detail: () => string = () => t('error.generic.detail')) =>
+  message(() => t('error.generic.title'), detail, true);
+
 /** Shown when the first scan is still running after every retry. */
-export const SCAN_STILL_LOADING: ErrorMessage = {
-  title: "Club data still isn't ready",
-  detail: 'The first scan is taking longer than usual. Try again in a minute.',
-  canRetry: true,
-};
+export function scanStillLoading(): ErrorMessage {
+  return message(
+    () => t('error.scanStillLoading.title'),
+    () => t('error.scanStillLoading.detail'),
+    true,
+  );
+}
 
 /** A friendly message for a failed search. */
 export function describeError(error: unknown): ErrorMessage {
   if (!(error instanceof ApiError)) {
-    return { title: 'Something went wrong', detail: 'Try again in a moment.', canRetry: true };
+    return generic();
   }
   switch (error.kind) {
     case 'network':
-      return {
-        title: "Couldn't reach the server",
-        detail: 'Check your connection and try again.',
-        canRetry: true,
-      };
+      return message(
+        () => t('error.network.title'),
+        () => t('error.network.detail'),
+        true,
+      );
     case 'timeout':
-      return {
-        title: 'The server took too long to answer',
-        detail: 'Try again in a moment.',
-        canRetry: true,
-      };
+      return message(
+        () => t('error.timeout.title'),
+        () => t('error.generic.detail'),
+        true,
+      );
     case 'invalid-response':
-      return {
-        title: 'Something went wrong',
-        detail: 'The server sent an unexpected response. Try again in a moment.',
-        canRetry: true,
-      };
+      return generic(() => t('error.invalidResponse.detail'));
     case 'human-check':
-      return {
-        title: "We couldn't confirm you're a person",
-        detail: error.message,
-        canRetry: true,
-      };
+      return message(
+        () => t('error.humanCheck.title'),
+        () => error.message,
+        true,
+      );
     case 'http':
       return describeStatus(error);
   }
@@ -56,29 +71,31 @@ export function describeError(error: unknown): ErrorMessage {
 function describeStatus(error: ApiError): ErrorMessage {
   switch (error.status) {
     case 400:
-      return { title: "That search didn't work", detail: error.message, canRetry: false };
+      return message(
+        () => t('error.badSearch.title'),
+        () => error.message,
+        false,
+      );
     case 404:
-      return {
-        title: "We couldn't find that trainer",
-        detail:
-          "Check the trainer ID. It's 9 to 12 digits, shown in-game under Menu → Profile. The trainer also needs to be in a club that uma.moe tracks.",
-        canRetry: false,
-      };
+      return message(
+        () => t('error.trainerNotFound.title'),
+        () => t('error.trainerNotFound.detail'),
+        false,
+      );
     case 422:
-      return {
-        title: 'Not enough fan data yet',
-        detail:
-          'uma.moe needs at least 3 days of fan data this month to work out your pace. Try again in a few days, or search by daily pace instead.',
-        canRetry: false,
-      };
+      return message(
+        () => t('error.notEnoughData.title'),
+        () => t('error.notEnoughData.detail'),
+        false,
+      );
     case 502:
-      return {
-        title: "Couldn't reach uma.moe",
-        detail: "The server couldn't get your data from uma.moe. Try again in a moment.",
-        canRetry: true,
-      };
+      return message(
+        () => t('error.umamoe.title'),
+        () => t('error.umamoe.detail'),
+        true,
+      );
     default:
-      return { title: 'Something went wrong', detail: error.message, canRetry: true };
+      return generic(() => error.message);
   }
 }
 
@@ -86,16 +103,16 @@ function describeStatus(error: ApiError): ErrorMessage {
 export function emptyHints(options: Recommendations['options']): string[] {
   const hints: string[] = [];
   if (options.has_discord) {
-    hints.push('Turn off Has Discord.');
+    hints.push(t('hint.discord'));
   }
   if (options.playstyles !== null) {
-    hints.push('Set playstyle back to any.');
+    hints.push(t('hint.playstyle'));
   }
   if (!options.include_closed) {
-    hints.push("Pick Closed under join style to see clubs that aren't recruiting right now.");
+    hints.push(t('hint.closed'));
   }
   if (options.balance_weight !== null && options.balance_weight > 0) {
-    hints.push('Lower the balance strength or turn balance scoring off.');
+    hints.push(t('hint.balance'));
   }
   return hints;
 }
@@ -106,9 +123,7 @@ export function filterNotice(options: Recommendations['options']): string | null
   const narrowed =
     (joinStyles !== null && !(joinStyles.includes('open') && joinStyles.includes('approval'))) ||
     options.playstyles !== null;
-  return narrowed
-    ? 'These results are filtered by join style or playstyle, so your best matches may be further from your pace than usual.'
-    : null;
+  return narrowed ? t('notice.filtered') : null;
 }
 
 /** Says how many shortlisted clubs are still loading, or `null` when none are. */
@@ -117,8 +132,7 @@ export function pendingNotice(coverage: Recommendations['coverage']): string | n
   if (pending <= 0) {
     return null;
   }
-  const clubs = pending === 1 ? 'club is' : 'clubs are';
-  return `${pending} more ${clubs} still loading. Search again in a minute for complete results.`;
+  return t('notice.pending', { n: pending });
 }
 
 /** Says when results use last month's data, or `null` when they use the current game month. */
@@ -126,14 +140,14 @@ export function monthNotice(result: Pick<Recommendations, 'month' | 'updated_at'
   if (result.month === null || result.month === gameMonth(result.updated_at)) {
     return null;
   }
-  return `These results are based on last month's data (${monthLabel(result.month)}), because the new game month has only just started.`;
+  return t('notice.lastMonth', { month: monthLabel(result.month) });
 }
 
 /** Every notice for a result, the month first. */
 export function resultNotices(result: Recommendations): string[] {
   return [
     filterNotice(result.options),
-    result.options.has_discord ? DISCORD_NOTE : null,
+    result.options.has_discord ? discordNote() : null,
     monthNotice(result),
     pendingNotice(result.coverage),
   ].filter((notice): notice is string => notice !== null);
