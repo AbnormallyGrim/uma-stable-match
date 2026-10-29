@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 /// Features that are switched on. All are off by default.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Features {
-    /// Whether the Japanese translation and the EN/JP switch are offered.
+    /// Whether the Japanese translation and its language button are offered.
     pub japanese: bool,
 }
 

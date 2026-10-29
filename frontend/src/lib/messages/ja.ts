@@ -13,9 +13,7 @@ export const ja: Catalog = {
   'nav.label': 'メインメニュー',
   'nav.tour': 'ツアーを見る',
 
-  'language.label': '言語',
-  'language.en': 'English',
-  'language.ja': '日本語',
+  'language.switch': '英語に切り替え (English)',
 
   'theme.label': 'テーマ',
   'theme.system': 'システム',

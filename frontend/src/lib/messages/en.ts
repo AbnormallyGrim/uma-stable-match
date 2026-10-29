@@ -15,9 +15,7 @@ export const en = {
   'nav.label': 'Main',
   'nav.tour': 'Take the tour',
 
-  'language.label': 'Language',
-  'language.en': 'English',
-  'language.ja': '日本語',
+  'language.switch': 'Switch to Japanese (日本語)',
 
   'theme.label': 'Theme',
   'theme.system': 'System',

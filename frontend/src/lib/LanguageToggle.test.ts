@@ -16,22 +16,17 @@ afterEach(() => {
 describe('LanguageToggle', () => {
   it('is hidden while Japanese is off', () => {
     render(LanguageToggle);
-    expect(screen.queryByRole('group')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('starts on English and switches to Japanese, remembering the choice', async () => {
+  it('names the language it switches to, and flips between the two', async () => {
     language.japaneseEnabled = true;
     render(LanguageToggle);
-    expect(screen.getByRole('group', { name: 'Language' })).toBeInTheDocument();
-    expect(screen.getByLabelText('English')).toBeChecked();
-
-    await fireEvent.click(screen.getByLabelText('日本語'));
+    await fireEvent.click(screen.getByRole('button', { name: 'Switch to Japanese (日本語)' }));
     expect(language.current).toBe('ja');
     expect(localStorage.getItem(LANGUAGE_KEY)).toBe('ja');
-    expect(screen.getByRole('group', { name: '言語' })).toBeInTheDocument();
-    expect(screen.getByLabelText('日本語')).toBeChecked();
 
-    await fireEvent.click(screen.getByLabelText('English'));
+    await fireEvent.click(screen.getByRole('button', { name: '英語に切り替え (English)' }));
     expect(language.current).toBe('en');
     expect(localStorage.getItem(LANGUAGE_KEY)).toBe('en');
   });
@@ -40,6 +35,6 @@ describe('LanguageToggle', () => {
     language.japaneseEnabled = true;
     language.choose('ja');
     render(LanguageToggle);
-    expect(screen.getByLabelText('日本語')).toBeChecked();
+    expect(screen.getByRole('button', { name: '英語に切り替え (English)' })).toBeInTheDocument();
   });
 });
