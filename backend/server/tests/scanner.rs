@@ -47,7 +47,7 @@ fn listed(id: u64, rank: i32, members: i32) -> Value {
 
 fn details(server: &MockServer) -> ClubDetails {
     ClubDetails::new(
-        &client(server),
+        client(server),
         SharedPool::default(),
         DetailConfig::default(),
     )

@@ -1,4 +1,4 @@
-use uma_stable_match_umamoe_client::{ApiKey, ClientConfig, StatusCode};
+use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, StatusCode};
 use wiremock::matchers::path;
 use wiremock::{Mock, MockServer, ResponseTemplate};
 

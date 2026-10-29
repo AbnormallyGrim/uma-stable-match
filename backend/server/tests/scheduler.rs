@@ -224,7 +224,7 @@ fn refreshing(server: &MockServer) -> ClubDetails {
         refresher: true,
         ..DetailConfig::default()
     };
-    ClubDetails::new(&client(server), SharedPool::default(), config).0
+    ClubDetails::new(client(server), SharedPool::default(), config).0
 }
 
 async fn mount_list(server: &MockServer) {

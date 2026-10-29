@@ -8,13 +8,13 @@ use tracing::field::Empty;
 use tracing::{Instrument, Span};
 use uma_stable_match_scoring::daily_pace;
 use uma_stable_match_umamoe_client::{
-    CircleRequest, CircleResponse, Client, Error, Priority, RankingsGainsRequest,
-    RankingsMonthlyRequest, StatusCode,
+    CircleRequest, CircleResponse, Priority, RankingsGainsRequest, RankingsMonthlyRequest,
 };
 
-use crate::details::{ClubDetails, VISITOR_MAX_PAUSE};
+use crate::details::ClubDetails;
 use crate::pool::Period;
 use crate::shared::SharedCache;
+use crate::source::{Source, SourceError};
 use crate::traces::in_trace;
 
 /// How long a looked-up pace is reused.
@@ -23,15 +23,15 @@ pub const DEFAULT_PACE_TTL: Duration = Duration::from_secs(10 * 60);
 /// Why a trainer's pace couldn't be found. Messages never include the trainer ID.
 #[derive(Debug, thiserror::Error)]
 pub enum PaceError {
-    /// uma.moe doesn't know the trainer, or they aren't in the club it returned.
+    /// The source doesn't know the trainer, or they aren't in the club it returned.
     #[error("trainer not found")]
     NotFound,
     /// Fewer than 3 days of data, or no gain this month.
     #[error("not enough fan data this month to work out a pace")]
     NotEnoughData,
-    /// The uma.moe request failed.
+    /// The source request failed.
     #[error("could not reach uma.moe")]
-    Upstream(#[source] Error),
+    Upstream(#[source] SourceError),
 }
 
 type Entries = HashMap<(u64, Option<Period>), (Instant, Outcome)>;
@@ -65,7 +65,7 @@ impl Outcome {
 /// Looks up trainers' paces, reusing results for a while. Clones share the cache.
 #[derive(Debug, Clone)]
 pub struct PaceLookup {
-    client: Client,
+    source: Source,
     ttl: Duration,
     entries: Arc<Mutex<Entries>>,
     shared: SharedCache,
@@ -74,9 +74,9 @@ pub struct PaceLookup {
 
 impl PaceLookup {
     /// Reuses each result for `ttl`.
-    pub fn new(client: Client, ttl: Duration) -> Self {
+    pub fn new(source: impl Into<Source>, ttl: Duration) -> Self {
         Self {
-            client: client.with_max_pause(VISITOR_MAX_PAUSE),
+            source: source.into(),
             ttl,
             entries: Arc::default(),
             shared: SharedCache::none(),
@@ -84,12 +84,12 @@ impl PaceLookup {
         }
     }
 
-    /// Checks `shared` before uma.moe, and stores each result in it.
+    /// Checks `shared` before the source, and stores each result in it.
     pub fn with_shared(self, shared: SharedCache) -> Self {
         Self { shared, ..self }
     }
 
-    /// Reads trainers' clubs through `details`, so cached clubs don't need another uma.moe call.
+    /// Reads trainers' clubs through `details`, so cached clubs don't need another source call.
     pub fn with_details(self, details: ClubDetails) -> Self {
         Self {
             details: Some(details),
@@ -100,7 +100,7 @@ impl PaceLookup {
     /// The trainer's daily fan gain and club this month, or in `period` if given. For a given
     /// period it falls back to the 7-day gain ÷ 7 when that month has too little data.
     ///
-    /// Found and not-found results are cached per month; uma.moe failures aren't.
+    /// Found and not-found results are cached per month.
     pub async fn pace(
         &self,
         viewer_id: u64,
@@ -123,7 +123,11 @@ impl PaceLookup {
         }
 
         let outcome = self.lookup(viewer_id, period).await;
-        count_pace(if outcome.is_ok() { "umamoe" } else { "error" });
+        count_pace(if outcome.is_ok() {
+            self.source.name()
+        } else {
+            "error"
+        });
         let outcome = outcome?;
         self.store(viewer_id, period, outcome);
         self.shared.set(&key, &outcome, self.ttl).await;
@@ -140,9 +144,9 @@ impl PaceLookup {
         request: CircleRequest,
         viewer_id: u64,
     ) -> Result<Outcome, PaceError> {
-        match self.client.circle(&request).await {
+        match self.source.club(&request, Priority::Interactive).await {
             Ok(response) => Ok(pace_from_response(&response, viewer_id)),
-            Err(error) if error.status() == Some(StatusCode::NOT_FOUND) => Ok(Outcome::NotFound),
+            Err(error) if error.is_not_found() => Ok(Outcome::NotFound),
             Err(error) => {
                 tracing::warn!(
                     trainer_id = viewer_id,
@@ -184,9 +188,9 @@ impl PaceLookup {
         if let Some((year, month)) = period {
             request = request.for_month(year, month);
         }
-        match self.client.rankings_monthly(&request).await {
+        match self.source.rankings_monthly(&request).await {
             Ok(rankings) => rankings.viewer(viewer_id).and_then(|row| row.circle_id),
-            Err(error) if error.status() == Some(StatusCode::NOT_FOUND) => None,
+            Err(error) if error.is_not_found() => None,
             Err(error) => {
                 tracing::warn!(
                     trainer_id = viewer_id,
@@ -231,8 +235,8 @@ impl PaceLookup {
                 if let Some((year, month)) = period {
                     request = request.for_month(year, month);
                 }
-                self.client
-                    .circle(&request)
+                self.source
+                    .club(&request, Priority::Interactive)
                     .await
                     .map(|response| pace_from_response(&response, viewer_id))
                     .map(|outcome| with_club(outcome, circle_id))
@@ -258,12 +262,12 @@ impl PaceLookup {
         outcome: Outcome,
     ) -> Result<Outcome, PaceError> {
         let gains = match self
-            .client
+            .source
             .rankings_gains(&RankingsGainsRequest::for_viewer(viewer_id))
             .await
         {
             Ok(gains) => gains,
-            Err(error) if error.status() == Some(StatusCode::NOT_FOUND) => return Ok(outcome),
+            Err(error) if error.is_not_found() => return Ok(outcome),
             Err(error) => {
                 tracing::warn!(
                     trainer_id = viewer_id,

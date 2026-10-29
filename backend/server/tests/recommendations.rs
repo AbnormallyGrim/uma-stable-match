@@ -30,7 +30,7 @@ fn offline() -> Client {
 }
 
 fn unscanned() -> Scanned {
-    let details = ClubDetails::new(&offline(), SharedPool::default(), DetailConfig::default()).0;
+    let details = ClubDetails::new(offline(), SharedPool::default(), DetailConfig::default()).0;
     (Cache::new(), details)
 }
 

@@ -169,7 +169,7 @@ async fn requests_still_work_when_redis_stops_answering() {
         .await
         .unwrap();
     let (details, _loader) =
-        ClubDetails::with_shared(&client(&server), pool(id), DetailConfig::default(), shared);
+        ClubDetails::with_shared(client(&server), pool(id), DetailConfig::default(), shared);
 
     let club = details.get(id, Priority::Interactive).await.unwrap();
     assert_eq!(club.circle_id, id);
@@ -216,9 +216,9 @@ async fn instances_share_club_details() {
         .await;
 
     let config = DetailConfig::default();
-    let (first, _a) = ClubDetails::with_shared(&client(&server), pool(id), config, first_shared);
+    let (first, _a) = ClubDetails::with_shared(client(&server), pool(id), config, first_shared);
     let (second, _b) =
-        ClubDetails::with_shared(&client(&server), pool(id), config, second_shared.clone());
+        ClubDetails::with_shared(client(&server), pool(id), config, second_shared.clone());
 
     first.get(id, Priority::Interactive).await.unwrap();
     let club = second.get(id, Priority::Interactive).await.unwrap();
@@ -321,7 +321,7 @@ struct Instance {
 fn instance(server: &MockServer, config: ScanConfig, shared: SharedCache) -> Instance {
     let cache = Cache::new();
     let (details, _loader) = ClubDetails::with_shared(
-        &client(server),
+        client(server),
         SharedPool::default(),
         DetailConfig::default(),
         shared,
@@ -629,9 +629,9 @@ async fn a_refresh_reaches_other_instances_with_its_update_time() {
         .mount(&server)
         .await;
     let config = DetailConfig::default();
-    let (first, _a) = ClubDetails::with_shared(&client(&server), pool(id), config, first_shared);
+    let (first, _a) = ClubDetails::with_shared(client(&server), pool(id), config, first_shared);
     let (second, _b) =
-        ClubDetails::with_shared(&client(&server), pool(id), config, redis().await.unwrap());
+        ClubDetails::with_shared(client(&server), pool(id), config, redis().await.unwrap());
 
     first.get(id, Priority::Interactive).await.unwrap();
     first.refresh(id, Priority::Background).await.unwrap();
@@ -690,7 +690,7 @@ async fn club_details_stay_in_redis_a_day_past_their_next_refresh() {
         .mount(&server)
         .await;
     let (details, _) =
-        ClubDetails::with_shared(&client(&server), pool(id), DetailConfig::default(), shared);
+        ClubDetails::with_shared(client(&server), pool(id), DetailConfig::default(), shared);
 
     details.get(id, Priority::Interactive).await.unwrap();
     let ttl = Duration::from_millis(ttl_millis(&club_key(id, None)).await as u64);
@@ -717,10 +717,9 @@ async fn a_club_past_its_next_refresh_is_fetched_again_through_redis() {
         .respond_with(updated(id, "After", "2026-03-20T15:00:00Z"))
         .mount(&server)
         .await;
-    let (first, _a) =
-        ClubDetails::with_shared(&client(&server), pool(id), every(100), first_shared);
+    let (first, _a) = ClubDetails::with_shared(client(&server), pool(id), every(100), first_shared);
     let (second, _b) = ClubDetails::with_shared(
-        &client(&server),
+        client(&server),
         pool(id),
         every(100),
         redis().await.unwrap(),
@@ -760,13 +759,9 @@ async fn the_last_copy_in_redis_is_served_when_uma_moe_fails() {
         .respond_with(ResponseTemplate::new(500))
         .mount(&server)
         .await;
-    let (first, _a) = ClubDetails::with_shared(&client(&server), pool(id), every(50), first_shared);
-    let (second, _b) = ClubDetails::with_shared(
-        &client(&server),
-        pool(id),
-        every(50),
-        redis().await.unwrap(),
-    );
+    let (first, _a) = ClubDetails::with_shared(client(&server), pool(id), every(50), first_shared);
+    let (second, _b) =
+        ClubDetails::with_shared(client(&server), pool(id), every(50), redis().await.unwrap());
 
     first.get(id, Priority::Interactive).await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -787,7 +782,7 @@ fn refreshing(server: &MockServer, scan: ScanConfig, shared: SharedCache) -> Clu
         scan,
         ..DetailConfig::default()
     };
-    ClubDetails::with_shared(&client(server), SharedPool::default(), config, shared).0
+    ClubDetails::with_shared(client(server), SharedPool::default(), config, shared).0
 }
 
 async fn mount_details(server: &MockServer, ids: &[u64]) {

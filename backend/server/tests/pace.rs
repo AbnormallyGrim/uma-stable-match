@@ -82,7 +82,7 @@ fn unscanned(server: &MockServer) -> (Cache, ClubDetails) {
 
 fn details(server: &MockServer) -> ClubDetails {
     ClubDetails::new(
-        &client(server),
+        client(server),
         SharedPool::default(),
         DetailConfig::default(),
     )

@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
-use uma_stable_match_umamoe_client::{Circle, Client};
+use uma_stable_match_umamoe_client::Circle;
 
 use crate::cache::Cache;
 use crate::cache::ScanPhase;
@@ -17,6 +17,7 @@ use crate::scanner::{
     install, list_candidates, load, scan_period, scan_with, Scan, ScanConfig, ScanError,
 };
 use crate::shared::{ScanLease, ScanTurn, SharedCache};
+use crate::source::Source;
 
 const WAIT_POLL: Duration = Duration::from_secs(1);
 
@@ -68,13 +69,14 @@ impl InProgress {
 /// scan stays current until the next scan is due. A scan in
 /// progress at shutdown is cancelled.
 pub async fn run_scheduler(
-    client: Client,
+    source: impl Into<Source>,
     details: ClubDetails,
     config: ScanConfig,
     every: Option<Duration>,
     cache: Cache,
     mut shutdown: watch::Receiver<bool>,
 ) {
+    let source: Source = source.into();
     let shared = details.shared().clone();
     let daily = every.is_none() && details.refreshes();
     let interval = every.unwrap_or(Duration::from_secs(
@@ -90,7 +92,7 @@ pub async fn run_scheduler(
                 tracing::info!("scan started");
                 let started = SystemTime::now();
                 cache.start_progress(ScanPhase::Listing, Some(started));
-                let work = scan_with(&client, &details, &config, &cache);
+                let work = scan_with(&source, &details, &config, &cache);
                 let Some(result) = until_stopped(work, &mut shutdown).await else {
                     return cancelled(&cache);
                 };
@@ -120,7 +122,7 @@ pub async fn run_scheduler(
                 };
                 let started = plan.started();
                 cache.start_progress(ScanPhase::Listing, Some(started));
-                let work = lead(&client, &details, &config, &cache, &lease, plan);
+                let work = lead(&source, &details, &config, &cache, &lease, plan);
                 let Some(result) = until_stopped(work, &mut shutdown).await else {
                     lease.release().await;
                     return cancelled(&cache);
@@ -170,7 +172,7 @@ pub async fn run_scheduler(
                     cache.begin_scan();
                     let started = SystemTime::now();
                     cache.start_progress(ScanPhase::Loading, Some(started));
-                    let work = sync(&client, &details, &config, &cache);
+                    let work = sync(&source, &details, &config, &cache);
                     let Some(result) = until_stopped(work, &mut shutdown).await else {
                         return cancelled(&cache);
                     };
@@ -206,7 +208,7 @@ impl Plan {
 }
 
 async fn lead(
-    client: &Client,
+    source: &Source,
     details: &ClubDetails,
     config: &ScanConfig,
     cache: &Cache,
@@ -220,7 +222,7 @@ async fn lead(
                 saved.rows
             }
             Plan::List { started, keep_for } => {
-                let rows = list_candidates(client, config, cache).await?;
+                let rows = list_candidates(source, config, cache).await?;
                 let progress = InProgress::new(rows.clone(), started, SystemTime::now());
                 lease.save_progress(&progress, keep_for).await;
                 rows
@@ -238,7 +240,7 @@ async fn lead(
 }
 
 async fn sync(
-    client: &Client,
+    source: &Source,
     details: &ClubDetails,
     config: &ScanConfig,
     cache: &Cache,
@@ -254,7 +256,7 @@ async fn sync(
         None => {
             tracing::warn!("the published scan is missing; scanning here");
             cache.update_progress(|p| p.phase = ScanPhase::Listing);
-            scan_with(client, details, config, cache).await
+            scan_with(source, details, config, cache).await
         }
     }
 }
