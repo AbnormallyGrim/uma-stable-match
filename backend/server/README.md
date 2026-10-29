@@ -66,6 +66,8 @@ The API key, `REDIS_URL` (which can hold a password), `REDIS_KEY_SECRET`, `TURNS
 
 The scanner, club details and trainer lookups read their data through a `ClubSource`, shared as a `Source`. `UmaMoeSource`, built from the uma.moe `Client`, is the one the server uses. A `Client` converts into a `Source` directly, so `scan`, `ClubDetails::new`, `PaceLookup::new` and `run_scheduler` accept either.
 
+`run(config, source)` starts everything with a given source: metrics, Redis, the scheduler, the refresher, the background loader, the API and the frontend. It serves until Ctrl-C or SIGTERM and returns a `RunError` if something fails to start. `Config` holds the settings that don't depend on the source; the uma.moe ones, `UMAMOE_API_KEY` and `UMAMOE_BASE_URL`, are read separately into `UmaMoeConfig`. The binary in `main.rs` only sets up logging and traces, builds the uma.moe `Client` from `UmaMoeConfig`, and calls `run`, so another binary can run the same server with its own source.
+
 A source answers four calls, with uma.moe's request and response types:
 
 | Call | Used by |

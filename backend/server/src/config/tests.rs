@@ -12,10 +12,8 @@ fn lookup(vars: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
 
 #[test]
 fn defaults() {
-    let config = Config::from_lookup(lookup(&[("UMAMOE_API_KEY", "test-key")])).unwrap();
-    assert_eq!(config.api_key, ApiKey::new("test-key"));
+    let config = Config::from_lookup(lookup(&[])).unwrap();
     assert_eq!(config.bind_addr, "127.0.0.1:8080".parse().unwrap());
-    assert_eq!(config.base_url, None);
     assert_eq!(config.scan, ScanConfig::default());
     assert_eq!(config.scan_interval, None);
     assert_eq!(config.detail_cache, None);
@@ -38,22 +36,44 @@ fn reads_all_settings() {
         ("TRAINER_CACHE_MINUTES", "15"),
     ]))
     .unwrap();
-    assert_eq!(config.api_key, ApiKey::new("test-key"));
-    assert_eq!(config.base_url.as_deref(), Some("http://localhost:9000"));
     assert_eq!(config.bind_addr, "0.0.0.0:9090".parse().unwrap());
     assert_eq!(config.trainer_cache, Duration::from_secs(15 * 60));
 }
 
 #[test]
+fn reads_umamoe_settings() {
+    let config = UmaMoeConfig::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", " test-key "),
+        ("UMAMOE_BASE_URL", "http://localhost:9000"),
+    ]))
+    .unwrap();
+    assert_eq!(config.api_key, ApiKey::new("test-key"));
+    assert_eq!(config.base_url.as_deref(), Some("http://localhost:9000"));
+    assert_eq!(config.client_config().base_url, "http://localhost:9000");
+
+    let config = UmaMoeConfig::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("UMAMOE_BASE_URL", ""),
+    ]))
+    .unwrap();
+    assert_eq!(config.base_url, None);
+}
+
+#[test]
 fn missing_or_blank_key_fails() {
     assert_eq!(
-        Config::from_lookup(lookup(&[])).unwrap_err(),
+        UmaMoeConfig::from_lookup(lookup(&[])).unwrap_err(),
         ConfigError::MissingApiKey
     );
     assert_eq!(
-        Config::from_lookup(lookup(&[("UMAMOE_API_KEY", "  ")])).unwrap_err(),
+        UmaMoeConfig::from_lookup(lookup(&[("UMAMOE_API_KEY", "  ")])).unwrap_err(),
         ConfigError::MissingApiKey
     );
+}
+
+#[test]
+fn server_settings_need_no_api_key() {
+    assert!(Config::from_lookup(lookup(&[])).is_ok());
 }
 
 #[test]
@@ -110,7 +130,6 @@ fn blank_optional_settings_use_defaults() {
         ("PORT", ""),
     ]))
     .unwrap();
-    assert_eq!(config.base_url, None);
     assert_eq!(
         config.bind_addr,
         SocketAddr::new(DEFAULT_HOST, DEFAULT_PORT)

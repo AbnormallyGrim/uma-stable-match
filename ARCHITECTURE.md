@@ -55,6 +55,8 @@ flowchart TB
 
 The scanner fills the pool in the background, and the refresher keeps the detail cache current. A visitor's request reads both, fetches a few missing clubs if it must, and scores everything it has. The server also serves the built web page, so one process runs the whole tool.
 
+The scanner, club details and trainer lookups read uma.moe through a `ClubSource`, and the server starts through `run(config, source)`, so the same server can run with another data source. See [Data source](backend/server/README.md#data-source) in the server README.
+
 ## Project layout
 
 ```
