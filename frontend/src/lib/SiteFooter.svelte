@@ -7,6 +7,7 @@
 <script lang="ts">
   import carats from '../assets/carats/carats.webp';
   import BrandLogo from './BrandLogo.svelte';
+  import { t } from './i18n';
 
   const REPO = 'https://github.com/AbnormallyGrim/uma-stable-match';
   const KOFI = 'https://ko-fi.com/L5P6299MV1';
@@ -18,67 +19,42 @@
   const aprilFools = $derived(today.getMonth() === 3 && today.getDate() === 1);
 </script>
 
+<!-- eslint-disable svelte/no-at-html-tags -- first-party text from the message catalog -->
 <footer class="site-footer">
   <details class="tips">
-    <summary>Tips for switching clubs</summary>
+    <summary>{t('footer.tipsSummary')}</summary>
     <ul>
-      <li>
-        <strong>14-day rule:</strong> you need at least 14 days in a club during a month to receive its
-        monthly reward, so switch early in the month.
-      </li>
-      <li>
-        <strong>24-hour cooldown:</strong> after leaving a club you can't join another for 24 hours. Players
-        report that being removed by the leader avoids this.
-      </li>
-      <li>
-        <strong>Month-start lock:</strong> from 10:00 to 14:59 UTC on the 1st, you can't leave, apply
-        to or invite to clubs.
-      </li>
-      <li>
-        <strong>Check activity first:</strong> review members' activity on uma.moe before applying.
-      </li>
+      <li>{@html t('footer.tip14')}</li>
+      <li>{@html t('footer.tip24')}</li>
+      <li>{@html t('footer.tipLock')}</li>
+      <li>{@html t('footer.tipActivity')}</li>
     </ul>
-    <p>These rules can change, so check in-game if something doesn't match.</p>
+    <p>{t('footer.tipsNote')}</p>
   </details>
 
   <div class="meta">
     <div class="brand">
       <BrandLogo size={32} />
-      <span>Uma Stable Match</span>
+      <span>{t('app.name')}</span>
     </div>
 
-    <nav aria-label="Project links">
-      <button type="button" onclick={() => open(`${REPO}/issues`)}>Report a problem</button>
+    <nav aria-label={t('footer.links')}>
+      <button type="button" onclick={() => open(`${REPO}/issues`)}>{t('footer.report')}</button>
       <button type="button" class="kofi" onclick={() => open(KOFI)}
-        ><span aria-hidden="true">🥕</span> Buy me a carrot</button
+        ><span aria-hidden="true">🥕</span> {t('footer.kofi')}</button
       >
       {#if aprilFools}
         <button type="button" class="carats" onclick={() => open(FREE_CARATS)}
-          ><img src={carats} alt="" width="20" height="20" /> Free carats</button
+          ><img src={carats} alt="" width="20" height="20" /> {t('footer.carats')}</button
         >
       {/if}
     </nav>
-    <p class="support">Optional tips help cover hosting. Every feature stays free.</p>
+    <p class="support">{t('footer.support')}</p>
 
     <div class="notes">
-      <p>
-        Uma Stable Match is an <strong>unofficial, non-commercial fan tool</strong>. It isn't
-        affiliated with, endorsed by or sponsored by uma.moe or Cygames, Inc.
-      </p>
-      <p>
-        Club and trainer data comes from
-        <a href="https://uma.moe" target="_blank" rel="noopener noreferrer">uma.moe</a> and may be delayed
-        or incomplete. Recommendations are estimates to help you decide, not judgements of any player
-        or club.
-      </p>
-      <p>
-        <em>Umamusume: Pretty Derby</em> and its names, characters, artwork and trademarks belong to
-        Cygames, Inc. The club tier icons are © Cygames, Inc. and are used non-commercially in line
-        with Cygames'
-        <a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener noreferrer"
-          >Fan-Created Content Guidelines</a
-        >.
-      </p>
+      <p>{@html t('footer.unofficial')}</p>
+      <p>{@html t('footer.data')}</p>
+      <p>{@html t('footer.trademark')}</p>
     </div>
   </div>
 </footer>
@@ -252,7 +228,7 @@
     margin: 0 0 8px;
   }
 
-  strong {
+  .site-footer :global(strong) {
     color: var(--text-2);
   }
 </style>

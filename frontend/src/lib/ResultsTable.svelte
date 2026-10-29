@@ -14,6 +14,7 @@
     joinStyleLabel,
     tierIndex,
   } from './format';
+  import { t, type MessageKey } from './i18n';
   import TierBadge from './TierBadge.svelte';
 
   type SortKey =
@@ -35,7 +36,7 @@
   // `first` is the direction a column sorts in when first selected.
   interface Column {
     key: SortKey;
-    label: string;
+    label: MessageKey;
     value: (row: Row) => number | string | null;
     first: Direction;
     balanceOnly?: boolean;
@@ -55,64 +56,74 @@
   let { clubs, balanceOn, includeClosed }: Props = $props();
 
   const columns: Column[] = [
-    { key: 'pick', label: '#', value: (r) => r.pick, first: 'ascending' },
+    { key: 'pick', label: 'table.col.pick', value: (r) => r.pick, first: 'ascending' },
     {
       key: 'tier',
-      label: 'Tier',
+      label: 'table.col.tier',
       value: (r) => (tierIndex(r.club.tier) < 0 ? null : tierIndex(r.club.tier)),
       first: 'descending',
     },
-    { key: 'name', label: 'Club', value: (r) => r.club.name.toLowerCase(), first: 'ascending' },
-    { key: 'rank', label: 'Rank', value: (r) => r.club.monthly_rank, first: 'ascending' },
+    {
+      key: 'name',
+      label: 'table.col.club',
+      value: (r) => r.club.name.toLowerCase(),
+      first: 'ascending',
+    },
+    { key: 'rank', label: 'table.col.rank', value: (r) => r.club.monthly_rank, first: 'ascending' },
     {
       key: 'lastRank',
-      label: 'Last month',
+      label: 'table.col.lastMonth',
       value: (r) => r.club.last_month_rank,
       first: 'ascending',
     },
-    { key: 'spots', label: 'Open spots', value: (r) => r.club.open_spots, first: 'descending' },
+    {
+      key: 'spots',
+      label: 'table.col.openSpots',
+      value: (r) => r.club.open_spots,
+      first: 'descending',
+    },
     {
       key: 'join',
-      label: 'Join style',
+      label: 'table.col.joinStyle',
       value: (r) => joinStyleLabel(r.club.join_style),
       first: 'ascending',
     },
     {
       key: 'median',
-      label: 'Median/day',
+      label: 'table.col.median',
       value: (r) => r.club.median_per_day,
       first: 'descending',
     },
     {
       key: 'place',
-      label: "You'd be",
+      label: 'table.col.place',
       value: (r) => r.club.your_place / r.club.club_size,
       first: 'ascending',
     },
     {
       key: 'balance',
-      label: 'Balance',
+      label: 'table.col.balance',
       value: (r) => r.club.balance?.score ?? null,
       first: 'descending',
       balanceOnly: true,
     },
     {
       key: 'passengers',
-      label: 'Passengers',
+      label: 'table.col.passengers',
       value: (r) => r.club.balance?.passengers ?? null,
       first: 'ascending',
       balanceOnly: true,
     },
     {
       key: 'top3',
-      label: 'Top 3 share',
+      label: 'table.col.top3',
       value: (r) => r.club.balance?.top3_share ?? null,
       first: 'ascending',
       balanceOnly: true,
     },
     {
       key: 'score',
-      label: 'Fit',
+      label: 'table.col.fit',
       value: (r) => (balanceOn ? r.club.score : r.club.fit),
       first: 'ascending',
     },
@@ -126,7 +137,9 @@
   const visibleColumns = $derived(
     columns
       .filter((c) => balanceOn || !c.balanceOnly)
-      .map((c) => (c.key === 'score' && balanceOn ? { ...c, label: 'Score' } : c)),
+      .map((c) =>
+        c.key === 'score' && balanceOn ? { ...c, label: 'table.col.score' as const } : c,
+      ),
   );
   const rows = $derived(clubs.map((club, i) => ({ club, pick: i + 1 })));
   const filtered = $derived.by(() => {
@@ -169,23 +182,22 @@
 
 <div class="toolbar">
   <label>
-    <span class="visually-hidden">Search clubs by name</span>
-    <input type="search" placeholder="Search clubs" bind:value={search} />
+    <span class="visually-hidden">{t('table.search')}</span>
+    <input type="search" placeholder={t('table.searchPlaceholder')} bind:value={search} />
   </label>
   {#if includeClosed}
     <label class="check">
       <input type="checkbox" bind:checked={hideClosed} />
-      Hide closed clubs
+      {t('table.hideClosed')}
     </label>
   {/if}
   <span class="count" aria-live="polite">
-    Showing {sorted.length} of {clubs.length}
-    {clubs.length === 1 ? 'club' : 'clubs'}
+    {t('table.showing', { shown: sorted.length, total: clubs.length })}
   </span>
 </div>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="scroll" role="region" aria-label="Top results" tabindex="0">
+<div class="scroll" role="region" aria-label={t('table.region')} tabindex="0">
   <table>
     <thead>
       <tr>
@@ -196,7 +208,7 @@
             class:name={column.key === 'name'}
           >
             <button type="button" onclick={() => sortBy(column)}>
-              {column.label}
+              {t(column.label)}
               <span class="arrow" aria-hidden="true"
                 >{sortKey === column.key ? (direction === 'ascending' ? '▲' : '▼') : ''}</span
               >
@@ -216,7 +228,9 @@
           <td>{club.monthly_rank ?? '–'}</td>
           <td>{club.last_month_rank ?? '–'}</td>
           <td>
-            {#if club.open_spots === 0}<span class="full">Full</span>{:else}{spots(club)}{/if}
+            {#if club.open_spots === 0}<span class="full">{t('club.full')}</span>{:else}{spots(
+                club,
+              )}{/if}
           </td>
           <td>{joinStyleLabel(club.join_style) ?? '–'}</td>
           <td>{formatPerDay(club.median_per_day)}</td>
@@ -232,7 +246,7 @@
         </tr>
       {:else}
         <tr>
-          <td class="empty" colspan={visibleColumns.length}>No clubs match.</td>
+          <td class="empty" colspan={visibleColumns.length}>{t('table.empty')}</td>
         </tr>
       {/each}
     </tbody>

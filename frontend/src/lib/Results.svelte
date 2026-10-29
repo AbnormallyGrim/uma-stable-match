@@ -7,6 +7,7 @@
 <script lang="ts">
   import type { Recommendations } from './api';
   import ClubCard from './ClubCard.svelte';
+  import { t } from './i18n';
   import ResultsSummary from './ResultsSummary.svelte';
   import ResultsTable from './ResultsTable.svelte';
   import { emptyHints, resultNotices } from './states';
@@ -29,19 +30,19 @@
 </script>
 
 <section aria-labelledby="results-heading" class:stale aria-busy={stale}>
-  <h2 id="results-heading" class="visually-hidden">Results</h2>
+  <h2 id="results-heading" class="visually-hidden">{t('results.heading')}</h2>
   <ResultsSummary {result} />
   {#each notices as notice (notice)}
     <p class="notice" data-testid="result-notice">{notice}</p>
   {/each}
 
-  <h3>Top picks</h3>
+  <h3>{t('results.topPicks')}</h3>
   {#if picks.length === 0 && count > 0}
-    <p>Every matching club is full. They're listed below, but there's no spot to join.</p>
+    <p>{t('results.allFull')}</p>
   {:else if picks.length === 0}
-    <p>No clubs matched your search.</p>
+    <p>{t('results.none')}</p>
     {#if hints.length > 0}
-      <p>You could try:</p>
+      <p>{t('results.tryThese')}</p>
       <ul class="hints">
         {#each hints as hint (hint)}
           <li>{hint}</li>
@@ -58,22 +59,12 @@
 
   <div class="about" data-testid="results-about">
     <p>
-      {result.options.include_full
-        ? "Full clubs (30 of 30 members) are in the table, but not the top picks, since there's no spot to join."
-        : "Full clubs (30 of 30 members) aren't in the results, since there's no spot to join."}
-      Your current club is never listed here:
-      {result.your_club
-        ? "it's compared with your top pick below."
-        : 'search by trainer ID to see how it compares.'}
+      {t(result.options.include_full ? 'results.fullIncluded' : 'results.fullExcluded')}
+      {t(result.your_club ? 'results.ownCompared' : 'results.ownSearch')}
     </p>
     <details>
-      <summary>Why not a higher-tier club?</summary>
-      <p>
-        A club's tier comes from its total fans, which its fastest members drive. Matches are based
-        on a club's typical member instead, so you land in clubs where you'd sit around the middle.
-        If you're well below a high-tier club's typical member, your best fits may be a tier or two
-        lower.
-      </p>
+      <summary>{t('results.whyTier')}</summary>
+      <p>{t('results.whyTierBody')}</p>
     </details>
   </div>
 
@@ -88,7 +79,7 @@
   {/if}
 
   {#if count > 0}
-    <h3>Top {count} {count === 1 ? 'result' : 'results'}</h3>
+    <h3>{t('results.topN', { n: count })}</h3>
     <ResultsTable clubs={result.clubs} {balanceOn} includeClosed={result.options.include_closed} />
   {/if}
 </section>

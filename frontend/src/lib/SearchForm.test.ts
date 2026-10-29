@@ -4,7 +4,10 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 
 import SearchForm from './SearchForm.svelte';
-import { DEFAULT_SEARCH, PACE_ERROR, TRAINER_ID_ERROR } from './search';
+import { DEFAULT_SEARCH } from './search';
+
+const TRAINER_ID_ERROR = 'Enter your trainer ID: 9 to 12 digits.';
+const PACE_ERROR = 'Enter your daily fan gain in millions, such as 7.6.';
 
 function setup(overrides: Partial<typeof DEFAULT_SEARCH> = {}, remember = false) {
   const onsearch = vi.fn();

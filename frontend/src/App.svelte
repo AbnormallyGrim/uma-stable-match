@@ -4,6 +4,7 @@
   import { fetchFeatures, fetchRecommendations, type RecommendationQuery } from './lib/api';
   import { HumanCheck } from './lib/human';
   import HowToUse from './lib/HowToUse.svelte';
+  import { t } from './lib/i18n';
   import { language } from './lib/language.svelte';
   import NavBar from './lib/NavBar.svelte';
   import Results from './lib/Results.svelte';
@@ -12,7 +13,7 @@
   import SearchStatus from './lib/SearchStatus.svelte';
   import SiteFooter from './lib/SiteFooter.svelte';
   import { resultNotices } from './lib/states';
-  import { hasSeenTour, markTourSeen, TOUR_STEPS } from './lib/tour';
+  import { hasSeenTour, markTourSeen, tourSteps } from './lib/tour';
   import Tour from './lib/Tour.svelte';
   import {
     DEFAULT_SEARCH,
@@ -59,7 +60,7 @@
       return '';
     }
     const total = search.result.total;
-    const found = `Found ${total} ${total === 1 ? 'club' : 'clubs'}.`;
+    const found = t('app.found', { n: total });
     return [found, ...resultNotices(search.result)].join(' ');
   });
   const showResults = $derived(
@@ -102,7 +103,7 @@
 
 <main>
   <div class="hero">
-    <h1 class="visually-hidden">Uma Stable Match club finder</h1>
+    <h1 class="visually-hidden">{t('app.heading')}</h1>
     <SearchForm {initial} remember={remembered !== null} {busy} {onsearch} />
     <HowToUse />
   </div>
@@ -119,5 +120,5 @@
 <SiteFooter />
 
 {#if touring}
-  <Tour steps={TOUR_STEPS} onclose={endTour} />
+  <Tour steps={tourSteps()} onclose={endTour} />
 {/if}

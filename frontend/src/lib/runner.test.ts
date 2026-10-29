@@ -9,7 +9,7 @@ import {
   type RunnerOptions,
   type SearchState,
 } from './runner';
-import { SCAN_STILL_LOADING } from './states';
+import { scanStillLoading } from './states';
 import { recommendations } from './test-data';
 
 const query: RecommendationQuery = { source: { pace: 7_600_000 } };
@@ -76,7 +76,7 @@ describe('SearchRunner', () => {
     expect(last().status).toEqual({ phase: 'waiting-for-scan', retryIn: 3 });
     await vi.advanceTimersByTimeAsync(3000);
     expect(fetch).toHaveBeenCalledTimes(3);
-    expect(last().status).toEqual({ phase: 'error', message: SCAN_STILL_LOADING });
+    expect(last().status).toEqual({ phase: 'error', message: scanStillLoading() });
   });
 
   it('retries a 503 straight away with retryNow', async () => {

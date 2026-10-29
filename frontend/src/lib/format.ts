@@ -1,6 +1,7 @@
 /** Formatting and labels for showing results. */
 
 import type { JoinStyle } from './api';
+import { hasMessage, locale, t } from './i18n';
 
 /** Fans in millions: one decimal from 1M (`6.4M`), two below (`0.85M`), `<0.01M` for tiny values. */
 export function formatMillions(fans: number): string {
@@ -17,12 +18,12 @@ export function formatMillions(fans: number): string {
 
 /** A daily gain, such as `6.4M/day`. */
 export function formatPerDay(fans: number): string {
-  return `${formatMillions(fans)}/day`;
+  return t('format.perDay', { value: formatMillions(fans) });
 }
 
 /** A place in a club, such as `8 of 30`. */
 export function formatPlace(place: number, size: number): string {
-  return `${place} of ${size}`;
+  return t('format.place', { place, size });
 }
 
 /** A share from 0 to 1 as a whole percentage, such as `34%`. */
@@ -49,10 +50,10 @@ export interface RankTrend {
 /** How a club's monthly rank changed since last month. A lower rank number is better. */
 export function rankTrend(rank: number | null, lastMonthRank: number | null): RankTrend {
   if (rank === null) {
-    return { kind: 'unknown', change: 0, label: '', description: 'Rank unknown' };
+    return { kind: 'unknown', change: 0, label: '', description: t('trend.unknown') };
   }
   if (lastMonthRank === null) {
-    return { kind: 'new', change: 0, label: 'new', description: 'Not ranked last month' };
+    return { kind: 'new', change: 0, label: t('trend.new'), description: t('trend.notRanked') };
   }
   const change = lastMonthRank - rank;
   if (change > 0) {
@@ -60,7 +61,7 @@ export function rankTrend(rank: number | null, lastMonthRank: number | null): Ra
       kind: 'up',
       change,
       label: `▲${change}`,
-      description: `Up ${change} ${change === 1 ? 'place' : 'places'} since last month`,
+      description: t('trend.up', { n: change }),
     };
   }
   if (change < 0) {
@@ -68,10 +69,10 @@ export function rankTrend(rank: number | null, lastMonthRank: number | null): Ra
       kind: 'down',
       change,
       label: `▼${-change}`,
-      description: `Down ${-change} ${change === -1 ? 'place' : 'places'} since last month`,
+      description: t('trend.down', { n: -change }),
     };
   }
-  return { kind: 'same', change: 0, label: '–', description: 'Same rank as last month' };
+  return { kind: 'same', change: 0, label: '–', description: t('trend.same') };
 }
 
 /** Club tiers from lowest to highest. */
@@ -82,46 +83,31 @@ export function tierIndex(tier: string | null): number {
   return tier === null ? -1 : TIER_LABELS.indexOf(tier);
 }
 
-const JOIN_STYLE_LABELS: Record<JoinStyle, string> = {
-  open: 'Open',
-  approval: 'Approval',
-  closed: 'Closed',
-};
-
 /** Display name for a join style. */
 export function joinStyleLabel(style: JoinStyle | null): string | null {
-  return style === null ? null : JOIN_STYLE_LABELS[style];
+  return style === null ? null : t(`join.${style}`);
 }
 
-// uma.moe's names for club policy codes.
-const PLAYSTYLE_LABELS: Record<number, string> = {
-  1: 'You Do You',
-  2: 'Laid-back',
-  3: 'Going for Gold',
-  4: 'Beginners Welcome',
-  5: "Let's Party!",
-  6: 'Rank 2000+',
-  7: 'Rank 1000+',
-  8: 'Rank 500+',
-  9: 'Rank 250+',
-  10: 'Rank 100+',
-  11: 'Rank 20+',
-  12: 'Log in Daily',
-  13: 'Log in Every 3 Days',
-  14: 'Active in the Morning',
-  15: 'Active in the Afternoon',
-  16: 'Active in the Evening',
-  17: 'Active at Night',
-};
+/** uma.moe's club policy codes, which the game shows as playstyles. */
+export const PLAYSTYLE_CODES = Array.from({ length: 17 }, (_, i) => i + 1);
 
 /** Every playstyle code with its name, in code order. */
-export const PLAYSTYLES: [number, string][] = Object.entries(PLAYSTYLE_LABELS).map(
-  ([code, label]) => [Number(code), label],
-);
+export function playstyles(): [number, string][] {
+  return PLAYSTYLE_CODES.map((code) => [code, playstyleLabel(code) ?? '']);
+}
 
-/** uma.moe's name for a club's playstyle code, or `null` if unknown. */
+/** A club's playstyle name from its code, or `null` if unknown. */
 export function playstyleLabel(policy: number | null): string | null {
-  return policy === null ? null : (PLAYSTYLE_LABELS[policy] ?? null);
+  const key = `playstyle.${policy}`;
+  return policy !== null && hasMessage(key) ? t(key) : null;
+}
+
+/** How many spots are open, such as `3 open spots`, or `Full`. `null` if unknown. */
+export function spotsLabel(openSpots: number | null): string | null {
+  if (openSpots === null) {
+    return null;
+  }
+  return openSpots === 0 ? t('club.full') : t('club.openSpots', { n: openSpots });
 }
 
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
@@ -134,35 +120,20 @@ const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
 export function formatUpdated(iso: string, now: Date = new Date()): string {
   const then = new Date(iso);
   if (Number.isNaN(then.getTime())) {
-    return 'unknown';
+    return t('time.unknown');
   }
   const seconds = Math.round((now.getTime() - then.getTime()) / 1000);
   if (seconds < 60) {
-    return 'just now';
+    return t('time.justNow');
   }
-  const format = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+  const format = new Intl.RelativeTimeFormat(locale(), { numeric: 'auto' });
   for (const [unit, size] of UNITS) {
     if (seconds >= size) {
       return format.format(-Math.floor(seconds / size), unit);
     }
   }
-  return 'just now';
+  return t('time.justNow');
 }
-
-const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
 
 const JST_OFFSET_MS = 9 * 3_600_000;
 
@@ -188,6 +159,8 @@ export function gameMonth(iso: string): string | null {
 /** `2026-02` → `February 2026`. Anything else is returned unchanged. */
 export function monthLabel(month: string): string {
   const match = /^(\d{4})-(\d{2})$/.exec(month);
-  const name = match ? MONTHS[Number(match[2]) - 1] : undefined;
-  return match && name ? `${name} ${match[1]}` : month;
+  const number = match ? Number(match[2]) : 0;
+  return match && number >= 1 && number <= 12
+    ? t('month.label', { year: match[1]!, month: number })
+    : month;
 }

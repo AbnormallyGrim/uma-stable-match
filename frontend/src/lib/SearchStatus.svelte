@@ -5,6 +5,7 @@
 -->
 
 <script lang="ts">
+  import { t } from './i18n';
   import type { SearchPhase } from './runner';
 
   interface Props {
@@ -14,36 +15,35 @@
 
   let { status, onretry }: Props = $props();
 
-  const seconds = (n: number) => `${n} ${n === 1 ? 'second' : 'seconds'}`;
+  const seconds = (n: number) => t('time.seconds', { n });
 </script>
 
 {#if status.phase === 'loading'}
-  <p class="status" role="status">Finding clubs…</p>
+  <p class="status" role="status">{t('status.loading')}</p>
 {:else if status.phase === 'waiting-for-scan'}
   <div class="status notice" role="status">
-    <p class="title">Club data is still loading</p>
-    <p>
-      The server is scanning clubs for the first time, which takes about a minute. Trying again in
-      {seconds(status.retryIn)}.
-    </p>
-    <button type="button" onclick={onretry}>Try now</button>
+    <p class="title">{t('status.waitingTitle')}</p>
+    <p>{t('status.waitingBody', { wait: seconds(status.retryIn) })}</p>
+    <button type="button" onclick={onretry}>{t('status.tryNow')}</button>
   </div>
 {:else if status.phase === 'rate-limited'}
   <div class="status notice" role="status">
-    <p class="title">Too many searches</p>
+    <p class="title">{t('status.rateLimitedTitle')}</p>
     {#if status.retryIn > 0}
-      <p>Please wait {seconds(status.retryIn)} before searching again.</p>
+      <p>{t('status.rateLimitedWait', { wait: seconds(status.retryIn) })}</p>
     {:else}
-      <p>You can search again now.</p>
+      <p>{t('status.rateLimitedDone')}</p>
     {/if}
-    <button type="button" onclick={onretry} disabled={status.retryIn > 0}>Try again</button>
+    <button type="button" onclick={onretry} disabled={status.retryIn > 0}
+      >{t('status.tryAgain')}</button
+    >
   </div>
 {:else if status.phase === 'error'}
   <div class="status error" role="alert">
     <p class="title">{status.message.title}</p>
     <p>{status.message.detail}</p>
     {#if status.message.canRetry}
-      <button type="button" onclick={onretry}>Try again</button>
+      <button type="button" onclick={onretry}>{t('status.tryAgain')}</button>
     {/if}
   </div>
 {/if}

@@ -6,6 +6,7 @@
 
 <script lang="ts">
   import { tierIndex } from './format';
+  import { t } from './i18n';
 
   const icons = import.meta.glob<string>('../assets/tiers/tier-*.webp', {
     eager: true,
@@ -28,15 +29,15 @@
   <img
     class="tier {size}"
     {src}
-    alt="Club tier {tier}"
-    title="Club tier {tier}"
+    alt={t('tier.label', { tier })}
+    title={t('tier.label', { tier })}
     width={pixels}
     height={Math.round(pixels * (74 / 64))}
   />
 {:else}
-  <span class="tier unknown {size}" title="Club tier unknown">
+  <span class="tier unknown {size}" title={t('tier.unknown')}>
     <span aria-hidden="true">?</span>
-    <span class="visually-hidden">Club tier unknown</span>
+    <span class="visually-hidden">{t('tier.unknown')}</span>
   </span>
 {/if}
 
