@@ -15,6 +15,7 @@ use tower_http::catch_panic::CatchPanicLayer;
 use crate::api_error::ApiError;
 use crate::cache::{Cache, ScanFailure, ScanPhase, Snapshot};
 use crate::details::ClubDetails;
+use crate::features::{self, Features};
 use crate::frontend;
 use crate::human::{challenge, require_human, site_key, HumanCheck};
 use crate::limits::{limit_requests, RateLimits};
@@ -65,9 +66,18 @@ pub fn router(state: AppState) -> Router {
 }
 
 /// The routes plus security headers, a request timeout and a JSON 500 for panics, serving the built
-/// frontend from `frontend_dir` if given.
+/// frontend from `frontend_dir` if given. All features are off.
 pub fn app(state: AppState, frontend_dir: Option<&Path>) -> Router {
-    let mut app = router(state);
+    app_with_features(state, frontend_dir, Features::default())
+}
+
+/// Like [`app`], reporting `features` on `GET /api/v1/features`.
+pub fn app_with_features(
+    state: AppState,
+    frontend_dir: Option<&Path>,
+    features: Features,
+) -> Router {
+    let mut app = router(state).merge(features::router(features));
     if let Some(dir) = frontend_dir {
         app = app.fallback_service(frontend::service(dir));
     }

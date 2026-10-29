@@ -6,6 +6,7 @@ mod cache;
 mod calibration;
 mod config;
 mod details;
+mod features;
 mod frontend;
 mod human;
 mod limits;
@@ -20,7 +21,7 @@ mod shared;
 mod telemetry;
 mod traces;
 
-pub use app::{app, router, status_router, AppState};
+pub use app::{app, app_with_features, router, status_router, AppState};
 pub use cache::{Cache, CacheStatus, ScanFailure, ScanPhase, ScanProgress, Snapshot};
 pub use calibration::{club_median, Calibration, MIN_CALIBRATION_SAMPLES};
 pub use config::{
@@ -29,6 +30,7 @@ pub use config::{
     DEFAULT_TRAINER_LOOKUPS_PER_MINUTE,
 };
 pub use details::{club_weight, BackgroundLoader, ClubDetails, DetailConfig, SharedPool};
+pub use features::Features;
 pub use frontend::CONTENT_SECURITY;
 pub use human::{HumanCheck, SigningKey, TurnstileSecret, TOKEN_LIFETIME};
 pub use limits::RateLimits;

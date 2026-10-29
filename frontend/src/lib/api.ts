@@ -68,6 +68,11 @@ export interface Recommendations {
   your_club: YourClub | null;
 }
 
+/** Features the server has switched on. */
+export interface Features {
+  japanese: boolean;
+}
+
 /** Look up a trainer's pace, or give it directly in fans per day. */
 export type PaceSource = { trainerId: string } | { pace: number };
 
@@ -179,6 +184,18 @@ export async function fetchRecommendations(
     human.invalidate();
     return getJson<Recommendations>(path, options, await human.token());
   }
+}
+
+/**
+ * Fetches the switched-on features. Anything missing or unreadable counts as off.
+ *
+ * Throws `ApiError`, or the caller's abort error when `signal` is aborted.
+ */
+export async function fetchFeatures(options: RequestOptions = {}): Promise<Features> {
+  const body = await getJson<unknown>('/api/v1/features', options, null);
+  const japanese =
+    body !== null && typeof body === 'object' && 'japanese' in body && body.japanese === true;
+  return { japanese };
 }
 
 async function getJson<T>(path: string, options: RequestOptions, token: string | null): Promise<T> {

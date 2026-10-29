@@ -25,6 +25,7 @@ fn defaults() {
     assert_eq!(config.rate_limit_per_minute, 30);
     assert_eq!(config.trainer_lookups_per_minute, 10);
     assert!(!config.trust_forwarded_for);
+    assert!(!config.features.japanese);
 }
 
 #[test]
@@ -545,5 +546,31 @@ fn rejects_a_partial_or_short_human_check() {
         ]))
         .unwrap_err(),
         ConfigError::InvalidTokenSigningKey
+    );
+}
+
+#[test]
+fn reads_the_japanese_flag() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("ENABLE_JAPANESE", "true"),
+    ]))
+    .unwrap();
+    assert!(config.features.japanese);
+}
+
+#[test]
+fn invalid_japanese_flag_fails() {
+    let error = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("ENABLE_JAPANESE", "1"),
+    ]))
+    .unwrap_err();
+    assert_eq!(
+        error,
+        ConfigError::InvalidBool {
+            name: "ENABLE_JAPANESE",
+            value: "1".into()
+        }
     );
 }
