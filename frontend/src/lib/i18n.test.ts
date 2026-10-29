@@ -75,6 +75,11 @@ function text(message: unknown): string {
   return typeof message === 'function' ? message(SAMPLE) : String(message);
 }
 
+// The words a visitor would read, with any markup parsed away rather than pattern-matched out.
+function visibleText(message: unknown): string {
+  return new DOMParser().parseFromString(text(message), 'text/html').body.textContent ?? '';
+}
+
 describe('the Japanese catalog', () => {
   it('has exactly the English messages', () => {
     expect(Object.keys(ja).sort()).toEqual(Object.keys(en).sort());
@@ -82,8 +87,7 @@ describe('the Japanese catalog', () => {
 
   it('uses the Japanese term for a club, not the English word', () => {
     for (const [key, message] of Object.entries(ja)) {
-      // The `club` class names in markup aren't visible text.
-      expect(text(message).replace(/<[^>]*>/g, ''), key).not.toMatch(/club/i);
+      expect(visibleText(message), key).not.toMatch(/club/i);
     }
   });
 
