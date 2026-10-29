@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App.svelte';
 import type { Recommendations } from './lib/api';
+import { language } from './lib/language.svelte';
 import { TOUR_KEY } from './lib/tour';
 
 function recommendations(
@@ -33,22 +34,20 @@ function recommendations(
   };
 }
 
-function stubApi(recommendations: () => Response) {
-  // Anything but recommendations is a 404, as for a server with the human check off.
-  const fetch = vi.fn<typeof globalThis.fetch>(
-    (input) =>
-      new Promise((resolve) =>
-        setTimeout(
-          () =>
-            resolve(
-              String(input).startsWith('/api/v1/recommendations')
-                ? recommendations()
-                : new Response(JSON.stringify({ error: 'not found' }), { status: 404 }),
-            ),
-          10,
-        ),
-      ),
-  );
+function stubApi(
+  recommendations: () => Response,
+  features: () => Response = () => json({ japanese: false }),
+) {
+  // Anything else is a 404, as for a server with the human check off.
+  const fetch = vi.fn<typeof globalThis.fetch>((input) => {
+    const url = String(input);
+    const reply = url.startsWith('/api/v1/recommendations')
+      ? recommendations
+      : url.startsWith('/api/v1/features')
+        ? features
+        : () => new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+    return new Promise((resolve) => setTimeout(() => resolve(reply()), 10));
+  });
   vi.stubGlobal('fetch', fetch);
   const recommendationCalls = () =>
     fetch.mock.calls
@@ -75,9 +74,44 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  language.choose('en');
+  language.japaneseEnabled = false;
+  document.documentElement.lang = '';
 });
 
 describe('App', () => {
+  it('stays in English when the server has Japanese off, even after choosing it', async () => {
+    language.choose('ja');
+    stubApi(() => json(recommendations(0)));
+    render(App);
+    await vi.waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
+    expect(language.current).toBe('en');
+    expect(document.documentElement.lang).toBe('en');
+  });
+
+  it('shows the saved language when the server has Japanese on', async () => {
+    language.choose('ja');
+    stubApi(
+      () => json(recommendations(0)),
+      () => json({ japanese: true }),
+    );
+    render(App);
+    await vi.waitFor(() => expect(document.documentElement.lang).toBe('ja'));
+  });
+
+  it('stays in English when the features request fails', async () => {
+    language.choose('ja');
+    const { fetch } = stubApi(
+      () => json(recommendations(0)),
+      () => json({ error: 'down' }, 500),
+    );
+    render(App);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(language.current).toBe('en');
+    expect(document.documentElement.lang).toBe('en');
+  });
+
   it("announces clubs still loading and last month's data", async () => {
     const result = recommendations(2, 7_600_000, {
       updated_at: '2026-03-02T15:00:00Z',

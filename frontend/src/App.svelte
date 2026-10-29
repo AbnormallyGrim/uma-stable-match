@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import { fetchRecommendations, type RecommendationQuery } from './lib/api';
+  import { fetchFeatures, fetchRecommendations, type RecommendationQuery } from './lib/api';
   import { HumanCheck } from './lib/human';
   import HowToUse from './lib/HowToUse.svelte';
+  import { language } from './lib/language.svelte';
   import NavBar from './lib/NavBar.svelte';
   import Results from './lib/Results.svelte';
   import { SearchRunner, type SearchState as RunnerState } from './lib/runner';
@@ -73,14 +74,27 @@
     runner.run(query);
   }
 
+  $effect(() => {
+    document.documentElement.lang = language.current;
+  });
+
   onMount(() => {
+    // A failed request leaves Japanese off.
+    const features = new AbortController();
+    fetchFeatures({ signal: features.signal }).then(
+      (found) => (language.japaneseEnabled = found.japanese),
+      () => {},
+    );
     if (fromUrl) {
       const validation = validate(fromUrl);
       if (validation.ok) {
         runner.run(validation.query);
       }
     }
-    return () => runner.dispose();
+    return () => {
+      features.abort();
+      runner.dispose();
+    };
   });
 </script>
 

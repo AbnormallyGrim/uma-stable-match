@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
   DEFAULT_TIMEOUT_MS,
+  fetchFeatures,
   fetchRecommendations,
   recommendationParams,
   type Recommendations,
@@ -238,5 +239,31 @@ describe('timeouts and cancellation', () => {
       name: 'AbortError',
     });
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchFeatures', () => {
+  const reply = (body: unknown, status = 200) =>
+    vi.fn<typeof fetch>(async () => new Response(JSON.stringify(body), { status }));
+
+  it('reads the switched-on features', async () => {
+    const fetch = reply({ japanese: true });
+    await expect(fetchFeatures({ fetch })).resolves.toEqual({ japanese: true });
+    expect(fetch.mock.calls[0]?.[0]).toBe('/api/v1/features');
+  });
+
+  it('counts anything that is not exactly true as off', async () => {
+    await expect(fetchFeatures({ fetch: reply({ japanese: 'yes' }) })).resolves.toEqual({
+      japanese: false,
+    });
+    await expect(fetchFeatures({ fetch: reply({}) })).resolves.toEqual({ japanese: false });
+    await expect(fetchFeatures({ fetch: reply(null) })).resolves.toEqual({ japanese: false });
+  });
+
+  it('fails like any other request', async () => {
+    await expect(fetchFeatures({ fetch: reply({ error: 'nope' }, 500) })).rejects.toMatchObject({
+      kind: 'http',
+      status: 500,
+    });
   });
 });

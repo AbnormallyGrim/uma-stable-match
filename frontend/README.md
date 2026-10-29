@@ -61,6 +61,8 @@ src/lib/Tour.svelte           The product tour's overlay, highlight and instruct
 src/lib/tour.ts               The tour's steps, and remembering that it was seen
 src/lib/ThemeToggle.svelte    System / Light / Dark switch, as icons with tooltips
 src/lib/theme.ts              Saving and applying the theme choice
+src/lib/language.ts           Saving the language choice, and which language to show
+src/lib/language.svelte.ts    The language shown right now, shared by every component
 src/lib/SiteFooter.svelte     Tips, the logo, a link to report a problem, and the disclaimer
 src/lib/BrandLogo.svelte      The logo, in the version for the current theme
 src/lib/api.ts                Typed API client
@@ -385,3 +387,7 @@ try {
 - **ESLint** uses flat config, with the recommended JavaScript, TypeScript and Svelte rules.
 - **Prettier** uses single quotes and 100-character lines. Markdown files are left alone.
 - **Tests** use Vitest with jsdom and [Testing Library](https://testing-library.com/docs/svelte-testing-library/intro). Stub `fetch` with `vi.stubGlobal` rather than calling a real server.
+
+## Language
+
+The Japanese translation is behind the server's `ENABLE_JAPANESE` setting, off by default. At startup the app asks `GET /api/v1/features`; if the answer is missing or fails, it stays in English. With it on, the saved choice (`uma-stable-match:language` in local storage, `en` or `ja`) is shown, and a visitor with no saved choice gets English.

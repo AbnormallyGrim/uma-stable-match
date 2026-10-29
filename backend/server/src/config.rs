@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use uma_stable_match_umamoe_client::ApiKey;
 
+use crate::features::Features;
 use crate::human::{HumanCheck, SigningKey, TurnstileSecret};
 use crate::pace::DEFAULT_PACE_TTL;
 use crate::recommendations::MatchSettings;
@@ -60,6 +61,8 @@ pub struct Config {
     pub trainer_lookups_per_minute: u32,
     /// Whether to identify visitors by `X-Forwarded-For`, from `TRUST_FORWARDED_FOR`.
     pub trust_forwarded_for: bool,
+    /// Features that are switched on, from `ENABLE_JAPANESE`.
+    pub features: Features,
     /// Built frontend to serve, from `FRONTEND_DIR`. `None` serves only the API.
     pub frontend_dir: Option<PathBuf>,
     /// Redis to share caches with other instances, from `REDIS_URL`. `None` keeps everything local.
@@ -231,15 +234,17 @@ impl Config {
             "TRAINER_LOOKUPS_PER_MINUTE",
             DEFAULT_TRAINER_LOOKUPS_PER_MINUTE,
         )?;
-        let trust_forwarded_for = match get("TRUST_FORWARDED_FOR").as_deref() {
-            None | Some("false") => false,
-            Some("true") => true,
-            Some(value) => {
-                return Err(ConfigError::InvalidBool {
-                    name: "TRUST_FORWARDED_FOR",
-                    value: value.to_owned(),
-                })
-            }
+        let boolean = |name: &'static str| match get(name).as_deref() {
+            None | Some("false") => Ok(false),
+            Some("true") => Ok(true),
+            Some(value) => Err(ConfigError::InvalidBool {
+                name,
+                value: value.to_owned(),
+            }),
+        };
+        let trust_forwarded_for = boolean("TRUST_FORWARDED_FOR")?;
+        let features = Features {
+            japanese: boolean("ENABLE_JAPANESE")?,
         };
         let frontend_dir = match get("FRONTEND_DIR") {
             None => None,
@@ -311,6 +316,7 @@ impl Config {
             rate_limit_per_minute,
             trainer_lookups_per_minute,
             trust_forwarded_for,
+            features,
             frontend_dir,
             redis_url,
             redis_key_secret,

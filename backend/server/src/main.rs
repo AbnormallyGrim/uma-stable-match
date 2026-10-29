@@ -6,8 +6,8 @@ use std::process::ExitCode;
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 use uma_stable_match_server::{
-    app, init_logging, install_metrics, metrics_router, run_scheduler, AppState, Cache,
-    ClubDetails, Config, DetailConfig, LogFormat, PaceLookup, RateLimits, RefreshConfig,
+    app_with_features, init_logging, install_metrics, metrics_router, run_scheduler, AppState,
+    Cache, ClubDetails, Config, DetailConfig, LogFormat, PaceLookup, RateLimits, RefreshConfig,
     SharedCache, SharedPool, TraceExport,
 };
 use uma_stable_match_umamoe_client::{Client, ClientConfig};
@@ -162,7 +162,7 @@ async fn main() -> ExitCode {
                 .ok();
         });
     }
-    let app = app(state, config.frontend_dir.as_deref());
+    let app = app_with_features(state, config.frontend_dir.as_deref(), config.features);
     let served = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

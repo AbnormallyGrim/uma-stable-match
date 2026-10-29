@@ -37,6 +37,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `RATE_LIMIT_PER_MINUTE` | `30` | Recommendation requests each visitor can make per minute |
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer lookups each visitor can make per minute that need a call to uma.moe |
 | `TRUST_FORWARDED_FOR` | `false` | `true` to identify visitors by `X-Forwarded-For`. Only turn this on behind a reverse proxy that sets the header |
+| `ENABLE_JAPANESE` | `false` | `true` to offer the Japanese translation and the EN/JP switch in the web app. Reported on `GET /api/v1/features` |
 | `FRONTEND_DIR` | none | Built frontend to serve, such as `frontend/dist`. Unset, the server serves only the API |
 | `REDIS_URL` | none | A `redis://` or `rediss://` URL to share club details, trainer paces and scans with other instances. Unset, everything stays in this instance's memory. See [Shared cache](#shared-cache) |
 | `REDIS_KEY_SECRET` | none | Required with `REDIS_URL`: at least 32 characters, the same on every instance. Keys the hash that replaces trainer IDs in Redis |
@@ -51,7 +52,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 Blank values count as unset. These stop the server at startup, with an error message and exit code 1:
 
 - a missing key, or a `HOST` that isn't an IP address (hostnames such as `localhost` aren't accepted)
-- a `PORT` outside 1 to 65535, a `TRUST_FORWARDED_FOR` other than `true` or `false`, or a `LOG_FORMAT` other than `text` or `json`
+- a `PORT` outside 1 to 65535, a `TRUST_FORWARDED_FOR` or `ENABLE_JAPANESE` other than `true` or `false`, or a `LOG_FORMAT` other than `text` or `json`
 - a scan, cache or rate limit setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO`
 - a `FRONTEND_DIR` without an `index.html`
 - a `REDIS_URL` without a `redis://` or `rediss://` scheme, a missing or short `REDIS_KEY_SECRET`, or a Redis that can't be reached within 5 seconds
@@ -336,6 +337,7 @@ All endpoints are under `/api/v1`.
 | Method | Path | Response |
 |---|---|---|
 | `GET` | `/api/v1/health` | `200 {"status":"ok"}` |
+| `GET` | `/api/v1/features` | `200 {"japanese":false}`: the features that are switched on |
 | `GET` | `/api/v1/recommendations` | Ranked clubs for a trainer or a pace, below |
 
 There's no public status endpoint. The page takes the data's age from each search's `updated_at`, and the full scan state is served privately at [`/status`](#status), next to the metrics.
