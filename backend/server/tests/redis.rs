@@ -16,9 +16,10 @@ use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    club_key, router, run_scheduler, scan, AppState, Cache, CacheStatus, ClubDetails, ClubPool,
-    DetailConfig, KeySecret, ListedClub, MatchSettings, PaceLookup, RateLimits, RedisUrl,
-    RefreshConfig, ScanConfig, ScanPhase, SharedCache, SharedPool, DEFAULT_PACE_TTL,
+    club_key, install_metrics, metrics_router, router, run_scheduler, scan, AppState, Cache,
+    CacheStatus, ClubDetails, ClubPool, DetailConfig, KeySecret, ListedClub, MatchSettings,
+    PaceLookup, RateLimits, RedisUrl, RefreshConfig, ScanConfig, ScanPhase, SharedCache,
+    SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -1191,4 +1192,70 @@ async fn lower_range_clubs_have_their_own_shared_schedule() {
     let status = second.refresh_status().await;
     assert_eq!(status.scheduled, 1);
     assert_eq!((status.lower.scheduled, status.lower.loaded), (1, 1));
+}
+
+// One test, as every test shares the same key and would count each other's searches.
+#[tokio::test]
+async fn the_search_total_counts_successful_searches_and_never_expires() {
+    let Some(shared) = redis().await else { return };
+    let handle = install_metrics().unwrap();
+    let other = redis().await.unwrap();
+    let server = MockServer::start().await;
+    mount_scan(&server, unique_id()).await;
+    let running = instance(&server, scan_config(), shared.clone());
+    running.wait_until(|s| s.snapshot.is_some()).await;
+    let state = AppState {
+        cache: running.cache.clone(),
+        details: running.details.clone(),
+        matching: MatchSettings::default(),
+        human: Default::default(),
+        paces: PaceLookup::new(client(&server), DEFAULT_PACE_TTL),
+        limits: RateLimits::new(10_000, 10_000, false),
+    };
+    let search = |query: &'static str| {
+        let app = router(state.clone());
+        async move {
+            app.oneshot(
+                Request::get(format!("/api/v1/recommendations{query}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .status()
+        }
+    };
+
+    let before = shared.searches().await.unwrap();
+    assert_eq!(search("?pace=-1").await, StatusCode::BAD_REQUEST);
+    assert_eq!(search("?pace=5000000").await, StatusCode::OK);
+    wait_for(async || shared.searches().await.unwrap() > before).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(shared.searches().await.unwrap(), before + 1);
+
+    other.count_search().await;
+    assert_eq!(shared.searches().await.unwrap(), before + 2);
+    assert_eq!(ttl_millis("usm:v1:searches").await, -1);
+
+    let response = metrics_router(handle, state)
+        .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let rendered = String::from_utf8(body.to_vec()).unwrap();
+    let exported: u64 = rendered
+        .lines()
+        .find_map(|line| line.strip_prefix("searches_total "))
+        .expect("searches_total is exported")
+        .parse()
+        .unwrap();
+    assert_eq!(exported, before + 2);
+    running.stop().await;
+}
+
+#[tokio::test]
+async fn the_search_total_is_absent_without_redis() {
+    let none = SharedCache::none();
+    none.count_search().await;
+    assert_eq!(none.searches().await, None);
 }

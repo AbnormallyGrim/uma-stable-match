@@ -164,8 +164,12 @@ pub(crate) async fn recommendations(
     params: Result<Query<Params>, QueryRejection>,
 ) -> Result<Json<Recommendations>, ApiError> {
     let started = Instant::now();
+    let shared = state.details.shared().clone();
     let result = search(state, visitor, params).await;
     log_search(query.as_deref(), &result, started.elapsed());
+    if result.is_ok() && shared.is_enabled() {
+        tokio::spawn(async move { shared.count_search().await });
+    }
     result
 }
 

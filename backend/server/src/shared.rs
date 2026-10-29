@@ -336,6 +336,30 @@ impl SharedCache {
         }
     }
 
+    /// Adds one to the search total, which never expires. Failures are ignored.
+    pub async fn count_search(&self) {
+        let Backend::Redis(redis) = &self.backend else {
+            return;
+        };
+        let mut incr = redis::cmd("INCR");
+        incr.arg(searches_key());
+        redis.query_as::<i64>("incr", &incr, OP_TIMEOUT).await;
+    }
+
+    /// The search total, `0` before the first search, or `None` without Redis or if it doesn't
+    /// answer.
+    pub async fn searches(&self) -> Option<u64> {
+        let Backend::Redis(redis) = &self.backend else {
+            return None;
+        };
+        let mut get = redis::cmd("GET");
+        get.arg(searches_key());
+        redis
+            .query_as::<Option<u64>>("get", &get, OP_TIMEOUT)
+            .await
+            .map(Option::unwrap_or_default)
+    }
+
     /// Stores a value until `ttl` passes. Failures are ignored, as the value can be fetched again.
     pub async fn set<T: Serialize + Sync>(&self, key: &str, value: &T, ttl: Duration) {
         let Backend::Redis(redis) = &self.backend else {
@@ -978,6 +1002,10 @@ fn millis(duration: Duration) -> u64 {
 /// Shared-cache key for a club's details in a month (`None` = the current game month).
 pub fn club_key(circle_id: u64, period: Option<Period>) -> String {
     format!("{KEY_PREFIX}:club:{circle_id}:{}", period_part(period))
+}
+
+fn searches_key() -> String {
+    format!("{KEY_PREFIX}:searches")
 }
 
 fn medians_key(month: &str) -> String {

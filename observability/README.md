@@ -138,9 +138,9 @@ Every dashboard links to the other three at the top, keeping the time range. The
 
 | Dashboard | Row | Panels |
 |---|---|---|
-| Overview | Searches | Searches in the last 24 hours, the same by status code, and searches per hour |
+| Overview | Searches | Searches in the dashboard's time range, the total since launch, the same by status code, and searches per hour |
 | | Health | Redis up or down, time since the last successful scan, and uma.moe calls without a 2xx answer in the last hour |
-| | Web traffic | Requests per second by route and status code, error responses, response times, rate-limited visitors and a count of each status code in the last hour |
+| | Web traffic | Requests per second by route and status code, error responses, response times, rate-limited visitors and a count of each status code in the dashboard's time range |
 | | Errors | Warnings and errors logged per hour, and a table of them by the file and line that logged them. Each file links to [Axiom](#links-to-axiom) |
 | Search quality | Search depth | How deep into the rankings searches go (worst shortlisted and top-pick rank, median and 90th percentile), the share of searches that reached the slowest clubs in the pool, and searches by deepest shortlisted rank |
 | | Club pool | Clubs in the pool, clubs with an exact median, and the calibration factor and samples |

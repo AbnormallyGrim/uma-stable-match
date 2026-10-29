@@ -248,7 +248,9 @@
             ]
           },
           "decimals": 1,
-          "unit": "percent"
+          "unit": "percent",
+          "max": 100,
+          "min": 0
         },
         "overrides": []
       },
