@@ -15,6 +15,7 @@ mod pace;
 mod pool;
 mod recommendations;
 mod refresher;
+mod run;
 mod scanner;
 mod scheduler;
 mod shared;
@@ -26,7 +27,7 @@ pub use app::{app, app_with_features, router, status_router, AppState};
 pub use cache::{Cache, CacheStatus, ScanFailure, ScanPhase, ScanProgress, Snapshot};
 pub use calibration::{club_median, Calibration, MIN_CALIBRATION_SAMPLES};
 pub use config::{
-    Config, ConfigError, DEFAULT_DETAIL_CACHE_MB, DEFAULT_HOST, DEFAULT_PORT,
+    Config, ConfigError, UmaMoeConfig, DEFAULT_DETAIL_CACHE_MB, DEFAULT_HOST, DEFAULT_PORT,
     DEFAULT_RATE_LIMIT_PER_MINUTE, DEFAULT_SCAN_INTERVAL_MINUTES,
     DEFAULT_TRAINER_LOOKUPS_PER_MINUTE,
 };
@@ -45,6 +46,7 @@ pub use pool::{
 };
 pub use recommendations::{MatchSettings, DEFAULT_FETCH_BUDGET};
 pub use refresher::{RefreshConfig, RefreshStatus, Refresher, StoredTtl, TierStatus};
+pub use run::{run, RunError};
 pub use scanner::{scan, Scan, ScanConfig, ScanError};
 pub use scheduler::run_scheduler;
 pub use shared::{club_key, KeySecret, RedisUrl, SharedCache, SharedCacheError};

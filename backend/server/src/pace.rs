@@ -29,9 +29,17 @@ pub enum PaceError {
     /// Fewer than 3 days of data, or no gain this month.
     #[error("not enough fan data this month to work out a pace")]
     NotEnoughData,
-    /// The source request failed.
-    #[error("could not reach uma.moe")]
+    /// The source request failed. The message names uma.moe for its errors, and is the source's own
+    /// public message otherwise.
+    #[error("{}", upstream_message(.0))]
     Upstream(#[source] SourceError),
+}
+
+fn upstream_message(error: &SourceError) -> String {
+    match error {
+        SourceError::UmaMoe(_) => "could not reach uma.moe".into(),
+        other => other.summary(),
+    }
 }
 
 type Entries = HashMap<(u64, Option<Period>), (Instant, Outcome)>;

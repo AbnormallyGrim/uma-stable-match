@@ -1,16 +1,9 @@
-//! Starts the Uma Stable Match server.
+//! Starts the Uma Stable Match server with uma.moe as its data source.
 
-use std::net::SocketAddr;
 use std::process::ExitCode;
 
-use tokio::net::TcpListener;
-use tokio::sync::watch;
-use uma_stable_match_server::{
-    app_with_features, init_logging, install_metrics, metrics_router, run_scheduler, AppState,
-    Cache, ClubDetails, Config, DetailConfig, LogFormat, PaceLookup, RateLimits, RefreshConfig,
-    SharedCache, SharedPool, Source, TraceExport,
-};
-use uma_stable_match_umamoe_client::{Client, ClientConfig};
+use uma_stable_match_server::{init_logging, run, Config, LogFormat, TraceExport, UmaMoeConfig};
+use uma_stable_match_umamoe_client::Client;
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -43,168 +36,25 @@ async fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-
-    let metrics = match config.metrics_addr {
-        None => None,
-        Some(addr) => {
-            let handle = match install_metrics() {
-                Ok(handle) => handle,
-                Err(error) => {
-                    tracing::error!("could not start metrics: {error}");
-                    return ExitCode::FAILURE;
-                }
-            };
-            let listener = match TcpListener::bind(addr).await {
-                Ok(listener) => listener,
-                Err(error) => {
-                    tracing::error!("could not serve metrics on {addr}: {error}");
-                    return ExitCode::FAILURE;
-                }
-            };
-            tracing::info!("serving metrics on {addr}");
-            Some((handle, listener))
-        }
-    };
-
-    let mut client_config = ClientConfig::new(config.api_key.clone());
-    if let Some(base_url) = &config.base_url {
-        client_config.base_url = base_url.clone();
-    }
-    let source = match Client::new(client_config) {
-        Ok(client) => Source::from(client),
+    let client = match UmaMoeConfig::from_env()
+        .map_err(|error| error.to_string())
+        .and_then(|umamoe| Client::new(umamoe.client_config()).map_err(|error| error.to_string()))
+    {
+        Ok(client) => client,
         Err(error) => {
             tracing::error!("{error}");
             return ExitCode::FAILURE;
         }
     };
 
-    let shared = match (&config.redis_url, &config.redis_key_secret) {
-        (Some(url), Some(secret)) => match SharedCache::connect(url, secret.clone()).await {
-            Ok(shared) => {
-                tracing::info!("using Redis as a shared cache");
-                shared
-            }
-            Err(error) => {
-                tracing::error!("{error}");
-                return ExitCode::FAILURE;
-            }
-        },
-        _ => SharedCache::none(),
-    };
-
-    let listener = match TcpListener::bind(config.bind_addr).await {
-        Ok(listener) => listener,
-        Err(error) => {
-            tracing::error!("could not listen on {}: {error}", config.bind_addr);
-            return ExitCode::FAILURE;
-        }
-    };
-    tracing::info!("listening on {}", config.bind_addr);
-
-    let cache = Cache::new();
-    let (stop, stopped) = watch::channel(false);
-    let paces = PaceLookup::new(&source, config.trainer_cache).with_shared(shared.clone());
-    let limits = RateLimits::new(
-        config.rate_limit_per_minute,
-        config.trainer_lookups_per_minute,
-        config.trust_forwarded_for,
-    );
-    let window = u64::from(config.scan.rank_to - config.scan.rank_from + 1);
-    let refresh = RefreshConfig {
-        every: config.detail_cache,
-        ..RefreshConfig::default()
-    };
-    let (details, loader) = ClubDetails::with_shared(
-        &source,
-        SharedPool::default(),
-        DetailConfig {
-            max_bytes: u64::from(config.detail_cache_mb) * 1024 * 1024,
-            queue_size: window as usize,
-            refresh,
-            refresher: true,
-            scan: config.scan,
-        },
-        shared,
-    );
-    tokio::spawn(loader.run());
-    if let Some(refresher) = details.refresher() {
-        tokio::spawn(refresher.run());
-    }
-    let scheduler = tokio::spawn(run_scheduler(
-        source,
-        details.clone(),
-        config.scan,
-        config.scan_interval,
-        cache.clone(),
-        stopped,
-    ));
-
-    if let Some(dir) = &config.frontend_dir {
-        tracing::info!("serving the frontend from {}", dir.display());
-    }
-    let state = AppState {
-        cache,
-        paces: paces.with_details(details.clone()),
-        limits,
-        details,
-        matching: config.matching,
-        human: config.human_check(),
-    };
-    if let Some((handle, listener)) = metrics {
-        let mut stopped = stop.subscribe();
-        let router = metrics_router(handle, state.clone());
-        tokio::spawn(async move {
-            axum::serve(listener, router)
-                .with_graceful_shutdown(async move {
-                    stopped.wait_for(|stop| *stop).await.ok();
-                })
-                .await
-                .ok();
-        });
-    }
-    let app = app_with_features(state, config.frontend_dir.as_deref(), config.features);
-    let served = axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .with_graceful_shutdown(async move {
-        shutdown_signal().await;
-        stop.send(true).ok();
-    })
-    .await;
-    scheduler.await.ok();
+    let result = run(&config, client).await;
     if let Some(traces) = traces {
         traces.shutdown();
     }
-
-    if let Err(error) = served {
-        tracing::error!("server error: {error}");
+    if let Err(error) = result {
+        tracing::error!("{error}");
         return ExitCode::FAILURE;
     }
     tracing::info!("stopped");
     ExitCode::SUCCESS
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        tokio::signal::ctrl_c().await.ok();
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-            Ok(mut signal) => {
-                signal.recv().await;
-            }
-            Err(_) => std::future::pending().await,
-        }
-    };
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
-    }
-    tracing::info!("shutting down");
 }

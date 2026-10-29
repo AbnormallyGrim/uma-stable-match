@@ -103,3 +103,15 @@ fn uma_moe_summaries_hide_details() {
     let error = SourceError::from(Error::InvalidRequest("made-up detail".into()));
     assert_eq!(error.summary(), "internal error");
 }
+
+#[test]
+fn pace_errors_name_their_source() {
+    use crate::pace::PaceError;
+    let error = PaceError::Upstream(Error::InvalidRequest("made-up detail".into()).into());
+    assert_eq!(error.to_string(), "could not reach uma.moe");
+    let error = PaceError::Upstream(SourceError::Unavailable {
+        origin: "made-up",
+        message: "made-up source is down".into(),
+    });
+    assert_eq!(error.to_string(), "made-up source is down");
+}

@@ -4,7 +4,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use uma_stable_match_umamoe_client::ApiKey;
+use uma_stable_match_umamoe_client::{ApiKey, ClientConfig};
 
 use crate::features::Features;
 use crate::human::{HumanCheck, SigningKey, TurnstileSecret};
@@ -33,13 +33,45 @@ pub const DEFAULT_SCAN_INTERVAL_MINUTES: u32 = 180;
 /// Megabytes of club details kept in memory when `DETAIL_CACHE_MB` isn't set.
 pub const DEFAULT_DETAIL_CACHE_MB: u32 = 256;
 
-/// Server settings. `Debug` output redacts the API key.
+/// uma.moe settings, for [`UmaMoeSource`](crate::UmaMoeSource). `Debug` output redacts the API key.
 #[derive(Debug, Clone)]
-pub struct Config {
+pub struct UmaMoeConfig {
     /// uma.moe API key, from `UMAMOE_API_KEY`.
     pub api_key: ApiKey,
     /// uma.moe base URL override, from `UMAMOE_BASE_URL`.
     pub base_url: Option<String>,
+}
+
+impl UmaMoeConfig {
+    /// Reads settings from environment variables.
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(|name| std::env::var(name).ok())
+    }
+
+    /// Reads settings through `lookup`. Blank values count as unset.
+    pub fn from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Result<Self, ConfigError> {
+        let get = trimmed(lookup);
+        Ok(Self {
+            api_key: get("UMAMOE_API_KEY")
+                .map(ApiKey::new)
+                .ok_or(ConfigError::MissingApiKey)?,
+            base_url: get("UMAMOE_BASE_URL"),
+        })
+    }
+
+    /// Client settings with this key and base URL.
+    pub fn client_config(&self) -> ClientConfig {
+        let mut config = ClientConfig::new(self.api_key.clone());
+        if let Some(base_url) = &self.base_url {
+            config.base_url = base_url.clone();
+        }
+        config
+    }
+}
+
+/// Server settings that don't depend on the data source.
+#[derive(Debug, Clone)]
+pub struct Config {
     /// Listen address, from `HOST` and `PORT`.
     pub bind_addr: SocketAddr,
     /// Scan settings, from `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `SCAN_MAX_DETAILS`.
@@ -161,15 +193,8 @@ impl Config {
 
     /// Reads settings through `lookup`. Blank values count as unset.
     pub fn from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Result<Self, ConfigError> {
-        let get = |name: &str| {
-            lookup(name)
-                .map(|v| v.trim().to_owned())
-                .filter(|v| !v.is_empty())
-        };
+        let get = trimmed(lookup);
 
-        let api_key = get("UMAMOE_API_KEY")
-            .map(ApiKey::new)
-            .ok_or(ConfigError::MissingApiKey)?;
         let host = match get("HOST") {
             None => DEFAULT_HOST,
             Some(value) => value.parse().map_err(|_| ConfigError::InvalidHost(value))?,
@@ -304,8 +329,6 @@ impl Config {
         }
 
         Ok(Self {
-            api_key,
-            base_url: get("UMAMOE_BASE_URL"),
             bind_addr,
             scan,
             scan_interval,
@@ -323,6 +346,14 @@ impl Config {
             human,
             metrics_addr,
         })
+    }
+}
+
+fn trimmed(lookup: impl Fn(&str) -> Option<String>) -> impl Fn(&str) -> Option<String> {
+    move |name| {
+        lookup(name)
+            .map(|v| v.trim().to_owned())
+            .filter(|v| !v.is_empty())
     }
 }
 
