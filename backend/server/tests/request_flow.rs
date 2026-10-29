@@ -84,7 +84,7 @@ async fn flow(closed: &[u64], failing: &[u64], max_details: u32) -> Flow {
     }
 
     let (details, loader) = ClubDetails::new(
-        &client(&server),
+        client(&server),
         SharedPool::default(),
         DetailConfig::default(),
     );
@@ -313,7 +313,7 @@ async fn serves_results_while_the_first_scan_loads() {
             .await;
     }
     let (details, _loader) = ClubDetails::new(
-        &client(&server),
+        client(&server),
         SharedPool::default(),
         DetailConfig::default(),
     );

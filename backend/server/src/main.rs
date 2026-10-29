@@ -8,7 +8,7 @@ use tokio::sync::watch;
 use uma_stable_match_server::{
     app_with_features, init_logging, install_metrics, metrics_router, run_scheduler, AppState,
     Cache, ClubDetails, Config, DetailConfig, LogFormat, PaceLookup, RateLimits, RefreshConfig,
-    SharedCache, SharedPool, TraceExport,
+    SharedCache, SharedPool, Source, TraceExport,
 };
 use uma_stable_match_umamoe_client::{Client, ClientConfig};
 
@@ -70,8 +70,8 @@ async fn main() -> ExitCode {
     if let Some(base_url) = &config.base_url {
         client_config.base_url = base_url.clone();
     }
-    let client = match Client::new(client_config) {
-        Ok(client) => client,
+    let source = match Client::new(client_config) {
+        Ok(client) => Source::from(client),
         Err(error) => {
             tracing::error!("{error}");
             return ExitCode::FAILURE;
@@ -103,7 +103,7 @@ async fn main() -> ExitCode {
 
     let cache = Cache::new();
     let (stop, stopped) = watch::channel(false);
-    let paces = PaceLookup::new(client.clone(), config.trainer_cache).with_shared(shared.clone());
+    let paces = PaceLookup::new(&source, config.trainer_cache).with_shared(shared.clone());
     let limits = RateLimits::new(
         config.rate_limit_per_minute,
         config.trainer_lookups_per_minute,
@@ -115,7 +115,7 @@ async fn main() -> ExitCode {
         ..RefreshConfig::default()
     };
     let (details, loader) = ClubDetails::with_shared(
-        &client,
+        &source,
         SharedPool::default(),
         DetailConfig {
             max_bytes: u64::from(config.detail_cache_mb) * 1024 * 1024,
@@ -131,7 +131,7 @@ async fn main() -> ExitCode {
         tokio::spawn(refresher.run());
     }
     let scheduler = tokio::spawn(run_scheduler(
-        client,
+        source,
         details.clone(),
         config.scan,
         config.scan_interval,

@@ -13,7 +13,7 @@ fn scan(ids: &[u64]) -> Scan {
 }
 
 fn failure() -> ScanError {
-    ScanError::List(Error::InvalidRequest("made-up failure".into()))
+    ScanError::List(Error::InvalidRequest("made-up failure".into()).into())
 }
 
 fn at(seconds: u64) -> SystemTime {

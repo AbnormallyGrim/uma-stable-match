@@ -4,13 +4,12 @@ use std::collections::HashSet;
 use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
-use uma_stable_match_umamoe_client::{
-    Circle, CircleSort, Client, Error, ListCirclesRequest, Priority, SortDir,
-};
+use uma_stable_match_umamoe_client::{Circle, CircleSort, ListCirclesRequest, Priority, SortDir};
 
 use crate::cache::{Cache, ScanPhase};
 use crate::details::ClubDetails;
 use crate::pool::{game_month, is_early_month, previous_game_month, ClubPool, ListedClub, Period};
+use crate::source::{Source, SourceError};
 
 /// Which clubs a scan looks at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,14 +73,14 @@ pub struct Scan {
 pub enum ScanError {
     /// A list request failed.
     #[error("listing clubs failed: {0}")]
-    List(#[source] Error),
+    List(#[source] SourceError),
     /// Another instance's scan failed, with its public message.
     #[error("{0}")]
     Shared(String),
 }
 
 impl ScanError {
-    /// Where the error came from, as [`Error::origin`]. A scan published by another instance counts
+    /// Where the error came from, as [`SourceError::origin`]. A scan published by another instance counts
     /// as `"server"`.
     pub(crate) fn origin(&self) -> &'static str {
         match self {
@@ -93,39 +92,29 @@ impl ScanError {
     /// A short message that's safe to show visitors: no URLs or upstream error text.
     pub(crate) fn public_message(&self) -> String {
         match self {
-            Self::List(error) => format!("listing clubs failed: {}", upstream_summary(error)),
+            Self::List(error) => format!("listing clubs failed: {}", error.summary()),
             Self::Shared(message) => message.clone(),
         }
-    }
-}
-
-fn upstream_summary(error: &Error) -> String {
-    match error {
-        Error::Status { status, .. } => format!("uma.moe returned {status}"),
-        Error::RateLimited { .. } => "uma.moe asked to slow down".into(),
-        Error::Transport(_) => "could not reach uma.moe".into(),
-        Error::Decode(_) => "unexpected response from uma.moe".into(),
-        Error::Config(_) | Error::InvalidRequest(_) => "internal error".into(),
     }
 }
 
 /// Lists the rank window into a new club pool and swaps it into `details`. Then, if `details` has a
 /// refresher, schedules the clubs for it; otherwise prefetches club details in the background lane.
 pub async fn scan(
-    client: &Client,
+    source: impl Into<Source>,
     details: &ClubDetails,
     config: &ScanConfig,
 ) -> Result<Scan, ScanError> {
-    scan_with(client, details, config, &Cache::new()).await
+    scan_with(&source.into(), details, config, &Cache::new()).await
 }
 
 pub(crate) async fn scan_with(
-    client: &Client,
+    source: &Source,
     details: &ClubDetails,
     config: &ScanConfig,
     cache: &Cache,
 ) -> Result<Scan, ScanError> {
-    let rows = list_candidates(client, config, cache).await?;
+    let rows = list_candidates(source, config, cache).await?;
     Ok(load(details, rows, config, cache).await)
 }
 
@@ -305,7 +294,7 @@ fn month_label((year, month): Period) -> String {
 }
 
 pub(crate) async fn list_candidates(
-    client: &Client,
+    source: &Source,
     config: &ScanConfig,
     cache: &Cache,
 ) -> Result<Vec<Circle>, ScanError> {
@@ -320,8 +309,8 @@ pub(crate) async fn list_candidates(
 
     let mut candidates = Vec::new();
     for page in 0..max_pages(config) {
-        let rows = client
-            .list_circles(&request.page(page))
+        let rows = source
+            .list_clubs(&request.page(page))
             .await
             .map_err(ScanError::List)?
             .circles;

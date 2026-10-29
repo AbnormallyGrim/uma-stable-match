@@ -42,7 +42,7 @@ fn details(
     config: DetailConfig,
     ids: &[u64],
 ) -> (ClubDetails, BackgroundLoader) {
-    ClubDetails::new(&client(server, Duration::ZERO), pool(ids), config)
+    ClubDetails::new(client(server, Duration::ZERO), pool(ids), config)
 }
 
 fn detail(id: u64) -> Value {

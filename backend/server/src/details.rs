@@ -12,13 +12,14 @@ use tokio::sync::mpsc;
 use tracing::field::Empty;
 use tracing::{Instrument, Span};
 use uma_stable_match_scoring::{Club, MemberSnapshot};
-use uma_stable_match_umamoe_client::{Circle, CircleRequest, Client, Error, Priority};
+use uma_stable_match_umamoe_client::{Circle, CircleRequest, Priority};
 
 use crate::calibration::club_median;
 use crate::pool::{ClubPool, Period};
 use crate::refresher::{utc_now, RefreshConfig, RefreshStatus, Refresher, Refreshing, Tier};
 use crate::scanner::ScanConfig;
 use crate::shared::{club_key, SharedCache};
+use crate::source::{Source, SourceError};
 use crate::traces::in_trace;
 
 /// The club pool, shared between requests and the detail cache.
@@ -27,8 +28,6 @@ pub type SharedPool = Arc<RwLock<ClubPool>>;
 const KEEP_AFTER_DUE: Duration = Duration::from_secs(24 * 60 * 60);
 // Each load renews the whole month's medians, so they outlast any gap between loads.
 const KEEP_MEDIANS: Duration = Duration::from_secs(4 * 24 * 60 * 60);
-/// Longest `Retry-After` pause a visitor's request waits out; longer ones fail straight away.
-pub(crate) const VISITOR_MAX_PAUSE: Duration = Duration::from_secs(30);
 
 /// Detail cache settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,8 +65,7 @@ pub struct ClubDetails {
 }
 
 struct Inner {
-    interactive: Client,
-    background: Client,
+    source: Source,
     cache: Cache<(u64, Option<Period>), Entry>,
     period: RwLock<Option<Period>>,
     pool: SharedPool,
@@ -181,17 +179,17 @@ impl std::fmt::Debug for ClubDetails {
 impl ClubDetails {
     /// Builds the cache and the loader for its queue.
     pub fn new(
-        client: &Client,
+        source: impl Into<Source>,
         pool: SharedPool,
         config: DetailConfig,
     ) -> (Self, BackgroundLoader) {
-        Self::with_shared(client, pool, config, SharedCache::none())
+        Self::with_shared(source, pool, config, SharedCache::none())
     }
 
-    /// Like [`ClubDetails::new`], checking `shared` before uma.moe and storing each loaded club in
-    /// it.
+    /// Like [`ClubDetails::new`], checking `shared` before the source and storing each loaded club
+    /// in it.
     pub fn with_shared(
-        client: &Client,
+        source: impl Into<Source>,
         pool: SharedPool,
         config: DetailConfig,
         shared: SharedCache,
@@ -206,10 +204,7 @@ impl ClubDetails {
         let (sender, receiver) = mpsc::channel(config.queue_size.max(1));
         let details = Self {
             inner: Arc::new(Inner {
-                interactive: client
-                    .with_priority(Priority::Interactive)
-                    .with_max_pause(VISITOR_MAX_PAUSE),
-                background: client.with_priority(Priority::Background),
+                source: source.into(),
                 cache,
                 period: RwLock::new(None),
                 pool,
@@ -238,12 +233,20 @@ impl ClubDetails {
     /// A club's details, fetched in the given lane if they aren't cached. Concurrent calls for one
     /// club share a single fetch. Failed fetches aren't cached. A shared copy past its next refresh
     /// is fetched again, but still served if that fetch fails.
-    pub async fn get(&self, circle_id: u64, priority: Priority) -> Result<Arc<Club>, Arc<Error>> {
+    pub async fn get(
+        &self,
+        circle_id: u64,
+        priority: Priority,
+    ) -> Result<Arc<Club>, Arc<SourceError>> {
         let span = in_trace(|| tracing::info_span!("club details", circle_id, source = Empty));
         self.load(circle_id, priority).instrument(span).await
     }
 
-    async fn load(&self, circle_id: u64, priority: Priority) -> Result<Arc<Club>, Arc<Error>> {
+    async fn load(
+        &self,
+        circle_id: u64,
+        priority: Priority,
+    ) -> Result<Arc<Club>, Arc<SourceError>> {
         let inner = &self.inner;
         let period = self.period();
         if let Some(entry) = inner.cache.get(&(circle_id, period)).await {
@@ -285,7 +288,7 @@ impl ClubDetails {
         &self,
         circle_id: u64,
         priority: Priority,
-    ) -> Result<Arc<Club>, Arc<Error>> {
+    ) -> Result<Arc<Club>, Arc<SourceError>> {
         let inner = &self.inner;
         let period = self.period();
         let entry = fetch(inner, circle_id, period, priority)
@@ -295,7 +298,7 @@ impl ClubDetails {
         Ok(entry.club)
     }
 
-    /// When uma.moe last updated a cached club, if it said.
+    /// When the source last updated a cached club, if it said.
     pub async fn last_updated(&self, circle_id: u64) -> Option<DateTime<Utc>> {
         let entry = self.inner.cache.get(&(circle_id, self.period())).await?;
         DateTime::from_timestamp(entry.last_updated?, 0)
@@ -548,19 +551,19 @@ async fn fetch(
     circle_id: u64,
     period: Option<Period>,
     priority: Priority,
-) -> Result<Entry, Error> {
-    let client = match priority {
-        Priority::Interactive => &inner.interactive,
-        Priority::Background => &inner.background,
-    };
+) -> Result<Entry, SourceError> {
     let mut request = CircleRequest::by_circle_id(circle_id);
     if let Some((year, month)) = period {
         request = request.for_month(year, month);
     }
-    let mut response = client.circle(&request).await.inspect_err(|_| {
-        count_detail("error");
-    })?;
-    count_detail("umamoe");
+    let mut response = inner
+        .source
+        .club(&request, priority)
+        .await
+        .inspect_err(|_| {
+            count_detail("error");
+        })?;
+    count_detail(inner.source.name());
     if response.circle.circle_id == 0 {
         if let Some(listed) = read(&inner.listed).get(&circle_id) {
             response.circle = listed.clone();

@@ -41,7 +41,7 @@ fn refreshing(server: &MockServer, refresh: RefreshConfig) -> ClubDetails {
         refresher: true,
         ..DetailConfig::default()
     };
-    ClubDetails::new(&client(server), SharedPool::default(), config).0
+    ClubDetails::new(client(server), SharedPool::default(), config).0
 }
 
 fn every(millis: u64) -> RefreshConfig {
@@ -139,7 +139,7 @@ fn start(details: &ClubDetails) {
 async fn without_refresh_settings_there_is_no_refresher() {
     let server = MockServer::start().await;
     let (details, _) = ClubDetails::new(
-        &client(&server),
+        client(&server),
         SharedPool::default(),
         DetailConfig::default(),
     );
@@ -365,7 +365,7 @@ async fn refreshed_details_do_not_expire() {
         refresher: true,
         ..DetailConfig::default()
     };
-    let (details, _) = ClubDetails::new(&client(&server), SharedPool::default(), config);
+    let (details, _) = ClubDetails::new(client(&server), SharedPool::default(), config);
 
     details.get(1, Priority::Interactive).await.unwrap();
     tokio::time::sleep(Duration::from_millis(150)).await;
@@ -524,7 +524,7 @@ fn refreshing_with(server: &MockServer, scan: ScanConfig) -> ClubDetails {
         scan,
         ..DetailConfig::default()
     };
-    ClubDetails::new(&client(server), SharedPool::default(), config).0
+    ClubDetails::new(client(server), SharedPool::default(), config).0
 }
 
 #[tokio::test]

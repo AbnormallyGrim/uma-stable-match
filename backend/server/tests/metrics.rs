@@ -221,7 +221,7 @@ async fn club_details_are_counted_by_source() {
         .mount(&server)
         .await;
     let (details, _loader) = ClubDetails::new(
-        &client(server.uri()),
+        client(server.uri()),
         SharedPool::default(),
         DetailConfig::default(),
     );

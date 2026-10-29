@@ -62,6 +62,23 @@ Blank values count as unset. These stop the server at startup, with an error mes
 
 The API key, `REDIS_URL` (which can hold a password), `REDIS_KEY_SECRET`, `TURNSTILE_SECRET_KEY`, `TOKEN_SIGNING_KEY` and `OTEL_EXPORTER_OTLP_HEADERS` are never logged, never included in errors and are redacted in `Debug` output. `.env` is git-ignored; never commit it.
 
+## Data source
+
+The scanner, club details and trainer lookups read their data through a `ClubSource`, shared as a `Source`. `UmaMoeSource`, built from the uma.moe `Client`, is the one the server uses. A `Client` converts into a `Source` directly, so `scan`, `ClubDetails::new`, `PaceLookup::new` and `run_scheduler` accept either.
+
+A source answers four calls, with uma.moe's request and response types:
+
+| Call | Used by |
+|---|---|
+| `club(request, priority)` | Club details, and trainer lookups by club or trainer ID |
+| `list_clubs(request)` | The scanner |
+| `rankings_monthly(request)` | Trainer lookups: finding a trainer's club |
+| `rankings_gains(request)` | Trainer lookups: the 7-day gain fallback for a past month |
+
+`priority` is the lane a rate-limited source waits in. `UmaMoeSource` keeps a lane per use: visitors' requests go first and give up on long `Retry-After` pauses (see [Long pauses](#club-details)), background loads wait, and scans list in the default lane. A source without rate limits can ignore it.
+
+Calls fail with a `SourceError`: `UmaMoe` wraps the client's error, `NotFound` means the club or trainer doesn't exist (it counts as a 404), and `Unavailable` covers any other source, with a message that's shown to visitors. `origin()` and `status()` label logs and metrics, and `name()` (`"umamoe"`) is the `source` label of the detail and pace lookup metrics.
+
 ## Scanner
 
 `scan` builds a new [club pool](#club-pool) and decides which clubs' details to keep loaded:
