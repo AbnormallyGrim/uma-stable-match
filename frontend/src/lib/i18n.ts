@@ -3,14 +3,14 @@
 import type { Language } from './language';
 import { language } from './language.svelte';
 import { en, type Catalog } from './messages/en';
+import { ja } from './messages/ja';
 
 /** The name of a message. */
 export type MessageKey = keyof Catalog;
 
 type Params<K extends MessageKey> = Catalog[K] extends (params: infer P) => string ? P : never;
 
-// A language without a catalog yet shows English.
-const catalogs: Partial<Record<Language, Catalog>> = { en };
+const catalogs: Record<Language, Catalog> = { en, ja };
 
 /**
  * The message `key` in the language being shown, filled in with `params`.
@@ -21,7 +21,7 @@ export function t<K extends MessageKey>(
   key: K,
   ...params: [Params<K>] extends [never] ? [] : [Params<K>]
 ): string {
-  const message = (catalogs[language.current] ?? en)[key] as string | ((p: unknown) => string);
+  const message = catalogs[language.current][key] as string | ((p: unknown) => string);
   return typeof message === 'function' ? message(params[0]) : message;
 }
 

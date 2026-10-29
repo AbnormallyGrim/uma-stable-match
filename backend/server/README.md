@@ -37,7 +37,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `RATE_LIMIT_PER_MINUTE` | `30` | Recommendation requests each visitor can make per minute |
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer lookups each visitor can make per minute that need a call to uma.moe |
 | `TRUST_FORWARDED_FOR` | `false` | `true` to identify visitors by `X-Forwarded-For`. Only turn this on behind a reverse proxy that sets the header |
-| `ENABLE_JAPANESE` | `false` | `true` to offer the Japanese translation and the EN/JP switch in the web app. Reported on `GET /api/v1/features` |
+| `ENABLE_JAPANESE` | `false` | `true` to offer the Japanese translation and its language button in the web app. Reported on `GET /api/v1/features` |
 | `FRONTEND_DIR` | none | Built frontend to serve, such as `frontend/dist`. Unset, the server serves only the API |
 | `REDIS_URL` | none | A `redis://` or `rediss://` URL to share club details, trainer paces and scans with other instances. Unset, everything stays in this instance's memory. See [Shared cache](#shared-cache) |
 | `REDIS_KEY_SECRET` | none | Required with `REDIS_URL`: at least 32 characters, the same on every instance. Keys the hash that replaces trainer IDs in Redis |

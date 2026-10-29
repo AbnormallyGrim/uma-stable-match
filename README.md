@@ -201,7 +201,7 @@ Set these in `.env`. Only `UMAMOE_API_KEY` is required; [`.env.example`](.env.ex
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer ID lookups allowed per visitor per minute, not counting cached ones |
 | `TRUST_FORWARDED_FOR` | `false` | Set to `true` behind a reverse proxy, so visitors are told apart by their own address |
 | `LOG_FORMAT` | `text` | `json` writes logs as one JSON object per line, for a log search service. See the [server README](backend/server/README.md#logs) |
-| `ENABLE_JAPANESE` | `false` | Set to `true` to offer the Japanese translation and the EN/JP switch in the web app |
+| `ENABLE_JAPANESE` | `false` | Set to `true` to offer the Japanese translation and its language button in the web app |
 | `FRONTEND_DIR` | *(none)* | Folder with the built web page. Leave it unset to run only the API. Ignored by the Docker setup, which serves the page built into the image |
 | `REDIS_URL` | *(none)* | Optional. A `redis://` or `rediss://` URL to share club data, trainer paces and scans between several servers. The server won't start if it can't reach it |
 | `REDIS_KEY_SECRET` | *(none)* | Required with `REDIS_URL`: at least 32 characters, the same on every server. Looked-up trainer IDs are stored in Redis only as a hash keyed with it |

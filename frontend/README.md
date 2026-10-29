@@ -61,8 +61,10 @@ src/lib/Tour.svelte           The product tour's overlay, highlight and instruct
 src/lib/tour.ts               The tour's steps, and remembering that it was seen
 src/lib/ThemeToggle.svelte    System / Light / Dark switch, as icons with tooltips
 src/lib/theme.ts              Saving and applying the theme choice
+src/lib/LanguageToggle.svelte  Translate button, shown only when Japanese is enabled
 src/lib/i18n.ts               `t()`, which looks up a message in the language being shown
 src/lib/messages/en.ts        Every message in English, and the shape other languages follow
+src/lib/messages/ja.ts        The same messages in Japanese
 src/lib/language.ts           Saving the language choice, and which language to show
 src/lib/language.svelte.ts    The language shown right now, shared by every component
 src/lib/SiteFooter.svelte     Tips, the logo, a link to report a problem, and the disclaimer
@@ -226,7 +228,7 @@ The logo and the background artwork each have a light and a dark version in `src
 - **Background.** The search form and "How to use" sit in a `.hero` section. Its `::before` shows the wide artwork (`--hero`), dimmed by `--hero-opacity` and faded to transparent towards its edges with a radial mask, so no box shows whatever the image's background colour. It's anchored to the top of the section, and up to 720 pixels wide to the bottom, so on phones it sits behind the form rather than the title. It stays inside the section, so it never shows behind results or the footer.
 - **Search form.** The form's card is translucent with a slight blur, so the artwork shows through it.
 - **Alignment.** The light and dark artwork are aligned so their outlines lie on top of each other. Keep them aligned when replacing either: measure the drawing in both, and scale and centre the light version to match.
-- **Icons.** `public/favicon-32.png` and `public/apple-touch-icon.png` are the dark logo at 32 and 180 pixels.
+- **Icons.** The language button's icon is "translate" from [Bootstrap Icons](https://icons.getbootstrap.com/) (MIT licence). `public/favicon-32.png` and `public/apple-touch-icon.png` are the dark logo at 32 and 180 pixels.
 
 ### Page width
 
@@ -392,8 +394,8 @@ try {
 
 ## Language
 
-The Japanese translation is behind the server's `ENABLE_JAPANESE` setting, off by default. At startup the app asks `GET /api/v1/features`; if the answer is missing or fails, it stays in English. With it on, the saved choice (`uma-stable-match:language` in local storage, `en` or `ja`) is shown, and a visitor with no saved choice gets English.
+The Japanese translation is behind the server's `ENABLE_JAPANESE` setting, off by default. At startup the app asks `GET /api/v1/features`; if the answer is missing or fails, it stays in English. With it on, a translate button appears in the top bar and the saved choice (`uma-stable-match:language` in local storage, `en` or `ja`) is shown, and a visitor with no saved choice gets English.
 
 ### Messages
 
-Every piece of text the app shows is a message in `src/lib/messages/en.ts`, looked up with `t('key')`, or `t('key', { n })` for a message with values. A message is a string, or a function when it has numbers or plurals. Call `t()` where the text is shown, never in a module-level constant, so it follows a language switch. A few messages hold markup (the how-to steps and the footer) and are shown with `{@html}`; they are first-party text, so never put visitor input in one. A language without a catalog shows English.
+Every piece of text the app shows is a message in `src/lib/messages/en.ts`, looked up with `t('key')`, or `t('key', { n })` for a message with values. A message is a string, or a function when it has numbers or plurals. Call `t()` where the text is shown, never in a module-level constant, so it follows a language switch. A few messages hold markup (the how-to steps and the footer) and are shown with `{@html}`; they are first-party text, so never put visitor input in one. Add every new message to both `en.ts` and `ja.ts`; the types and a test enforce it. In Japanese, use the game's own terms (a club is a サークル, never "club"); a test fails on the English word.
