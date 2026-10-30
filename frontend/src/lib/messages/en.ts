@@ -15,6 +15,35 @@ export const en = {
   'nav.label': 'Main',
   'nav.tour': 'Take the tour',
 
+  'nav.releases': "What's new",
+
+  'releases.title': "What's new",
+  'releases.intro': 'Every update to Uma Stable Match, newest first.',
+  'releases.close': 'Close',
+  'releases.current': ({ build }: { build: string }) => `Build ${build}`,
+  'releases.latest': 'Latest',
+  'releases.kind.update': 'Update',
+  'releases.kind.hotfix': 'Hotfix',
+  'releases.change.new': 'New',
+  'releases.change.improved': 'Improved',
+  'releases.change.fixed': 'Fixed',
+
+  'releases.earlyMonth.title': 'Steadier results early in the month',
+  'releases.earlyMonth.body':
+    "Get steadier results early in the game month, with last month's pace blended in until this month has enough data.",
+  'releases.yourClub.title': 'Compare your current club',
+  'releases.yourClub.body':
+    'Search by trainer ID to compare your current club with your top pick, including its median pace against yours, your place among its members and its fit.',
+  'releases.fullClubs.title': 'Include full clubs',
+  'releases.fullClubs.body':
+    'Show clubs with no open spot, marked with a Full badge, to compare against. They stay out of your top picks.',
+  'releases.filters.title': 'Filter by playstyle and join style',
+  'releases.filters.body':
+    'Narrow your results to the playstyles you want and to Open, Approval or Closed clubs, in place of Include closed clubs.',
+  'releases.movedClubs.title': 'Fixed trainer ID search after changing clubs',
+  'releases.movedClubs.body':
+    "Searching by trainer ID no longer says your trainer wasn't found if you've changed clubs.",
+
   'language.switch': 'Switch to Japanese (日本語)',
 
   'theme.label': 'Theme',

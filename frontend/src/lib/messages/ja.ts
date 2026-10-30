@@ -13,6 +13,35 @@ export const ja: Catalog = {
   'nav.label': 'メインメニュー',
   'nav.tour': 'ツアーを見る',
 
+  'nav.releases': '更新情報',
+
+  'releases.title': '更新情報',
+  'releases.intro': 'Uma Stable Matchのアップデート履歴です(新しい順)。',
+  'releases.close': '閉じる',
+  'releases.current': ({ build }) => `ビルド ${build}`,
+  'releases.latest': '最新',
+  'releases.kind.update': 'アップデート',
+  'releases.kind.hotfix': '緊急修正',
+  'releases.change.new': '新機能',
+  'releases.change.improved': '改善',
+  'releases.change.fixed': '修正',
+
+  'releases.earlyMonth.title': '月初めの結果が安定',
+  'releases.earlyMonth.body':
+    '月初めは先月のペースを取り入れ、今月のデータがそろうまで結果の変動を抑えます。',
+  'releases.yourClub.title': '今のサークルを比較',
+  'releases.yourClub.body':
+    'トレーナーIDで検索すると、今のサークルとおすすめの1位を比較できます。中央値とあなたのペース、メンバー内での順位、適合度を確認できます。',
+  'releases.fullClubs.title': '満員のサークルも検索',
+  'releases.fullClubs.body':
+    '空きのないサークルを「満員」のバッジ付きで表示し、比較に使えます。おすすめには含まれません。',
+  'releases.filters.title': 'サークル方針と加入方法で絞り込み',
+  'releases.filters.body':
+    '希望のサークル方針と、自由加入・承認制・募集停止の加入方法で結果を絞り込めます。「募集停止のサークルも含める」に代わる項目です。',
+  'releases.movedClubs.title': '修正: 移籍後のトレーナーID検索',
+  'releases.movedClubs.body':
+    'サークルを移籍していても、トレーナーIDで検索して「見つかりません」と表示されることはなくなりました。',
+
   'language.switch': '英語に切り替え (English)',
 
   'theme.label': 'テーマ',

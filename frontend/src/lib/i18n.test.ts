@@ -69,6 +69,7 @@ const SAMPLE = {
   pace: '7.6M/day',
   balanced: true,
   rankings: 'https://example.com',
+  build: '1.0.0',
 } as never;
 
 function text(message: unknown): string {

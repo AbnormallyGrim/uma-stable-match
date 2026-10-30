@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App.svelte';
 import type { Recommendations } from './lib/api';
 import { language } from './lib/language.svelte';
+import { LATEST_BUILD, RELEASE_SEEN_KEY } from './lib/releases';
 import { TOUR_KEY } from './lib/tour';
 
 function recommendations(
@@ -268,5 +269,22 @@ describe('App states', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await fireEvent.click(screen.getByRole('button', { name: 'Take the tour' }));
     expect(screen.getByRole('dialog', { name: 'Welcome to Uma Stable Match' })).toBeInTheDocument();
+  });
+
+  it('opens the release notes, and stops pointing them out once read', async () => {
+    stubApi(() => json(recommendations(0)));
+    const { unmount } = render(App);
+    expect(screen.getByTestId('unseen-release')).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: "What's new" }));
+    expect(screen.getByRole('dialog', { name: "What's new" })).toBeInTheDocument();
+    expect(screen.queryByTestId('unseen-release')).not.toBeInTheDocument();
+    expect(localStorage.getItem(RELEASE_SEEN_KEY)).toBe(LATEST_BUILD);
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    unmount();
+
+    render(App);
+    expect(screen.queryByTestId('unseen-release')).not.toBeInTheDocument();
   });
 });

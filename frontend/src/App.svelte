@@ -7,6 +7,8 @@
   import { t } from './lib/i18n';
   import { language } from './lib/language.svelte';
   import NavBar from './lib/NavBar.svelte';
+  import ReleaseNotes from './lib/ReleaseNotes.svelte';
+  import { hasUnseenRelease, markReleaseSeen, RELEASES } from './lib/releases';
   import Results from './lib/Results.svelte';
   import { SearchRunner, type SearchState as RunnerState } from './lib/runner';
   import SearchForm from './lib/SearchForm.svelte';
@@ -42,6 +44,15 @@
   function endTour() {
     touring = false;
     markTourSeen(storage);
+  }
+
+  let readingReleases = $state(false);
+  let unseenRelease = $state(hasUnseenRelease(storage));
+
+  function openReleases() {
+    readingReleases = true;
+    unseenRelease = false;
+    markReleaseSeen(storage);
   }
 
   const human = new HumanCheck();
@@ -99,7 +110,7 @@
   });
 </script>
 
-<NavBar onhelp={() => (touring = true)} />
+<NavBar onhelp={() => (touring = true)} onreleases={openReleases} unseen={unseenRelease} />
 
 <main>
   <div class="hero">
@@ -118,6 +129,10 @@
 </main>
 
 <SiteFooter />
+
+{#if readingReleases}
+  <ReleaseNotes releases={RELEASES} onclose={() => (readingReleases = false)} />
+{/if}
 
 {#if touring}
   <Tour steps={tourSteps()} onclose={endTour} />
