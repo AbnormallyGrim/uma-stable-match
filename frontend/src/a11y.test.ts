@@ -96,6 +96,14 @@ describe('accessibility', () => {
     expect(await violations(document.body, true)).toEqual([]);
   });
 
+  it('has no violations with the release notes open', async () => {
+    stubApi(() => json(withResults));
+    render(App);
+    await fireEvent.click(screen.getByRole('button', { name: "What's new" }));
+    await screen.findByRole('dialog', { name: "What's new" });
+    expect(await violations(document.body, true)).toEqual([]);
+  });
+
   it('has no violations with results, cards and the table', async () => {
     window.history.replaceState(null, '', '/?pace=7600000&balance_weight=0.5&include_closed=true');
     stubApi(() => json(withResults));

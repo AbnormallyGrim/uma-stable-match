@@ -56,7 +56,9 @@ src/lib/runner.ts             Search state machine: loading, retries and countdo
 src/lib/states.ts             Error messages and empty-result hints
 src/lib/HowToUse.svelte       Step-by-step instructions under the search form
 src/lib/SearchStatus.svelte   Loading, waiting and error messages
-src/lib/NavBar.svelte         Top bar: the brand, linking to the website, the tour button and the theme switch
+src/lib/NavBar.svelte         Top bar: the brand, linking to the website, the release notes and tour buttons, and the theme switch
+src/lib/ReleaseNotes.svelte   The release notes modal: a timeline of builds, newest first
+src/lib/releases.ts           The releases themselves, and remembering the newest one seen
 src/lib/Tour.svelte           The product tour's overlay, highlight and instruction card
 src/lib/tour.ts               The tour's steps, and remembering that it was seen
 src/lib/ThemeToggle.svelte    System / Light / Dark switch, as icons with tooltips
@@ -401,3 +403,34 @@ The Japanese translation is behind the server's `ENABLE_JAPANESE` setting, off b
 ### Messages
 
 Every piece of text the app shows is a message in `src/lib/messages/en.ts`, looked up with `t('key')`, or `t('key', { n })` for a message with values. A message is a string, or a function when it has numbers or plurals. Call `t()` where the text is shown, never in a module-level constant, so it follows a language switch. A few messages hold markup (the how-to steps and the footer) and are shown with `{@html}`; they are first-party text, so never put visitor input in one. Add every new message to both `en.ts` and `ja.ts`; the types and a test enforce it. In Japanese, use the game's own terms (a club is a サークル, never "club"); a test fails on the English word.
+
+## Release notes
+
+The sparkle button in the navbar opens the release notes. It carries a dot until the visitor has opened them at the newest build. The notes are in English and Japanese, like the rest of the app.
+
+Publish a note only for a change a visitor would notice: a new feature, a better result or a fixed bug. Skip refactors, tests, tooling, docs, running locally and anything else that doesn't change what the app does for them. Not every merged pull request needs one.
+
+### Build numbers
+
+Builds are `major.minor.patch`:
+
+| Raise | When | Release kind |
+|---|---|---|
+| minor | A new feature or a visible improvement | `update` |
+| patch | A hotfix that only fixes a bug | `hotfix` |
+| major | A redesign or a change that breaks old links | `update` |
+
+The site launched as `1.0.0` on 23 October 2026. A release's date is the day it went live, in `YYYY-MM-DD`. Group the changes that go out together under one build.
+
+### Add a release
+
+1. Add the release at the **top** of `RELEASES` in `src/lib/releases.ts`, with its build, date, kind and changes. Each change has a kind (`new`, `improved` or `fixed`) and the keys of its title and body messages.
+2. Write both messages in `messages/en.ts` and `messages/ja.ts`, under `releases.<name>.title` and `releases.<name>.body`. The tests fail if one language is missing.
+
+Writing the notes:
+
+- Write for players, not developers: say what changed for them and why it helps. No issue or pull request numbers, no code, no setup or hosting details.
+- Use the labels players see in the app (such as **Include full clubs**), and the game's own terms in Japanese.
+- Title as a short phrase without a full stop. Body as one sentence that starts with what the player can now do, such as "Track goals, compare results with your plan, and carry savings forward." Don't narrate the fix or add caveats.
+- A hotfix lists only `fixed` changes. Start each title with "Fixed" and say in plain words what was wrong, such as "Searching by trainer ID no longer says your trainer wasn't found."
+- Never edit the notes of a published release except to fix a mistake. Describe later changes in a new release.
