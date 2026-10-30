@@ -91,6 +91,27 @@ pace = (latest value − first value) ÷ (days with data − 1)
 
 At least 3 days of data are needed.
 
+### Blended pace
+
+Early in a month there are too few days for a reliable pace. `blended_pace` combines this month's pace with a prior, such as the member's pace last month, and trusts this month more with each day of data:
+
+```text
+d     = days with data − 1
+Z     = d ÷ (d + k)
+pace  = Z × this month's pace + (1 − Z) × prior
+```
+
+With no gains yet (`d` = 0) it's the prior. Without a prior it's `daily_pace`. A larger `k` keeps more weight on the prior for longer, and `k` = 0 ignores it once there's a gain. This is credibility weighting, the pattern baseball projection systems such as Marcel use. A backtest on real clubs found `k` = 1 suits club medians and `k` = 4 a single trainer's pace.
+
+`blended_median` is the club median over current members' blended paces, with a prior looked up for each member by trainer ID. Unlike the fit's median, it includes members with fewer than 3 days of data when they have a prior. Negative paces count as 0, and it needs at least 8 paces.
+
+```rust
+use uma_stable_match_scoring::blended_pace;
+
+// 10 fans a day over 3 gains, against a prior of 40 a day: Z = 3 ÷ 4.
+assert_eq!(blended_pace(&[100, 110, 120, 130], Some(40.0), 1.0), Some(17.5));
+```
+
 ### Current members
 
 `current_members` decides who is still in a club:

@@ -5,7 +5,9 @@ use std::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::members::{current_members, daily_pace, days_with_data, MIN_DAYS_FOR_PACE};
+use crate::members::{
+    blended_pace, current_members, daily_pace, days_with_data, MIN_DAYS_FOR_PACE,
+};
 use crate::model::{Club, JoinStyle, MemberSnapshot, CLUB_CAP};
 use crate::stats::{gini, median, round_half_even};
 
@@ -151,6 +153,24 @@ pub fn club_balance(members: &[MemberSnapshot]) -> Option<Balance> {
         bottom_quarter_per_day: bottom_quarter,
         top3_share,
     })
+}
+
+/// Median [`blended_pace`] of a club's current members, with `prior` giving each member's prior
+/// by trainer ID. `None` with fewer than [`MIN_RANKED_MEMBERS`] paces.
+pub fn blended_median(
+    members: &[MemberSnapshot],
+    prior: impl Fn(u64) -> Option<f64>,
+    k: f64,
+) -> Option<f64> {
+    let rates: Vec<f64> = current_members(members)
+        .into_iter()
+        .filter_map(|m| blended_pace(&m.daily_fans, prior(m.viewer_id), k))
+        .map(|r| r.max(0.0))
+        .collect();
+    if rates.len() < MIN_RANKED_MEMBERS {
+        return None;
+    }
+    median(&rates)
 }
 
 /// Scores one club, or returns `Ok(None)` if the club is left out.

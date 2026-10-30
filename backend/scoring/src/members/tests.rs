@@ -78,3 +78,46 @@ fn empty_club_has_no_current_members() {
     assert!(current_members(&[]).is_empty());
     assert!(current_members(&[member(1, &[0, 0])]).is_empty());
 }
+
+#[test]
+fn blend_shifts_weight_to_this_month_with_each_gain() {
+    // Gains of 10 a day this month against a prior of 40.
+    assert_eq!(blended_pace(&[100], Some(40.0), 1.0), Some(40.0));
+    assert_eq!(blended_pace(&[100, 110], Some(40.0), 1.0), Some(25.0));
+    assert_eq!(
+        blended_pace(&[100, 110, 120, 130], Some(40.0), 1.0),
+        Some(17.5)
+    );
+    assert_eq!(
+        blended_pace(&[100, 110, 120, 130], Some(40.0), 3.0),
+        Some(25.0)
+    );
+}
+
+#[test]
+fn blend_skips_empty_days_and_counts_previous_club_fans() {
+    assert_eq!(blended_pace(&[-100, 0, 120], Some(0.0), 0.0), Some(20.0));
+}
+
+#[test]
+fn blend_without_a_prior_is_the_daily_pace() {
+    assert_eq!(blended_pace(&[100, 110, 120], None, 4.0), Some(10.0));
+    assert_eq!(blended_pace(&[100, 110], None, 4.0), None);
+    assert_eq!(
+        blended_pace(&[100, 110, 120], Some(f64::NAN), 4.0),
+        Some(10.0)
+    );
+}
+
+#[test]
+fn blend_needs_a_valid_k() {
+    assert_eq!(blended_pace(&[100, 110], Some(40.0), -1.0), None);
+    assert_eq!(blended_pace(&[100, 110], Some(40.0), f64::INFINITY), None);
+    assert_eq!(blended_pace(&[100, 110], Some(40.0), 0.0), Some(10.0));
+}
+
+#[test]
+fn blend_of_no_data_is_the_prior() {
+    assert_eq!(blended_pace(&[], Some(40.0), 1.0), Some(40.0));
+    assert_eq!(blended_pace(&[], None, 1.0), None);
+}
