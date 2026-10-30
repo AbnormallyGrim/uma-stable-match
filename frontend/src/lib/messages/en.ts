@@ -156,6 +156,8 @@ export const en = {
     `${n} more ${plural(n, 'club is', 'clubs are')} still loading. Search again in a minute for complete results.`,
   'notice.lastMonth': ({ month }: { month: string }) =>
     `These results are based on last month's data (${month}), because the new game month has only just started.`,
+  'notice.blended':
+    "The game month has only just started, so these results combine this month's data with last month's. Last month's counts for less each day.",
 
   'results.heading': 'Results',
   'results.topPicks': 'Top picks',

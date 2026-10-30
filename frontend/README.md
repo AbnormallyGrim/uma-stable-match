@@ -162,6 +162,7 @@ After a search, the page shows a summary and the top ten picks.
   - The Discord best-guess note, when `options.has_discord` is true
   - "*N more clubs are still loading. Search again in a minute for complete results.*" when the API's `coverage.pending` is above 0
   - "*These results are based on last month's data (February 2026), because the new game month has only just started.*" when `month` isn't the game month of `updated_at`
+  - "*The game month has only just started, so these results combine this month's data with last month's. Last month's counts for less each day.*" when `updated_at` is fewer than `BLENDED_DAYS` (5) whole days into its game month, the days the server blends club paces with last month's
 - **Top picks:** the first ten clubs with an open spot. Full clubs are only in the table. If every match is full, the page says so instead of "No clubs matched", and the table still shows them.
 - **Notes:** under the top picks, always shown, even with no matches: full clubs aren't in the results (or, with **Include full clubs**, are only in the table), your own club never is, and a collapsed "Why not a higher-tier club?" explains that matches follow a club's typical member, not its tier. The note points to the **Your club** card when there is one, and otherwise suggests a trainer ID search. The FAQ on the marketing page answers the same two questions.
 - **Your club:** when the response has `your_club`, a card between the notes and the table shows:
@@ -336,6 +337,7 @@ The runner takes the fetch function, a change callback, the retry delays and the
 | `playstyleLabel` | `2` → `Laid-back`, using uma.moe's names for policy codes 1 to 17 |
 | `formatUpdated` | 3 hours earlier → `3 hours ago`; a day earlier → `yesterday` |
 | `gameMonth` | `2026-03-01T15:00:00Z` (the 2nd in Japan) → `2026-03`; `2026-03-01T14:59:59Z` → `2026-02` |
+| `daysIntoGameMonth` | `2026-03-01T15:00:00Z` → `0`; `2026-03-06T15:00:00Z` → `5` |
 | `monthLabel` | `2026-02` → `February 2026` |
 
 ## API client

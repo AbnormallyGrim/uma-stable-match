@@ -128,12 +128,20 @@ describe('result notices', () => {
   });
 
   it("mention last month's data only when it's used", () => {
-    const at = '2026-03-02T15:00:00Z';
+    const at = '2026-03-19T15:00:00Z';
     expect(monthNotice({ updated_at: at, month: '2026-03' })).toBeNull();
     expect(monthNotice({ updated_at: at, month: null })).toBeNull();
-    expect(monthNotice({ updated_at: at, month: '2026-02' })).toBe(
+    expect(monthNotice({ updated_at: '2026-03-02T15:00:00Z', month: '2026-02' })).toBe(
       "These results are based on last month's data (February 2026), because the new game month has only just started.",
     );
+  });
+
+  it("mention last month's blended data in the first days of a month", () => {
+    const blended =
+      "The game month has only just started, so these results combine this month's data with last month's. Last month's counts for less each day.";
+    expect(monthNotice({ updated_at: '2026-03-01T15:00:00Z', month: '2026-03' })).toBe(blended);
+    expect(monthNotice({ updated_at: '2026-03-05T15:00:00Z', month: '2026-03' })).toBe(blended);
+    expect(monthNotice({ updated_at: '2026-03-06T15:00:00Z', month: '2026-03' })).toBeNull();
   });
 
   it('put the month first', () => {

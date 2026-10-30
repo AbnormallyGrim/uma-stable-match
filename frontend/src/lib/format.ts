@@ -156,6 +156,18 @@ export function gameMonth(iso: string): string | null {
   return `${year}-${String(month).padStart(2, '0')}`;
 }
 
+/** Whole days from the start of a time's game month (the 2nd, 00:00 Japan time) to the time. */
+export function daysIntoGameMonth(iso: string): number | null {
+  const time = new Date(iso).getTime();
+  const month = gameMonth(iso);
+  if (month === null) {
+    return null;
+  }
+  const [year, number] = month.split('-').map(Number);
+  const start = Date.UTC(year!, number! - 1, 2) - JST_OFFSET_MS;
+  return Math.floor((time - start) / 86_400_000);
+}
+
 /** `2026-02` → `February 2026`. Anything else is returned unchanged. */
 export function monthLabel(month: string): string {
   const match = /^(\d{4})-(\d{2})$/.exec(month);

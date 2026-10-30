@@ -141,7 +141,7 @@ uma.moe's game month starts on the 2nd at 00:00 JST. Club details and responses 
 The page is a single Svelte app, built by Vite into static files that the server serves. It calls only `/api/v1/recommendations`.
 
 - `SearchForm` and `SearchStatus` handle input, and loading and error states.
-- `Results`, `ResultsSummary`, `ClubCard` and `ResultsTable` show the results, with the data's age and notices for clubs still loading and last month's data.
+- `Results`, `ResultsSummary`, `ClubCard` and `ResultsTable` show the results, with the data's age and notices for clubs still loading and early-month data.
 - Searches are kept in the page address, and the trainer ID and theme can be remembered in the browser.
 
 ## Build and deployment

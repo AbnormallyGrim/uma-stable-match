@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  daysIntoGameMonth,
   gameMonth,
   monthLabel,
   formatMillions,
@@ -120,6 +121,14 @@ describe('game months', () => {
     expect(gameMonth('2026-03-01T14:59:59Z')).toBe('2026-02');
     expect(gameMonth('2027-01-01T12:00:00+09:00')).toBe('2026-12');
     expect(gameMonth('not a date')).toBeNull();
+  });
+
+  it('count whole days from their start', () => {
+    expect(daysIntoGameMonth('2026-03-01T15:00:00Z')).toBe(0);
+    expect(daysIntoGameMonth('2026-03-03T23:59:59+09:00')).toBe(1);
+    expect(daysIntoGameMonth('2026-03-06T15:00:00Z')).toBe(5);
+    expect(daysIntoGameMonth('2027-01-01T12:00:00+09:00')).toBe(30);
+    expect(daysIntoGameMonth('not a date')).toBeNull();
   });
 
   it('have readable labels', () => {

@@ -1,7 +1,7 @@
 /** User-facing messages for search errors and empty results. */
 
 import { ApiError, type Recommendations } from './api';
-import { gameMonth, monthLabel } from './format';
+import { daysIntoGameMonth, gameMonth, monthLabel } from './format';
 import { t } from './i18n';
 import { discordNote } from './search';
 
@@ -135,12 +135,22 @@ export function pendingNotice(coverage: Recommendations['coverage']): string | n
   return t('notice.pending', { n: pending });
 }
 
-/** Says when results use last month's data, or `null` when they use the current game month. */
+/** Days into a game month while the server blends club paces with last month's. */
+export const BLENDED_DAYS = 5;
+
+/**
+ * Says when results use last month's data, or blend it in early in the game month, or `null`
+ * otherwise.
+ */
 export function monthNotice(result: Pick<Recommendations, 'month' | 'updated_at'>): string | null {
-  if (result.month === null || result.month === gameMonth(result.updated_at)) {
+  if (result.month === null) {
     return null;
   }
-  return t('notice.lastMonth', { month: monthLabel(result.month) });
+  if (result.month !== gameMonth(result.updated_at)) {
+    return t('notice.lastMonth', { month: monthLabel(result.month) });
+  }
+  const days = daysIntoGameMonth(result.updated_at);
+  return days !== null && days < BLENDED_DAYS ? t('notice.blended') : null;
 }
 
 /** Every notice for a result, the month first. */
