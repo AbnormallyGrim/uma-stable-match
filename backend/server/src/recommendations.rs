@@ -307,11 +307,14 @@ async fn search(
     let (pace, trainer_id, own_club_id) = match source {
         PaceSource::Given(pace) => (pace, None, None),
         PaceSource::Trainer(id) => {
-            let period = state.details.period();
-            if !state.paces.is_cached(id, period) {
+            if !state.paces.is_cached(id, None) {
                 state.limits.check_lookup(visitor)?;
             }
-            let found = state.paces.pace(id, period).await.map_err(pace_error)?;
+            let found = state
+                .paces
+                .blended(id, state.details.period())
+                .await
+                .map_err(pace_error)?;
             (found.pace, Some(id), found.circle_id)
         }
     };

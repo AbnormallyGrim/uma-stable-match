@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use tracing::field::Empty;
 use tracing::{Instrument, Span};
-use uma_stable_match_scoring::daily_pace;
+use uma_stable_match_scoring::{blended_pace, daily_pace};
 use uma_stable_match_umamoe_client::{
     CircleRequest, CircleResponse, Priority, RankingsGainsRequest, RankingsMonthlyRequest,
 };
@@ -53,20 +53,49 @@ pub struct TrainerPace {
     pub circle_id: Option<u64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+/// Days of data this month from which a trainer's pace no longer blends in last month's.
+pub const TRAINER_BLEND_DAYS: usize = 10;
+
+/// How long a trainer's pace leans on last month's: `k` in the blend.
+pub const TRAINER_PRIOR_K: f64 = 4.0;
+
+/// Last month's pace is left out when this month's is more than this many times higher or lower.
+pub const MAX_PRIOR_RATIO: f64 = 2.0;
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 enum Outcome {
+    /// The trainer's snapshot, whatever its amount of data.
+    Fans(Fans),
     Pace(TrainerPace),
     NotFound,
     NotEnoughData,
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+struct Fans {
+    daily_fans: Vec<i64>,
+    period: Option<Period>,
+    circle_id: Option<u64>,
+}
+
 impl Outcome {
     fn into_result(self) -> Result<TrainerPace, PaceError> {
         match self {
+            Self::Fans(fans) => match daily_pace(&fans.daily_fans) {
+                Some(pace) if pace > 0.0 => Ok(TrainerPace {
+                    pace,
+                    circle_id: fans.circle_id,
+                }),
+                _ => Err(PaceError::NotEnoughData),
+            },
             Self::Pace(found) => Ok(found),
             Self::NotFound => Err(PaceError::NotFound),
             Self::NotEnoughData => Err(PaceError::NotEnoughData),
         }
+    }
+
+    fn has_pace(&self) -> bool {
+        self.clone().into_result().is_ok()
     }
 }
 
@@ -118,16 +147,70 @@ impl PaceLookup {
         self.find(viewer_id, period).instrument(span).await
     }
 
+    /// The trainer's pace this month, blended with last month's while this month has fewer than
+    /// [`TRAINER_BLEND_DAYS`] days of data; see the README. Without data this month, it's the pace
+    /// in `fallback`, if given.
+    pub async fn blended(
+        &self,
+        viewer_id: u64,
+        fallback: Option<Period>,
+    ) -> Result<TrainerPace, PaceError> {
+        let span = in_trace(|| tracing::info_span!("pace lookup", source = Empty));
+        self.blend(viewer_id, fallback).instrument(span).await
+    }
+
+    async fn blend(
+        &self,
+        viewer_id: u64,
+        fallback: Option<Period>,
+    ) -> Result<TrainerPace, PaceError> {
+        let fans = match self.outcome(viewer_id, None).await? {
+            Outcome::Fans(fans) => fans,
+            Outcome::NotFound | Outcome::NotEnoughData if fallback.is_some() => {
+                return self.find(viewer_id, fallback).await;
+            }
+            other => return other.into_result(),
+        };
+        let days = fans.daily_fans.iter().filter(|v| **v != 0).count();
+        let previous = fans.period.map(month_before).or(fallback);
+        let (prior, prior_error) = match previous {
+            Some(previous) if days < TRAINER_BLEND_DAYS => {
+                match self.find(viewer_id, Some(previous)).await {
+                    Ok(found) => (Some(found.pace), None),
+                    Err(PaceError::Upstream(error)) => (None, Some(error)),
+                    Err(_) => (None, None),
+                }
+            }
+            _ => (None, None),
+        };
+        // A pace that clearly changed since last month isn't held back by it.
+        let prior = prior.filter(|prior| match daily_pace(&fans.daily_fans) {
+            Some(pace) => (prior / MAX_PRIOR_RATIO..=prior * MAX_PRIOR_RATIO).contains(&pace),
+            None => true,
+        });
+        match blended_pace(&fans.daily_fans, prior, TRAINER_PRIOR_K) {
+            Some(pace) if pace > 0.0 => Ok(TrainerPace {
+                pace,
+                circle_id: fans.circle_id,
+            }),
+            _ => Err(prior_error.map_or(PaceError::NotEnoughData, PaceError::Upstream)),
+        }
+    }
+
     async fn find(&self, viewer_id: u64, period: Option<Period>) -> Result<TrainerPace, PaceError> {
+        self.outcome(viewer_id, period).await?.into_result()
+    }
+
+    async fn outcome(&self, viewer_id: u64, period: Option<Period>) -> Result<Outcome, PaceError> {
         if let Some(outcome) = self.cached(viewer_id, period) {
             count_pace("memory");
-            return outcome.into_result();
+            return Ok(outcome);
         }
         let key = self.shared.pace_key(viewer_id, period);
         if let Some(outcome) = self.shared.get::<Outcome>(&key).await {
             count_pace("redis");
-            self.store(viewer_id, period, outcome);
-            return outcome.into_result();
+            self.store(viewer_id, period, outcome.clone());
+            return Ok(outcome);
         }
 
         let outcome = self.lookup(viewer_id, period).await;
@@ -137,9 +220,9 @@ impl PaceLookup {
             "error"
         });
         let outcome = outcome?;
-        self.store(viewer_id, period, outcome);
+        self.store(viewer_id, period, outcome.clone());
         self.shared.set(&key, &outcome, self.ttl).await;
-        outcome.into_result()
+        Ok(outcome)
     }
 
     /// Whether a fresh result for this trainer is cached.
@@ -184,9 +267,7 @@ impl PaceLookup {
             ranked
         };
         match period {
-            Some(_) if !matches!(outcome, Outcome::Pace(_)) => {
-                self.seven_day_gains(viewer_id, outcome).await
-            }
+            Some(_) if !outcome.has_pace() => self.seven_day_gains(viewer_id, outcome).await,
             _ => Ok(outcome),
         }
     }
@@ -304,7 +385,7 @@ impl PaceLookup {
         entries
             .get(&(viewer_id, period))
             .filter(|(at, _)| at.elapsed() < self.ttl)
-            .map(|(_, outcome)| *outcome)
+            .map(|(_, outcome)| outcome.clone())
     }
 
     fn store(&self, viewer_id: u64, period: Option<Period>, outcome: Outcome) {
@@ -316,11 +397,23 @@ impl PaceLookup {
 
 fn with_club(outcome: Outcome, circle_id: u64) -> Outcome {
     match outcome {
+        Outcome::Fans(fans) => Outcome::Fans(Fans {
+            circle_id: Some(circle_id),
+            ..fans
+        }),
         Outcome::Pace(found) => Outcome::Pace(TrainerPace {
             circle_id: Some(circle_id),
             ..found
         }),
         other => other,
+    }
+}
+
+fn month_before((year, month): Period) -> Period {
+    if month <= 1 {
+        (year - 1, 12)
+    } else {
+        (year, month - 1)
     }
 }
 
@@ -355,10 +448,11 @@ fn pace_of<'a>(
         .max_by_key(|(_, year, month, _)| (*year, *month));
     match snapshot {
         None => Outcome::NotFound,
-        Some((.., daily_fans)) => match daily_pace(daily_fans) {
-            Some(pace) if pace > 0.0 => Outcome::Pace(TrainerPace { pace, circle_id }),
-            _ => Outcome::NotEnoughData,
-        },
+        Some((_, year, month, daily_fans)) => Outcome::Fans(Fans {
+            daily_fans: daily_fans.to_vec(),
+            period: year.zip(month.and_then(|m| u32::try_from(m).ok())),
+            circle_id,
+        }),
     }
 }
 

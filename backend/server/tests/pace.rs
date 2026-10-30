@@ -332,7 +332,8 @@ async fn too_little_data_is_unprocessable() {
     let mut fans = vec![0i64; 31];
     fans[0] = 100_000_000;
     fans[1] = 105_000_000;
-    mount_trainer(&server, trainer_club(fans), 1).await;
+    mount_this_month(&server, trainer_club(fans), 1).await;
+    mount_last_month(&server, ResponseTemplate::new(404), 1).await;
     let state = app(&server, cache, DEFAULT_PACE_TTL);
 
     let (status, body) = get(&state, &by_trainer()).await;
@@ -404,6 +405,25 @@ async fn mount_last_month(server: &MockServer, response: ResponseTemplate, times
         .expect(times)
         .mount(server)
         .await;
+}
+
+async fn mount_this_month(server: &MockServer, response: ResponseTemplate, times: u64) {
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("viewer_id", TRAINER.to_string()))
+        .and(query_param_is_missing("year"))
+        .respond_with(response)
+        .expect(times)
+        .mount(server)
+        .await;
+}
+
+/// `days` days of data gaining `pace` a day.
+fn days(pace: i64, days: usize) -> Vec<i64> {
+    let mut fans = vec![0i64; 31];
+    for (day, value) in fans.iter_mut().take(days).enumerate() {
+        *value = 100_000_000 + pace * day as i64;
+    }
+    fans
 }
 
 async fn mount_gains(server: &MockServer, response: ResponseTemplate, times: u64) {
@@ -742,4 +762,84 @@ async fn searches_read_the_ranked_club_from_the_club_cache() {
     let (status, body) = get(&state, &format!("?trainer_id={member}")).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["trainer"]["pace_per_day"], 5_500_000.0);
+}
+
+#[tokio::test]
+async fn early_paces_blend_in_last_month() {
+    let server = MockServer::start().await;
+    mount_this_month(&server, trainer_club(days(4_000_000, 3)), 1).await;
+    mount_last_month(&server, trainer_club(series(3_000_000)), 1).await;
+
+    // 2 gains against k = 4: a third this month's 4M, two thirds last month's 3M.
+    let pace = lookup(&server).blended(TRAINER, None).await.unwrap();
+    assert!((pace.pace - 10_000_000.0 / 3.0).abs() < 1.0);
+    assert_eq!(pace.circle_id, Some(2));
+}
+
+#[tokio::test]
+async fn one_day_of_data_is_last_months_pace() {
+    let server = MockServer::start().await;
+    mount_this_month(&server, trainer_club(days(9_000_000, 1)), 1).await;
+    mount_last_month(&server, trainer_club(series(3_000_000)), 1).await;
+
+    let pace = lookup(&server).blended(TRAINER, None).await.unwrap().pace;
+    assert_eq!(pace, 3_000_000.0);
+}
+
+#[tokio::test]
+async fn ten_days_of_data_skip_last_month() {
+    let server = MockServer::start().await;
+    mount_this_month(&server, trainer_club(series(4_000_000)), 1).await;
+    mount_last_month(&server, trainer_club(series(3_000_000)), 0).await;
+
+    let pace = lookup(&server).blended(TRAINER, None).await.unwrap().pace;
+    assert_eq!(pace, 4_000_000.0);
+}
+
+#[tokio::test]
+async fn a_pace_that_clearly_changed_skips_last_month() {
+    let server = MockServer::start().await;
+    mount_this_month(&server, trainer_club(days(7_000_000, 3)), 1).await;
+    mount_last_month(&server, trainer_club(series(3_000_000)), 1).await;
+
+    let pace = lookup(&server).blended(TRAINER, None).await.unwrap().pace;
+    assert_eq!(pace, 7_000_000.0);
+}
+
+#[tokio::test]
+async fn without_data_this_month_the_fallback_month_is_used() {
+    let server = MockServer::start().await;
+    mount_this_month(&server, ResponseTemplate::new(404), 1).await;
+    mount_last_month(&server, trainer_club(series(3_000_000)), 1).await;
+
+    let paces = lookup(&server);
+    assert_eq!(
+        paces.blended(TRAINER, FEBRUARY).await.unwrap().pace,
+        3_000_000.0
+    );
+    assert!(matches!(
+        paces.blended(TRAINER, None).await.unwrap_err(),
+        PaceError::NotFound
+    ));
+}
+
+#[tokio::test]
+async fn a_failed_last_month_lookup_still_uses_this_month() {
+    let server = MockServer::start().await;
+    mount_this_month(&server, trainer_club(days(4_000_000, 3)), 1).await;
+    mount_last_month(&server, ResponseTemplate::new(500), 1).await;
+    mount_gains(&server, ResponseTemplate::new(500), 0).await;
+
+    let pace = lookup(&server).blended(TRAINER, None).await.unwrap().pace;
+    assert_eq!(pace, 4_000_000.0);
+}
+
+#[tokio::test]
+async fn a_failed_last_month_lookup_with_too_little_data_is_upstream() {
+    let server = MockServer::start().await;
+    mount_this_month(&server, trainer_club(days(4_000_000, 2)), 1).await;
+    mount_last_month(&server, ResponseTemplate::new(500), 1).await;
+
+    let error = lookup(&server).blended(TRAINER, None).await.unwrap_err();
+    assert!(matches!(error, PaceError::Upstream(_)));
 }

@@ -154,7 +154,7 @@ Full clubs (30 of 30 members) aren't shown unless you tick **Include full clubs*
 
 ### How clubs are ranked
 
-**Your pace** is your average daily fan gain this month. On the first two days of a game month, before there's enough data, both your pace and the clubs' data come from last month, and the results say so.
+**Your pace** is your average daily fan gain this month. Early in a game month there's little data, so your pace also leans on last month's, less each day, until there are 10 days of data. On the first two days the clubs' data comes from last month, and the results say so.
 
 **Fit** is best when you'd sit roughly 25–60% of the way down the club's members and the club's median is a little below your pace:
 
