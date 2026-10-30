@@ -40,9 +40,10 @@ export function formatPercent(share: number): string {
   return `${Math.round(share * 100)}%`;
 }
 
-/** A fit or score to three decimals. */
-export function formatScore(score: number): string {
-  return score.toFixed(3);
+/** How far a pace is above (`+3.6M/day`) or below (`−1.2M/day`) another. */
+export function formatGap(fans: number): string {
+  const sign = fans > 0 ? '+' : fans < 0 ? '−' : '';
+  return `${sign}${formatPace(Math.abs(fans))}`;
 }
 
 /** Direction of a club's rank since last month. */

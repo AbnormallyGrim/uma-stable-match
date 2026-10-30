@@ -95,8 +95,6 @@ export const en = {
   'club.balance': 'Balance',
   'club.passengers': 'Passengers',
   'club.top3Share': 'Top 3 share',
-  'club.score': 'Score',
-  'club.fit': 'Fit',
   'tier.label': ({ tier }: { tier: string }) => `Club tier ${tier}`,
   'tier.unknown': 'Club tier unknown',
 
@@ -242,10 +240,7 @@ export const en = {
   'yourClub.typical': ({ own, pace }: { own: string; pace: string }) =>
     `Its typical member gains ${own}, against your ${pace}.`,
   'yourClub.topPick': 'Top pick',
-  'yourClub.note': ({ name, score }: { name: string; score: string }) =>
-    `Top pick: ${name}. A lower ${score} is better.`,
-  'yourClub.scoreWord': ({ balanced }: { balanced: boolean }): string =>
-    balanced ? 'score' : 'fit',
+  'yourClub.gap': 'Vs your pace',
 
   'tour.step': ({ n, total }: { n: number; total: number }) => `Step ${n} of ${total}`,
   'tour.skip': 'Skip tour',

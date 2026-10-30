@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { club, yourClub } from './test-data';
 import YourClub from './YourClub.svelte';
 
-const topPick = club({ name: 'Best Fit Club', your_place: 12, club_size: 28, fit: 0.0562 });
+const topPick = club({ name: 'Best Fit Club', your_place: 12, club_size: 28 });
 
 function setup(overrides: Partial<Parameters<typeof render<typeof YourClub>>[1]> = {}) {
   return render(YourClub, {
@@ -14,7 +14,6 @@ function setup(overrides: Partial<Parameters<typeof render<typeof YourClub>>[1]>
     topPick,
     pace: 7_600_000,
     count: 100,
-    balanceOn: false,
     ...overrides,
   });
 }
@@ -52,23 +51,43 @@ describe('YourClub', () => {
 
   it('compares the club with the top pick', () => {
     setup();
-    const rows = within(screen.getByRole('table')).getAllByRole('row');
-    expect(rows[0]).toHaveTextContent('Your clubTop pick');
-    expect(rows[1]).toHaveTextContent('Median11.2M/day6.4M/day');
-    expect(rows[2]).toHaveTextContent("You'd be24 of 3012 of 28");
-    expect(rows[3]).toHaveTextContent('Fit0.4320.056');
-    expect(screen.getByText(/Top pick: Best Fit Club/)).toBeInTheDocument();
+    const own = screen.getByTestId('your-club-own');
+    expect(own).toHaveTextContent('Median 11.2M/day');
+    expect(own).toHaveTextContent('Vs your pace +3.6M/day');
+    expect(own).toHaveTextContent("You'd be 24 of 30");
+    const top = screen.getByTestId('your-club-top');
+    expect(within(top).getByRole('link', { name: 'Best Fit Club' })).toBeInTheDocument();
+    expect(top).toHaveTextContent('Up 16 places since last month');
+    expect(top).toHaveTextContent('5 open spots');
+    expect(top).toHaveTextContent('Median 6.4M/day');
+    expect(top).toHaveTextContent('Vs your pace −1.2M/day');
+    expect(top).toHaveTextContent("You'd be 12 of 28");
+    expect(screen.queryByText('Fit')).not.toBeInTheDocument();
   });
 
-  it('shows the score with balance on', () => {
-    setup({ balanceOn: true });
-    const rows = within(screen.getByRole('table')).getAllByRole('row');
-    expect(rows[3]).toHaveTextContent('Score0.4820.106');
+  it('shows balance details when a club has them', () => {
+    setup({
+      topPick: club({
+        balance: {
+          score: 88,
+          gini: 0.1,
+          passengers: 2,
+          counted: 20,
+          bottom_quarter_per_day: 3_000_000,
+          top3_share: 0.3,
+        },
+      }),
+    });
+    const top = screen.getByTestId('your-club-top');
+    expect(top).toHaveTextContent('Balance 88/100');
+    expect(top).toHaveTextContent('Passengers 2 of 20');
+    expect(top).toHaveTextContent('Top 3 share 30%');
+    expect(screen.getByTestId('your-club-own')).not.toHaveTextContent('Balance');
   });
 
   it('shows only the club without a top pick', () => {
     setup({ topPick: null });
     expect(screen.queryByText('Top pick')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Top pick:/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('your-club-top')).not.toBeInTheDocument();
   });
 });

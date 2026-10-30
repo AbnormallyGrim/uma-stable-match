@@ -52,7 +52,7 @@
   {:else}
     <ol class="cards">
       {#each picks as club, i (club.circle_id)}
-        <li><ClubCard {club} position={i + 1} {balanceOn} /></li>
+        <li><ClubCard {club} position={i + 1} /></li>
       {/each}
     </ol>
   {/if}
@@ -74,7 +74,6 @@
       topPick={picks[0] ?? null}
       pace={result.trainer.pace_per_day}
       {count}
-      {balanceOn}
     />
   {/if}
 

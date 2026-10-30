@@ -1,12 +1,20 @@
 <!--
   @component
   The trainer's current club: where it would sit in the results, its median against their pace,
-  and its median, place and fit side by side with the top pick.
+  and its stats side by side with the top pick's.
 -->
 
 <script lang="ts">
   import type { Club, YourClub } from './api';
-  import { formatPace, formatPlace, formatScore, joinStyleLabel, spotsLabel } from './format';
+  import {
+    formatGap,
+    formatPace,
+    formatPercent,
+    formatPlace,
+    joinStyleLabel,
+    rankTrend,
+    spotsLabel,
+  } from './format';
   import { t } from './i18n';
   import TierBadge from './TierBadge.svelte';
 
@@ -15,13 +23,10 @@
     topPick: Club | null;
     pace: number;
     count: number;
-    balanceOn: boolean;
   }
 
-  let { own, topPick, pace, count, balanceOn }: Props = $props();
+  let { own, topPick, pace, count }: Props = $props();
 
-  const joinStyle = $derived(joinStyleLabel(own.join_style));
-  const spots = $derived(spotsLabel(own.open_spots));
   const verdict = $derived(
     own.result_rank === 1
       ? t('yourClub.best')
@@ -29,72 +34,76 @@
         ? t('yourClub.rank', { rank: own.result_rank })
         : t('yourClub.below', { n: count }),
   );
-  const scoreLabel = $derived(balanceOn ? t('club.score') : t('club.fit'));
-  const rows = $derived([
-    {
-      label: t('club.median'),
-      own: formatPace(own.median_per_day),
-      top: topPick && formatPace(topPick.median_per_day),
-    },
-    {
-      label: t('club.youdBe'),
-      own: formatPlace(own.your_place, own.club_size),
-      top: topPick && formatPlace(topPick.your_place, topPick.club_size),
-    },
-    {
-      label: scoreLabel,
-      own: formatScore(balanceOn ? own.score : own.fit),
-      top: topPick && formatScore(balanceOn ? topPick.score : topPick.fit),
-    },
-  ]);
 </script>
+
+{#snippet panel(label: string, club: Club, testId: string)}
+  {@const trend = rankTrend(club.monthly_rank, club.last_month_rank)}
+  {@const joinStyle = joinStyleLabel(club.join_style)}
+  {@const spots = spotsLabel(club.open_spots)}
+  <div class="panel" data-testid={testId}>
+    <p class="label">{label}</p>
+    <div class="head">
+      <TierBadge tier={club.tier} />
+      <div class="info">
+        <a class="name" href={club.url} target="_blank" rel="noopener noreferrer">{club.name}</a>
+        <div class="line">
+          {#if club.monthly_rank !== null}
+            <span>
+              {t('club.rank', { rank: club.monthly_rank })}
+              {#if trend.label}
+                <span class="trend {trend.kind}" title={trend.description}>
+                  <span aria-hidden="true">{trend.label}</span>
+                  <span class="visually-hidden">{trend.description}</span>
+                </span>
+              {/if}
+            </span>
+          {/if}
+          {#if spots}<span>{spots}</span>{/if}
+          {#if joinStyle}<span class="tag join {club.join_style}">{joinStyle}</span>{/if}
+        </div>
+      </div>
+    </div>
+    <dl class="stats">
+      <div>
+        <dt>{t('club.median')}</dt>
+        <dd>{formatPace(club.median_per_day)}</dd>
+      </div>
+      <div>
+        <dt>{t('yourClub.gap')}</dt>
+        <dd>{formatGap(club.median_per_day - pace)}</dd>
+      </div>
+      <div>
+        <dt>{t('club.youdBe')}</dt>
+        <dd>{formatPlace(club.your_place, club.club_size)}</dd>
+      </div>
+      {#if club.balance}
+        <div>
+          <dt>{t('club.balance')}</dt>
+          <dd>{club.balance.score}/100</dd>
+        </div>
+        <div>
+          <dt>{t('club.passengers')}</dt>
+          <dd>{formatPlace(club.balance.passengers, club.balance.counted)}</dd>
+        </div>
+        <div>
+          <dt>{t('club.top3Share')}</dt>
+          <dd>{formatPercent(club.balance.top3_share)}</dd>
+        </div>
+      {/if}
+    </dl>
+  </div>
+{/snippet}
 
 <section class="your-club" aria-labelledby="your-club-heading" data-testid="your-club">
   <h3 id="your-club-heading">{t('yourClub.heading')}</h3>
-  <div class="head">
-    <TierBadge tier={own.tier} />
-    <div class="info">
-      <a class="name" href={own.url} target="_blank" rel="noopener noreferrer">{own.name}</a>
-      <div class="line">
-        {#if own.monthly_rank !== null}<span>{t('club.rank', { rank: own.monthly_rank })}</span
-          >{/if}
-        {#if spots}<span>{spots}</span>{/if}
-        {#if joinStyle}<span class="tag join {own.join_style}">{joinStyle}</span>{/if}
-      </div>
-    </div>
-  </div>
-
   <p class="verdict">
     {verdict}
     {t('yourClub.typical', { own: formatPace(own.median_per_day), pace: formatPace(pace) })}
   </p>
-
-  <table>
-    <thead>
-      <tr>
-        <td></td>
-        <th scope="col">{t('yourClub.heading')}</th>
-        {#if topPick}<th scope="col">{t('yourClub.topPick')}</th>{/if}
-      </tr>
-    </thead>
-    <tbody>
-      {#each rows as row (row.label)}
-        <tr>
-          <th scope="row">{row.label}</th>
-          <td>{row.own}</td>
-          {#if topPick}<td>{row.top}</td>{/if}
-        </tr>
-      {/each}
-    </tbody>
-  </table>
-  {#if topPick}
-    <p class="note">
-      {t('yourClub.note', {
-        name: topPick.name,
-        score: t('yourClub.scoreWord', { balanced: balanceOn }),
-      })}
-    </p>
-  {/if}
+  <div class="panels">
+    {@render panel(t('yourClub.heading'), own, 'your-club-own')}
+    {#if topPick}{@render panel(t('yourClub.topPick'), topPick, 'your-club-top')}{/if}
+  </div>
 </section>
 
 <style>
@@ -107,9 +116,38 @@
   }
 
   h3 {
-    margin: 0 0 10px;
+    margin: 0 0 4px;
     font-size: 1rem;
     font-weight: 650;
+  }
+
+  .verdict {
+    margin: 0 0 12px;
+    color: var(--text-2);
+    line-height: 1.5;
+  }
+
+  /* Two panels side by side on wide screens, stacked on narrow ones. */
+  .panels {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .panel {
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .label {
+    margin: 0 0 8px;
+    color: var(--muted);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   .head {
@@ -120,26 +158,45 @@
   }
 
   .info {
+    display: grid;
+    gap: 3px;
     min-width: 0;
   }
 
   .name {
+    overflow: hidden;
     color: var(--text);
     font-weight: 650;
     text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .name:hover {
+  .name:hover,
+  .name:focus-visible {
     text-decoration: underline;
   }
 
   .line {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 12px;
-    margin-top: 2px;
+    gap: 4px 12px;
+    align-items: center;
     color: var(--text-2);
     font-size: 0.8125rem;
+  }
+
+  .trend.up {
+    color: var(--up);
+  }
+
+  .trend.down {
+    color: var(--down);
+  }
+
+  .trend.new {
+    color: var(--muted);
+    font-style: italic;
   }
 
   .tag {
@@ -164,44 +221,31 @@
     color: var(--closed);
   }
 
-  .verdict {
-    margin: 12px 0 8px;
-    color: var(--text-2);
-    line-height: 1.5;
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 16px;
+    margin: 12px 0 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
   }
 
-  table {
-    width: 100%;
-    max-width: 420px;
-    border-collapse: collapse;
-    font-variant-numeric: tabular-nums;
-  }
-
-  th,
-  td {
-    padding: 4px 8px 4px 0;
-    text-align: left;
-  }
-
-  thead th {
-    color: var(--text-2);
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-
-  tbody th {
-    color: var(--text-2);
-    font-size: 0.8125rem;
-    font-weight: 500;
-  }
-
-  tbody td {
-    font-weight: 650;
-  }
-
-  .note {
-    margin: 8px 0 0;
+  .stats dt {
     color: var(--muted);
-    font-size: 0.8125rem;
+    font-size: 0.6875rem;
+  }
+
+  .stats dd {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 720px) {
+    .panels {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 </style>

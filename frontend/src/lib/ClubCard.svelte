@@ -10,7 +10,6 @@
     formatPercent,
     formatPerDay,
     formatPlace,
-    formatScore,
     joinStyleLabel,
     playstyleLabel,
     rankTrend,
@@ -22,10 +21,9 @@
   interface Props {
     club: Club;
     position: number;
-    balanceOn: boolean;
   }
 
-  let { club, position, balanceOn }: Props = $props();
+  let { club, position }: Props = $props();
 
   const trend = $derived(rankTrend(club.monthly_rank, club.last_month_rank));
   const joinStyle = $derived(joinStyleLabel(club.join_style));
@@ -66,21 +64,18 @@
         {/if}
       </div>
     </div>
-    <dl class="nums">
-      <div>
-        <dt>{t('club.youdBe')}</dt>
-        <dd>{formatPlace(club.your_place, club.club_size)}</dd>
-      </div>
-      <div>
-        <dt>{t('club.median')}</dt>
-        <dd>{formatPerDay(club.median_per_day)}</dd>
-      </div>
-      <div>
-        <dt>{balanceOn ? t('club.score') : t('club.fit')}</dt>
-        <dd>{formatScore(balanceOn ? club.score : club.fit)}</dd>
-      </div>
-    </dl>
   </div>
+
+  <dl class="nums">
+    <div>
+      <dt>{t('club.youdBe')}</dt>
+      <dd>{formatPlace(club.your_place, club.club_size)}</dd>
+    </div>
+    <div>
+      <dt>{t('club.median')}</dt>
+      <dd>{formatPerDay(club.median_per_day)}</dd>
+    </div>
+  </dl>
 
   {#if club.comment || club.balance}
     <div class="details">
@@ -113,8 +108,17 @@
 </article>
 
 <style>
+  /* Pick column width and header gap, shared with the description so it lines up with the name. */
   .card {
-    padding: 10px 14px;
+    --pick: 32px;
+    --gap: 12px;
+    display: grid;
+    grid-template-areas:
+      'head nums'
+      'details nums';
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 16px;
+    padding: 11px 15px;
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -133,9 +137,10 @@
   }
 
   .head {
+    grid-area: head;
     display: grid;
-    grid-template-columns: 32px 48px minmax(0, 1fr) auto;
-    gap: 12px;
+    grid-template-columns: var(--pick) 48px minmax(0, 1fr);
+    gap: var(--gap);
     align-items: center;
   }
 
@@ -231,14 +236,27 @@
     color: var(--discord);
   }
 
+  /* The divider on its left spans 85% of the card's content height. Fixed column widths, wide
+     enough for `30 of 30` and `<0.01M/day`, keep it in line from card to card. */
   .nums {
+    position: relative;
+    grid-area: nums;
     display: grid;
-    grid-auto-flow: column;
+    grid-template-columns: 4.5rem 6rem;
     gap: 16px;
+    align-content: center;
     margin: 0;
     padding-left: 16px;
-    border-left: 1px solid var(--border);
     text-align: right;
+  }
+
+  .nums::before {
+    position: absolute;
+    top: 7.5%;
+    bottom: 7.5%;
+    left: 0;
+    border-left: 1px solid var(--border);
+    content: '';
   }
 
   .nums dt,
@@ -257,11 +275,12 @@
 
   /* The description and balance details share a row on wide screens, and stack on narrow ones. */
   .details {
+    grid-area: details;
     display: flex;
     gap: 8px 24px;
     align-items: center;
     justify-content: space-between;
-    margin-top: 8px;
+    margin: 8px 0 0 calc(var(--pick) + 48px + 2 * var(--gap));
   }
 
   .comment {
@@ -315,24 +334,35 @@
   @media (max-width: 720px) {
     .details {
       display: block;
+      margin-left: 0;
     }
 
     .comment + .balance {
       margin-top: 8px;
     }
 
-    .head {
-      grid-template-columns: 24px 48px minmax(0, 1fr);
-      gap: 8px;
+    .card {
+      --pick: 24px;
+      --gap: 8px;
+      grid-template-areas:
+        'head'
+        'nums'
+        'details';
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .nums {
-      grid-column: 1 / -1;
+      grid-template-columns: none;
+      grid-auto-flow: column;
       justify-content: start;
+      margin-top: 8px;
       padding: 8px 0 0;
       border-top: 1px solid var(--border);
-      border-left: 0;
       text-align: left;
+    }
+
+    .nums::before {
+      display: none;
     }
   }
 </style>

@@ -76,8 +76,6 @@ export const ja: Catalog = {
   'club.balance': 'バランス',
   'club.passengers': 'おんぶ組',
   'club.top3Share': '上位3人の割合',
-  'club.score': 'スコア',
-  'club.fit': '適合度',
   'tier.label': ({ tier }) => `サークルティア${tier}`,
   'tier.unknown': 'サークルティア不明',
 
@@ -222,8 +220,7 @@ export const ja: Catalog = {
   'yourClub.typical': ({ own, pace }) =>
     `典型的なメンバーの獲得数は${own}で、あなたのペースは${pace}です。`,
   'yourClub.topPick': 'おすすめ1位',
-  'yourClub.note': ({ name, score }) => `おすすめ1位: ${name}。${score}は低いほど良い値です。`,
-  'yourClub.scoreWord': ({ balanced }) => (balanced ? 'スコア' : '適合度'),
+  'yourClub.gap': 'あなたとの差',
 
   'tour.step': ({ n, total }) => `ステップ ${n} / ${total}`,
   'tour.skip': 'ツアーをスキップ',
