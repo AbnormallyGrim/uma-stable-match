@@ -27,6 +27,18 @@ describe('SearchStatus', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Finding clubs…');
   });
 
+  it('shows the progress bar only while loading', () => {
+    const loading = render(SearchStatus, { status: { phase: 'loading' }, onretry: vi.fn() });
+    expect(loading.container.querySelector('.track')).not.toBeNull();
+    loading.unmount();
+
+    const waiting = render(SearchStatus, {
+      status: { phase: 'waiting-for-scan', retryIn: 5 },
+      onretry: vi.fn(),
+    });
+    expect(waiting.container.querySelector('.track')).toBeNull();
+  });
+
   it('counts down while the first scan runs and can retry now', async () => {
     const onretry = setup({ phase: 'waiting-for-scan', retryIn: 5 });
     expect(screen.getByText('Club data is still loading')).toBeInTheDocument();

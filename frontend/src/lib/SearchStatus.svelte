@@ -1,11 +1,13 @@
 <!--
   @component
-  Shows the search's phase: loading, waiting for the first scan, rate limited or an error.
+  Shows the search's phase: loading with a running progress bar, waiting for the first scan, rate
+  limited or an error.
   `onretry` runs when the visitor chooses to retry.
 -->
 
 <script lang="ts">
   import { t } from './i18n';
+  import RunnerProgress from './RunnerProgress.svelte';
   import type { SearchPhase } from './runner';
 
   interface Props {
@@ -16,10 +18,14 @@
   let { status, onretry }: Props = $props();
 
   const seconds = (n: number) => t('time.seconds', { n });
+  const succeeded = () => status.phase === 'done';
 </script>
 
 {#if status.phase === 'loading'}
-  <p class="status" role="status">{t('status.loading')}</p>
+  <div class="status loading" role="status">
+    <RunnerProgress finished={succeeded} />
+    <p>{t('status.loading')}</p>
+  </div>
 {:else if status.phase === 'waiting-for-scan'}
   <div class="status notice" role="status">
     <p class="title">{t('status.waitingTitle')}</p>
@@ -58,12 +64,13 @@
     color: var(--text-2);
   }
 
-  p.status {
-    color: var(--muted);
-  }
-
   .status p {
     margin: 0 0 6px;
+  }
+
+  .loading p {
+    margin: 8px 0 0;
+    color: var(--muted);
   }
 
   .title {
