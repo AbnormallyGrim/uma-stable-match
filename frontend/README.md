@@ -56,6 +56,8 @@ src/lib/runner.ts             Search state machine: loading, retries and countdo
 src/lib/states.ts             Error messages and empty-result hints
 src/lib/HowToUse.svelte       Step-by-step instructions under the search form
 src/lib/SearchStatus.svelte   Loading, waiting and error messages
+src/lib/RunnerProgress.svelte The running figure that moves along a track while a search runs
+src/lib/progress.ts           The progress curve: how far along the track the runner is
 src/lib/NavBar.svelte         Top bar: the brand, linking to the website, the release notes and tour buttons, and the theme switch
 src/lib/ReleaseNotes.svelte   The release notes modal: a timeline of builds, newest first
 src/lib/releases.ts           The releases themselves, and remembering the newest one seen
@@ -87,6 +89,7 @@ src/lib/test-data.ts          Made-up data for component tests
 src/app.css                   Global styles and light and dark colour tokens
 src/assets/tiers/             Club tier icons (Cygames artwork, not MIT licensed)
 src/assets/brand/             Logo and background artwork, light and dark
+src/assets/runner/            The running figure's sprite strip (not MIT licensed)
 src/lib/SearchForm.svelte     The search form
 src/**/*.test.ts              Unit and component tests
 src/a11y.test.ts              axe-core checks for the main views and states
@@ -144,6 +147,16 @@ Each search replaces the page URL's query with the same parameters the API uses,
 ### Remembering the trainer ID
 
 "Remember my trainer ID on this device" is off by default. When it's ticked at search time, the trainer ID is saved in the browser's local storage under `uma-stable-match:trainer-id`. Unticking it and searching again deletes it. Nothing else is stored. Without a search in the URL, a remembered ID fills the form, but doesn't start a search on its own. Browsers that block storage simply don't remember.
+
+## Search progress
+
+While a search runs, `SearchStatus.svelte` shows "Finding clubs…" under a progress bar: a gold running figure moving left to right along a thin track, which fills in behind it. The figure is a sprite strip, `assets/runner/runner.webp`, played with a CSS `steps()` animation.
+
+- **The curve.** The server doesn't report progress, so the bar is a guess based only on elapsed time: `progressAt()` in `progress.ts` eases towards 90% of the track, `0.9 × (1 − e^(−t/τ))` with τ of 4 seconds, and never reaches the end. A search that's taking long just leaves the figure near the end.
+- **Per search.** `RunnerProgress.svelte` starts its own clock when it's shown and stops it when it's removed, so every search starts at the beginning and searches never affect each other. Nothing is sent to or read from the server.
+- **Finish.** When a search succeeds, the figure dashes to the end of the track over a quarter of a second as the bar leaves. When it fails, or the visitor is told to wait, the bar goes at once.
+- **Accessibility.** The bar is hidden from screen readers; the "Finding clubs…" text, in a `role="status"` region, is what they read. With reduced motion, the figure stands still on the first frame and doesn't dash, though the bar still fills.
+- **Tuning.** `PROGRESS_TAU_MS` and `PROGRESS_CAP` in `progress.ts` set the speed and the point it stops at.
 
 ## Results view
 
