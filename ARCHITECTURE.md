@@ -133,7 +133,7 @@ With the defaults, a scan makes about 160 calls (9 list pages and about 150 club
 
 ## Game months
 
-uma.moe's game month starts on the 2nd at 00:00 JST. On the 2nd and 3rd there are fewer than 3 days of data, so the scanner, the detail cache and trainer lookups all switch to the previous month together, and responses report which month they use. The [server README](backend/server/README.md#early-in-the-month) has the details.
+uma.moe's game month starts on the 2nd at 00:00 JST. On the 2nd and 3rd there are fewer than 3 days of data, so the scanner and the detail cache switch to the previous month together, and responses report which month they use. Trainer paces blend this month's data with last month's until there are 10 days of data. The [server README](backend/server/README.md#early-in-the-month) has the details.
 
 ## Web page
 

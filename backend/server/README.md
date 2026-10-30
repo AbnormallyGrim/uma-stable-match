@@ -118,16 +118,16 @@ uma.moe's game month starts on the **2nd at 00:00 JST** (UTC+09:00), so the 1st 
 
 ### Early in the month
 
-On the first two days of a game month (the 2nd and 3rd in JST), there are fewer than 3 days of data, which isn't enough for a pace. Until the 4th, the whole flow uses the previous game month instead:
+On the first two days of a game month (the 2nd and 3rd in JST), there are fewer than 3 days of data, which isn't enough for a pace. Until the 4th, clubs use the previous game month instead, and a trainer's pace blends in last month's for longer (see [Blended trainer pace](#blended-trainer-pace)):
 
 | Part | Normal | Early in the month |
 |---|---|---|
 | Pool estimate | `monthly_point ÷ elapsed days ÷ member_count` | `last_month_point ÷ days in the previous game month ÷ member_count` (`from_circle_last_month`) |
 | Club details | Current month | `CircleRequest::for_month` with the previous month |
-| Trainer pace | This month's `daily_fans`, from the club in this month's rankings | Last month's `daily_fans`, from the club in last month's rankings, or the 7-day gain ÷ 7 from `rankings_gains` if that month has too little data |
+| Trainer pace | This month's `daily_fans`, from the club in this month's rankings, from 10 days of data | This month's blended with last month's. Without data this month, last month's alone |
 | `month` in responses | Current game month | Previous game month |
 
-The scan decides the month from the list's snapshot time (`is_early_month`), so clubs and trainers always use the same month. The detail cache and the trainer pace cache keep each month's data separately, so the switch on the 4th never mixes months. A detail load that started under the old month doesn't write its median into the new pool.
+The scan decides the clubs' month from the list's snapshot time (`is_early_month`). The detail cache and the trainer pace cache keep each month's data separately, so the switch on the 4th never mixes months. A detail load that started under the old month doesn't write its median into the new pool.
 
 ### Estimate
 
@@ -398,7 +398,19 @@ With `trainer_id`, the server finds the trainer's club and their snapshot in it 
 2. **Their fans, from that club.** The club comes through the detail cache (memory, then Redis, then uma.moe), so a club already loaded costs no extra call.
 3. **Fallback.** With no rankings row, no club, a club that doesn't list them, or a failed rankings or club request, the server uses uma.moe's trainer lookup (`CircleRequest::by_viewer_id`) instead.
 
-[Early in the month](#early-in-the-month), it uses last month's rankings and data, falling back to the trainer's 7-day gain.
+#### Blended trainer pace
+
+With fewer than `TRAINER_BLEND_DAYS` (10) days of data this month, `PaceLookup::blended` combines this month's pace with last month's, using the scoring crate's `blended_pace` with `k` = `TRAINER_PRIOR_K` (4):
+
+```text
+Z    = gains this month ÷ (gains this month + 4)
+pace = Z × this month's pace + (1 − Z) × last month's pace
+```
+
+- **Last month's pace** comes from last month's rankings and data, the same way, or the 7-day gain ÷ 7 from `rankings_gains` if that month has too little data. It's cached per month.
+- **Clear changes.** With 3 or more days of data, last month's pace is left out when this month's is more than `MAX_PRIOR_RATIO` (2) times higher or lower, so a trainer who sped up isn't held back.
+- **Missing months.** With no data this month, the 2nd and 3rd use last month's pace alone, and later days return "not found". With no pace last month, or a failed lookup, this month's is used alone if it has 3 days of data.
+- **Why.** A backtest on real trainers found a pace from 2 or 3 daily gains has a median error of about 31%, against about 22% for the blend. The [scoring crate's README](../scoring/README.md#blended-pace) has the formula.
 
 - **Cached for `TRAINER_CACHE_MINUTES`** (10 by default). A found pace, and a "not found" or "not enough data" answer, is reused for that long, so repeat requests don't call uma.moe again. Failed uma.moe requests aren't cached.
 - **IDs stay out of logs.** Trainer IDs never appear in log messages or error responses, only in the response to the trainer's own request. Failed lookups log only the HTTP status.
