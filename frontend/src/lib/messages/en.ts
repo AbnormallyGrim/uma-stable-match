@@ -234,8 +234,6 @@ export const en = {
   'table.col.balance': 'Balance',
   'table.col.passengers': 'Passengers',
   'table.col.top3': 'Top 3 share',
-  'table.col.fit': 'Fit',
-  'table.col.score': 'Score',
 
   'yourClub.heading': 'Your club',
   'yourClub.best': 'Your club fits you better than any of your results.',

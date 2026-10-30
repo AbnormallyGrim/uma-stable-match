@@ -6,14 +6,7 @@
 
 <script lang="ts">
   import type { Club } from './api';
-  import {
-    formatPercent,
-    formatPerDay,
-    formatPlace,
-    formatScore,
-    joinStyleLabel,
-    tierIndex,
-  } from './format';
+  import { formatPercent, formatPerDay, formatPlace, joinStyleLabel, tierIndex } from './format';
   import { t, type MessageKey } from './i18n';
   import TierBadge from './TierBadge.svelte';
 
@@ -29,8 +22,7 @@
     | 'place'
     | 'balance'
     | 'passengers'
-    | 'top3'
-    | 'score';
+    | 'top3';
   type Direction = 'ascending' | 'descending';
 
   // `first` is the direction a column sorts in when first selected.
@@ -121,12 +113,6 @@
       first: 'ascending',
       balanceOnly: true,
     },
-    {
-      key: 'score',
-      label: 'table.col.fit',
-      value: (r) => (balanceOn ? r.club.score : r.club.fit),
-      first: 'ascending',
-    },
   ];
 
   let search = $state('');
@@ -134,13 +120,7 @@
   let sortKey = $state<SortKey>('pick');
   let direction = $state<Direction>('ascending');
 
-  const visibleColumns = $derived(
-    columns
-      .filter((c) => balanceOn || !c.balanceOnly)
-      .map((c) =>
-        c.key === 'score' && balanceOn ? { ...c, label: 'table.col.score' as const } : c,
-      ),
-  );
+  const visibleColumns = $derived(columns.filter((c) => balanceOn || !c.balanceOnly));
   const rows = $derived(clubs.map((club, i) => ({ club, pick: i + 1 })));
   const filtered = $derived.by(() => {
     const term = search.trim().toLowerCase();
@@ -242,7 +222,6 @@
             </td>
             <td>{club.balance ? formatPercent(club.balance.top3_share) : '–'}</td>
           {/if}
-          <td>{formatScore(balanceOn ? club.score : club.fit)}</td>
         </tr>
       {:else}
         <tr>
@@ -294,10 +273,22 @@
 
   th,
   td {
-    padding: 6px 8px;
+    padding: 6px 16px;
     border-bottom: 1px solid var(--border);
     text-align: right;
     white-space: nowrap;
+  }
+
+  th:first-child,
+  td:first-child {
+    width: 1%;
+    padding-left: 8px;
+    padding-right: 4px;
+  }
+
+  th:last-child,
+  td:last-child {
+    padding-right: 20px;
   }
 
   th.name,

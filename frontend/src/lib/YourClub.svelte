@@ -6,7 +6,7 @@
 
 <script lang="ts">
   import type { Club, YourClub } from './api';
-  import { formatPerDay, formatPlace, formatScore, joinStyleLabel, spotsLabel } from './format';
+  import { formatPace, formatPlace, formatScore, joinStyleLabel, spotsLabel } from './format';
   import { t } from './i18n';
   import TierBadge from './TierBadge.svelte';
 
@@ -33,8 +33,8 @@
   const rows = $derived([
     {
       label: t('club.median'),
-      own: formatPerDay(own.median_per_day),
-      top: topPick && formatPerDay(topPick.median_per_day),
+      own: formatPace(own.median_per_day),
+      top: topPick && formatPace(topPick.median_per_day),
     },
     {
       label: t('club.youdBe'),
@@ -66,7 +66,7 @@
 
   <p class="verdict">
     {verdict}
-    {t('yourClub.typical', { own: formatPerDay(own.median_per_day), pace: formatPerDay(pace) })}
+    {t('yourClub.typical', { own: formatPace(own.median_per_day), pace: formatPace(pace) })}
   </p>
 
   <table>

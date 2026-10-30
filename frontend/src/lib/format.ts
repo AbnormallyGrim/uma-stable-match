@@ -21,6 +21,15 @@ export function formatPerDay(fans: number): string {
   return t('format.perDay', { value: formatMillions(fans) });
 }
 
+/** A daily pace: thousands below 1M (`850K/day`), plain below 1K, otherwise as `formatPerDay`. */
+export function formatPace(fans: number): string {
+  if (Math.abs(fans) >= 1_000_000) {
+    return formatPerDay(fans);
+  }
+  const value = Math.abs(fans) < 1000 ? `${Math.round(fans)}` : `${Math.floor(fans / 1000)}K`;
+  return t('format.perDay', { value });
+}
+
 /** A place in a club, such as `8 of 30`. */
 export function formatPlace(place: number, size: number): string {
   return t('format.place', { place, size });

@@ -8,6 +8,7 @@ import {
   monthLabel,
   formatMillions,
   formatPercent,
+  formatPace,
   formatPerDay,
   formatPlace,
   formatScore,
@@ -29,6 +30,14 @@ describe('numbers', () => {
 
   it('formats a daily pace', () => {
     expect(formatPerDay(7_620_000)).toBe('7.6M/day');
+  });
+
+  it('formats a pace in thousands below 1M', () => {
+    expect(formatPace(850_000)).toBe('850K/day');
+    expect(formatPace(420)).toBe('420/day');
+    expect(formatPace(999_999)).toBe('999K/day');
+    expect(formatPace(1_000_000)).toBe('1.0M/day');
+    expect(formatPace(7_620_000)).toBe('7.6M/day');
   });
 
   it('formats places, percentages and scores', () => {
