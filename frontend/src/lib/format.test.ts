@@ -8,9 +8,10 @@ import {
   monthLabel,
   formatMillions,
   formatPercent,
+  formatGap,
+  formatPace,
   formatPerDay,
   formatPlace,
-  formatScore,
   formatUpdated,
   joinStyleLabel,
   playstyleLabel,
@@ -31,11 +32,24 @@ describe('numbers', () => {
     expect(formatPerDay(7_620_000)).toBe('7.6M/day');
   });
 
-  it('formats places, percentages and scores', () => {
+  it('formats a pace in thousands below 1M', () => {
+    expect(formatPace(850_000)).toBe('850K/day');
+    expect(formatPace(420)).toBe('420/day');
+    expect(formatPace(999_999)).toBe('999K/day');
+    expect(formatPace(1_000_000)).toBe('1.0M/day');
+    expect(formatPace(7_620_000)).toBe('7.6M/day');
+  });
+
+  it('formats a gap between paces with its sign', () => {
+    expect(formatGap(3_600_000)).toBe('+3.6M/day');
+    expect(formatGap(-850_000)).toBe('−850K/day');
+    expect(formatGap(0)).toBe('0/day');
+  });
+
+  it('formats places and percentages', () => {
     expect(formatPlace(8, 30)).toBe('8 of 30');
     expect(formatPercent(0.344)).toBe('34%');
     expect(formatPercent(1)).toBe('100%');
-    expect(formatScore(0.10449)).toBe('0.104');
   });
 });
 

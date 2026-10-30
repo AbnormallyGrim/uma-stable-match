@@ -21,6 +21,15 @@ export function formatPerDay(fans: number): string {
   return t('format.perDay', { value: formatMillions(fans) });
 }
 
+/** A daily pace: thousands below 1M (`850K/day`), plain below 1K, otherwise as `formatPerDay`. */
+export function formatPace(fans: number): string {
+  if (Math.abs(fans) >= 1_000_000) {
+    return formatPerDay(fans);
+  }
+  const value = Math.abs(fans) < 1000 ? `${Math.round(fans)}` : `${Math.floor(fans / 1000)}K`;
+  return t('format.perDay', { value });
+}
+
 /** A place in a club, such as `8 of 30`. */
 export function formatPlace(place: number, size: number): string {
   return t('format.place', { place, size });
@@ -31,9 +40,10 @@ export function formatPercent(share: number): string {
   return `${Math.round(share * 100)}%`;
 }
 
-/** A fit or score to three decimals. */
-export function formatScore(score: number): string {
-  return score.toFixed(3);
+/** How far a pace is above (`+3.6M/day`) or below (`−1.2M/day`) another. */
+export function formatGap(fans: number): string {
+  const sign = fans > 0 ? '+' : fans < 0 ? '−' : '';
+  return `${sign}${formatPace(Math.abs(fans))}`;
 }
 
 /** Direction of a club's rank since last month. */

@@ -118,14 +118,13 @@ describe('ResultsTable', () => {
     expect(screen.queryByLabelText('Hide closed clubs')).not.toBeInTheDocument();
   });
 
-  it('shows balance columns and score only with balance on', () => {
+  it('shows balance columns only with balance on', () => {
     const { table } = setup({ includeClosed: false, balanceOn: false });
     const headers = () =>
       within(table)
         .getAllByRole('columnheader')
         .map((h) => h.textContent);
-    expect(headers().join(' ')).not.toMatch(/Balance|Passengers|Top 3 share|Score/);
-    expect(headers().join(' ')).toMatch(/Fit/);
+    expect(headers().join(' ')).not.toMatch(/Balance|Passengers|Top 3 share|Score|Fit/);
   });
 
   it('shows balance details with balance on', () => {
@@ -146,8 +145,8 @@ describe('ResultsTable', () => {
     expect(within(row).getByText('88/100')).toBeInTheDocument();
     expect(within(row).getByText('2 of 20')).toBeInTheDocument();
     expect(within(row).getByText('30%')).toBeInTheDocument();
-    expect(within(row).getByText('0.106')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Score/ })).toBeInTheDocument();
+    expect(within(row).queryByText('0.106')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Score/ })).not.toBeInTheDocument();
   });
 
   it('can be scrolled with the keyboard', () => {

@@ -170,7 +170,7 @@ After a search, the page shows a summary and the top ten picks.
 - **Each card:**
   - **Header:** the pick number (gold, silver and bronze for the top three), the tier icon, and the club name linking to uma.moe in a new tab
   - **Details:** the monthly rank and trend, open spots, join style and playstyle tags, a **Discord** tag when the API's `has_discord` is true, and the description
-  - **How you'd compare:** your place, the club's median per day, and the fit (or the score, with balance on)
+  - **How you'd compare:** your place and the club's median per day
   - **With balance on:** the balance score as a bar, passengers and top-three share. On wide screens they sit to the right of the description, so the card stays one row shorter
 - **Notices:** under the summary, when they apply:
   - "*These results are filtered by join style or playstyle, so your best matches may be further from your pace than usual.*" when the API's `options` show a join style or playstyle filter
@@ -181,11 +181,10 @@ After a search, the page shows a summary and the top ten picks.
 - **Top picks:** the first ten clubs with an open spot. Full clubs are only in the table. If every match is full, the page says so instead of "No clubs matched", and the table still shows them.
 - **Notes:** under the top picks, always shown, even with no matches: full clubs aren't in the results (or, with **Include full clubs**, are only in the table), your own club never is, and a collapsed "Why not a higher-tier club?" explains that matches follow a club's typical member, not its tier. The note points to the **Your club** card when there is one, and otherwise suggests a trainer ID search. The FAQ on the marketing page answers the same two questions.
 - **Your club:** when the response has `your_club`, a card between the notes and the table shows:
-  - the club's tier, name, rank, open spots and join style
   - "Your club would be #37 in your results.", "fits you better than any of your results" at #1, or "would rank below your top 100" past the returned clubs, from `result_rank`
   - its median against your pace
-  - a table of median, your place and fit (score with balance on), next to the top pick's when there is one
-- **Layout:** on narrow screens, up to 720 pixels wide, the numbers move below the club details, and the description and balance details stack.
+  - a panel for your club and one for the top pick, when there is one, side by side on wide screens. Each has the tier, name, rank and trend, open spots and join style, then the median, its gap to your pace (`+3.6M/day` above it, `−1.2M/day` below), your place and, when the club has them, the balance details
+- **Layout:** on narrow screens, up to 720 pixels wide, the numbers move below the club details, the description and balance details stack, and the **Your club** panels stack.
 - **Screen readers:** after a search, only a short "Found N clubs" message is announced, followed by any notices, not the whole list. The text goes into a live region that's always on the page, because a notice that appears together with new results isn't reliably announced. Rank trends have spoken descriptions, such as "Up 16 places since last month".
 
 ### Tier icons
@@ -208,7 +207,6 @@ Below the cards, the 100 best-fitting clubs are listed in a table, best fit firs
 | You'd be | Nearest the top of the club first |
 | Balance *(balance on)* | Most even first |
 | Passengers, Top 3 share *(balance on)* | Fewest or lowest first |
-| Fit, or Score *(balance on)* | Best (lowest) first |
 
 - **Sorting:** select a column header to sort by it. Select it again to reverse the order. Missing values always sort last, and ties keep pick order. Each header is a button with `aria-sort`, so sorting works by keyboard and screen readers announce it.
 - **Search:** filters by club name as you type. "Showing X of Y clubs" updates as you go.
@@ -344,9 +342,10 @@ The runner takes the fetch function, a change callback, the retry delays and the
 | Function | Example |
 |---|---|
 | `formatMillions` / `formatPerDay` | `6400000` → `6.4M` / `6.4M/day`; `850000` → `0.85M` |
+| `formatPace` | `850000` → `850K/day`; `420` → `420/day`; from 1M as `formatPerDay` |
+| `formatGap` | `3600000` → `+3.6M/day`; `-850000` → `−850K/day` |
 | `formatPlace` | `8, 30` → `8 of 30` |
 | `formatPercent` | `0.344` → `34%` |
-| `formatScore` | `0.10449` → `0.104` |
 | `rankTrend` | `111, 127` → `▲16` ("Up 16 places since last month"); no last-month rank → `new` |
 | `joinStyleLabel` | `approval` → `Approval` |
 | `playstyleLabel` | `2` → `Laid-back`, using uma.moe's names for policy codes 1 to 17 |
