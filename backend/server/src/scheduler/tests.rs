@@ -53,8 +53,9 @@ fn an_old_scan_is_listed_again() {
 
 #[test]
 fn a_scan_from_another_game_month_is_listed_again() {
-    let progress = InProgress::new(Vec::new(), at(2026, 3, 3, 14), at(2026, 3, 3, 14));
-    assert!(!progress.is_current(at(2026, 3, 3, 16), INTERVAL));
+    // 23:00 JST on the 1st is still February's game month; 01:00 JST on the 2nd is March's.
+    let progress = InProgress::new(Vec::new(), at(2026, 3, 1, 14), at(2026, 3, 1, 14));
+    assert!(!progress.is_current(at(2026, 3, 1, 16), INTERVAL));
 }
 
 #[test]

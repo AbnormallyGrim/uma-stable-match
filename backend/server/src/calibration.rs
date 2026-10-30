@@ -2,6 +2,8 @@
 
 use uma_stable_match_scoring::{score_club, Club, ScoringOptions};
 
+use crate::priors::CLUB_PRIOR_K;
+
 /// Samples needed before the factor is used.
 pub const MIN_CALIBRATION_SAMPLES: usize = 20;
 
@@ -64,7 +66,9 @@ impl Calibration {
 
 /// A club's median daily pace, as the fit formula computes it, or `None` if it can't be scored.
 pub fn club_median(club: &Club) -> Option<f64> {
-    let options = ScoringOptions::default().with_include_closed(true);
+    let options = ScoringOptions::default()
+        .with_include_closed(true)
+        .with_prior_k(CLUB_PRIOR_K);
     let median = score_club(1.0, club, &options).ok()??.median_per_day;
     (median.is_finite() && median > 0.0).then_some(median)
 }

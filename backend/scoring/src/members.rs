@@ -50,10 +50,6 @@ pub(crate) fn last_day(daily_fans: &[i64]) -> Option<usize> {
     daily_fans.iter().rposition(|v| *v != 0)
 }
 
-pub(crate) fn days_with_data(daily_fans: &[i64]) -> usize {
-    daily_fans.iter().filter(|v| **v != 0).count()
-}
-
 /// Members still in the club: those with a positive value on the club's latest data day.
 pub fn current_members(members: &[MemberSnapshot]) -> Vec<&MemberSnapshot> {
     // Only the latest month counts.

@@ -86,9 +86,3 @@ fn keeps_the_snapshot_and_its_month() {
         })
     );
 }
-
-#[test]
-fn month_before_wraps_the_year() {
-    assert_eq!(month_before((2026, 3)), (2026, 2));
-    assert_eq!(month_before((2026, 1)), (2025, 12));
-}

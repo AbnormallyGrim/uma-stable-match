@@ -6,6 +6,7 @@ fn member(id: u64, daily_fans: &[i64]) -> MemberSnapshot {
         year: Some(2026),
         month: Some(10),
         daily_fans: daily_fans.to_vec(),
+        prior: None,
     }
 }
 

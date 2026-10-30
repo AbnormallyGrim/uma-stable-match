@@ -409,7 +409,9 @@ async fn a_new_scan_keeps_the_previous_pools_medians() {
 #[tokio::test]
 async fn a_new_month_drops_the_previous_pools_medians() {
     let server = MockServer::start().await;
-    mount_page(&server, 0, vec![listed(1, 12, 20)]).await;
+    let mut february = listed(1, 12, 20);
+    february["last_updated"] = json!("2026-02-19T15:00:00Z");
+    mount_page(&server, 0, vec![february]).await;
     Mock::given(path("/api/v4/circles"))
         .respond_with(ResponseTemplate::new(404))
         .mount(&server)
@@ -426,7 +428,7 @@ async fn a_new_month_drops_the_previous_pools_medians() {
         .await;
     let second = scan(&client(&server), &details, &config()).await.unwrap();
 
-    assert_eq!(second.month.as_deref(), Some("2026-02"));
+    assert_eq!(second.month.as_deref(), Some("2026-03"));
     assert_eq!(details.pool().read().unwrap().exact_medians(), 0);
 }
 
@@ -439,14 +441,13 @@ fn early(id: u64, rank: i32) -> Value {
 }
 
 #[tokio::test]
-async fn early_in_the_month_uses_last_month() {
+async fn early_in_the_month_loads_this_months_details() {
     let server = MockServer::start().await;
     mount_page(&server, 0, vec![early(1, 12), early(2, 13)]).await;
     for id in 1..=2 {
         Mock::given(path("/api/v4/circles"))
             .and(query_param("circle_id", id.to_string()))
-            .and(query_param("year", "2026"))
-            .and(query_param("month", "2"))
+            .and(query_param_is_missing("year"))
             .respond_with(detail(id))
             .expect(1)
             .mount(&server)
@@ -455,10 +456,11 @@ async fn early_in_the_month_uses_last_month() {
 
     let (scan, details) = run(&server, &config()).await;
     let scan = scan.unwrap();
-    assert_eq!(scan.month.as_deref(), Some("2026-02"));
+    assert_eq!(scan.month.as_deref(), Some("2026-03"));
     assert_eq!(scan.candidates, 2);
     assert_eq!(scan.prefetched, 2);
-    assert_eq!(details.period(), Some((2026, 2)));
+    assert_eq!(details.period(), None);
+    assert_eq!(details.prior_period(), Some((2026, 2)));
     assert_eq!(ids(&details), vec![1, 2]);
     let pool = details.pool().read().unwrap();
     assert_eq!(pool.estimated_median(1), Some(1_000_000.0 / 10.0));

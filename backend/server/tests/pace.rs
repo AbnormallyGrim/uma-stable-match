@@ -539,7 +539,7 @@ async fn paces_are_cached_per_month() {
 }
 
 #[tokio::test]
-async fn early_month_recommendations_use_last_month() {
+async fn early_month_recommendations_use_this_months_clubs_and_last_months_pace() {
     let server = MockServer::start().await;
     let mut row = club_detail()["circle"].clone();
     row["last_updated"] = json!("2026-03-02T15:00:00Z");
@@ -550,11 +550,12 @@ async fn early_month_recommendations_use_last_month() {
         .await;
     Mock::given(path("/api/v4/circles"))
         .and(query_param("circle_id", "1"))
-        .and(query_param("month", "2"))
+        .and(query_param_is_missing("year"))
         .respond_with(ResponseTemplate::new(200).set_body_json(club_detail()))
         .expect(1)
         .mount(&server)
         .await;
+    // No data this month yet, so the trainer's pace is last month's.
     mount_last_month(&server, trainer_club(series(3_000_000)), 1).await;
 
     let cache = Cache::new();
@@ -581,7 +582,7 @@ async fn early_month_recommendations_use_last_month() {
     let state = app(&server, (cache, details), DEFAULT_PACE_TTL);
     let (status, body) = get(&state, &by_trainer()).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["month"], "2026-02");
+    assert_eq!(body["month"], "2026-03");
     assert_eq!(body["trainer"]["pace_per_day"], 3_000_000.0);
     assert_eq!(body["total"], 1);
 }

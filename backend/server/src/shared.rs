@@ -387,19 +387,61 @@ impl SharedCache {
     /// Records clubs' exact medians for a game month (`YYYY-MM`), keeping them for `ttl` after the
     /// last write. Failures are ignored.
     pub(crate) async fn store_medians(&self, month: &str, medians: &[(u64, f64)], ttl: Duration) {
+        self.store_hash(&medians_key(month), medians, ttl).await;
+    }
+
+    /// Records trainers' paces in a game month (`YYYY-MM`), as priors for the next month, keeping
+    /// them for `ttl` after the last write. Failures are ignored.
+    pub(crate) async fn store_priors(&self, month: &str, paces: &[(u64, f64)], ttl: Duration) {
+        self.store_hash(&priors_key(month), paces, ttl).await;
+    }
+
+    /// The paces stored by [`SharedCache::store_priors`] for these trainers, in order.
+    pub(crate) async fn priors(&self, month: &str, viewer_ids: &[u64]) -> Vec<Option<f64>> {
+        self.hash_values(&priors_key(month), viewer_ids).await
+    }
+
+    /// The exact medians stored for these clubs in a game month (`YYYY-MM`), in order.
+    pub(crate) async fn medians_of(&self, month: &str, circle_ids: &[u64]) -> Vec<Option<f64>> {
+        self.hash_values(&medians_key(month), circle_ids).await
+    }
+
+    async fn store_hash(&self, key: &str, values: &[(u64, f64)], ttl: Duration) {
         let Backend::Redis(redis) = &self.backend else {
             return;
         };
-        if medians.is_empty() {
+        if values.is_empty() {
             return;
         }
         let script = Script::new(MEDIANS_SCRIPT);
         let mut invocation = script.prepare_invoke();
-        invocation.key(medians_key(month)).arg(millis(ttl));
-        for (circle_id, median) in medians {
-            invocation.arg(circle_id).arg(median);
+        invocation.key(key).arg(millis(ttl));
+        for (id, value) in values {
+            invocation.arg(id).arg(value);
         }
         redis.invoke::<i64>(&invocation, OP_TIMEOUT).await;
+    }
+
+    async fn hash_values(&self, key: &str, ids: &[u64]) -> Vec<Option<f64>> {
+        let misses = || ids.iter().map(|_| None).collect();
+        let Backend::Redis(redis) = &self.backend else {
+            return misses();
+        };
+        if ids.is_empty() {
+            return Vec::new();
+        }
+        let mut hmget = redis::cmd("HMGET");
+        hmget.arg(key).arg(ids);
+        match redis
+            .query_as::<Vec<Option<String>>>("hmget", &hmget, OP_TIMEOUT)
+            .await
+        {
+            Some(values) if values.len() == ids.len() => values
+                .into_iter()
+                .map(|value| value?.parse().ok())
+                .collect(),
+            _ => misses(),
+        }
     }
 
     /// The exact medians stored for a game month (`YYYY-MM`), or none without Redis or if it
@@ -1010,6 +1052,10 @@ fn searches_key() -> String {
 
 fn medians_key(month: &str) -> String {
     format!("{KEY_PREFIX}:medians:{month}")
+}
+
+fn priors_key(month: &str) -> String {
+    format!("{KEY_PREFIX}:priors:{month}")
 }
 
 fn period_part(period: Option<Period>) -> String {

@@ -113,6 +113,7 @@ The server keeps everything in memory. Without Redis, restarting it starts with 
 | Club pool | Club ID | Until the next scan | `pool.rs` |
 | Club details | Club ID and month | Until refreshed. With Redis, in memory until due for refresh, and in Redis a day longer | `details.rs`, `refresher.rs` |
 | Trainer paces | Trainer ID and month | `TRAINER_CACHE_MINUTES` (10) | `pace.rs` |
+| Last month's paces (priors) | Trainer or club ID, per month | One month in memory. With Redis, 14 days | `priors.rs` |
 | Rate limits | Visitor IP | Per-minute quotas | `limits.rs` |
 
 Concurrent requests for the same club share one fetch, and failed fetches aren't cached.
@@ -133,7 +134,7 @@ With the defaults, a scan makes about 160 calls (9 list pages and about 150 club
 
 ## Game months
 
-uma.moe's game month starts on the 2nd at 00:00 JST. On the 2nd and 3rd there are fewer than 3 days of data, so the scanner and the detail cache switch to the previous month together, and responses report which month they use. Trainer paces blend this month's data with last month's until there are 10 days of data. The [server README](backend/server/README.md#early-in-the-month) has the details.
+uma.moe's game month starts on the 2nd at 00:00 JST. Club details and responses always use the current game month. Early on there's too little data for a pace, so club medians blend each member's pace with last month's until a club has 6 days of data, and trainer paces until there are 10. Last month's paces are kept as priors in `priors.rs` when a club's details roll over to the new month. The [server README](backend/server/README.md#early-in-the-month) has the details.
 
 ## Web page
 

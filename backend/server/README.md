@@ -86,7 +86,7 @@ Calls fail with a `SourceError`: `UmaMoe` wraps the client's error, `NotFound` m
 `scan` builds a new [club pool](#club-pool) and decides which clubs' details to keep loaded:
 
 1. List clubs by monthly rank, best first, 100 per page and up to `SCAN_RANK_TO`, or `SCAN_LOWER_RANK_TO` with a [lower range](#lower-range). Stop after a page whose last club is ranked that or worse, after a short or empty page, or in the lower range after a page whose last club has no fans this month. As a safety stop, never list more than enough pages to reach the last rank, plus one (10 pages with the defaults), so any window can be listed in full.
-2. Decide which month to use. Early in a game month the previous month is used instead; see [Early in the month](#early-in-the-month).
+2. Use the listed data's game month. Early in a game month the pool's estimates and trainers' fallback paces come from the previous month; see [Early in the month](#early-in-the-month).
 3. Build a `ClubPool` from the clubs ranked `SCAN_RANK_FROM` to `SCAN_RANK_TO`. `ListedClub::from_circle` drops archived clubs, clubs with fewer than 8 members, and rows missing points, a member count or `last_updated`. Closed and full clubs are kept, so each request can include or exclude them.
 4. Copy in the previous pool's exact medians if the listed data is from the same game month, and the exact medians of clubs that are still cached for that month, then swap the new pool in. Cached clubs leave memory as they come due, just before the daily scan, so most medians come from the previous pool. With Redis, clubs still without one then take the medians stored there for the month, so a restarted instance starts with them too.
 5. Take up to `SCAN_MAX_DETAILS` joinable clubs in the rank window from the pool, best rank first. If a club's details come back without club information, the listed details are used.
@@ -118,16 +118,24 @@ uma.moe's game month starts on the **2nd at 00:00 JST** (UTC+09:00), so the 1st 
 
 ### Early in the month
 
-On the first two days of a game month (the 2nd and 3rd in JST), there are fewer than 3 days of data, which isn't enough for a pace. Until the 4th, clubs use the previous game month instead, and a trainer's pace blends in last month's for longer (see [Blended trainer pace](#blended-trainer-pace)):
+Early in a game month there's too little data for a reliable pace, so this month's data is blended with last month's. Club details and responses always use the current game month, so the roster is this month's from the 2nd: members who left on the 1st drop out and new members count straight away.
 
-| Part | Normal | Early in the month |
+| Part | From 6 days of data (10 for trainers) | Early in the month |
 |---|---|---|
-| Pool estimate | `monthly_point ÷ elapsed days ÷ member_count` | `last_month_point ÷ days in the previous game month ÷ member_count` (`from_circle_last_month`) |
-| Club details | Current month | `CircleRequest::for_month` with the previous month |
-| Trainer pace | This month's `daily_fans`, from the club in this month's rankings, from 10 days of data | This month's blended with last month's. Without data this month, last month's alone |
-| `month` in responses | Current game month | Previous game month |
+| Pool estimate | `monthly_point ÷ elapsed days ÷ member_count` | On the 2nd and 3rd, `last_month_point ÷ days in the previous game month ÷ member_count` (`from_circle_last_month`) |
+| Club medians and scoring | This month's `daily_pace` | Each member's pace blended with last month's; see [Blended club medians](#blended-club-medians) |
+| Trainer pace | This month's `daily_fans`, from the club in this month's rankings | This month's blended with last month's. On the 2nd and 3rd without data this month, last month's alone; see [Blended trainer pace](#blended-trainer-pace) |
+| `month` in responses | Current game month | Current game month |
 
-The scan decides the clubs' month from the list's snapshot time (`is_early_month`). The detail cache and the trainer pace cache keep each month's data separately, so the switch on the 4th never mixes months. A detail load that started under the old month doesn't write its median into the new pool.
+The scan decides from the list's snapshot time (`is_early_month`) whether it's the 2nd or 3rd, and `ClubDetails::prior_period` then names the previous month. Details still from last month, such as a club not yet refreshed on the 2nd, don't give the new pool a median.
+
+### Blended club medians
+
+While a club has fewer than `CLUB_BLEND_DAYS` (6) days of data, each member gets a prior, and the club's exact median and its scoring use the scoring crate's `blended_pace` with `k` = `CLUB_PRIOR_K` (1). From 6 days on, members get no prior and scoring is as before.
+
+- **Capturing priors.** When a club's details are replaced by a newer month's, the members' paces in the old details and the club's old median are kept for that month, in memory and, with Redis, in `usm:v1:priors:<YYYY-MM>` and `usm:v1:medians:<YYYY-MM>` for 14 days. At the month change the previous pool's exact medians are kept as club medians too. None of this calls uma.moe.
+- **A member's prior** is their own pace last month, in any club, else their club's median last month, else the club's listed `last_month_point ÷ days in the previous game month ÷ member_count`.
+- **Why.** A backtest on real clubs found the median error on the 3rd falls from 16% to 13% with the blend, and on the 4th from 12% to 10.5%. The [scoring crate's README](../scoring/README.md#blended-pace) has the formula.
 
 ### Estimate
 
@@ -245,7 +253,7 @@ Every instance shares one schedule, and one instance at a time refreshes:
 
 ## Shared cache
 
-`SharedCache` is a second cache layer for running several server instances against one store. On a local miss, `ClubDetails` and `PaceLookup` check it before calling uma.moe, and store what they load in it, under keys such as `usm:v1:club:<id>:<month>`. Paces expire as they do in memory. Club values hold the club, its `last_updated` and when it's due for its next refresh, and stay in Redis a day past that, so they're there until replaced. A club found there still gives the pool its exact median. Exact medians are also kept in one hash per game month, `usm:v1:medians:<YYYY-MM>`, which every load renews for 4 days, so a restarted instance reads them all in one call instead of loading every club.
+`SharedCache` is a second cache layer for running several server instances against one store. On a local miss, `ClubDetails` and `PaceLookup` check it before calling uma.moe, and store what they load in it, under keys such as `usm:v1:club:<id>:<month>`. Paces expire as they do in memory. Club values hold the club, its `last_updated` and when it's due for its next refresh, and stay in Redis a day past that, so they're there until replaced. A club found there still gives the pool its exact median. Exact medians are also kept in one hash per game month, `usm:v1:medians:<YYYY-MM>`, which every load renews for 4 days, so a restarted instance reads them all in one call instead of loading every club. Early in a month, [priors](#blended-club-medians) are kept in a hash per month as well, `usm:v1:priors:<YYYY-MM>`.
 
 - **Due clubs.** A club past its next refresh is fetched from uma.moe again. If that fails, the copy in Redis is served and kept in memory for `RefreshConfig::retry` (5 minutes).
 - **Older values.** A value stored by an older version, without a due time, counts as due.
@@ -275,7 +283,7 @@ With Redis, instances that have the same `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `S
 
 - **Lock.** It lasts 60 seconds and is renewed every 20 seconds while scanning. Shutdown releases it; if an instance crashes, another takes over within 60 seconds.
 - **Publishing.** After listing and scheduling the clubs, the leader publishes them and marks them current until the next scan is due: 30 minutes after uma.moe's next update, or for one `SCAN_INTERVAL_MINUTES` when set. It keeps them for twice that. The others build their pool from those rows and load club details from Redis, so they barely call uma.moe. An instance that starts later loads the published scan straight away.
-- **Resuming.** As soon as the leader has listed the clubs, it saves the list in Redis with when it was listed. An instance that takes the lock later, after a restart, redeploy or crash, continues that scan instead of listing again, if the list is less than `SCAN_INTERVAL_MINUTES` old (180 minutes when unset) and from the current game month (counting the [early-month](#early-in-the-month) switch). The resumed scan keeps its original start time in [`/status`](#status) and the metrics. Publishing the finished scan deletes the saved list.
+- **Resuming.** As soon as the leader has listed the clubs, it saves the list in Redis with when it was listed. An instance that takes the lock later, after a restart, redeploy or crash, continues that scan instead of listing again, if the list is less than `SCAN_INTERVAL_MINUTES` old (180 minutes when unset) and from the current game month. The resumed scan keeps its original start time in [`/status`](#status) and the metrics. Publishing the finished scan deletes the saved list.
 - **Failures.** A failed scan is published too: every instance records the same error, keeps its last results, and waits until the next scan is due.
 - **Missing data.** If a scan is marked current but its rows are gone from Redis, the instance scans on its own.
 

@@ -7,6 +7,12 @@ All notable changes to `uma-stable-match-scoring` are listed here. The format fo
 ### Added
 
 - `blended_pace` and `blended_median`: early-month paces that blend this month's data with a prior.
+- `MemberSnapshot::prior` and `ScoringOptions::with_prior_k`: score clubs from blended member paces.
+- `ScoringError::InvalidPriorK`.
+
+### Changed
+
+- `MemberSnapshot` is no longer `Eq`, since its prior is a float.
 
 ## [0.1.0] - Unreleased
 

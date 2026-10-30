@@ -13,6 +13,7 @@ mod limits;
 mod logging;
 mod pace;
 mod pool;
+mod priors;
 mod recommendations;
 mod refresher;
 mod run;
@@ -47,6 +48,7 @@ pub use pool::{
     ClubPool, ListedClub, Period, ShortlistFilter, DEFAULT_SHORTLIST_SIZE, EARLY_MONTH_DAYS,
     TARGET_MEDIAN_RATIO,
 };
+pub use priors::{CLUB_BLEND_DAYS, CLUB_PRIOR_K};
 pub use recommendations::{MatchSettings, DEFAULT_FETCH_BUDGET};
 pub use refresher::{RefreshConfig, RefreshStatus, Refresher, StoredTtl, TierStatus};
 pub use run::{run, RunError};

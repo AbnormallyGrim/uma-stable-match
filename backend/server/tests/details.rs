@@ -5,7 +5,8 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 use uma_stable_match_server::{
-    BackgroundLoader, ClubDetails, ClubPool, DetailConfig, ListedClub, RefreshConfig, SharedPool,
+    club_median, BackgroundLoader, ClubDetails, ClubPool, DetailConfig, ListedClub, RefreshConfig,
+    SharedPool,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -498,4 +499,61 @@ async fn details_stay_cached_until_uma_moes_next_update() {
     details.get(1, Priority::Interactive).await.unwrap();
     tokio::time::sleep(Duration::from_millis(200)).await;
     details.get(1, Priority::Interactive).await.unwrap();
+}
+
+/// A club whose 10 members gained `per_day` a day for `days` days of `month`.
+fn month_detail(month: u32, per_day: i64, days: usize) -> ResponseTemplate {
+    let members: Vec<Value> = (0..10)
+        .map(|i| {
+            let fans: Vec<i64> = (0..days)
+                .map(|day| 100_000_000 + per_day * day as i64)
+                .collect();
+            json!({ "viewer_id": 8001 + i, "year": 2026, "month": month, "daily_fans": fans })
+        })
+        .collect();
+    ResponseTemplate::new(200).set_body_json(json!({
+        "circle": { "circle_id": 1, "name": "Rolling Club", "member_count": 10 },
+        "members": members,
+    }))
+}
+
+#[tokio::test]
+async fn a_new_month_blends_in_last_months_paces() {
+    let server = MockServer::start().await;
+    let config = DetailConfig {
+        refresher: true,
+        ..DetailConfig::default()
+    };
+    let (details, _loader) = details(&server, config, &[1]);
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(month_detail(2, 2_000_000, 28))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    details.get(1, Priority::Interactive).await.unwrap();
+
+    Mock::given(path("/api/v4/circles"))
+        .respond_with(month_detail(3, 4_000_000, 2))
+        .mount(&server)
+        .await;
+    let march = details.refresh(1, Priority::Interactive).await.unwrap();
+
+    // One gain against k = 1: half this month's 4M, half last month's 2M.
+    assert!(march.members.iter().all(|m| m.prior == Some(2_000_000.0)));
+    assert_eq!(club_median(&march), Some(3_000_000.0));
+    assert_eq!(
+        details.pool().read().unwrap().estimated_median(1),
+        Some(3_000_000.0)
+    );
+}
+
+#[tokio::test]
+async fn later_in_the_month_details_have_no_priors() {
+    let server = MockServer::start().await;
+    let (details, _loader) = details(&server, DetailConfig::default(), &[1]);
+    mount(&server, 1, month_detail(3, 4_000_000, 6), 1).await;
+
+    let club = details.get(1, Priority::Interactive).await.unwrap();
+    assert!(club.members.iter().all(|m| m.prior.is_none()));
+    assert_eq!(club_median(&club), Some(4_000_000.0));
 }
