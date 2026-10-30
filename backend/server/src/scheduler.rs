@@ -12,10 +12,9 @@ use crate::cache::Cache;
 use crate::cache::ScanPhase;
 use crate::config::DEFAULT_SCAN_INTERVAL_MINUTES;
 use crate::details::ClubDetails;
+use crate::pool::game_month;
 use crate::refresher::{utc_now, RefreshConfig};
-use crate::scanner::{
-    install, list_candidates, load, scan_period, scan_with, Scan, ScanConfig, ScanError,
-};
+use crate::scanner::{install, list_candidates, load, scan_with, Scan, ScanConfig, ScanError};
 use crate::shared::{ScanLease, ScanTurn, SharedCache};
 use crate::source::Source;
 
@@ -57,7 +56,7 @@ impl InProgress {
             return false;
         };
         age < interval
-            && scan_period(DateTime::<Utc>::from(listed)) == scan_period(DateTime::<Utc>::from(now))
+            && game_month(DateTime::<Utc>::from(listed)) == game_month(DateTime::<Utc>::from(now))
     }
 }
 

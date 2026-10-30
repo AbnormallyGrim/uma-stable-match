@@ -10,6 +10,7 @@ fn member(id: u64, per_day: i64, days: usize) -> MemberSnapshot {
         year: Some(2026),
         month: Some(10),
         daily_fans: (0..days).map(|d| start + per_day * d as i64).collect(),
+        prior: None,
     }
 }
 
@@ -85,6 +86,7 @@ fn new_members_count_towards_size_but_not_place() {
             year: Some(2026),
             month: Some(10),
             daily_fans: fans,
+            prior: None,
         });
     }
     c.member_count = Some(10);
@@ -240,39 +242,113 @@ fn invalid_inputs_are_rejected() {
     );
 }
 
+/// `member` with a prior.
+fn with_prior(mut m: MemberSnapshot, prior: f64) -> MemberSnapshot {
+    m.prior = Some(prior);
+    m
+}
+
 #[test]
 fn blended_median_uses_priors_for_new_members() {
     // Eight members with 2 days of data, which daily_pace can't rank yet.
-    let members: Vec<MemberSnapshot> = (1..=8).map(|id| member(id, 2 * M, 2)).collect();
-    let prior = |id: u64| Some(if id <= 4 { 4.0 } else { 6.0 } * M as f64);
+    let new = |id: u64| member(id, 2 * M, 2);
+    let members: Vec<MemberSnapshot> = (1..=8)
+        .map(|id| with_prior(new(id), if id <= 4 { 4.0 } else { 6.0 } * M as f64))
+        .collect();
     // Each blend is half of 2M and half of the prior.
-    assert_eq!(blended_median(&members, prior, 1.0), Some(3.5 * M as f64));
-    assert_eq!(blended_median(&members, |_| None, 1.0), None);
+    assert_eq!(blended_median(&members, 1.0), Some(3.5 * M as f64));
+    let without: Vec<MemberSnapshot> = (1..=8).map(new).collect();
+    assert_eq!(blended_median(&without, 1.0), None);
 }
 
 #[test]
 fn blended_median_leaves_out_members_who_left() {
-    let mut members: Vec<MemberSnapshot> = (1..=8).map(|id| member(id, M, 3)).collect();
-    let mut left = member(9, 50 * M, 3);
+    let mut members: Vec<MemberSnapshot> = (1..=8)
+        .map(|id| with_prior(member(id, M, 3), M as f64))
+        .collect();
+    let mut left = with_prior(member(9, 50 * M, 3), 50.0 * M as f64);
     left.daily_fans[2] = 0;
     members.push(left);
-    assert_eq!(
-        blended_median(&members, |_| Some(M as f64), 1.0),
-        Some(M as f64)
-    );
+    assert_eq!(blended_median(&members, 1.0), Some(M as f64));
 }
 
 #[test]
 fn blended_median_needs_enough_members() {
-    let members: Vec<MemberSnapshot> = (1..=7).map(|id| member(id, M, 5)).collect();
-    assert_eq!(blended_median(&members, |_| Some(M as f64), 1.0), None);
+    let members: Vec<MemberSnapshot> = (1..=7)
+        .map(|id| with_prior(member(id, M, 5), M as f64))
+        .collect();
+    assert_eq!(blended_median(&members, 1.0), None);
 }
 
 #[test]
 fn blended_median_counts_falling_paces_as_zero() {
-    let members: Vec<MemberSnapshot> = (1..=8).map(|id| member(id, 0, 3)).collect();
-    assert_eq!(
-        blended_median(&members, |_| Some(-5.0 * M as f64), 1.0),
-        Some(0.0)
+    let members: Vec<MemberSnapshot> = (1..=8)
+        .map(|id| with_prior(member(id, 0, 3), -5.0 * M as f64))
+        .collect();
+    assert_eq!(blended_median(&members, 1.0), Some(0.0));
+}
+
+#[test]
+fn prior_k_scores_new_members_from_their_priors() {
+    let mut club = club("New", &[]);
+    club.members = (1..=10)
+        .map(|id| with_prior(member(id, 2 * M, 2), 4.0 * M as f64))
+        .collect();
+    club.member_count = Some(10);
+    let options = ScoringOptions::default();
+    assert!(score_club(3.0 * M as f64, &club, &options)
+        .unwrap()
+        .is_none());
+
+    let scored = score_club(3.0 * M as f64, &club, &options.with_prior_k(1.0))
+        .unwrap()
+        .unwrap();
+    assert_eq!(scored.median_per_day, 3.0 * M as f64);
+    assert_eq!(scored.ranked_members, 10);
+}
+
+#[test]
+fn prior_k_without_priors_scores_as_before() {
+    let club = club(
+        "Steady",
+        &[M, 2 * M, 3 * M, 4 * M, 5 * M, 6 * M, 7 * M, 8 * M],
     );
+    let plain = score_club(4.0 * M as f64, &club, &ScoringOptions::default()).unwrap();
+    let blended = score_club(
+        4.0 * M as f64,
+        &club,
+        &ScoringOptions::default().with_prior_k(1.0),
+    )
+    .unwrap();
+    assert_eq!(plain.map(|s| s.score), blended.map(|s| s.score));
+}
+
+#[test]
+fn rejects_an_invalid_prior_k() {
+    let club = club("Any", &[M; 8]);
+    for k in [-1.0, f64::NAN] {
+        let options = ScoringOptions::default().with_prior_k(k);
+        assert!(matches!(
+            score_club(M as f64, &club, &options),
+            Err(ScoringError::InvalidPriorK(_))
+        ));
+    }
+}
+
+#[test]
+fn prior_k_counts_new_members_in_balance() {
+    let mut club = club("New", &[]);
+    club.members = (1..=10)
+        .map(|id| with_prior(member(id, 2 * M, 2), 4.0 * M as f64))
+        .collect();
+    club.member_count = Some(10);
+    let options = ScoringOptions::default().with_balance_weight(0.5);
+    assert!(score_club(3.0 * M as f64, &club, &options)
+        .unwrap()
+        .is_none());
+
+    let scored = score_club(3.0 * M as f64, &club, &options.with_prior_k(1.0))
+        .unwrap()
+        .unwrap();
+    assert_eq!(scored.balance.unwrap().counted, 10);
 }

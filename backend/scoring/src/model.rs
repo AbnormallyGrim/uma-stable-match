@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub const CLUB_CAP: u32 = 30;
 
 /// One member's cumulative fan count for each day of a month.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[non_exhaustive]
 pub struct MemberSnapshot {
@@ -19,6 +19,13 @@ pub struct MemberSnapshot {
     pub month: Option<u32>,
     /// Cumulative fans per day: 0 = no data, negative = previous club.
     pub daily_fans: Vec<i64>,
+    /// Pace to blend with this month's, such as last month's; see
+    /// [`ScoringOptions::prior_k`](crate::ScoringOptions::prior_k).
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub prior: Option<f64>,
 }
 
 impl MemberSnapshot {

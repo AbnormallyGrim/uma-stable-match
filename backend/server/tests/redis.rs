@@ -1259,3 +1259,65 @@ async fn the_search_total_is_absent_without_redis() {
     none.count_search().await;
     assert_eq!(none.searches().await, None);
 }
+
+/// One club's details: members `viewers`, each gaining `per_day` for `days` days of `month`.
+fn rolling(id: u64, viewers: &[u64], month: u32, per_day: i64, days: usize) -> ResponseTemplate {
+    let members: Vec<serde_json::Value> = viewers
+        .iter()
+        .map(|viewer| {
+            let fans: Vec<i64> = (0..days)
+                .map(|day| 100_000_000 + per_day * day as i64)
+                .collect();
+            json!({ "viewer_id": viewer, "year": 2026, "month": month, "daily_fans": fans })
+        })
+        .collect();
+    ResponseTemplate::new(200).set_body_json(json!({
+        "circle": { "circle_id": id, "name": "Rolling Club", "member_count": viewers.len() },
+        "members": members,
+    }))
+}
+
+#[tokio::test]
+async fn priors_reach_a_restarted_instance() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let server = MockServer::start().await;
+    let (old_club, new_club) = (unique_id(), unique_id());
+    let viewers: Vec<u64> = (0..10).map(|_| unique_id()).collect();
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", old_club.to_string()))
+        .respond_with(rolling(old_club, &viewers, 2, 2_000_000, 28))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", old_club.to_string()))
+        .respond_with(rolling(old_club, &viewers, 3, 4_000_000, 2))
+        .mount(&server)
+        .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", new_club.to_string()))
+        .respond_with(rolling(new_club, &viewers[..1], 3, 4_000_000, 2))
+        .mount(&server)
+        .await;
+
+    let config = DetailConfig::default();
+    let (first, _a) =
+        ClubDetails::with_shared(client(&server), pool(old_club), config, first_shared);
+    first.get(old_club, Priority::Interactive).await.unwrap();
+    first
+        .refresh(old_club, Priority::Interactive)
+        .await
+        .unwrap();
+
+    // A new instance, with nothing in memory, finds the member's pace from February in Redis.
+    let (second, _b) = ClubDetails::with_shared(
+        client(&server),
+        pool(new_club),
+        config,
+        redis().await.unwrap(),
+    );
+    let club = second.get(new_club, Priority::Interactive).await.unwrap();
+    assert_eq!(club.members[0].prior, Some(2_000_000.0));
+}

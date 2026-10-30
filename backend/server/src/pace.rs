@@ -13,6 +13,7 @@ use uma_stable_match_umamoe_client::{
 
 use crate::details::ClubDetails;
 use crate::pool::Period;
+use crate::priors::month_before;
 use crate::shared::SharedCache;
 use crate::source::{Source, SourceError};
 use crate::traces::in_trace;
@@ -406,14 +407,6 @@ fn with_club(outcome: Outcome, circle_id: u64) -> Outcome {
             ..found
         }),
         other => other,
-    }
-}
-
-fn month_before((year, month): Period) -> Period {
-    if month <= 1 {
-        (year - 1, 12)
-    } else {
-        (year, month - 1)
     }
 }
 

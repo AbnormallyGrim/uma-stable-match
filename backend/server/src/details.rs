@@ -15,7 +15,8 @@ use uma_stable_match_scoring::{Club, MemberSnapshot};
 use uma_stable_match_umamoe_client::{Circle, CircleRequest, Priority};
 
 use crate::calibration::club_median;
-use crate::pool::{ClubPool, Period};
+use crate::pool::{last_month_rate, ClubPool, Period};
+use crate::priors::{data_days, data_period, month_label, Priors, CLUB_BLEND_DAYS};
 use crate::refresher::{utc_now, RefreshConfig, RefreshStatus, Refresher, Refreshing, Tier};
 use crate::scanner::ScanConfig;
 use crate::shared::{club_key, SharedCache};
@@ -68,6 +69,8 @@ struct Inner {
     source: Source,
     cache: Cache<(u64, Option<Period>), Entry>,
     period: RwLock<Option<Period>>,
+    prior_period: RwLock<Option<Period>>,
+    priors: Priors,
     pool: SharedPool,
     listed: RwLock<HashMap<u64, Circle>>,
     listing: RwLock<Option<(SystemTime, Option<String>)>>,
@@ -207,6 +210,8 @@ impl ClubDetails {
                 source: source.into(),
                 cache,
                 period: RwLock::new(None),
+                prior_period: RwLock::new(None),
+                priors: Priors::default(),
                 pool,
                 listed: RwLock::new(HashMap::new()),
                 listing: RwLock::new(None),
@@ -391,7 +396,9 @@ impl ClubDetails {
                 continue;
             };
             count_detail("redis");
-            if let Some(median) = club_median(&stored.club) {
+            if let Some(median) =
+                club_median(&stored.club).filter(|_| is_listed_month(inner, &stored.club))
+            {
                 medians.push((circle_id, median));
             }
             let entry = inner
@@ -415,6 +422,23 @@ impl ClubDetails {
     /// Switches to another month's details. Details cached for other months are ignored.
     pub fn set_period(&self, period: Option<Period>) {
         *write(&self.inner.period) = period;
+    }
+
+    /// The month whose paces stand in while the listed month has too little data: the previous
+    /// game month on its first two days, else `None`.
+    pub fn prior_period(&self) -> Option<Period> {
+        *read(&self.inner.prior_period)
+    }
+
+    pub(crate) fn set_prior_period(&self, period: Option<Period>) {
+        *write(&self.inner.prior_period) = period;
+    }
+
+    /// Keeps the pool's exact medians as last month's club priors, for a pool about to be
+    /// replaced by one for the month after `period`.
+    pub(crate) fn keep_club_priors(&self, period: Period) {
+        let medians: Vec<(u64, f64)> = read(&self.inner.pool).known_exact_medians().collect();
+        self.inner.priors.set_club_medians(period, medians);
     }
 
     /// Queues a club for background loading. Returns `false` if it's cached, already queued, or the
@@ -528,7 +552,7 @@ impl ClubDetails {
             self.inner
                 .cache
                 .iter()
-                .filter(|(key, _)| key.1 == period)
+                .filter(|(key, entry)| key.1 == period && is_listed_month(&self.inner, &entry.club))
                 .filter_map(|(key, entry)| club_median(&entry.club).map(|m| (key.0, m))),
         )
     }
@@ -579,6 +603,9 @@ async fn fetch(
     if club.circle_id == 0 {
         club.circle_id = circle_id;
     }
+    if data_days(&club) < CLUB_BLEND_DAYS {
+        blend_in_priors(inner, circle_id, period, &mut club).await;
+    }
     record_median(inner, &club, circle_id, period).await;
     let now = utc_now();
     let mut due = inner.timing.next_refresh(
@@ -600,6 +627,33 @@ async fn fetch(
         .set(&club_key(circle_id, period), &stored, keep)
         .await;
     Ok(Entry::from(stored))
+}
+
+// Early in a month a club's details roll over from last month's: keeps those members' paces as
+// priors, then gives this month's members theirs.
+async fn blend_in_priors(inner: &Inner, circle_id: u64, period: Option<Period>, club: &mut Club) {
+    let previous = match inner.cache.get(&(circle_id, period)).await {
+        Some(entry) => Some(entry.club),
+        None => inner
+            .shared
+            .get::<Stored>(&club_key(circle_id, period))
+            .await
+            .map(|stored| Arc::new(stored.club)),
+    };
+    if let Some(previous) = previous.filter(|p| data_period(p) < data_period(club)) {
+        inner
+            .priors
+            .capture(&inner.shared, circle_id, &previous)
+            .await;
+    }
+    let fallback = read(&inner.listed).get(&circle_id).and_then(|c| {
+        let members = u32::try_from(c.member_count?).ok()?;
+        last_month_rate(c.last_month_point?, members, utc_now())
+    });
+    inner
+        .priors
+        .attach(&inner.shared, circle_id, club, fallback)
+        .await;
 }
 
 async fn track(inner: &Inner, circle_id: u64, due: DateTime<Utc>) {
@@ -643,6 +697,9 @@ fn count_detail(source: &'static str) {
 }
 
 async fn record_median(inner: &Inner, club: &Club, circle_id: u64, period: Option<Period>) {
+    if !is_listed_month(inner, club) {
+        return;
+    }
     if let Some(median) = club_median(club) {
         record_medians(inner, vec![(circle_id, median)], period).await;
     }
@@ -664,6 +721,14 @@ async fn record_medians(inner: &Inner, medians: Vec<(u64, f64)>, period: Option<
 
 fn listed_month(inner: &Inner) -> Option<String> {
     read(&inner.listing).as_ref()?.1.clone()
+}
+
+// Details still from last month don't give this month's pool a median.
+fn is_listed_month(inner: &Inner, club: &Club) -> bool {
+    match (listed_month(inner), data_period(club)) {
+        (Some(listed), Some(period)) => listed == month_label(period),
+        _ => true,
+    }
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {

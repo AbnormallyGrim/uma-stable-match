@@ -5,9 +5,7 @@ use std::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::members::{
-    blended_pace, current_members, daily_pace, days_with_data, MIN_DAYS_FOR_PACE,
-};
+use crate::members::{blended_pace, current_members, daily_pace};
 use crate::model::{Club, JoinStyle, MemberSnapshot, CLUB_CAP};
 use crate::stats::{gini, median, round_half_even};
 
@@ -37,6 +35,10 @@ pub struct ScoringOptions {
     pub balance_weight: Option<f64>,
     /// Include clubs that aren't accepting members.
     pub include_closed: bool,
+    /// Ranks members by [`blended_pace`] with their `prior` and this `k`, so members with a prior
+    /// count with fewer than 3 days of data. Members without one use [`daily_pace`].
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub prior_k: Option<f64>,
 }
 
 impl ScoringOptions {
@@ -51,6 +53,12 @@ impl ScoringOptions {
         self.include_closed = include;
         self
     }
+
+    /// Ranks members by their pace blended with their prior, with this `k` (0 or more).
+    pub fn with_prior_k(mut self, k: f64) -> Self {
+        self.prior_k = Some(k);
+        self
+    }
 }
 
 /// Invalid input to [`score_clubs`] or [`score_club`].
@@ -61,6 +69,8 @@ pub enum ScoringError {
     InvalidPace(f64),
     /// Balance weight must be between 0 and 1.
     InvalidBalanceWeight(f64),
+    /// Prior `k` must be finite and 0 or more.
+    InvalidPriorK(f64),
 }
 
 impl fmt::Display for ScoringError {
@@ -70,6 +80,7 @@ impl fmt::Display for ScoringError {
             Self::InvalidBalanceWeight(w) => {
                 write!(f, "balance weight must be between 0 and 1, got {w}")
             }
+            Self::InvalidPriorK(k) => write!(f, "prior k must be 0 or more, got {k}"),
         }
     }
 }
@@ -119,12 +130,14 @@ pub struct ScoredClub<'a> {
 
 /// Balance of a club's current members, or `None` if too few can be counted.
 pub fn club_balance(members: &[MemberSnapshot]) -> Option<Balance> {
-    // New members without enough data are left out so they aren't counted as passengers.
-    let mut rates: Vec<f64> = current_members(members)
-        .into_iter()
-        .filter(|m| days_with_data(&m.daily_fans) >= MIN_DAYS_FOR_PACE)
-        .map(|m| daily_pace(&m.daily_fans).unwrap_or(0.0).max(0.0))
-        .collect();
+    balance_of(members, None)
+}
+
+fn balance_of(members: &[MemberSnapshot], prior_k: Option<f64>) -> Option<Balance> {
+    // New members without enough data or a prior are left out so they aren't counted as
+    // passengers.
+    let current = current_members(members);
+    let mut rates = rates(&current, prior_k);
     if rates.len() < MIN_RANKED_MEMBERS {
         return None;
     }
@@ -155,22 +168,27 @@ pub fn club_balance(members: &[MemberSnapshot]) -> Option<Balance> {
     })
 }
 
-/// Median [`blended_pace`] of a club's current members, with `prior` giving each member's prior
-/// by trainer ID. `None` with fewer than [`MIN_RANKED_MEMBERS`] paces.
-pub fn blended_median(
-    members: &[MemberSnapshot],
-    prior: impl Fn(u64) -> Option<f64>,
-    k: f64,
-) -> Option<f64> {
-    let rates: Vec<f64> = current_members(members)
-        .into_iter()
-        .filter_map(|m| blended_pace(&m.daily_fans, prior(m.viewer_id), k))
-        .map(|r| r.max(0.0))
-        .collect();
+/// Median [`blended_pace`] of a club's current members, each with their own `prior`. `None` with
+/// fewer than [`MIN_RANKED_MEMBERS`] paces.
+pub fn blended_median(members: &[MemberSnapshot], k: f64) -> Option<f64> {
+    let current = current_members(members);
+    let rates = rates(&current, Some(k));
     if rates.len() < MIN_RANKED_MEMBERS {
         return None;
     }
     median(&rates)
+}
+
+// Paces of rankable members, at least 0: blended with their priors when `prior_k` is set.
+fn rates(members: &[&MemberSnapshot], prior_k: Option<f64>) -> Vec<f64> {
+    members
+        .iter()
+        .filter_map(|m| match prior_k {
+            Some(k) => blended_pace(&m.daily_fans, m.prior, k),
+            None => daily_pace(&m.daily_fans),
+        })
+        .map(|r| r.max(0.0))
+        .collect()
 }
 
 /// Scores one club, or returns `Ok(None)` if the club is left out.
@@ -207,6 +225,11 @@ fn validate(pace: f64, options: &ScoringOptions) -> Result<(), ScoringError> {
             return Err(ScoringError::InvalidBalanceWeight(w));
         }
     }
+    if let Some(k) = options.prior_k {
+        if !(k.is_finite() && k >= 0.0) {
+            return Err(ScoringError::InvalidPriorK(k));
+        }
+    }
     Ok(())
 }
 
@@ -216,11 +239,7 @@ fn score_valid<'a>(pace: f64, club: &'a Club, options: &ScoringOptions) -> Optio
     }
 
     let current = current_members(&club.members);
-    let rates: Vec<f64> = current
-        .iter()
-        .filter_map(|m| daily_pace(&m.daily_fans))
-        .map(|r| r.max(0.0))
-        .collect();
+    let rates = rates(&current, options.prior_k);
     if rates.len() < MIN_RANKED_MEMBERS {
         return None;
     }
@@ -241,7 +260,7 @@ fn score_valid<'a>(pace: f64, club: &'a Club, options: &ScoringOptions) -> Optio
 
     let (balance, score) = match options.balance_weight {
         Some(weight) => {
-            let balance = club_balance(&club.members)?;
+            let balance = balance_of(&club.members, options.prior_k)?;
             let score = fit + weight * (1.0 - f64::from(balance.score) / 100.0);
             (Some(balance), score)
         }

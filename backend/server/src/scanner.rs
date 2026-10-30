@@ -9,6 +9,7 @@ use uma_stable_match_umamoe_client::{Circle, CircleSort, ListCirclesRequest, Pri
 use crate::cache::{Cache, ScanPhase};
 use crate::details::ClubDetails;
 use crate::pool::{game_month, is_early_month, previous_game_month, ClubPool, ListedClub, Period};
+use crate::priors::month_before;
 use crate::source::{Source, SourceError};
 
 /// Which clubs a scan looks at.
@@ -202,12 +203,14 @@ pub(crate) fn install(details: &ClubDetails, rows: Vec<Circle>, config: &ScanCon
         .filter_map(|t| DateTime::parse_from_rfc3339(t).ok())
         .map(|t| t.with_timezone(&Utc))
         .max();
-    let period = snapshot
+    // The first two days have too little data for this month's points, so the pool's estimates
+    // and trainers fall back on last month's. Club details are this month's, blended with priors.
+    let prior_period = snapshot
         .filter(|at| is_early_month(*at))
         .map(previous_game_month);
-    let month = snapshot.map(|at| month_label(period.unwrap_or_else(|| game_month(at))));
+    let month = snapshot.map(|at| month_label(game_month(at)));
 
-    let listed = if period.is_some() {
+    let listed = if prior_period.is_some() {
         ListedClub::from_circle_last_month
     } else {
         ListedClub::from_circle
@@ -230,10 +233,18 @@ pub(crate) fn install(details: &ClubDetails, rows: Vec<Circle>, config: &ScanCon
     let full_ids = by_rank(&main, |id| pool.contains(id) && !pool.is_joinable(id), max);
     // The cache drops clubs as they come due, just before the daily scan, so the previous pool
     // holds most medians. Another month's medians don't apply.
-    if details.listing().is_some_and(|(_, listed)| listed == month) {
-        details.carry_exact_medians(&mut pool);
+    let previous = snapshot.map(|at| month_before(game_month(at)));
+    match (details.listing(), previous) {
+        (Some((_, listed)), _) if listed == month => {
+            details.carry_exact_medians(&mut pool);
+        }
+        (Some((_, Some(listed))), Some(previous)) if listed == month_label(previous) => {
+            details.keep_club_priors(previous);
+        }
+        _ => {}
     }
-    details.set_period(period);
+    details.set_period(None);
+    details.set_prior_period(prior_period);
     details.set_listed(rows.into_iter().map(|c| (c.circle_id, c)));
     details.restore_exact_medians(&mut pool);
     let candidates = pool.len();
@@ -247,14 +258,6 @@ pub(crate) fn install(details: &ClubDetails, rows: Vec<Circle>, config: &ScanCon
         lower_ids,
         month,
         updated_at: snapshot,
-    }
-}
-
-pub(crate) fn scan_period(at: DateTime<Utc>) -> Period {
-    if is_early_month(at) {
-        previous_game_month(at)
-    } else {
-        game_month(at)
     }
 }
 

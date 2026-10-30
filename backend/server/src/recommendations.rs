@@ -28,6 +28,7 @@ use crate::pace::PaceError;
 use crate::pool::{
     join_style_bit, mentions_discord, ShortlistFilter, DEFAULT_SHORTLIST_SIZE, TARGET_MEDIAN_RATIO,
 };
+use crate::priors::CLUB_PRIOR_K;
 
 const CLUB_URL: &str = "https://uma.moe/circles/";
 const DEFAULT_LIMIT: u32 = 50;
@@ -295,7 +296,9 @@ async fn search(
             .ok_or_else(|| ApiError::bad_request("limit must be a positive whole number"))?,
     };
 
-    let mut options = ScoringOptions::default().with_include_closed(include_closed);
+    let mut options = ScoringOptions::default()
+        .with_include_closed(include_closed)
+        .with_prior_k(CLUB_PRIOR_K);
     options.balance_weight = balance_weight;
     let (updated_at, month) = match state.cache.snapshot() {
         Some(snapshot) => (snapshot.scanned_at, snapshot.month.clone()),
@@ -312,7 +315,7 @@ async fn search(
             }
             let found = state
                 .paces
-                .blended(id, state.details.period())
+                .blended(id, state.details.prior_period())
                 .await
                 .map_err(pace_error)?;
             (found.pace, Some(id), found.circle_id)

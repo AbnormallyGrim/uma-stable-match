@@ -103,7 +103,7 @@ pace  = Z × this month's pace + (1 − Z) × prior
 
 With no gains yet (`d` = 0) it's the prior. Without a prior it's `daily_pace`. A larger `k` keeps more weight on the prior for longer, and `k` = 0 ignores it once there's a gain. This is credibility weighting, the pattern baseball projection systems such as Marcel use. A backtest on real clubs found `k` = 1 suits club medians and `k` = 4 a single trainer's pace.
 
-`blended_median` is the club median over current members' blended paces, with a prior looked up for each member by trainer ID. Unlike the fit's median, it includes members with fewer than 3 days of data when they have a prior. Negative paces count as 0, and it needs at least 8 paces.
+Each `MemberSnapshot` can carry its own `prior`. With `ScoringOptions::with_prior_k(k)`, scoring ranks members, works out your place and takes the club median from blended paces, so members with a prior count even with fewer than 3 days of data. Members without a prior use `daily_pace` as before. Balance scoring uses the same paces, so new members with a prior aren't left out of it. `blended_median` is that club median on its own: negative paces count as 0, and it needs at least 8 paces.
 
 ```rust
 use uma_stable_match_scoring::blended_pace;
@@ -134,7 +134,7 @@ Members with fewer than 3 days of data are counted in the club size but can't be
 
 ### Balance
 
-`club_balance` measures how evenly current members contribute. Members with fewer than 3 days of data are left out.
+`club_balance` measures how evenly current members contribute. Members with fewer than 3 days of data are left out. When scoring with `with_prior_k`, members with a prior count too, by their blended pace.
 
 | Measure | Definition |
 |---|---|
@@ -169,6 +169,7 @@ Without it, the score is the fit. `score_clubs` returns clubs sorted by score, l
 
 - the pace isn't a finite number above zero
 - the balance weight is outside 0 to 1
+- the prior `k` isn't a finite number of 0 or more
 
 ## Tiers
 
