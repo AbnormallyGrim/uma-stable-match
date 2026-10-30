@@ -21,6 +21,31 @@ pub fn daily_pace(daily_fans: &[i64]) -> Option<f64> {
     Some((last - first) / (values.len() - 1) as f64)
 }
 
+/// This month's pace blended with a prior, weighted by days of data; see the README.
+///
+/// Without a prior it's [`daily_pace`]. `None` if `k` isn't finite and at least 0, or there's
+/// nothing to go on.
+pub fn blended_pace(daily_fans: &[i64], prior: Option<f64>, k: f64) -> Option<f64> {
+    if !(k.is_finite() && k >= 0.0) {
+        return None;
+    }
+    let Some(prior) = prior.filter(|p| p.is_finite()) else {
+        return daily_pace(daily_fans);
+    };
+    let values: Vec<i64> = daily_fans
+        .iter()
+        .filter(|v| **v != 0)
+        .map(|v| v.abs())
+        .collect();
+    let gains = values.len().saturating_sub(1) as f64;
+    if gains == 0.0 {
+        return Some(prior);
+    }
+    let this_month = (values[values.len() - 1] - values[0]) as f64 / gains;
+    let weight = gains / (gains + k);
+    Some(weight * this_month + (1.0 - weight) * prior)
+}
+
 pub(crate) fn last_day(daily_fans: &[i64]) -> Option<usize> {
     daily_fans.iter().rposition(|v| *v != 0)
 }

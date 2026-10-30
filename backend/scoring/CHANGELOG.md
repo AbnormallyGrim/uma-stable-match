@@ -4,6 +4,10 @@ All notable changes to `uma-stable-match-scoring` are listed here. The format fo
 
 ## [Unreleased]
 
+### Added
+
+- `blended_pace` and `blended_median`: early-month paces that blend this month's data with a prior.
+
 ## [0.1.0] - Unreleased
 
 First release.

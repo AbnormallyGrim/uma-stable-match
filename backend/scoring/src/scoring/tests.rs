@@ -239,3 +239,40 @@ fn invalid_inputs_are_rejected() {
         ScoringError::InvalidBalanceWeight(1.5)
     );
 }
+
+#[test]
+fn blended_median_uses_priors_for_new_members() {
+    // Eight members with 2 days of data, which daily_pace can't rank yet.
+    let members: Vec<MemberSnapshot> = (1..=8).map(|id| member(id, 2 * M, 2)).collect();
+    let prior = |id: u64| Some(if id <= 4 { 4.0 } else { 6.0 } * M as f64);
+    // Each blend is half of 2M and half of the prior.
+    assert_eq!(blended_median(&members, prior, 1.0), Some(3.5 * M as f64));
+    assert_eq!(blended_median(&members, |_| None, 1.0), None);
+}
+
+#[test]
+fn blended_median_leaves_out_members_who_left() {
+    let mut members: Vec<MemberSnapshot> = (1..=8).map(|id| member(id, M, 3)).collect();
+    let mut left = member(9, 50 * M, 3);
+    left.daily_fans[2] = 0;
+    members.push(left);
+    assert_eq!(
+        blended_median(&members, |_| Some(M as f64), 1.0),
+        Some(M as f64)
+    );
+}
+
+#[test]
+fn blended_median_needs_enough_members() {
+    let members: Vec<MemberSnapshot> = (1..=7).map(|id| member(id, M, 5)).collect();
+    assert_eq!(blended_median(&members, |_| Some(M as f64), 1.0), None);
+}
+
+#[test]
+fn blended_median_counts_falling_paces_as_zero() {
+    let members: Vec<MemberSnapshot> = (1..=8).map(|id| member(id, 0, 3)).collect();
+    assert_eq!(
+        blended_median(&members, |_| Some(-5.0 * M as f64), 1.0),
+        Some(0.0)
+    );
+}
