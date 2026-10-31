@@ -49,6 +49,7 @@ function setup(props: Partial<{ balanceOn: boolean; includeClosed: boolean }> = 
   const names = () =>
     within(table)
       .getAllByRole('link')
+      .filter((link) => link.getAttribute('target') === '_blank')
       .map((link) => link.textContent);
   const header = (name: string) =>
     within(table).getByRole('button', { name: new RegExp(`^${name}`) });

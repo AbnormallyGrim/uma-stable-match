@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { clubPath, clubRoute } from './route';
+import { clubPath, clubRoute, rememberedSearch, rememberSearch } from './route';
 
 describe('clubRoute', () => {
   it('reads the club and trainer', () => {
@@ -34,5 +34,28 @@ describe('clubPath', () => {
       circleId: '7',
       trainerId: '123456789012',
     });
+  });
+});
+
+describe('rememberSearch', () => {
+  it('keeps the search address for the club page', () => {
+    rememberSearch(sessionStorage, 'http://localhost:3000/?trainer_id=123456789012');
+    expect(rememberedSearch(sessionStorage)).toBe('http://localhost:3000/?trainer_id=123456789012');
+    sessionStorage.clear();
+    expect(rememberedSearch(sessionStorage)).toBeNull();
+  });
+
+  it('copes without storage', () => {
+    const broken = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('blocked');
+      },
+    } as unknown as Storage;
+    expect(() => rememberSearch(broken, '/')).not.toThrow();
+    expect(rememberedSearch(broken)).toBeNull();
+    expect(rememberedSearch(undefined)).toBeNull();
   });
 });

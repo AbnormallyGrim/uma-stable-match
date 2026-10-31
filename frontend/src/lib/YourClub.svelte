@@ -16,6 +16,7 @@
     spotsLabel,
   } from './format';
   import { t } from './i18n';
+  import MembersLink from './MembersLink.svelte';
   import TierBadge from './TierBadge.svelte';
 
   interface Props {
@@ -23,9 +24,11 @@
     topPick: Club | null;
     pace: number;
     count: number;
+    /** The trainer searched for, for the club page links. */
+    trainerId?: string | null;
   }
 
-  let { own, topPick, pace, count }: Props = $props();
+  let { own, topPick, pace, count, trainerId = null }: Props = $props();
 
   const verdict = $derived(
     own.result_rank === 1
@@ -61,6 +64,7 @@
           {#if spots}<span>{spots}</span>{/if}
           {#if joinStyle}<span class="tag join {club.join_style}">{joinStyle}</span>{/if}
         </div>
+        <MembersLink circleId={club.circle_id} name={club.name} {trainerId} />
       </div>
     </div>
     <dl class="stats">
@@ -161,6 +165,11 @@
     display: grid;
     gap: 3px;
     min-width: 0;
+  }
+
+  .info :global(.members) {
+    justify-self: start;
+    margin-top: 4px;
   }
 
   .name {

@@ -126,7 +126,8 @@ docker compose up -d
 4. Optionally tick **Include full clubs** to add clubs with no open spot to the table for comparison; full clubs never appear as top picks. Pick one **Join style** (Open, Approval or Closed) or one **Playstyle** to see only those clubs; without one, open and approval clubs of every playstyle are searched. Filtering leaves fewer clubs near your pace, so the page warns that your best matches may be further from it. Turn on **Has Discord** to keep only clubs whose description mentions Discord; it's a best guess, as some clubs only share their link in game. Club cards show a **Discord** tag for these clubs.
 5. Select **Find clubs**. The search is saved in the page's address, so you can bookmark or share it.
 6. Browse **Top picks**, or use **Top results** to search and sort the 100 best fits.
-7. Select a club's name to open its uma.moe page in a new tab, then contact the leader.
+7. Select **See how you fit** on a club to see where you'd rank among its members and a chart of everyone's pace this month. After a daily pace search, the button reads **See members** and shows the club alone. Select **Back to search** to return to your results.
+8. Select a club's name to open its uma.moe page in a new tab, then contact the leader.
 
 Club data refreshes automatically once a day, shortly after uma.moe's daily update, and the line under the title shows when it last did. If some clubs are still loading, or it's the first days of a game month and results combine this month's data with last month's, a note under the summary says so.
 

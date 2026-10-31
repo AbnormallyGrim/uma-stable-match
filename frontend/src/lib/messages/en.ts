@@ -95,6 +95,10 @@ export const en = {
   'club.balance': 'Balance',
   'club.passengers': 'Passengers',
   'club.top3Share': 'Top 3 share',
+  'club.seeMembers': 'See members',
+  'club.seeFit': 'See how you fit',
+  'club.seeFitIn': ({ name }: { name: string }) => `See how you fit in ${name}`,
+  'club.seeMembersOf': ({ name }: { name: string }) => `See members of ${name}`,
   'tier.label': ({ tier }: { tier: string }) => `Club tier ${tier}`,
   'tier.unknown': 'Club tier unknown',
 
@@ -243,6 +247,10 @@ export const en = {
   'yourClub.gap': 'Vs your pace',
 
   'clubPage.back': 'Back to search',
+  'clubPage.introYou':
+    "See how you'd fit in this club before you apply: where you'd rank among its members, and how everyone's daily fan gain has gone this month.",
+  'clubPage.introClub':
+    "This club's members and how everyone's daily fan gain has gone this month. Search by trainer ID to see where you'd rank among them.",
   'clubPage.title': ({ name }: { name: string }) => `${name} · Uma Stable Match`,
   'clubPage.loading': 'Loading the club…',
   'clubPage.median': 'Median/day',

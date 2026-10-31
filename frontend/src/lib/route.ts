@@ -29,3 +29,23 @@ export function clubPath(circleId: number | string, trainerId: string | null = n
   const path = `/club/${circleId}`;
   return trainerId === null ? path : `${path}?${new URLSearchParams({ trainer: trainerId })}`;
 }
+
+const FROM_KEY = 'uma-stable-match:club-from';
+
+/** Notes the search page's address before opening a club page, for its "Back to search". */
+export function rememberSearch(storage: Storage | undefined, href: string): void {
+  try {
+    storage?.setItem(FROM_KEY, href);
+  } catch {
+    // Without storage, "Back to search" opens a new search.
+  }
+}
+
+/** The search page's address noted by `rememberSearch`, if any. */
+export function rememberedSearch(storage: Storage | undefined): string | null {
+  try {
+    return storage?.getItem(FROM_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import { loadWebAnalytics } from './lib/analytics';
-  import { fetchFeatures, fetchRecommendations, type RecommendationQuery } from './lib/api';
+  import { fetchRecommendations, type RecommendationQuery } from './lib/api';
+  import { applyFeatures } from './lib/features';
   import { HumanCheck } from './lib/human';
   import HowToUse from './lib/HowToUse.svelte';
   import { t } from './lib/i18n';
@@ -92,17 +92,8 @@
   });
 
   onMount(() => {
-    // A failed request leaves Japanese and analytics off.
     const features = new AbortController();
-    fetchFeatures({ signal: features.signal }).then(
-      (found) => {
-        language.japaneseEnabled = found.japanese;
-        if (found.webAnalytics !== null) {
-          loadWebAnalytics(found.webAnalytics);
-        }
-      },
-      () => {},
-    );
+    applyFeatures({ signal: features.signal });
     if (fromUrl) {
       const validation = validate(fromUrl);
       if (validation.ok) {

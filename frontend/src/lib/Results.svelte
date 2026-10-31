@@ -27,6 +27,9 @@
   const hints = $derived(emptyHints(result.options));
   const notices = $derived(resultNotices(result));
   const count = $derived(result.clubs.length);
+  const trainerId = $derived(
+    result.trainer.trainer_id === null ? null : String(result.trainer.trainer_id),
+  );
 </script>
 
 <section aria-labelledby="results-heading" class:stale aria-busy={stale}>
@@ -52,7 +55,7 @@
   {:else}
     <ol class="cards">
       {#each picks as club, i (club.circle_id)}
-        <li><ClubCard {club} position={i + 1} /></li>
+        <li><ClubCard {club} position={i + 1} {trainerId} /></li>
       {/each}
     </ol>
   {/if}
@@ -74,12 +77,18 @@
       topPick={picks[0] ?? null}
       pace={result.trainer.pace_per_day}
       {count}
+      {trainerId}
     />
   {/if}
 
   {#if count > 0}
     <h3>{t('results.topN', { n: count })}</h3>
-    <ResultsTable clubs={result.clubs} {balanceOn} includeClosed={result.options.include_closed} />
+    <ResultsTable
+      clubs={result.clubs}
+      {balanceOn}
+      includeClosed={result.options.include_closed}
+      {trainerId}
+    />
   {/if}
 </section>
 

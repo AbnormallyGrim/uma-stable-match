@@ -1,10 +1,12 @@
 // ClubPage component tests with a stubbed loader. All data is made up.
 
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError, type ClubDetails, type fetchClub } from './api';
 import ClubPage from './ClubPage.svelte';
+import { language } from './language.svelte';
+import { rememberSearch } from './route';
 import { club } from './test-data';
 
 const M = 1_000_000;
@@ -52,6 +54,13 @@ function cards() {
   );
 }
 
+afterEach(() => {
+  sessionStorage.clear();
+  vi.unstubAllGlobals();
+  language.choose('en');
+  language.japaneseEnabled = false;
+});
+
 describe('ClubPage', () => {
   it('shows the club and its members, fastest first', async () => {
     const load = resolving(details());
@@ -96,6 +105,18 @@ describe('ClubPage', () => {
     expect(you?.tagName).not.toBe('BUTTON');
     expect(screen.getByText('3 of 6')).toBeInTheDocument();
     expect(screen.queryByText(/This is your club/)).not.toBeInTheDocument();
+  });
+
+  it('explains what the page shows when the trainer is placed', async () => {
+    setup(resolving(details({ trainer })), '123456789012');
+    expect(
+      await screen.findByText(/See how you'd fit in this club before you apply/),
+    ).toBeVisible();
+  });
+
+  it('suggests a trainer search when the club is shown alone', async () => {
+    setup(resolving(details()));
+    expect(await screen.findByText(/Search by trainer ID to see where you'd rank/)).toBeVisible();
   });
 
   it('says when it is the trainer’s own club', async () => {
@@ -160,7 +181,38 @@ describe('ClubPage', () => {
     expect(container.querySelector('path.chosen')).toBeNull();
   });
 
-  it('links back to the search', () => {
+  it('offers the language button and the saved language when the server has Japanese on', async () => {
+    language.choose('ja');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ japanese: true }), {
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        ),
+      ),
+    );
+    setup(resolving(details()));
+    expect(await screen.findByRole('link', { name: '← 検索に戻る' })).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe('ja');
+    expect(screen.getByRole('button', { name: /English/ })).toBeInTheDocument();
+  });
+
+  it('links to a new search when it was not opened from one', () => {
+    setup(resolving(details()));
+    expect(screen.getByRole('link', { name: '← Back to search' })).toHaveAttribute('href', '/');
+  });
+
+  it('links back to the search it was opened from', () => {
+    const search = `${window.location.origin}/?trainer_id=123456789012`;
+    rememberSearch(sessionStorage, search);
+    setup(resolving(details()));
+    expect(screen.getByRole('link', { name: '← Back to search' })).toHaveAttribute('href', search);
+  });
+
+  it('ignores a remembered address on another site', () => {
+    rememberSearch(sessionStorage, 'https://example.com/?trainer_id=123456789012');
     setup(resolving(details()));
     expect(screen.getByRole('link', { name: '← Back to search' })).toHaveAttribute('href', '/');
   });

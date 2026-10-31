@@ -9,6 +9,7 @@
   import { onMount } from 'svelte';
 
   import { fetchClub, type ClubDetails } from './api';
+  import { applyFeatures } from './features';
   import ClubTags from './ClubTags.svelte';
   import { formatGap, formatPace, formatPlace, formatUpdated, monthLabel } from './format';
   import { HumanCheck } from './human';
@@ -19,7 +20,7 @@
   import ReleaseNotes from './ReleaseNotes.svelte';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
   import { rosterRows } from './roster';
-  import type { ClubRoute } from './route';
+  import { rememberedSearch, type ClubRoute } from './route';
   import SiteFooter from './SiteFooter.svelte';
   import { describeClubError, type ErrorMessage } from './states';
   import TierBadge from './TierBadge.svelte';
@@ -70,9 +71,13 @@
     }
   }
 
-  // Back to the search the visitor came from, when there is one.
+  // The search this page was opened from in this tab, if any. Going back to it keeps its results
+  // and scroll position; without one, the link opens a new search.
+  const from = rememberedSearch(typeof sessionStorage === 'undefined' ? undefined : sessionStorage);
+  const backHref = from?.startsWith(`${window.location.origin}/`) ? from : '/';
+
   function back(event: MouseEvent) {
-    if (document.referrer.startsWith(`${window.location.origin}/`) && history.length > 1) {
+    if (backHref !== '/' && history.length > 1) {
       event.preventDefault();
       history.back();
     }
@@ -102,15 +107,20 @@
   });
 
   onMount(() => {
+    const features = new AbortController();
+    applyFeatures({ signal: features.signal });
     run();
-    return () => controller?.abort();
+    return () => {
+      features.abort();
+      controller?.abort();
+    };
   });
 </script>
 
 <NavBar onreleases={openReleases} unseen={unseenRelease} />
 
 <main>
-  <a class="back" href="/" onclick={back}>← {t('clubPage.back')}</a>
+  <a class="back" href={backHref} onclick={back}>← {t('clubPage.back')}</a>
 
   {#if page.phase === 'loading'}
     <p class="status" role="status">{t('clubPage.loading')}</p>
@@ -124,6 +134,7 @@
     </div>
   {:else}
     {@const { club, trainer, median_per_day: median } = page.details}
+    <p class="intro">{t(trainer ? 'clubPage.introYou' : 'clubPage.introClub')}</p>
     <header class="club">
       <TierBadge tier={club.tier} />
       <div class="info">
@@ -235,6 +246,13 @@
   .back:hover,
   .back:focus-visible {
     text-decoration: underline;
+  }
+
+  .intro {
+    max-width: 70ch;
+    margin: 0 0 12px;
+    color: var(--text-2);
+    font-size: 0.875rem;
   }
 
   .status {

@@ -54,10 +54,12 @@ describe('Results', () => {
     const picks = screen.getByRole('list');
     const items = within(picks).getAllByRole('listitem');
     expect(items).toHaveLength(10);
-    expect(within(items[0]!).getByRole('link')).toHaveTextContent('Club 1');
-    expect(within(items[9]!).getByRole('link')).toHaveTextContent('Club 10');
+    expect(within(items[0]!).getByRole('link', { name: 'Club 1' })).toBeInTheDocument();
+    expect(within(items[9]!).getByRole('link', { name: 'Club 10' })).toBeInTheDocument();
     expect(within(picks).queryByText('Club 11')).not.toBeInTheDocument();
-    expect(within(screen.getByRole('table')).getAllByRole('link')).toHaveLength(12);
+    expect(within(screen.getByRole('table')).getAllByRole('link', { name: /^Club / })).toHaveLength(
+      12,
+    );
   });
 
   it('heads the table with the number of results', () => {
@@ -153,6 +155,40 @@ describe('Results', () => {
   it('says when nothing matched', () => {
     render(Results, { result: recommendations() });
     expect(screen.getByText('No clubs matched your search.')).toBeInTheDocument();
+  });
+});
+
+describe('Results club page links', () => {
+  const clubs = [1, 2].map((id) =>
+    club({ circle_id: id, name: `Club ${id}`, url: `https://uma.moe/circles/${id}` }),
+  );
+
+  it('links every pick, table row and your club to its members with the trainer', () => {
+    render(Results, {
+      result: recommendations({
+        trainer: { trainer_id: 123456789012, pace_per_day: 7_600_000 },
+        total: 2,
+        clubs,
+        your_club: yourClub(),
+      }),
+    });
+    const links = screen.getAllByRole('link', { name: 'See how you fit in Club 1' });
+    // The top pick card, the top pick in the Your club comparison, and the table row.
+    expect(links).toHaveLength(3);
+    for (const link of links) {
+      expect(link).toHaveAttribute('href', '/club/1?trainer=123456789012');
+    }
+    expect(screen.getByRole('link', { name: 'See how you fit in Home Club' })).toHaveAttribute(
+      'href',
+      '/club/99?trainer=123456789012',
+    );
+  });
+
+  it('links without a trainer for a pace search', () => {
+    render(Results, { result: recommendations({ total: 2, clubs }) });
+    for (const link of screen.getAllByRole('link', { name: 'See members of Club 2' })) {
+      expect(link).toHaveAttribute('href', '/club/2');
+    }
   });
 });
 
