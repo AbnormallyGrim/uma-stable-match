@@ -8,6 +8,7 @@
   import type { Club } from './api';
   import { formatPercent, formatPerDay, formatPlace, joinStyleLabel, tierIndex } from './format';
   import { t, type MessageKey } from './i18n';
+  import MembersLink from './MembersLink.svelte';
   import TierBadge from './TierBadge.svelte';
 
   type SortKey =
@@ -43,9 +44,11 @@
     clubs: Club[];
     balanceOn: boolean;
     includeClosed: boolean;
+    /** The trainer searched for, for the club page links, or `null` for a pace search. */
+    trainerId?: string | null;
   }
 
-  let { clubs, balanceOn, includeClosed }: Props = $props();
+  let { clubs, balanceOn, includeClosed, trainerId = null }: Props = $props();
 
   const columns: Column[] = [
     { key: 'pick', label: 'table.col.pick', value: (r) => r.pick, first: 'ascending' },
@@ -204,6 +207,7 @@
           <td><TierBadge tier={club.tier} size="small" /></td>
           <td class="name">
             <a href={club.url} target="_blank" rel="noopener noreferrer">{club.name}</a>
+            <MembersLink circleId={club.circle_id} name={club.name} {trainerId} compact />
           </td>
           <td>{club.monthly_rank ?? '–'}</td>
           <td>{club.last_month_rank ?? '–'}</td>
@@ -294,6 +298,10 @@
   th.name,
   td.name {
     text-align: left;
+  }
+
+  td.name :global(.members) {
+    margin-left: 12px;
   }
 
   tbody tr:last-child td {

@@ -87,6 +87,7 @@ src/lib/ResultsTable.svelte   Sortable, searchable table of the best fits
 src/lib/ResultsSummary.svelte Pace, clubs analysed, comfortable fits, typical place and data age
 src/lib/stats.ts              Comfortable fits and typical place, from the results
 src/lib/ClubCard.svelte       One top pick
+src/lib/MembersLink.svelte    "See how you fit" button to a club page, noting the search for "Back to search"
 src/lib/ClubTags.svelte       A club's rank, trend, open spots and tags, on cards and the club page
 src/lib/Dropdown.svelte       A themed single-choice dropdown, used for playstyle
 src/lib/YourClub.svelte       The trainer's own club, compared with the top pick
@@ -174,9 +175,9 @@ After a search, the page shows a summary and the top ten picks.
 
   Hovering over either value explains it. Under the stats, "Club data updated 3 hours ago." comes from the response's `updated_at`, with the exact time on hover. The balance setting is in the form.
 - **Each card:**
-  - **Header:** the pick number (gold, silver and bronze for the top three), the tier icon, and the club name linking to uma.moe in a new tab
+  - **Header:** the pick number (gold, silver and bronze for the top three), the tier icon, the club name linking to uma.moe in a new tab
   - **Details:** the monthly rank and trend, open spots, join style and playstyle tags, a **Discord** tag when the API's `has_discord` is true, and the description
-  - **How you'd compare:** your place and the club's median per day
+  - **How you'd compare:** your place and the club's median per day, with a **See how you fit** button under them that opens the [club page](#club-page)
   - **With balance on:** the balance score as a bar, passengers and top-three share. On wide screens they sit to the right of the description, so the card stays one row shorter
 - **Notices:** under the summary, when they apply:
   - "*These results are filtered by join style or playstyle, so your best matches may be further from your pace than usual.*" when the API's `options` show a join style or playstyle filter
@@ -189,7 +190,7 @@ After a search, the page shows a summary and the top ten picks.
 - **Your club:** when the response has `your_club`, a card between the notes and the table shows:
   - "Your club would be #37 in your results.", "fits you better than any of your results" at #1, or "would rank below your top 100" past the returned clubs, from `result_rank`
   - its median against your pace
-  - a panel for your club and one for the top pick, when there is one, side by side on wide screens. Each has the tier, name, rank and trend, open spots and join style, then the median, its gap to your pace (`+3.6M/day` above it, `−1.2M/day` below), your place and, when the club has them, the balance details
+  - a panel for your club and one for the top pick, when there is one, side by side on wide screens. Each has the tier, name, rank and trend, open spots and join style, a **See how you fit** button, then the median, its gap to your pace (`+3.6M/day` above it, `−1.2M/day` below), your place and, when the club has them, the balance details
 - **Layout:** on narrow screens, up to 720 pixels wide, the numbers move below the club details, the description and balance details stack, and the **Your club** panels stack.
 - **Screen readers:** after a search, only a short "Found N clubs" message is announced, followed by any notices, not the whole list. The text goes into a live region that's always on the page, because a notice that appears together with new results isn't reliably announced. Rank trends have spoken descriptions, such as "Up 16 places since last month".
 
@@ -199,7 +200,7 @@ Tiers are shown with the game's own icons, D to SS, from [`src/assets/tiers/`](s
 
 ### Top results table
 
-Below the cards, the 100 best-fitting clubs are listed in a table, best fit first, under "Top N results" with the number returned, so it's clear these are the best matches rather than everything searched. The app asks the API for 100 clubs (`RESULT_LIMIT` in `App.svelte`), as clubs further down fit poorly. Searching and sorting work within those 100, while **Clubs analysed** in the summary counts every club compared with your pace.
+Below the cards, the 100 best-fitting clubs are listed in a table, best fit first, under "Top N results" with the number returned, so it's clear these are the best matches rather than everything searched. The app asks the API for 100 clubs (`RESULT_LIMIT` in `App.svelte`), as clubs further down fit poorly. Searching and sorting work within those 100, while **Clubs analysed** in the summary counts every club compared with your pace. Each club name links to uma.moe, with a small **See how you fit** button beside it.
 
 | Column | Sorts first by |
 |---|---|
@@ -347,13 +348,15 @@ The runner takes the fetch function, a change callback, the retry delays and the
 
 The page calls `fetchClub()`, which wraps [`GET /api/v1/clubs/{id}`](../backend/server/README.md#club-page) and uses the [human check](#human-check) like a search.
 
+- **Intro:** one line above the header saying what the page is for. With a trainer: see how you'd fit before you apply, your rank among the members and this month's daily gains. Without one, it describes the club and suggests a trainer ID search.
 - **Header:** the tier icon, the name linking to the club's uma.moe page, the same rank, spots and tags line as the cards (`ClubTags.svelte`), the description, and the median. With a trainer, their pace and "You'd be 6 of 30" too.
 - **Chart:** right under the header, `PaceChart.svelte` draws each member's line thin and muted, the club median in bold and the trainer's line in the accent colour, with an end dot. It shows **Daily gain** by default, and **Fans this month** shows the fans gained since each line's first day. A legend names the lines; see [Pace chart](#pace-chart).
 - **Members:** a numbered list of cards under the chart, one per current member, fastest first, filling as many columns as fit. Each card shows the place, trainer name and daily pace. A member without a name shows as "Unknown trainer". With a trainer, each card also says how far its pace is from theirs, such as "+2.5M/day vs you". Members too new to rank come last, without a place.
 - **Highlighting a member:** each member card is a toggle button. Selecting it highlights the card and the member's line, scrolling the chart into view if it's off screen; selecting it again, or another card, clears or moves the highlight.
 - **You:** `rosterRows()` adds the trainer as a highlighted card after every member faster than them, the same rule the server uses for "You'd be". In their own club, their own entry is left out and a note says they're placed as if joining.
 - **Errors:** a club that isn't loaded yet says so and offers a retry. Other errors read as they do for a search.
-- **Back to search** returns to the page the visitor came from when it's this site, and otherwise opens the search.
+- **See how you fit:** every top pick card, both **Your club** panels and every table row have a gold outlined button to the club page, opening in the same tab. On cards it sits under "You'd be" and the median; in the table it's a smaller version beside the name. After a trainer ID search it reads **See how you fit** and carries the trainer, so the page places them. After a pace search the page can't place anyone, so it reads **See members** and shows the club alone. Each button's spoken name includes the club, such as "See how you fit in Example Club".
+- **Back to search:** following one of those buttons notes the search's address in this tab's session storage. The club page's **Back to search** then goes back in history to those results, with their scroll position. Without one, for example when the club page was opened from a shared link, it opens a new search. The server sends `Referrer-Policy: no-referrer`, so the referrer can't tell where the visitor came from.
 
 The navbar keeps the release notes but has no tour button here.
 

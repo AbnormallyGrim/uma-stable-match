@@ -1,12 +1,13 @@
 <!--
   @component
-  One recommended club: tier, link to uma.moe, rank trend, tags, how you'd compare,
-  and balance details when balance scoring is on. The top three get medal colours.
+  One recommended club: tier, link to uma.moe, rank trend, tags, how you'd compare with a button to
+  the club page, and balance details when balance scoring is on. The top three get medal colours.
 -->
 
 <script lang="ts">
   import type { Club } from './api';
   import ClubTags from './ClubTags.svelte';
+  import MembersLink from './MembersLink.svelte';
   import { formatPercent, formatPerDay, formatPlace } from './format';
   import { t } from './i18n';
   import TierBadge from './TierBadge.svelte';
@@ -14,9 +15,11 @@
   interface Props {
     club: Club;
     position: number;
+    /** The trainer searched for, for the club page link, or `null` for a pace search. */
+    trainerId?: string | null;
   }
 
-  let { club, position }: Props = $props();
+  let { club, position, trainerId = null }: Props = $props();
 
   const medal = $derived(position <= 3 ? `p${position}` : '');
 </script>
@@ -37,16 +40,19 @@
     </div>
   </div>
 
-  <dl class="nums">
-    <div>
-      <dt>{t('club.youdBe')}</dt>
-      <dd>{formatPlace(club.your_place, club.club_size)}</dd>
-    </div>
-    <div>
-      <dt>{t('club.median')}</dt>
-      <dd>{formatPerDay(club.median_per_day)}</dd>
-    </div>
-  </dl>
+  <div class="side">
+    <dl class="nums">
+      <div>
+        <dt>{t('club.youdBe')}</dt>
+        <dd>{formatPlace(club.your_place, club.club_size)}</dd>
+      </div>
+      <div>
+        <dt>{t('club.median')}</dt>
+        <dd>{formatPerDay(club.median_per_day)}</dd>
+      </div>
+    </dl>
+    <MembersLink circleId={club.circle_id} name={club.name} {trainerId} />
+  </div>
 
   {#if club.comment || club.balance}
     <div class="details">
@@ -153,21 +159,28 @@
     text-decoration: underline;
   }
 
-  /* The divider on its left spans 85% of the card's content height. Fixed column widths, wide
-     enough for `30 of 30` and `<0.01M/day`, keep it in line from card to card. */
-  .nums {
+  /* The numbers and the club page button. The divider on its left spans 85% of the card's content
+     height. Fixed column widths, wide enough for `30 of 30` and `<0.01M/day`, keep it in line from
+     card to card. */
+  .side {
     position: relative;
     grid-area: nums;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+    padding-left: 16px;
+  }
+
+  .nums {
     display: grid;
     grid-template-columns: 4.5rem 6rem;
     gap: 16px;
-    align-content: center;
     margin: 0;
-    padding-left: 16px;
     text-align: right;
   }
 
-  .nums::before {
+  .side::before {
     position: absolute;
     top: 7.5%;
     bottom: 7.5%;
@@ -268,17 +281,21 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
+    .side {
+      align-items: start;
+      margin-top: 8px;
+      padding: 8px 0 0;
+      border-top: 1px solid var(--border);
+    }
+
     .nums {
       grid-template-columns: none;
       grid-auto-flow: column;
       justify-content: start;
-      margin-top: 8px;
-      padding: 8px 0 0;
-      border-top: 1px solid var(--border);
       text-align: left;
     }
 
-    .nums::before {
+    .side::before {
       display: none;
     }
   }

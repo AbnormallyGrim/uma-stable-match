@@ -76,6 +76,10 @@ export const ja: Catalog = {
   'club.balance': 'バランス',
   'club.passengers': 'おんぶ組',
   'club.top3Share': '上位3人の割合',
+  'club.seeMembers': 'メンバーを見る',
+  'club.seeFit': 'メンバーと比べる',
+  'club.seeFitIn': ({ name }) => `メンバーと比べる(${name})`,
+  'club.seeMembersOf': ({ name }) => `メンバーを見る(${name})`,
   'tier.label': ({ tier }) => `サークルティア${tier}`,
   'tier.unknown': 'サークルティア不明',
 
@@ -223,6 +227,10 @@ export const ja: Catalog = {
   'yourClub.gap': 'あなたとの差',
 
   'clubPage.back': '検索に戻る',
+  'clubPage.introYou':
+    '加入を申請する前に、このサークルでのあなたの位置を確認できます。メンバー内での順位と、今月の各メンバーの1日のファン獲得数の推移を表示します。',
+  'clubPage.introClub':
+    'このサークルのメンバーと、今月の各メンバーの1日のファン獲得数の推移です。トレーナーIDで検索すると、メンバー内でのあなたの順位も確認できます。',
   'clubPage.title': ({ name }) => `${name} · Uma Stable Match`,
   'clubPage.loading': 'サークルを読み込んでいます…',
   'clubPage.median': '1日の中央値',
