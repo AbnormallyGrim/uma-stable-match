@@ -1,6 +1,7 @@
 //! Works out a trainer's pace from their trainer ID.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -44,6 +45,39 @@ fn upstream_message(error: &SourceError) -> String {
 }
 
 type Entries = HashMap<(u64, Option<Period>), (Instant, Outcome)>;
+
+/// Trainer IDs left out of search metrics, such as the owner's test searches. Its `Debug` output
+/// shows only how many there are, so the IDs never reach logs.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct ExcludedTrainers(Arc<HashSet<u64>>);
+
+impl ExcludedTrainers {
+    /// Leaves out these trainer IDs.
+    pub fn new(ids: impl IntoIterator<Item = u64>) -> Self {
+        Self(Arc::new(ids.into_iter().collect()))
+    }
+
+    /// Whether `viewer_id` is left out.
+    pub fn contains(&self, viewer_id: u64) -> bool {
+        self.0.contains(&viewer_id)
+    }
+
+    /// How many trainer IDs are left out.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Whether none are.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl fmt::Debug for ExcludedTrainers {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ExcludedTrainers({} IDs)", self.len())
+    }
+}
 
 /// A looked-up trainer: their pace and the club it was found in.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -108,6 +142,7 @@ pub struct PaceLookup {
     entries: Arc<Mutex<Entries>>,
     shared: SharedCache,
     details: Option<ClubDetails>,
+    excluded: ExcludedTrainers,
 }
 
 impl PaceLookup {
@@ -119,7 +154,18 @@ impl PaceLookup {
             entries: Arc::default(),
             shared: SharedCache::none(),
             details: None,
+            excluded: ExcludedTrainers::default(),
         }
+    }
+
+    /// Leaves these trainers' lookups out of `pace_lookups_total`.
+    pub fn with_excluded(self, excluded: ExcludedTrainers) -> Self {
+        Self { excluded, ..self }
+    }
+
+    /// Whether `viewer_id` is left out of search metrics.
+    pub fn is_excluded(&self, viewer_id: u64) -> bool {
+        self.excluded.contains(viewer_id)
     }
 
     /// Checks `shared` before the source, and stores each result in it.
@@ -216,23 +262,25 @@ impl PaceLookup {
     }
 
     async fn outcome(&self, viewer_id: u64, period: Option<Period>) -> Result<Outcome, PaceError> {
+        let counted = !self.is_excluded(viewer_id);
         if let Some(outcome) = self.cached(viewer_id, period) {
-            count_pace("memory");
+            count_pace("memory", counted);
             return Ok(outcome);
         }
         let key = self.shared.pace_key(viewer_id, period);
         if let Some(outcome) = self.shared.get::<Outcome>(&key).await {
-            count_pace("redis");
+            count_pace("redis", counted);
             self.store(viewer_id, period, outcome.clone());
             return Ok(outcome);
         }
 
         let outcome = self.lookup(viewer_id, period).await;
-        count_pace(if outcome.is_ok() {
+        let source = if outcome.is_ok() {
             self.source.name()
         } else {
             "error"
-        });
+        };
+        count_pace(source, counted);
         let outcome = outcome?;
         self.store(viewer_id, period, outcome.clone());
         self.shared.set(&key, &outcome, self.ttl).await;
@@ -423,8 +471,10 @@ fn with_club(outcome: Outcome, circle_id: u64) -> Outcome {
     }
 }
 
-fn count_pace(source: &'static str) {
-    metrics::counter!("pace_lookups_total", "source" => source).increment(1);
+fn count_pace(source: &'static str, counted: bool) {
+    if counted {
+        metrics::counter!("pace_lookups_total", "source" => source).increment(1);
+    }
     Span::current().record("source", source);
 }
 

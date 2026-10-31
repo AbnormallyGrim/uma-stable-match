@@ -46,6 +46,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `TURNSTILE_SECRET_KEY` | none | Required with `TURNSTILE_SITE_KEY`: Turnstile's secret key |
 | `TOKEN_SIGNING_KEY` | none | Required with `TURNSTILE_SITE_KEY`: at least 32 characters, the same on every instance. Signs the tokens the human check issues |
 | `METRICS_ADDR` | none | IP address and port to serve Prometheus metrics and the full [status](#status) on, such as `127.0.0.1:9464`. Unset, no metrics are recorded. See [Metrics](#metrics) |
+| `METRICS_EXCLUDED_TRAINER_IDS` | none | Comma-separated trainer IDs whose searches are left out of search metrics and the search total. See [Excluded trainers](#excluded-trainers) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none | OTLP/HTTP base URL to send traces to, such as `http://127.0.0.1:4318`. Unset, no traces are recorded. See [Traces](#traces) |
 | `OTEL_EXPORTER_OTLP_HEADERS` | none | Headers for each export, such as `Authorization=Basic%20<token>`, with spaces written as `%20` |
 | `OTEL_SERVICE_NAME` | `uma-stable-match` | The service name traces are filed under |
@@ -60,9 +61,10 @@ Blank values count as unset. These stop the server at startup, with an error mes
 - a `REDIS_URL` without a `redis://` or `rediss://` scheme, a missing or short `REDIS_KEY_SECRET`, or a Redis that can't be reached within 5 seconds
 - only some of `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY`, or a `TOKEN_SIGNING_KEY` under 32 characters
 - a `METRICS_ADDR` that isn't an IP address and port, or that can't be listened on
+- a `METRICS_EXCLUDED_TRAINER_IDS` that isn't a comma-separated list of trainer IDs
 - an `OTEL_EXPORTER_OTLP_ENDPOINT` that isn't a valid URL
 
-The API key, `REDIS_URL` (which can hold a password), `REDIS_KEY_SECRET`, `TURNSTILE_SECRET_KEY`, `TOKEN_SIGNING_KEY` and `OTEL_EXPORTER_OTLP_HEADERS` are never logged, never included in errors and are redacted in `Debug` output. `.env` is git-ignored; never commit it.
+The trainer IDs in `METRICS_EXCLUDED_TRAINER_IDS` are never logged or shown in errors either; `Debug` output and the startup log give only how many there are. The API key, `REDIS_URL` (which can hold a password), `REDIS_KEY_SECRET`, `TURNSTILE_SECRET_KEY`, `TOKEN_SIGNING_KEY` and `OTEL_EXPORTER_OTLP_HEADERS` are never logged, never included in errors and are redacted in `Debug` output. `.env` is git-ignored; never commit it.
 
 ## Data source
 
@@ -710,7 +712,7 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 
 ### Search total
 
-With Redis, each successful search adds one to the `usm:v1:searches` key. It has no TTL, and `volatile-lru` only evicts keys that expire. It is one integer updated in place. Searches that fail or are rejected aren't counted.
+With Redis, each successful search adds one to the `usm:v1:searches` key. It has no TTL, and `volatile-lru` only evicts keys that expire. It is one integer updated in place. Searches that fail or are rejected aren't counted, and neither are those by [excluded trainers](#excluded-trainers).
 
 To start the total at a number from before it existed, add it once with `INCRBY`, which stays correct even if searches have already counted. For Fly.io, open the proxy with `fly proxy 6379:6379 -a uma-stable-match-redis`, then in another terminal:
 
@@ -721,6 +723,21 @@ redis-cli -a "$REDIS_PASSWORD" INCRBY usm:v1:searches 1000
 Replace `1000` with the number to add. Prometheus can give one close to the true count since launch: `sum(increase(http_requests_total{route="/api/v1/recommendations",status="200"}[30d]))`.
 
 To watch these on a dashboard, [observability/README.md](../../observability/README.md) sets up Prometheus and Grafana locally, with ready-made dashboards.
+
+### Excluded trainers
+
+`METRICS_EXCLUDED_TRAINER_IDS` keeps searches such as the owner's own test searches out of the numbers, so they reflect visitors. A search or club page request with one of those trainer IDs is answered as usual, but:
+
+- it doesn't add to the [search total](#search-total), so `searches_total` and the visitor stats leave it out
+- it records no `pace_lookups_total`, `search_shortlist_worst_rank`, `search_pick_worst_rank` or `search_pool_bottom_total`
+
+Everything else is unchanged. `http_requests_total` still counts the request, since it's recorded per route before the trainer is known, and logs and traces still show the search. Searches by daily pace can't be told apart, so they always count.
+
+Keep the IDs out of the repository. On Fly.io, set them as a secret, which restarts the machine:
+
+```bash
+fly secrets set METRICS_EXCLUDED_TRAINER_IDS=<trainer ID>,<another trainer ID>
+```
 
 ## Traces
 

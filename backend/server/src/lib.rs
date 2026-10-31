@@ -40,8 +40,8 @@ pub use human::{HumanCheck, SigningKey, TurnstileSecret, TOKEN_LIFETIME};
 pub use limits::RateLimits;
 pub use logging::{init_logging, InvalidLogFormat, LogFormat};
 pub use pace::{
-    PaceError, PaceLookup, TrainerPace, DEFAULT_PACE_TTL, MAX_PRIOR_RATIO, TRAINER_BLEND_DAYS,
-    TRAINER_PRIOR_K,
+    ExcludedTrainers, PaceError, PaceLookup, TrainerPace, DEFAULT_PACE_TTL, MAX_PRIOR_RATIO,
+    TRAINER_BLEND_DAYS, TRAINER_PRIOR_K,
 };
 pub use pool::{
     elapsed_days, game_month, game_month_start, is_early_month, join_style_bit, jst,
