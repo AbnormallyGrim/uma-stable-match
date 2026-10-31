@@ -53,7 +53,9 @@ public/theme-init.js          Applies the saved theme before the page renders
 public/favicon-32.png         Browser icon, with apple-touch-icon.png for home screens
 src/main.ts                   Mounts the search, or the club page for a /club/ address
 src/App.svelte                Root component: runs searches and keeps them in the URL
-src/lib/route.ts              Which page an address shows, and club page addresses
+src/lib/route.ts              Which page an address shows, and club and wishlist page addresses
+src/lib/WishlistPage.svelte   The wishlist page: StrawPoll polls for ideas, in frames
+src/lib/polls.ts              The polls on the wishlist page
 src/lib/ClubPage.svelte       The club page: a club's details, its chart and member cards, with you added
 src/lib/roster.ts             The club page's member cards, with you placed where you'd rank
 src/lib/PaceChart.svelte      The club page chart: everyone's pace this month, with you, the median and a chosen member
@@ -64,7 +66,9 @@ src/lib/HowToUse.svelte       Step-by-step instructions under the search form
 src/lib/SearchStatus.svelte   Loading, waiting and error messages
 src/lib/RunnerProgress.svelte The running figure that moves along a track while a search or club loads
 src/lib/progress.ts           The progress curve: how far along the track the runner is
-src/lib/NavBar.svelte         Top bar: the brand, linking to the website, the release notes and tour buttons, and the theme switch
+src/lib/NavBar.svelte         Top bar: the brand, linking to the website, the pages pill, the release notes and tour buttons, and the theme switch
+src/lib/NavLinks.svelte       The pages as a pill of icon links in the navbar, icons only on narrow screens
+src/lib/pages.ts              The pages the navbar links to, and which one is showing
 src/lib/ReleaseNotes.svelte   The release notes modal: a timeline of builds, newest first
 src/lib/releases.ts           The releases themselves, and remembering the newest one seen
 src/lib/Tour.svelte           The product tour's overlay, highlight and instruction card

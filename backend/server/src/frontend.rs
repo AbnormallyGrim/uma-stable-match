@@ -25,7 +25,7 @@ script-src 'self' https://challenges.cloudflare.com",
             $script,
             "; style-src 'self'; img-src 'self' data:; connect-src 'self'",
             $connect,
-            "; font-src 'self'; frame-src https://challenges.cloudflare.com; \
+            "; font-src 'self'; frame-src https://challenges.cloudflare.com https://strawpoll.com; \
 object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         )
     };

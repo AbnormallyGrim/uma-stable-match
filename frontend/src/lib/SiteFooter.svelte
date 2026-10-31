@@ -1,13 +1,15 @@
 <!--
   @component
-  The page footer: tips for switching clubs, the logo, a link to report a problem, and the
-  disclaimer and attributions. Keep the wording in step with the root README's Disclaimer section.
+  The page footer: tips for switching clubs (not on the wishlist page), the logo, links to the
+  wishlist page and to report a problem, and the disclaimer and attributions. Keep the wording in
+  step with the root README's Disclaimer section.
 -->
 
 <script lang="ts">
   import carats from '../assets/carats/carats.webp';
   import BrandLogo from './BrandLogo.svelte';
   import { t } from './i18n';
+  import { isWishlistRoute, WISHLIST_PATH } from './route';
 
   const REPO = 'https://github.com/AbnormallyGrim/uma-stable-match';
   const KOFI = 'https://ko-fi.com/L5P6299MV1';
@@ -16,21 +18,25 @@
   let { today = new Date() }: { today?: Date } = $props();
   const open = (url: string) => window.open(url, '_blank', 'noopener,noreferrer');
 
+  const onWishlistPage = isWishlistRoute(window.location.pathname);
+
   const aprilFools = $derived(today.getMonth() === 3 && today.getDate() === 1);
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- first-party text from the message catalog -->
 <footer class="site-footer">
-  <details class="tips">
-    <summary>{t('footer.tipsSummary')}</summary>
-    <ul>
-      <li>{@html t('footer.tip14')}</li>
-      <li>{@html t('footer.tip24')}</li>
-      <li>{@html t('footer.tipLock')}</li>
-      <li>{@html t('footer.tipActivity')}</li>
-    </ul>
-    <p>{t('footer.tipsNote')}</p>
-  </details>
+  {#if !onWishlistPage}
+    <details class="tips">
+      <summary>{t('footer.tipsSummary')}</summary>
+      <ul>
+        <li>{@html t('footer.tip14')}</li>
+        <li>{@html t('footer.tip24')}</li>
+        <li>{@html t('footer.tipLock')}</li>
+        <li>{@html t('footer.tipActivity')}</li>
+      </ul>
+      <p>{t('footer.tipsNote')}</p>
+    </details>
+  {/if}
 
   <div class="meta">
     <div class="brand">
@@ -39,6 +45,9 @@
     </div>
 
     <nav aria-label={t('footer.links')}>
+      {#if !onWishlistPage}
+        <a class="link" href={WISHLIST_PATH}>{t('wishlist.link')}</a>
+      {/if}
       <button type="button" onclick={() => open(`${REPO}/issues`)}>{t('footer.report')}</button>
       <button type="button" class="kofi" onclick={() => open(KOFI)}
         ><span aria-hidden="true">🥕</span> {t('footer.kofi')}</button
@@ -139,6 +148,21 @@
     color: var(--text);
     font-weight: 600;
     text-decoration: none;
+  }
+
+  nav a.link {
+    padding: 6px 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  nav a.link:hover {
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   nav button:hover {

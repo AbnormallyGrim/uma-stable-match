@@ -167,14 +167,17 @@ async fn adds_security_headers_everywhere() {
 }
 
 #[tokio::test]
-async fn csp_allows_only_same_origin_inline_data_images_and_turnstile() {
+async fn csp_allows_only_same_origin_data_images_turnstile_and_strawpoll_frames() {
     assert!(CONTENT_SECURITY.contains("script-src 'self' https://challenges.cloudflare.com;"));
-    assert!(CONTENT_SECURITY.contains("frame-src https://challenges.cloudflare.com;"));
+    assert!(CONTENT_SECURITY
+        .contains("frame-src https://challenges.cloudflare.com https://strawpoll.com;"));
     assert!(CONTENT_SECURITY.contains("connect-src 'self';"));
     assert!(!CONTENT_SECURITY.contains("unsafe-inline"));
     assert!(!CONTENT_SECURITY.contains("unsafe-eval"));
     assert!(!CONTENT_SECURITY.contains('*'));
-    // Cloudflare is only for scripts and frames, so Turnstile's host appears twice.
+    // Cloudflare is only for scripts and frames, so Turnstile's host appears twice, and StrawPoll
+    // (the wishlist page's polls) is only for frames.
+    assert_eq!(CONTENT_SECURITY.matches("strawpoll.com").count(), 1);
     assert_eq!(
         CONTENT_SECURITY
             .matches("challenges.cloudflare.com")

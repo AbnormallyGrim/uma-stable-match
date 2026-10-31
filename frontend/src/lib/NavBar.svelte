@@ -1,14 +1,15 @@
 <!--
   @component
-  The top bar: the brand, linking back to the website, a button that opens the release notes, a
-  help button that starts the product tour if there is one, and the theme switch. It matches the
-  website's navbar and stays at the top while scrolling.
+  The top bar: the brand, linking back to the website, the pages, a button that opens the release
+  notes, a help button that starts the product tour if there is one, and the theme switch. It
+  matches the website's navbar and stays at the top while scrolling.
 -->
 
 <script lang="ts">
   import BrandLogo from './BrandLogo.svelte';
   import { t } from './i18n';
   import LanguageToggle from './LanguageToggle.svelte';
+  import NavLinks from './NavLinks.svelte';
   import ThemeToggle from './ThemeToggle.svelte';
 
   interface Props {
@@ -31,6 +32,7 @@
       <BrandLogo size={40} />
       <span class="title">{t('app.name')}</span>
     </a>
+    <NavLinks />
     <div class="tools">
       <button
         type="button"
@@ -101,7 +103,8 @@
 
   .inner {
     display: flex;
-    gap: 16px;
+    flex-wrap: wrap;
+    gap: 8px 16px;
     align-items: center;
     justify-content: space-between;
     max-width: var(--page-max);
@@ -167,9 +170,14 @@
     white-space: nowrap;
   }
 
-  @media (max-width: 400px) {
-    .title {
-      font-size: 1rem;
+  /* On phones the pages' Home link takes the brand's place, so the pages and the buttons fit. */
+  @media (max-width: 560px) {
+    .brand {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
     }
   }
 </style>
