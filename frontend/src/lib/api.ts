@@ -160,7 +160,7 @@ export interface RequestOptions {
   timeoutMs?: number;
   fetch?: typeof fetch;
   /** Gets the token the API needs when its human check is on. Without it, no token is sent. */
-  human?: { token(): Promise<string | null>; invalidate(): void };
+  human?: { cached(): string | null; token(): Promise<string | null>; invalidate(): void };
 }
 
 /** How long a request may take before it fails with a `timeout` error. */
@@ -226,20 +226,17 @@ export async function fetchClub(
   return getChecked(`/api/v1/clubs/${encodeURIComponent(circleId)}${params}`, options);
 }
 
-// Fetches a path that needs the human check's token when `options.human` is given.
+// Fetches a path that needs the human check's token when `options.human` is given. Tries first
+// with the token in hand, if any, since the browser also sends the token cookie.
 async function getChecked<T>(path: string, options: RequestOptions): Promise<T> {
   const { human } = options;
-  if (!human) {
-    return getJson<T>(path, options, null);
-  }
-  const token = await human.token();
   try {
-    return await getJson<T>(path, options, token);
+    return await getJson<T>(path, options, human?.cached() ?? null);
   } catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 401) {
+    if (!human || !(error instanceof ApiError) || error.status !== 401) {
       throw error;
     }
-    // The token expired or was refused: get a new one and try once more.
+    // No valid token or cookie: run the check and try once more.
     human.invalidate();
     return getJson<T>(path, options, await human.token());
   }

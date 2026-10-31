@@ -81,6 +81,20 @@ describe('HumanCheck', () => {
     expect(fetch).toHaveBeenCalledTimes(4);
   });
 
+  it('has a cached token only after a check, until shortly before it expires', async () => {
+    let time = 0;
+    const human = new HumanCheck({
+      fetch: on(),
+      loadTurnstile: () => Promise.resolve(turnstile()),
+      now: () => time,
+    });
+    expect(human.cached()).toBeNull();
+    await human.token();
+    expect(human.cached()).toBe('made-up-token');
+    time = 571_000;
+    expect(human.cached()).toBeNull();
+  });
+
   it('asks for a new token after invalidate', async () => {
     const fetch = on();
     const human = new HumanCheck({ fetch, loadTurnstile: () => Promise.resolve(turnstile()) });
@@ -115,26 +129,36 @@ describe('HumanCheck', () => {
 describe('fetchRecommendations with a human check', () => {
   const recommendations = { total: 0, clubs: [] };
   const query = { source: { pace: 5000 } };
+  const authorization = (fetch: ReturnType<typeof vi.fn<typeof globalThis.fetch>>, call: number) =>
+    (fetch.mock.calls[call]![1]!.headers as Record<string, string>).Authorization;
 
-  it('sends the token as a bearer header', async () => {
+  function check(cached: string | null, tokens: (string | null)[] = []) {
+    return {
+      cached: () => cached,
+      token: vi.fn(() => Promise.resolve(tokens.shift() ?? null)),
+      invalidate: vi.fn(),
+    };
+  }
+
+  it('tries without a token first and runs no check when the request passes', async () => {
+    // As with a valid token cookie, or the check off.
     const fetch = vi.fn<typeof globalThis.fetch>(() => Promise.resolve(json(recommendations)));
-    const human = { token: () => Promise.resolve('made-up-token'), invalidate: vi.fn() };
+    const human = check(null);
     await fetchRecommendations(query, { fetch, human });
-    expect(fetch.mock.calls[0]![1]!.headers).toMatchObject({
-      Authorization: 'Bearer made-up-token',
-    });
+    expect(authorization(fetch, 0)).toBeUndefined();
+    expect(human.token).not.toHaveBeenCalled();
   });
 
-  it('sends no Authorization header when the server needs none', async () => {
+  it('sends a cached token as a bearer header', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>(() => Promise.resolve(json(recommendations)));
-    const human = { token: () => Promise.resolve(null), invalidate: vi.fn() };
+    const human = check('made-up-token');
     await fetchRecommendations(query, { fetch, human });
-    expect(fetch.mock.calls[0]![1]!.headers).not.toHaveProperty('Authorization');
+    expect(authorization(fetch, 0)).toBe('Bearer made-up-token');
+    expect(human.token).not.toHaveBeenCalled();
   });
 
-  it('gets a new token and retries once after a 401', async () => {
-    const tokens = ['made-up-old', 'made-up-new'];
-    const human = { token: vi.fn(() => Promise.resolve(tokens.shift()!)), invalidate: vi.fn() };
+  it('runs the check and retries once with its token after a 401', async () => {
+    const human = check(null, ['made-up-new']);
     const fetch = vi.fn<typeof globalThis.fetch>((_url, init) =>
       Promise.resolve(
         (init!.headers as Record<string, string>).Authorization === 'Bearer made-up-new'
@@ -144,11 +168,12 @@ describe('fetchRecommendations with a human check', () => {
     );
     await fetchRecommendations(query, { fetch, human });
     expect(human.invalidate).toHaveBeenCalledTimes(1);
+    expect(human.token).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('gives up after a second 401', async () => {
-    const human = { token: () => Promise.resolve('made-up-token'), invalidate: vi.fn() };
+    const human = check('made-up-token', ['made-up-token']);
     const fetch = vi.fn<typeof globalThis.fetch>(() => Promise.resolve(json({ error: 'no' }, 401)));
     await expect(fetchRecommendations(query, { fetch, human })).rejects.toMatchObject({
       status: 401,
@@ -157,7 +182,7 @@ describe('fetchRecommendations with a human check', () => {
   });
 
   it('does not retry other errors', async () => {
-    const human = { token: () => Promise.resolve('made-up-token'), invalidate: vi.fn() };
+    const human = check(null);
     const fetch = vi.fn<typeof globalThis.fetch>(() =>
       Promise.resolve(json({ error: 'busy' }, 503)),
     );

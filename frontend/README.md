@@ -437,11 +437,11 @@ try {
 
 ### Human check
 
-`src/lib/human.ts` gets the token the server asks for when its [human check](../backend/server/README.md#human-check) is on. The first search asks `GET /api/v1/challenge` for Turnstile's site key. A `404` means the check is off, and the page never asks again or loads anything from Cloudflare.
+`src/lib/human.ts` gets the token the server asks for when its [human check](../backend/server/README.md#human-check) is on. Requests go out first without running the check: the browser sends the server's [token cookie](../backend/server/README.md#token-cookie) from an earlier check, on any page or tab, until it expires. Only a `401` runs the check, so with the check off, or a valid cookie, the page loads nothing from Cloudflare.
 
-- **Challenge:** the page loads Turnstile's script from `challenges.cloudflare.com` only then. The widget stays hidden unless the visitor has to interact. It's shown in a `.human-check` box at the bottom of the page and removed afterwards.
-- **Token:** the response is traded at `POST /api/v1/challenge` for a token, kept in memory (never stored) and sent to `/api/v1/recommendations` as `Authorization: Bearer`. A new one is fetched 30 seconds before it expires.
-- **Retry:** a `401` clears the token, fetches a new one and repeats the request once. `fetchClub` does the same.
+- **Challenge:** after a `401`, the page asks `GET /api/v1/challenge` for Turnstile's site key and loads Turnstile's script from `challenges.cloudflare.com`. A `404` means the check is off. The widget stays hidden unless the visitor has to interact. It's shown in a `.human-check` box at the bottom of the page and removed afterwards.
+- **Token:** the response is traded at `POST /api/v1/challenge` for a token, which the server also sets as the cookie. The page keeps it in memory too (never in storage) and sends it as `Authorization: Bearer` until 30 seconds before it expires, for browsers that don't keep the cookie, such as over plain HTTP on a LAN address.
+- **Retry:** after the check, the request is repeated once. A second `401` fails. `fetchClub` does the same.
 - **Failure:** a challenge that fails, times out after 60 seconds or can't load shows "We couldn't confirm you're a person", with a retry.
 - **Needs the CSP:** the page can only load the script and widget if the server's content security policy allows `challenges.cloudflare.com`.
 
