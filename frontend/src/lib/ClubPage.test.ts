@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError, type ClubDetails, type fetchClub } from './api';
 import ClubPage from './ClubPage.svelte';
+import { language } from './language.svelte';
 import { rememberSearch } from './route';
 import { club } from './test-data';
 
@@ -55,6 +56,9 @@ function cards() {
 
 afterEach(() => {
   sessionStorage.clear();
+  vi.unstubAllGlobals();
+  language.choose('en');
+  language.japaneseEnabled = false;
 });
 
 describe('ClubPage', () => {
@@ -175,6 +179,24 @@ describe('ClubPage', () => {
 
     await fireEvent.click(screen.getByRole('button', { name: /Made-up Trainer C/ }));
     expect(container.querySelector('path.chosen')).toBeNull();
+  });
+
+  it('offers the language button and the saved language when the server has Japanese on', async () => {
+    language.choose('ja');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ japanese: true }), {
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        ),
+      ),
+    );
+    setup(resolving(details()));
+    expect(await screen.findByRole('link', { name: '← 検索に戻る' })).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe('ja');
+    expect(screen.getByRole('button', { name: /English/ })).toBeInTheDocument();
   });
 
   it('links to a new search when it was not opened from one', () => {

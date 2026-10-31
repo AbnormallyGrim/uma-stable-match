@@ -9,6 +9,7 @@
   import { onMount } from 'svelte';
 
   import { fetchClub, type ClubDetails } from './api';
+  import { applyFeatures } from './features';
   import ClubTags from './ClubTags.svelte';
   import { formatGap, formatPace, formatPlace, formatUpdated, monthLabel } from './format';
   import { HumanCheck } from './human';
@@ -106,8 +107,13 @@
   });
 
   onMount(() => {
+    const features = new AbortController();
+    applyFeatures({ signal: features.signal });
     run();
-    return () => controller?.abort();
+    return () => {
+      features.abort();
+      controller?.abort();
+    };
   });
 </script>
 

@@ -79,6 +79,7 @@ src/lib/language.svelte.ts    The language shown right now, shared by every comp
 src/lib/SiteFooter.svelte     Tips, the logo, a link to report a problem, and the disclaimer
 src/lib/BrandLogo.svelte      The logo, in the version for the current theme
 src/lib/api.ts                Typed API client
+src/lib/features.ts           Switches on Japanese and analytics from the server's features, on every page
 src/lib/human.ts              The human check: Turnstile challenge and API token
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
@@ -451,11 +452,11 @@ try {
 
 ## Analytics
 
-Analytics are off unless the server's `WEB_ANALYTICS_TOKEN` is set. The app reads the token from `GET /api/v1/features` at startup and adds Cloudflare's Web Analytics beacon (`src/lib/analytics.ts`), which counts page views without cookies. If the request fails, the beacon isn't loaded.
+Analytics are off unless the server's `WEB_ANALYTICS_TOKEN` is set. Both the search and the club page read the token from `GET /api/v1/features` at startup, through `applyFeatures()` in `src/lib/features.ts`, and add Cloudflare's Web Analytics beacon (`src/lib/analytics.ts`), which counts page views without cookies. If the request fails, the beacon isn't loaded.
 
 ## Language
 
-The Japanese translation is behind the server's `ENABLE_JAPANESE` setting, off by default. At startup the app asks `GET /api/v1/features`; if the answer is missing or fails, it stays in English. With it on, a translate button appears in the top bar and the saved choice (`en` or `ja`) is shown, and a visitor with no saved choice gets English. The choice is saved in a `uma-stable-match-language` cookie on `umastable.com`, so it carries over to the website and back, and in local storage under `uma-stable-match:language`. The cookie wins when both are set; local storage covers choices made before the cookie existed, and hosts such as `localhost`, where the cookie stays on that host.
+The Japanese translation is behind the server's `ENABLE_JAPANESE` setting, off by default. At startup both the search and the club page ask `GET /api/v1/features`, through the same `applyFeatures()`; if the answer is missing or fails, they stay in English. With it on, a translate button appears in the top bar and the saved choice (`en` or `ja`) is shown, and a visitor with no saved choice gets English. The choice is saved in a `uma-stable-match-language` cookie on `umastable.com`, so it carries over to the website and back, and in local storage under `uma-stable-match:language`. The cookie wins when both are set; local storage covers choices made before the cookie existed, and hosts such as `localhost`, where the cookie stays on that host.
 
 ### Messages
 
