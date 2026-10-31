@@ -171,6 +171,30 @@ async fn recommendations_need_a_valid_token_when_the_check_is_on() {
 }
 
 #[tokio::test]
+async fn the_club_page_needs_a_valid_token_when_the_check_is_on() {
+    let server = cloudflare(true).await;
+    let human = check(&server);
+    let (_, body) = challenge(app(human.clone()), r#"{"response":"made-up-response"}"#).await;
+    let token = body["token"].as_str().unwrap();
+    let club = |authorization: Option<String>| {
+        let mut request = Request::get("/api/v1/clubs/1");
+        if let Some(value) = authorization {
+            request = request.header("authorization", value);
+        }
+        app(human.clone()).oneshot(request.body(Body::empty()).unwrap())
+    };
+
+    let status = club(None).await.unwrap().status();
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    // A valid token gets past the check; no club is loaded yet.
+    let status = club(Some(format!("Bearer {token}")))
+        .await
+        .unwrap()
+        .status();
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn a_token_from_another_key_is_turned_away() {
     let server = cloudflare(true).await;
     let (_, body) = challenge(app(check(&server)), r#"{"response":"made-up-response"}"#).await;

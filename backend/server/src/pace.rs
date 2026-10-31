@@ -198,6 +198,19 @@ impl PaceLookup {
         }
     }
 
+    /// The trainer's cumulative fans per day this month, or in `period` if given. `None` if they
+    /// aren't found or their pace came from the 7-day gain. Shares the cache with [`Self::pace`].
+    pub async fn daily_fans(
+        &self,
+        viewer_id: u64,
+        period: Option<Period>,
+    ) -> Result<Option<Vec<i64>>, PaceError> {
+        Ok(match self.outcome(viewer_id, period).await? {
+            Outcome::Fans(fans) => Some(fans.daily_fans),
+            _ => None,
+        })
+    }
+
     async fn find(&self, viewer_id: u64, period: Option<Period>) -> Result<TrainerPace, PaceError> {
         self.outcome(viewer_id, period).await?.into_result()
     }

@@ -4,6 +4,7 @@ mod api_error;
 mod app;
 mod cache;
 mod calibration;
+mod club;
 mod config;
 mod details;
 mod features;

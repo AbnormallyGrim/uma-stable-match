@@ -14,6 +14,7 @@ use tower_http::catch_panic::CatchPanicLayer;
 
 use crate::api_error::ApiError;
 use crate::cache::{Cache, ScanFailure, ScanPhase, Snapshot};
+use crate::club::club;
 use crate::details::ClubDetails;
 use crate::features::{self, Features};
 use crate::frontend;
@@ -51,6 +52,12 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/recommendations",
             get(recommendations)
+                .route_layer(from_fn_with_state(state.clone(), require_human))
+                .route_layer(from_fn_with_state(state.clone(), limit_requests)),
+        )
+        .route(
+            "/api/v1/clubs/{id}",
+            get(club)
                 .route_layer(from_fn_with_state(state.clone(), require_human))
                 .route_layer(from_fn_with_state(state.clone(), limit_requests)),
         )

@@ -383,6 +383,14 @@ impl ClubDetails {
             .map(|entry| entry.club)
     }
 
+    /// A club's details if they're cached or current in the shared cache. Never calls the source.
+    pub async fn loaded(&self, circle_id: u64) -> Option<Arc<Club>> {
+        match self.cached(circle_id).await {
+            Some(club) => Some(club),
+            None => self.load_shared(&[circle_id]).await.pop(),
+        }
+    }
+
     pub(crate) async fn load_shared(&self, ids: &[u64]) -> Vec<Arc<Club>> {
         let inner = &self.inner;
         let period = self.period();
