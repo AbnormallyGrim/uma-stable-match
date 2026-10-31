@@ -84,7 +84,15 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
 
     let cache = Cache::new();
     let (stop, stopped) = watch::channel(false);
-    let paces = PaceLookup::new(&source, config.trainer_cache).with_shared(shared.clone());
+    let paces = PaceLookup::new(&source, config.trainer_cache)
+        .with_shared(shared.clone())
+        .with_excluded(config.excluded_trainers.clone());
+    if !config.excluded_trainers.is_empty() {
+        tracing::info!(
+            count = config.excluded_trainers.len(),
+            "leaving trainer IDs out of search metrics"
+        );
+    }
     let limits = RateLimits::new(
         config.rate_limit_per_minute,
         config.trainer_lookups_per_minute,

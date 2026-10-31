@@ -25,6 +25,7 @@ fn defaults() {
     assert!(!config.trust_forwarded_for);
     assert!(!config.features.japanese);
     assert_eq!(config.features.web_analytics, None);
+    assert!(config.excluded_trainers.is_empty());
 }
 
 #[test]
@@ -616,4 +617,38 @@ fn invalid_japanese_flag_fails() {
             value: "1".into()
         }
     );
+}
+
+#[test]
+fn reads_excluded_trainer_ids() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        (
+            "METRICS_EXCLUDED_TRAINER_IDS",
+            " 111111111111, 222222222222 ,,111111111111 ",
+        ),
+    ]))
+    .unwrap();
+    assert_eq!(config.excluded_trainers.len(), 2);
+    assert!(config.excluded_trainers.contains(111111111111));
+    assert!(config.excluded_trainers.contains(222222222222));
+    assert!(!config.excluded_trainers.contains(333333333333));
+}
+
+#[test]
+fn excluded_trainer_ids_stay_out_of_debug_output_and_errors() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("METRICS_EXCLUDED_TRAINER_IDS", "111111111111"),
+    ]))
+    .unwrap();
+    assert!(!format!("{config:?}").contains("111111111111"));
+
+    let error = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("METRICS_EXCLUDED_TRAINER_IDS", "111111111111,me"),
+    ]))
+    .unwrap_err();
+    assert_eq!(error, ConfigError::InvalidExcludedTrainers);
+    assert!(!error.to_string().contains("111111111111"));
 }

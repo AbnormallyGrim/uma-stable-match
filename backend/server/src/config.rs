@@ -8,7 +8,7 @@ use uma_stable_match_umamoe_client::{ApiKey, ClientConfig};
 
 use crate::features::Features;
 use crate::human::{HumanCheck, SigningKey, TurnstileSecret};
-use crate::pace::DEFAULT_PACE_TTL;
+use crate::pace::{ExcludedTrainers, DEFAULT_PACE_TTL};
 use crate::recommendations::MatchSettings;
 use crate::scanner::ScanConfig;
 use crate::shared::{KeySecret, RedisUrl};
@@ -107,6 +107,8 @@ pub struct Config {
     pub human: Option<(String, TurnstileSecret, SigningKey)>,
     /// Address to serve Prometheus metrics on, from `METRICS_ADDR`. `None` records no metrics.
     pub metrics_addr: Option<SocketAddr>,
+    /// Trainer IDs left out of search metrics, from `METRICS_EXCLUDED_TRAINER_IDS`.
+    pub excluded_trainers: ExcludedTrainers,
 }
 
 /// Invalid or missing settings.
@@ -143,6 +145,10 @@ pub enum ConfigError {
     /// `METRICS_ADDR` isn't an IP address with a port from 1 to 65535.
     #[error("METRICS_ADDR must be an IP address and port, such as 127.0.0.1:9464, got {0:?}")]
     InvalidMetricsAddr(String),
+    /// `METRICS_EXCLUDED_TRAINER_IDS` isn't a comma-separated list of trainer IDs. The value isn't
+    /// shown, as it holds trainer IDs.
+    #[error("METRICS_EXCLUDED_TRAINER_IDS must be a comma-separated list of trainer IDs")]
+    InvalidExcludedTrainers,
     /// `WEB_ANALYTICS_TOKEN` has characters other than letters and digits. The value isn't shown.
     #[error("WEB_ANALYTICS_TOKEN must contain only letters and digits")]
     InvalidWebAnalyticsToken,
@@ -324,6 +330,18 @@ impl Config {
                     .ok_or(ConfigError::InvalidMetricsAddr(value))?,
             ),
         };
+        let excluded_trainers = match get("METRICS_EXCLUDED_TRAINER_IDS") {
+            None => ExcludedTrainers::default(),
+            Some(value) => ExcludedTrainers::new(
+                value
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|id| !id.is_empty())
+                    .map(|id| id.parse::<u64>())
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|_| ConfigError::InvalidExcludedTrainers)?,
+            ),
+        };
         if scan.rank_from > scan.rank_to {
             return Err(ConfigError::InvalidRankWindow {
                 from: scan.rank_from,
@@ -354,6 +372,7 @@ impl Config {
             redis_key_secret,
             human,
             metrics_addr,
+            excluded_trainers,
         })
     }
 }

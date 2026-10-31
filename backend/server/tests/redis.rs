@@ -17,9 +17,9 @@ use tokio::task::JoinHandle;
 use tower::ServiceExt;
 use uma_stable_match_server::{
     club_key, install_metrics, metrics_router, router, run_scheduler, scan, AppState, Cache,
-    CacheStatus, ClubDetails, ClubPool, DetailConfig, KeySecret, ListedClub, MatchSettings,
-    PaceLookup, RateLimits, RedisUrl, RefreshConfig, ScanConfig, ScanPhase, SharedCache,
-    SharedPool, DEFAULT_PACE_TTL,
+    CacheStatus, ClubDetails, ClubPool, DetailConfig, ExcludedTrainers, KeySecret, ListedClub,
+    MatchSettings, PaceLookup, RateLimits, RedisUrl, RefreshConfig, ScanConfig, ScanPhase,
+    SharedCache, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -1244,6 +1244,17 @@ async fn the_search_total_counts_successful_searches_and_never_expires() {
     let other = redis().await.unwrap();
     let server = MockServer::start().await;
     mount_scan(&server, unique_id()).await;
+    // A made-up excluded trainer, whose searches are answered but not counted.
+    let excluded = unique_id();
+    let fans: Vec<i64> = (0..4).map(|day| 100_000_000 + 3_000_000 * day).collect();
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("viewer_id", excluded.to_string()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "circle": { "circle_id": 900000699 },
+            "members": [{ "viewer_id": excluded, "year": 2026, "month": 3, "daily_fans": fans }],
+        })))
+        .mount(&server)
+        .await;
     let running = instance(&server, scan_config(), shared.clone());
     running.wait_until(|s| s.snapshot.is_some()).await;
     let state = AppState {
@@ -1251,10 +1262,11 @@ async fn the_search_total_counts_successful_searches_and_never_expires() {
         details: running.details.clone(),
         matching: MatchSettings::default(),
         human: Default::default(),
-        paces: PaceLookup::new(client(&server), DEFAULT_PACE_TTL),
+        paces: PaceLookup::new(client(&server), DEFAULT_PACE_TTL)
+            .with_excluded(ExcludedTrainers::new([excluded])),
         limits: RateLimits::new(10_000, 10_000, false),
     };
-    let search = |query: &'static str| {
+    let search = |query: String| {
         let app = router(state.clone());
         async move {
             app.oneshot(
@@ -1269,8 +1281,10 @@ async fn the_search_total_counts_successful_searches_and_never_expires() {
     };
 
     let before = shared.searches().await.unwrap();
-    assert_eq!(search("?pace=-1").await, StatusCode::BAD_REQUEST);
-    assert_eq!(search("?pace=5000000").await, StatusCode::OK);
+    assert_eq!(search("?pace=-1".into()).await, StatusCode::BAD_REQUEST);
+    let by_excluded = format!("?trainer_id={excluded}");
+    assert_eq!(search(by_excluded).await, StatusCode::OK);
+    assert_eq!(search("?pace=5000000".into()).await, StatusCode::OK);
     wait_for(async || shared.searches().await.unwrap() > before).await;
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(shared.searches().await.unwrap(), before + 1);

@@ -173,9 +173,18 @@ pub(crate) async fn recommendations(
 ) -> Result<Json<Recommendations>, ApiError> {
     let started = Instant::now();
     let shared = state.details.shared().clone();
+    let paces = state.paces.clone();
     let result = search(state, visitor, params).await;
-    log_search(query.as_deref(), &result, started.elapsed());
-    if result.is_ok() && shared.is_enabled() {
+    // Searches by excluded trainers are answered and logged but left out of the counts.
+    let counted = match &result {
+        Ok(Json(found)) => found
+            .trainer
+            .trainer_id
+            .is_none_or(|id| !paces.is_excluded(id)),
+        Err(_) => true,
+    };
+    log_search(query.as_deref(), &result, started.elapsed(), counted);
+    if result.is_ok() && counted && shared.is_enabled() {
         tokio::spawn(async move { shared.count_search().await });
     }
     result
@@ -193,16 +202,20 @@ fn record_depth(depth: SearchDepth) {
     }
 }
 
-/// Logs one line per search with its query string and outcome, so it can be found and rerun.
+/// Logs one line per search with its query string and outcome, so it can be found and rerun, and
+/// records how deep it went when `counted`.
 fn log_search(
     query: Option<&str>,
     result: &Result<Json<Recommendations>, ApiError>,
     took: Duration,
+    counted: bool,
 ) {
     let duration_ms = u64::try_from(took.as_millis()).unwrap_or(u64::MAX);
     match result {
         Ok(Json(found)) => {
-            record_depth(found.depth);
+            if counted {
+                record_depth(found.depth);
+            }
             let top_clubs: Vec<u64> = found
                 .clubs
                 .iter()
