@@ -71,6 +71,42 @@ jobs:
             frontend/test-results/
           retention-days: 14
 
+  # Comments on the merged pull request, and opens the e2e-failure issue or comments on the open
+  # one, so repeated failures don't pile up issues.
+  report:
+    name: Report end-to-end failure
+    needs: e2e
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write # Create the label, and open or comment on the issue.
+      pull-requests: write # Comment on the merged pull request.
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Report the failure
+        run: |
+          message="The end-to-end test failed for ${HEAD_SHA:0:7}, so it wasn't deployed. See the [run]($RUN_URL) and its \`e2e-report\` artifact."
+          pr=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/pulls" \
+            --jq '[.[] | select(.merged_at != null)][0].number // empty')
+          if [ -n "$pr" ]; then
+            gh pr comment "$pr" --body "$message"
+          fi
+
+          gh label create e2e-failure --color B60205 \
+            --description "The end-to-end test failed on main" 2>/dev/null || true
+          issue=$(gh issue list --label e2e-failure --state open --limit 1 --json number \
+            --jq '.[0].number // empty')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "$message${pr:+ Merged in #$pr.}"
+          else
+            gh issue create --label e2e-failure --title "End-to-end test failing on main" \
+              --body "$message${pr:+ Merged in #$pr.} Close this once it passes again."
+          fi
+
   deploy:
     name: Deploy to Fly.io
     needs: e2e
