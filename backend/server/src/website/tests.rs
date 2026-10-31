@@ -35,7 +35,10 @@ fn stops_at_an_unclosed_element() {
 #[test]
 fn policy_adds_the_hashes_and_google_fonts() {
     let policy = content_security("<script>run()</script><style>p{}</style>");
-    assert!(policy.contains(&format!("script-src 'self' {};", sha256("run()"))));
+    assert!(policy.contains(&format!(
+        "script-src 'self' https://static.cloudflareinsights.com {};",
+        sha256("run()")
+    )));
     assert!(policy.contains(&format!(
         "style-src 'self' https://fonts.googleapis.com {};",
         sha256("p{}")
@@ -45,9 +48,10 @@ fn policy_adds_the_hashes_and_google_fonts() {
 }
 
 #[test]
-fn policy_without_inline_elements_allows_only_the_site() {
+fn policy_without_inline_elements_allows_the_site_and_the_beacon() {
     let policy = content_security("");
-    assert!(policy.contains("script-src 'self';"));
+    assert!(policy.contains("script-src 'self' https://static.cloudflareinsights.com;"));
+    assert!(policy.contains("connect-src 'self' https://cloudflareinsights.com;"));
     assert!(policy.contains("style-src 'self' https://fonts.googleapis.com;"));
 }
 
