@@ -1,0 +1,83 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * 1"
+
+# No permissions by default; each job asks only for what it needs.
+permissions: {}
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect changes
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      languages: ${{ steps.languages.outputs.languages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # A pull request analyses the languages whose files it changes, or every language when it
+      # changes this workflow. A push or the weekly run analyses every language.
+      - name: Find languages to analyse
+        id: languages
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed="$RUNNER_TEMP/changed"
+          touch "$changed"
+          flags=(--all)
+          if [ "$EVENT" = pull_request ]; then
+            git diff --name-only "$BASE...$HEAD" > "$changed"
+            grep -qE '^\.github/(workflows/codeql\.yml|scripts/changed-areas\.sh)$' "$changed" || flags=()
+          fi
+          languages=$(.github/scripts/changed-areas.sh "${flags[@]}" \
+            'actions=^\.github/workflows/|(^|/)action\.ya?ml$' \
+            'javascript-typescript=^(frontend|site)/|\.([cm]?[jt]sx?|html?)$' \
+            'rust=^(backend/|Cargo\.(toml|lock)$)' \
+            < "$changed" | jq -Rnc '[inputs | select(endswith("=true")) | rtrimstr("=true")]')
+          echo "languages=$languages" | tee -a "$GITHUB_OUTPUT"
+
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    needs: changes
+    if: needs.changes.outputs.languages != '[]'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(needs.changes.outputs.languages) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      # The category matches the one default setup used, so existing alerts carry over.
+      - name: Analyze
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: /language:${{ matrix.language }}
