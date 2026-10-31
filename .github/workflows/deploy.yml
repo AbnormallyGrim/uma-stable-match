@@ -1,13 +1,14 @@
 name: Deploy
 
-# Deploys the server to Fly.io after CI passes for a push to main.
+# Runs the end-to-end test after CI passes for a push to main, then deploys the server to Fly.io if
+# it passes.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
 
-# No permissions by default; the job asks only for what it needs.
+# No permissions by default; each job asks only for what it needs.
 permissions: {}
 
 # One deploy at a time, and a running deploy is never cancelled.
@@ -16,8 +17,63 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  e2e:
+    name: End-to-end test
+    # Only CI runs for pushes to this repository's main. Without the last two checks, a pull request
+    # from a fork's own main branch would match too.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      # Installs the toolchain and components from rust-toolchain.toml.
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Cache build
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Builds the page and the fixture server, then runs the test. See the frontend README.
+      - name: End-to-end test
+        run: npm run e2e
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 14
+
   deploy:
     name: Deploy to Fly.io
+    needs: e2e
     # Only CI runs for pushes to this repository's main. Without the last two checks, a pull request
     # from a fork's own main branch would match too.
     if: >-
