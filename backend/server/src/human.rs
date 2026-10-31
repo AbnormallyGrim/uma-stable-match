@@ -6,8 +6,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::extract::{Request, State};
-use axum::http::header::AUTHORIZATION;
-use axum::http::StatusCode;
+use axum::http::header::{AUTHORIZATION, COOKIE, SET_COOKIE};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -21,6 +21,9 @@ use crate::app::AppState;
 
 /// How long a token stays valid.
 pub const TOKEN_LIFETIME: Duration = Duration::from_secs(10 * 60);
+
+/// The cookie that carries the token between page loads.
+pub const TOKEN_COOKIE: &str = "usm_human";
 
 const VERIFY_URL: &str = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const VERIFY_TIMEOUT: Duration = Duration::from_secs(5);
@@ -215,19 +218,18 @@ pub(crate) struct Token {
     expires_in: u64,
 }
 
-/// Turns away requests without a valid `Authorization: Bearer` token. Lets everything through when
-/// the check is off.
+/// Turns away requests without a valid token, in an `Authorization: Bearer` header or the token
+/// cookie. Lets everything through when the check is off.
 pub(crate) async fn require_human(
     State(state): State<AppState>,
     request: Request,
     next: Next,
 ) -> Response {
-    let token = request
-        .headers()
-        .get(AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "));
-    if token.is_some_and(|token| state.human.is_valid(token)) || !state.human.is_enabled() {
+    let headers = request.headers();
+    let passed = !state.human.is_enabled()
+        || bearer(headers).is_some_and(|token| state.human.is_valid(token))
+        || cookies(headers).any(|token| state.human.is_valid(token));
+    if passed {
         return next.run(request).await;
     }
     metrics::counter!("human_checks_total", "result" => "token_missing").increment(1);
@@ -236,6 +238,33 @@ pub(crate) async fn require_human(
         "a human check token is required; get one from /api/v1/challenge",
     )
     .into_response()
+}
+
+fn bearer(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+}
+
+// Every value of the token cookie, since a browser can send more than one.
+fn cookies(headers: &HeaderMap) -> impl Iterator<Item = &str> {
+    headers
+        .get_all(COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(';'))
+        .filter_map(|pair| pair.trim().split_once('='))
+        .filter(|(name, _)| *name == TOKEN_COOKIE)
+        .map(|(_, value)| value)
+}
+
+fn token_cookie(token: &str) -> HeaderValue {
+    let max_age = TOKEN_LIFETIME.as_secs();
+    HeaderValue::from_str(&format!(
+        "{TOKEN_COOKIE}={token}; Max-Age={max_age}; Path=/api; HttpOnly; Secure; SameSite=Strict"
+    ))
+    .expect("a signed token is a valid header value")
 }
 
 /// Serves `GET /api/v1/challenge`: Turnstile's public site key, for the web app.
@@ -249,11 +278,11 @@ pub(crate) async fn site_key(State(state): State<AppState>) -> Result<Json<Value
     }
 }
 
-/// Serves `POST /api/v1/challenge`: trades a Turnstile response for a token.
+/// Serves `POST /api/v1/challenge`: trades a Turnstile response for a token, also set as a cookie.
 pub(crate) async fn challenge(
     State(state): State<AppState>,
     Json(body): Json<Challenge>,
-) -> Result<Json<Token>, ApiError> {
+) -> Result<Response, ApiError> {
     let Some(enabled) = &state.human.enabled else {
         return Err(ApiError::new(
             StatusCode::NOT_FOUND,
@@ -266,10 +295,13 @@ pub(crate) async fn challenge(
     match state.human.verify(enabled, &body.response).await {
         Ok(()) => {
             metrics::counter!("human_checks_total", "result" => "passed").increment(1);
-            Ok(Json(Token {
-                token: sign(&enabled.key, SystemTime::now()),
+            let token = sign(&enabled.key, SystemTime::now());
+            let cookie = token_cookie(&token);
+            let body = Json(Token {
+                token,
                 expires_in: TOKEN_LIFETIME.as_secs(),
-            }))
+            });
+            Ok(([(SET_COOKIE, cookie)], body).into_response())
         }
         Err(VerifyError::Failed) => {
             metrics::counter!("human_checks_total", "result" => "failed").increment(1);

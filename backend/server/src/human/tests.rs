@@ -57,3 +57,23 @@ fn an_off_check_accepts_anything() {
     assert!(!check.is_enabled());
     assert!(check.is_valid("nonsense"));
 }
+
+#[test]
+fn every_token_cookie_is_read_and_other_cookies_are_ignored() {
+    let mut headers = HeaderMap::new();
+    headers.append(COOKIE, HeaderValue::from_static("other=1; usm_human=first"));
+    headers.append(
+        COOKIE,
+        HeaderValue::from_static("usm_human=second;usm_human_x=no"),
+    );
+    assert_eq!(cookies(&headers).collect::<Vec<_>>(), ["first", "second"]);
+    assert_eq!(cookies(&HeaderMap::new()).count(), 0);
+}
+
+#[test]
+fn the_token_cookie_is_scoped_to_the_api_and_hidden_from_scripts() {
+    assert_eq!(
+        token_cookie("123.abc"),
+        "usm_human=123.abc; Max-Age=600; Path=/api; HttpOnly; Secure; SameSite=Strict"
+    );
+}
