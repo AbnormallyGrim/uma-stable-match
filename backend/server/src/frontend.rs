@@ -16,11 +16,29 @@ use axum::Router;
 use tower::ServiceExt;
 use tower_http::services::{ServeDir, ServeFile};
 
+/// Builds a `Content-Security-Policy`, adding extra script and connect sources.
+macro_rules! content_security {
+    ($script:literal, $connect:literal) => {
+        concat!(
+            "default-src 'self'; \
+script-src 'self' https://challenges.cloudflare.com",
+            $script,
+            "; style-src 'self'; img-src 'self' data:; connect-src 'self'",
+            $connect,
+            "; font-src 'self'; frame-src https://challenges.cloudflare.com; \
+object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        )
+    };
+}
+
 /// The `Content-Security-Policy` header sent with every response.
-pub const CONTENT_SECURITY: &str = "default-src 'self'; \
-script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; \
-connect-src 'self'; font-src 'self'; frame-src https://challenges.cloudflare.com; \
-object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+pub const CONTENT_SECURITY: &str = content_security!("", "");
+
+/// [`CONTENT_SECURITY`] plus Cloudflare Web Analytics, sent when its token is set.
+pub const CONTENT_SECURITY_WITH_ANALYTICS: &str = content_security!(
+    " https://static.cloudflareinsights.com",
+    " https://cloudflareinsights.com"
+);
 
 const IMMUTABLE: &str = "public, max-age=31536000, immutable";
 const REVALIDATE: &str = "no-cache";
@@ -61,11 +79,16 @@ async fn cache_headers(request: Request, next: Next) -> Response {
     response
 }
 
-pub(crate) async fn security_headers(request: Request, next: Next) -> Response {
+/// Adds the security headers, with `content_security` as the `Content-Security-Policy`.
+pub(crate) async fn security_headers(
+    State(content_security): State<&'static str>,
+    request: Request,
+    next: Next,
+) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
     for (name, value) in [
-        (CONTENT_SECURITY_POLICY, CONTENT_SECURITY),
+        (CONTENT_SECURITY_POLICY, content_security),
         (X_CONTENT_TYPE_OPTIONS, "nosniff"),
         (REFERRER_POLICY, "no-referrer"),
         (X_FRAME_OPTIONS, "DENY"),

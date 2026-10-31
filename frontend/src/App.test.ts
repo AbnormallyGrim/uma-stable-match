@@ -4,6 +4,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App.svelte';
+import { BEACON_SRC } from './lib/analytics';
 import type { Recommendations } from './lib/api';
 import { language } from './lib/language.svelte';
 import { LATEST_BUILD, RELEASE_SEEN_KEY } from './lib/releases';
@@ -98,6 +99,17 @@ describe('App', () => {
     );
     render(App);
     await vi.waitFor(() => expect(document.documentElement.lang).toBe('ja'));
+  });
+
+  it('loads the analytics beacon only when the server has a token', async () => {
+    const beacon = () => document.head.querySelector(`script[src="${BEACON_SRC}"]`);
+    stubApi(
+      () => json(recommendations(0)),
+      () => json({ japanese: false, web_analytics: 'madeuptoken123' }),
+    );
+    render(App);
+    await vi.waitFor(() => expect(beacon()).not.toBeNull());
+    beacon()!.remove();
   });
 
   it('stays in English when the features request fails', async () => {

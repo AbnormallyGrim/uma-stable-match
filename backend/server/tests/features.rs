@@ -45,13 +45,26 @@ async fn features(app: axum::Router) -> (StatusCode, Value) {
 async fn everything_is_off_by_default() {
     let (status, body) = features(app(state(), None)).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, json!({ "japanese": false }));
+    assert_eq!(body, json!({ "japanese": false, "web_analytics": null }));
 }
 
 #[tokio::test]
 async fn reports_the_japanese_flag_when_on() {
-    let app = app_with_features(state(), None, Features { japanese: true });
-    let (status, body) = features(app).await;
+    let features_on = Features {
+        japanese: true,
+        ..Features::default()
+    };
+    let (status, body) = features(app_with_features(state(), None, features_on)).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, json!({ "japanese": true }));
+    assert_eq!(body, json!({ "japanese": true, "web_analytics": null }));
+}
+
+#[tokio::test]
+async fn reports_the_web_analytics_token_when_set() {
+    let features_on = Features {
+        web_analytics: Some("madeuptoken123".into()),
+        ..Features::default()
+    };
+    let (_, body) = features(app_with_features(state(), None, features_on)).await;
+    assert_eq!(body["web_analytics"], "madeuptoken123");
 }

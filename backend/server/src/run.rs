@@ -143,7 +143,11 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
                 .ok();
         });
     }
-    let app = app_with_features(state, config.frontend_dir.as_deref(), config.features);
+    let app = app_with_features(
+        state,
+        config.frontend_dir.as_deref(),
+        config.features.clone(),
+    );
     let served = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
