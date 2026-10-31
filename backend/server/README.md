@@ -366,6 +366,7 @@ All endpoints are under `/api/v1`.
 | `GET` | `/api/v1/health` | `200 {"status":"ok"}` |
 | `GET` | `/api/v1/features` | `200 {"japanese":false}`: the features that are switched on |
 | `GET` | `/api/v1/recommendations` | Ranked clubs for a trainer or a pace, below |
+| `GET` | `/api/v1/clubs/{id}` | A loaded club's members, and where a trainer would sit among them; see [Club page](#club-page) |
 
 There's no public status endpoint. The page takes the data's age from each search's `updated_at`, and the full scan state is served privately at [`/status`](#status), next to the metrics.
 
@@ -544,9 +545,37 @@ Errors come back as `{"error": "..."}`:
 | `503` | The first scan hasn't listed the clubs yet. Try again shortly |
 | `504` | The request took longer than 30 seconds. See [Request timeout](#request-timeout) |
 
+### Club page
+
+`GET /api/v1/clubs/{id}` returns one club's current members for the web app's club page. It only serves clubs already loaded, in memory or in Redis, and never fetches the club. A club that isn't loaded is `404`; it's usually loaded once a search has scored it.
+
+| Parameter | Required | Description |
+|---|---|---|
+| `trainer_id` | no | A trainer to place among the members. Looked up like a [trainer search](#looking-up-a-trainer), sharing its cache and limits |
+
+```json
+{
+  "club": { "circle_id": 100000001, "name": "Example Club", "url": "https://uma.moe/circles/100000001", "tier": "A+", "join_style": "approval", "policy": 2, "member_count": 29, "open_spots": 1, "monthly_rank": 111, "last_month_rank": 127, "comment": "Example description", "has_discord": false },
+  "month": "2026-03",
+  "updated_at": "2026-03-19T15:00:00Z",
+  "median_per_day": 5650000.0,
+  "members": [
+    { "pace_per_day": 9120000.0, "daily_fans": [100000000, 109120000, 0] }
+  ],
+  "trainer": { "trainer_id": 123456789012, "pace_per_day": 7600000.0, "daily_fans": [90000000, 97600000, 0], "in_club": false, "your_place": 12, "club_size": 30 }
+}
+```
+
+- `club` has the same fields as a recommendation's club details.
+- `month` is the game month of the members' data, and `updated_at` when uma.moe last updated the club, if known.
+- `members` are the [current members](../scoring/README.md#current-members), fastest first. `pace_per_day` uses the same [blended pace](#blended-club-medians) as searches, so it matches `median_per_day` and the search results; it's `null` for members too new to rank, who come last. `daily_fans` is each day's cumulative fan count, with `0` for days without data.
+- `trainer` is `null` without `trainer_id`. As with [the trainer's own club](#the-trainers-own-club), their own row is left out of `members` and the club counts one member smaller, and `in_club` says they're a member. `daily_fans` is `null` when their pace came from the 7-day gain, and `your_place` and `club_size` are `null` when the club has fewer than 8 rankable members.
+
+The [human check](#human-check) and [rate limits](#rate-limits) apply as for recommendations. Errors are the same as [recommendations' errors](#errors) for a trainer, plus `400` when the club ID isn't a number, and `404` with `"club not loaded yet; try again later"`.
+
 ### Rate limits
 
-`/api/v1/recommendations` is limited per visitor. Health isn't limited.
+`/api/v1/recommendations` and `/api/v1/clubs/{id}` are limited per visitor. Health isn't limited.
 
 - **All requests:** `RATE_LIMIT_PER_MINUTE` (30 by default).
 - **Trainer lookups:** `TRAINER_LOOKUPS_PER_MINUTE` (10 by default). This only counts `trainer_id` requests that need a call to uma.moe. Cached trainers and `pace` requests don't use it, so a public instance can't be used to flood uma.moe.
@@ -565,7 +594,7 @@ IP addresses are kept in memory only while they're being limited, and they're ne
 
 With `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY` set, a visitor trades a [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) response for a short-lived token. Unset, the endpoint answers `404`, so local development and self-hosting need nothing.
 
-When it's on, `/api/v1/recommendations` needs the token in an `Authorization: Bearer <token>` header and answers `401` without a valid, unexpired one. Health, `/status` and the frontend's files stay open. A request is rate limited before its token is checked.
+When it's on, `/api/v1/recommendations` and `/api/v1/clubs/{id}` need the token in an `Authorization: Bearer <token>` header and answers `401` without a valid, unexpired one. Health, `/status` and the frontend's files stay open. A request is rate limited before its token is checked.
 
 `GET /api/v1/challenge` returns `{"site_key": "..."}` for the web app, or `404` when the check is off, which tells the app no token is needed.
 

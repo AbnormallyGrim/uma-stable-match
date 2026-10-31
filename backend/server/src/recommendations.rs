@@ -124,20 +124,27 @@ struct OptionsView {
     limit: u32,
 }
 
+/// A club's listing details, as recommendations and the club page show them.
 #[derive(Debug, Serialize)]
-struct Recommendation {
-    circle_id: u64,
+pub(crate) struct ClubInfo {
+    pub(crate) circle_id: u64,
     name: String,
     url: String,
     tier: Option<&'static str>,
     join_style: Option<&'static str>,
     policy: Option<u32>,
-    member_count: Option<u32>,
-    open_spots: Option<u32>,
+    pub(crate) member_count: Option<u32>,
+    pub(crate) open_spots: Option<u32>,
     monthly_rank: Option<u32>,
     last_month_rank: Option<u32>,
     comment: Option<String>,
     has_discord: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct Recommendation {
+    #[serde(flatten)]
+    info: ClubInfo,
     your_place: u32,
     club_size: u32,
     ranked_members: usize,
@@ -196,7 +203,12 @@ fn log_search(
     match result {
         Ok(Json(found)) => {
             record_depth(found.depth);
-            let top_clubs: Vec<u64> = found.clubs.iter().take(10).map(|c| c.circle_id).collect();
+            let top_clubs: Vec<u64> = found
+                .clubs
+                .iter()
+                .take(10)
+                .map(|c| c.info.circle_id)
+                .collect();
             tracing::info!(
                 query,
                 status = 200,
@@ -410,21 +422,27 @@ async fn own_club(
             );
         })
         .ok()?;
-    let mut club = Club::clone(&loaded);
+    let club = without_trainer(&loaded, trainer_id);
+    let options = options.with_include_closed(true);
+    let own = score_club(pace, &club, &options).ok()??;
+    let mut view = recommendation(&own);
+    view.info.member_count = loaded.member_count;
+    view.info.open_spots = loaded.open_spots();
+    Some(YourClub {
+        club: view,
+        result_rank: scored.iter().filter(|s| s.score < own.score).count() + 1,
+    })
+}
+
+/// `club` without `trainer_id`'s member row, one member smaller if they were in it.
+pub(crate) fn without_trainer(club: &Club, trainer_id: u64) -> Club {
+    let mut club = club.clone();
     let before = club.members.len();
     club.members.retain(|member| member.viewer_id != trainer_id);
     if club.members.len() < before {
         club.member_count = club.member_count.map(|n| n.saturating_sub(1));
     }
-    let options = options.with_include_closed(true);
-    let own = score_club(pace, &club, &options).ok()??;
-    let mut view = recommendation(&own);
-    view.member_count = loaded.member_count;
-    view.open_spots = loaded.open_spots();
-    Some(YourClub {
-        club: view,
-        result_rank: scored.iter().filter(|s| s.score < own.score).count() + 1,
-    })
+    club
 }
 
 // Every cached club in the pool, the uncached shortlisted clubs current in Redis, and up to
@@ -599,11 +617,11 @@ fn parse_bool(name: &str, value: &Option<String>) -> Result<Option<bool>, ApiErr
     }
 }
 
-fn blank_to_none(value: &Option<String>) -> Option<&str> {
+pub(crate) fn blank_to_none(value: &Option<String>) -> Option<&str> {
     value.as_deref().map(str::trim).filter(|v| !v.is_empty())
 }
 
-fn pace_error(error: PaceError) -> ApiError {
+pub(crate) fn pace_error(error: PaceError) -> ApiError {
     let status = match error {
         PaceError::NotFound => StatusCode::NOT_FOUND,
         PaceError::NotEnoughData => StatusCode::UNPROCESSABLE_ENTITY,
@@ -621,8 +639,20 @@ fn parse_number(name: &str, value: &str) -> Result<f64, ApiError> {
 }
 
 fn recommendation(scored: &ScoredClub<'_>) -> Recommendation {
-    let club = scored.club;
     Recommendation {
+        info: club_info(scored.club),
+        your_place: scored.your_place,
+        club_size: scored.club_size,
+        ranked_members: scored.ranked_members,
+        median_per_day: scored.median_per_day,
+        fit: scored.fit,
+        score: scored.score,
+        balance: scored.balance.map(balance_view),
+    }
+}
+
+pub(crate) fn club_info(club: &Club) -> ClubInfo {
+    ClubInfo {
         circle_id: club.circle_id,
         name: club.name.clone(),
         url: format!("{CLUB_URL}{}", club.circle_id),
@@ -640,13 +670,6 @@ fn recommendation(scored: &ScoredClub<'_>) -> Recommendation {
         last_month_rank: club.last_month_rank,
         comment: club.comment.clone(),
         has_discord: club.comment.as_deref().is_some_and(mentions_discord),
-        your_place: scored.your_place,
-        club_size: scored.club_size,
-        ranked_members: scored.ranked_members,
-        median_per_day: scored.median_per_day,
-        fit: scored.fit,
-        score: scored.score,
-        balance: scored.balance.map(balance_view),
     }
 }
 

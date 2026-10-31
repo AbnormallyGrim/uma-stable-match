@@ -235,6 +235,48 @@ async fn instances_share_club_details() {
 }
 
 #[tokio::test]
+async fn the_club_page_serves_a_club_another_instance_loaded() {
+    let Some(first_shared) = redis().await else {
+        return;
+    };
+    let second_shared = redis().await.unwrap();
+    let server = MockServer::start().await;
+    let id = unique_id();
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", id.to_string()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(detail(id)))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let config = DetailConfig::default();
+    let (first, _a) = ClubDetails::with_shared(client(&server), pool(id), config, first_shared);
+    let (second, _b) = ClubDetails::with_shared(client(&server), pool(id), config, second_shared);
+    first.get(id, Priority::Interactive).await.unwrap();
+
+    let response = router(AppState {
+        cache: Cache::new(),
+        details: second,
+        matching: MatchSettings::default(),
+        human: Default::default(),
+        paces: PaceLookup::new(client(&server), DEFAULT_PACE_TTL),
+        limits: RateLimits::new(10_000, 10_000, false),
+    })
+    .oneshot(
+        Request::get(format!("/api/v1/clubs/{id}"))
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(body["club"]["name"], "Shared Club");
+    assert_eq!(body["members"].as_array().unwrap().len(), 9);
+}
+
+#[tokio::test]
 async fn instances_share_trainer_paces_under_hashed_keys() {
     let Some(first_shared) = redis().await else {
         return;
