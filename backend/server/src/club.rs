@@ -32,6 +32,7 @@ pub(crate) struct ClubPage {
 
 #[derive(Debug, Serialize)]
 struct MemberView {
+    name: Option<String>,
     pace_per_day: Option<f64>,
     daily_fans: Vec<i64>,
 }
@@ -102,6 +103,7 @@ fn members(club: &Club) -> Vec<MemberView> {
     let mut members: Vec<MemberView> = current_members(&club.members)
         .into_iter()
         .map(|m| MemberView {
+            name: m.name.clone(),
             pace_per_day: blended_pace(&m.daily_fans, m.prior, CLUB_PRIOR_K).map(|p| p.max(0.0)),
             daily_fans: m.daily_fans.iter().map(|v| v.abs()).collect(),
         })

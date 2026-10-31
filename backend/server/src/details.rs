@@ -94,7 +94,9 @@ pub fn club_weight(club: &Club) -> u32 {
     let members: usize = club
         .members
         .iter()
-        .map(|m| m.daily_fans.capacity() * size_of::<i64>())
+        .map(|m| {
+            m.daily_fans.capacity() * size_of::<i64>() + m.name.as_ref().map_or(0, String::capacity)
+        })
         .sum();
     let bytes = size_of::<Entry>()
         + size_of::<Club>()

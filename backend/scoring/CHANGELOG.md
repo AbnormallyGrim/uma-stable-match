@@ -9,6 +9,7 @@ All notable changes to `uma-stable-match-scoring` are listed here. The format fo
 - `blended_pace` and `blended_median`: early-month paces that blend this month's data with a prior.
 - `MemberSnapshot::prior` and `ScoringOptions::with_prior_k`: score clubs from blended member paces.
 - `ScoringError::InvalidPriorK`.
+- `MemberSnapshot::name`: the trainer's name, for display. Scoring doesn't use it.
 
 ### Changed
 

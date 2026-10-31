@@ -26,6 +26,12 @@ pub struct MemberSnapshot {
         serde(default, skip_serializing_if = "Option::is_none")
     )]
     pub prior: Option<f64>,
+    /// Trainer name, for display. Not used in scoring.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub name: Option<String>,
 }
 
 impl MemberSnapshot {

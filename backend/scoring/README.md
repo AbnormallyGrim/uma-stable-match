@@ -56,6 +56,8 @@ A `MemberSnapshot` holds one member's **cumulative** fan count for each day of t
 | `0` | No data for that day (before joining, or after leaving) |
 | Negative | Fan count recorded while in a previous club |
 
+A `MemberSnapshot` can also carry the trainer's `name` for display; scoring ignores it.
+
 A `Club` holds the club's details and its member snapshots for the month.
 
 `Club`, `MemberSnapshot` and `ScoringOptions` are `#[non_exhaustive]`, so new fields can be added without a breaking release. Build them with a constructor and set the other fields directly:

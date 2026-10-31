@@ -11,6 +11,7 @@ fn member(id: u64, per_day: i64, days: usize) -> MemberSnapshot {
         month: Some(10),
         daily_fans: (0..days).map(|d| start + per_day * d as i64).collect(),
         prior: None,
+        name: None,
     }
 }
 
@@ -87,6 +88,7 @@ fn new_members_count_towards_size_but_not_place() {
             month: Some(10),
             daily_fans: fans,
             prior: None,
+            name: None,
         });
     }
     c.member_count = Some(10);

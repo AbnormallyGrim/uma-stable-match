@@ -260,6 +260,7 @@ impl From<CircleMember> for MemberSnapshot {
         let mut member = MemberSnapshot::new(m.viewer_id, m.daily_fans);
         member.year = m.year;
         member.month = to_u32(m.month);
+        member.name = m.trainer_name;
         member
     }
 }
