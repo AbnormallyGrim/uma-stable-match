@@ -35,7 +35,7 @@ pub use config::{
 };
 pub use details::{club_weight, BackgroundLoader, ClubDetails, DetailConfig, SharedPool};
 pub use features::Features;
-pub use frontend::CONTENT_SECURITY;
+pub use frontend::{CONTENT_SECURITY, CONTENT_SECURITY_WITH_ANALYTICS};
 pub use human::{HumanCheck, SigningKey, TurnstileSecret, TOKEN_LIFETIME};
 pub use limits::RateLimits;
 pub use logging::{init_logging, InvalidLogFormat, LogFormat};

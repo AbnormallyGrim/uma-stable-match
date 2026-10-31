@@ -93,7 +93,7 @@ pub struct Config {
     pub trainer_lookups_per_minute: u32,
     /// Whether to identify visitors by `X-Forwarded-For`, from `TRUST_FORWARDED_FOR`.
     pub trust_forwarded_for: bool,
-    /// Features that are switched on, from `ENABLE_JAPANESE`.
+    /// Features that are switched on, from `ENABLE_JAPANESE` and `WEB_ANALYTICS_TOKEN`.
     pub features: Features,
     /// Built frontend to serve, from `FRONTEND_DIR`. `None` serves only the API.
     pub frontend_dir: Option<PathBuf>,
@@ -143,6 +143,9 @@ pub enum ConfigError {
     /// `METRICS_ADDR` isn't an IP address with a port from 1 to 65535.
     #[error("METRICS_ADDR must be an IP address and port, such as 127.0.0.1:9464, got {0:?}")]
     InvalidMetricsAddr(String),
+    /// `WEB_ANALYTICS_TOKEN` has characters other than letters and digits. The value isn't shown.
+    #[error("WEB_ANALYTICS_TOKEN must contain only letters and digits")]
+    InvalidWebAnalyticsToken,
     /// A true-or-false setting is something else.
     #[error("{name} must be true or false, got {value:?}")]
     InvalidBool {
@@ -268,8 +271,14 @@ impl Config {
             }),
         };
         let trust_forwarded_for = boolean("TRUST_FORWARDED_FOR")?;
+        let web_analytics = match get("WEB_ANALYTICS_TOKEN") {
+            None => None,
+            Some(value) if value.chars().all(|c| c.is_ascii_alphanumeric()) => Some(value),
+            Some(_) => return Err(ConfigError::InvalidWebAnalyticsToken),
+        };
         let features = Features {
             japanese: boolean("ENABLE_JAPANESE")?,
+            web_analytics,
         };
         let frontend_dir = match get("FRONTEND_DIR") {
             None => None,

@@ -71,6 +71,8 @@ export interface Recommendations {
 /** Features the server has switched on. */
 export interface Features {
   japanese: boolean;
+  /** Cloudflare Web Analytics token, or `null` when analytics are off. */
+  webAnalytics: string | null;
 }
 
 /** Look up a trainer's pace, or give it directly in fans per day. */
@@ -193,9 +195,11 @@ export async function fetchRecommendations(
  */
 export async function fetchFeatures(options: RequestOptions = {}): Promise<Features> {
   const body = await getJson<unknown>('/api/v1/features', options, null);
-  const japanese =
-    body !== null && typeof body === 'object' && 'japanese' in body && body.japanese === true;
-  return { japanese };
+  const fields = (body !== null && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+  const japanese = fields.japanese === true;
+  const token = fields.web_analytics;
+  const webAnalytics = typeof token === 'string' && token !== '' ? token : null;
+  return { japanese, webAnalytics };
 }
 
 async function getJson<T>(path: string, options: RequestOptions, token: string | null): Promise<T> {

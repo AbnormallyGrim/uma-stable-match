@@ -24,6 +24,7 @@ fn defaults() {
     assert_eq!(config.trainer_lookups_per_minute, 10);
     assert!(!config.trust_forwarded_for);
     assert!(!config.features.japanese);
+    assert_eq!(config.features.web_analytics, None);
 }
 
 #[test]
@@ -576,6 +577,29 @@ fn reads_the_japanese_flag() {
     ]))
     .unwrap();
     assert!(config.features.japanese);
+}
+
+#[test]
+fn reads_the_web_analytics_token() {
+    let config = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("WEB_ANALYTICS_TOKEN", " madeuptoken123 "),
+    ]))
+    .unwrap();
+    assert_eq!(
+        config.features.web_analytics.as_deref(),
+        Some("madeuptoken123")
+    );
+}
+
+#[test]
+fn invalid_web_analytics_token_fails() {
+    let error = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("WEB_ANALYTICS_TOKEN", "made-up\"token"),
+    ]))
+    .unwrap_err();
+    assert_eq!(error, ConfigError::InvalidWebAnalyticsToken);
 }
 
 #[test]

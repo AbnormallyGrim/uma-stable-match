@@ -9,8 +9,9 @@ use axum::Router;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    app, AppState, Cache, ClubDetails, DetailConfig, MatchSettings, PaceLookup, RateLimits,
-    SharedPool, CONTENT_SECURITY, DEFAULT_PACE_TTL,
+    app, app_with_features, AppState, Cache, ClubDetails, DetailConfig, Features, MatchSettings,
+    PaceLookup, RateLimits, SharedPool, CONTENT_SECURITY, CONTENT_SECURITY_WITH_ANALYTICS,
+    DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig};
 
@@ -182,6 +183,37 @@ async fn csp_allows_only_same_origin_inline_data_images_and_turnstile() {
     );
     assert!(CONTENT_SECURITY.contains("img-src 'self' data:"));
     assert!(CONTENT_SECURITY.contains("frame-ancestors 'none'"));
+}
+
+#[tokio::test]
+async fn allows_web_analytics_only_when_its_token_is_set() {
+    let features = Features {
+        web_analytics: Some("madeuptoken123".into()),
+        ..Features::default()
+    };
+    let dir = frontend();
+    let app = app_with_features(state(), Some(dir.path()), features);
+    for path in ["/", "/api/v1/health"] {
+        let reply = get(&app, path).await;
+        assert_eq!(
+            reply.headers["content-security-policy"], CONTENT_SECURITY_WITH_ANALYTICS,
+            "{path}"
+        );
+    }
+    assert!(!CONTENT_SECURITY.contains("cloudflareinsights.com"));
+}
+
+#[tokio::test]
+async fn analytics_csp_adds_only_the_beacon_script_and_its_endpoint() {
+    let with = CONTENT_SECURITY_WITH_ANALYTICS;
+    assert!(with.contains(
+        "script-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com;"
+    ));
+    assert!(with.contains("connect-src 'self' https://cloudflareinsights.com;"));
+    let base: String = with
+        .replace(" https://static.cloudflareinsights.com", "")
+        .replace(" https://cloudflareinsights.com", "");
+    assert_eq!(base, CONTENT_SECURITY);
 }
 
 #[tokio::test]

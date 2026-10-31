@@ -78,12 +78,18 @@ pub fn app(state: AppState, frontend_dir: Option<&Path>) -> Router {
     app_with_features(state, frontend_dir, Features::default())
 }
 
-/// Like [`app`], reporting `features` on `GET /api/v1/features`.
+/// Like [`app`], reporting `features` on `GET /api/v1/features`. A Web Analytics token also allows
+/// Cloudflare's beacon in the `Content-Security-Policy`.
 pub fn app_with_features(
     state: AppState,
     frontend_dir: Option<&Path>,
     features: Features,
 ) -> Router {
+    let content_security = if features.web_analytics.is_some() {
+        frontend::CONTENT_SECURITY_WITH_ANALYTICS
+    } else {
+        frontend::CONTENT_SECURITY
+    };
     let mut app = router(state).merge(features::router(features));
     if let Some(dir) = frontend_dir {
         app = app.fallback_service(frontend::service(dir));
@@ -91,7 +97,10 @@ pub fn app_with_features(
     app.layer(CatchPanicLayer::custom(panic_response))
         .layer(from_fn(time_limit))
         .layer(from_fn(track_requests))
-        .layer(from_fn(frontend::security_headers))
+        .layer(from_fn_with_state(
+            content_security,
+            frontend::security_headers,
+        ))
 }
 
 /// Answers a request whose handler panicked. The panic itself is logged by the panic hook.

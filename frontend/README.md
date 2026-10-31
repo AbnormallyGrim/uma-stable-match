@@ -408,6 +408,10 @@ try {
 - **Prettier** uses single quotes and 100-character lines. Markdown files are left alone.
 - **Tests** use Vitest with jsdom and [Testing Library](https://testing-library.com/docs/svelte-testing-library/intro). Stub `fetch` with `vi.stubGlobal` rather than calling a real server.
 
+## Analytics
+
+Analytics are off unless the server's `WEB_ANALYTICS_TOKEN` is set. The app reads the token from `GET /api/v1/features` at startup and adds Cloudflare's Web Analytics beacon (`src/lib/analytics.ts`), which counts page views without cookies. If the request fails, the beacon isn't loaded.
+
 ## Language
 
 The Japanese translation is behind the server's `ENABLE_JAPANESE` setting, off by default. At startup the app asks `GET /api/v1/features`; if the answer is missing or fails, it stays in English. With it on, a translate button appears in the top bar and the saved choice (`en` or `ja`) is shown, and a visitor with no saved choice gets English. The choice is saved in a `uma-stable-match-language` cookie on `umastable.com`, so it carries over to the website and back, and in local storage under `uma-stable-match:language`. The cookie wins when both are set; local storage covers choices made before the cookie existed, and hosts such as `localhost`, where the cookie stays on that host.
