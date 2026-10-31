@@ -81,14 +81,16 @@ async fn cache_headers(request: Request, next: Next) -> Response {
 
 /// Adds the security headers, with `content_security` as the `Content-Security-Policy`.
 pub(crate) async fn security_headers(
-    State(content_security): State<&'static str>,
+    State(content_security): State<HeaderValue>,
     request: Request,
     next: Next,
 ) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
+    headers
+        .entry(CONTENT_SECURITY_POLICY)
+        .or_insert(content_security);
     for (name, value) in [
-        (CONTENT_SECURITY_POLICY, content_security),
         (X_CONTENT_TYPE_OPTIONS, "nosniff"),
         (REFERRER_POLICY, "no-referrer"),
         (X_FRAME_OPTIONS, "DENY"),

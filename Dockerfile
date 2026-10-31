@@ -25,6 +25,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 FROM gcr.io/distroless/cc-debian12:nonroot
 COPY --from=server /usr/local/bin/uma-stable-match-server /app/uma-stable-match-server
 COPY --from=frontend /build/frontend/dist /app/frontend
+# The project website, served only when SITE_HOST and SITE_DIR are set.
+COPY site/ /app/site
 ENV HOST=0.0.0.0 \
     PORT=8080 \
     FRONTEND_DIR=/app/frontend

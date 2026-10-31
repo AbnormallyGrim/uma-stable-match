@@ -66,7 +66,7 @@ backend/
   server/          API server, scheduled club scanner and cache
 frontend/          Web interface (Svelte + TypeScript)
 observability/     Prometheus config and Grafana dashboards for local metrics
-site/              Project website, published to GitHub Pages at umastable.com, with a Markdown copy for agents
+site/              Project website, served by the server at umastable.com, with a Markdown copy for agents
 docs/images/       README screenshots and the website's original artwork
 ```
 
@@ -149,7 +149,7 @@ The page is a single Svelte app, built by Vite into static files that the server
 ## Build and deployment
 
 - **Docker:** a multi-stage build. Node builds the page, Rust builds the server, and the result runs on a distroless, non-root base with only the binary and the built page. Compose runs it read-only, with no capabilities, on `127.0.0.1`, and an optional `redis` profile adds a memory-only Redis for the shared cache.
-- **Fly.io:** `fly.toml` runs the Docker image on one always-on machine, with HTTPS, a health check on `/api/v1/health`, JSON logs and metrics; Fly's log shipper forwards the logs to Axiom, and Fly's managed Prometheus and Grafana collect and show the metrics. Redis runs as a second app from `deploy/redis`, with a password, append-only persistence on a volume and no public address. The live instance runs at [app.umastable.com](https://app.umastable.com).
+- **Fly.io:** `fly.toml` runs the Docker image on one always-on machine, with HTTPS, a health check on `/api/v1/health`, JSON logs and metrics; Fly's log shipper forwards the logs to Axiom, and Fly's managed Prometheus and Grafana collect and show the metrics. Redis runs as a second app from `deploy/redis`, with a password, append-only persistence on a volume and no public address. The live instance runs at [app.umastable.com](https://app.umastable.com), and the same machine serves `site/` at [umastable.com](https://umastable.com/), chosen by host name.
 - **Logs:** stdout, as readable text or, with `LOG_FORMAT=json`, one JSON object per line for a log search service. See the [server README](backend/server/README.md#logs).
 - **Metrics:** with `METRICS_ADDR` set, the server serves Prometheus metrics on that address, apart from the app: requests by route and status code, uma.moe calls by status code with retries and wait times, rate limits, scan progress, where club details and paces come from, Redis health, the club pool and the total of searches since launch, which Redis keeps. See the [server README](backend/server/README.md#metrics), and [observability/README.md](observability/README.md) for local Prometheus and Grafana dashboards.
 - **Traces:** with `OTEL_EXPORTER_OTLP_ENDPOINT` set, the server sends a span per request over OTLP/HTTP to a trace store such as Grafana Tempo. Log lines stay out of traces. See the [server README](backend/server/README.md#traces).
