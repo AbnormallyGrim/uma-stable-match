@@ -100,6 +100,8 @@ To keep your email address out of commits, turn on **Keep my email addresses pri
 - Set `persist-credentials: false` on `actions/checkout`.
 - Workflows grant no permissions by default (`permissions: {}`). Give each job only the permissions it needs.
 - Check workflow changes with [zizmor](https://docs.zizmor.sh): `zizmor .github/workflows`.
+- On a pull request, CI and CodeQL run only the jobs and languages whose files it changes, and everything when it changes the workflow itself. Pushes to `main` and the weekly CodeQL run cover everything. Each workflow's `Detect changes` job lists the paths for each area, matched by `.github/scripts/changed-areas.sh`. When a job starts depending on new paths, add them there.
+- `All checks passed` is the only required CI check. Add every new CI job to its `needs`.
 
 ### Website
 

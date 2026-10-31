@@ -16,8 +16,49 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  changes:
+    name: Detect changes
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.areas.outputs.rust }}
+      scoring: ${{ steps.areas.outputs.scoring }}
+      frontend: ${{ steps.areas.outputs.frontend }}
+      docker: ${{ steps.areas.outputs.docker }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # A pull request runs the jobs whose files it changes, or every job when it changes CI itself.
+      # A push runs every job.
+      - name: Find changed areas
+        id: areas
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed="$RUNNER_TEMP/changed"
+          touch "$changed"
+          flags=(--all)
+          if [ "$EVENT" = pull_request ]; then
+            git diff --name-only "$BASE...$HEAD" > "$changed"
+            grep -qE '^\.github/(workflows/ci\.yml|scripts/changed-areas\.sh)$' "$changed" || flags=()
+          fi
+          .github/scripts/changed-areas.sh "${flags[@]}" \
+            'rust=^(backend/|Cargo\.(toml|lock)$|rust-toolchain\.toml$)' \
+            'scoring=^(backend/scoring/|Cargo\.(toml|lock)$|rust-toolchain\.toml$)' \
+            'frontend=^frontend/' \
+            'docker=^(backend/|frontend/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|Dockerfile$|\.dockerignore$)' \
+            < "$changed" | tee -a "$GITHUB_OUTPUT"
+
   rust:
     name: Rust (fmt, clippy, test)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -56,6 +97,8 @@ jobs:
 
   scoring:
     name: Scoring crate (docs, MSRV)
+    needs: changes
+    if: needs.changes.outputs.scoring == 'true'
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -99,6 +142,8 @@ jobs:
 
   frontend:
     name: Frontend (check, lint, test, build)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -134,6 +179,8 @@ jobs:
 
   docker:
     name: Docker image
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -153,3 +200,21 @@ jobs:
           tags: uma-stable-match:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # The one required check. A skipped job passes, so this fails only when a job failed or was
+  # cancelled, including the change detection that every other job waits on.
+  ci:
+    name: All checks passed
+    if: always()
+    needs: [changes, rust, scoring, frontend, docker]
+    permissions: {}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check job results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "* | *" cancelled "*) exit 1 ;;
+          esac
