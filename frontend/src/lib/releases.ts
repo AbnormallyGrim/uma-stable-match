@@ -28,6 +28,18 @@ export interface Release {
 /** Every published release, newest first. See the frontend README before adding one. */
 export const RELEASES: Release[] = [
   {
+    build: '1.3.0',
+    date: '2026-10-31',
+    kind: 'update',
+    changes: [
+      {
+        kind: 'new',
+        title: 'releases.clubPage.title',
+        body: 'releases.clubPage.body',
+      },
+    ],
+  },
+  {
     build: '1.2.0',
     date: '2026-10-30',
     kind: 'update',

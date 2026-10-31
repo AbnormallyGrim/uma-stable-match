@@ -28,6 +28,9 @@ export const en = {
   'releases.change.improved': 'Improved',
   'releases.change.fixed': 'Fixed',
 
+  'releases.clubPage.title': 'See how you fit in a club',
+  'releases.clubPage.body':
+    "Select See how you fit on any club to see where you'd rank among its members and follow everyone's daily fan gain this month on a chart.",
   'releases.earlyMonth.title': 'Steadier results early in the month',
   'releases.earlyMonth.body':
     "Get steadier results early in the game month, with last month's pace blended in until this month has enough data.",
