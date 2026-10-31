@@ -219,6 +219,7 @@ export const ja: Catalog = {
   'table.col.balance': 'バランス',
   'table.col.passengers': 'おんぶ組',
   'table.col.top3': '上位3人の割合',
+  'table.col.link': 'サークルページ',
 
   'yourClub.heading': 'あなたのサークル',
   'yourClub.best': 'あなたのサークルは、どの検索結果よりもあなたに合っています。',
