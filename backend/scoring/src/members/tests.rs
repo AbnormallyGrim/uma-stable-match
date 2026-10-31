@@ -7,6 +7,7 @@ fn member(id: u64, daily_fans: &[i64]) -> MemberSnapshot {
         month: Some(10),
         daily_fans: daily_fans.to_vec(),
         prior: None,
+        name: None,
     }
 }
 

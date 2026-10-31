@@ -23,3 +23,21 @@ fn lists_current_members_fastest_first_and_new_ones_last() {
     assert_eq!(paces, [Some(300.0), Some(100.0), Some(50.0), None]);
     assert_eq!(members[2].daily_fans, [100, 150, 200]);
 }
+
+#[test]
+fn shows_names_and_loads_members_stored_without_one() {
+    // Clubs stored in Redis before names were kept have no `name`.
+    let club: Club = serde_json::from_value(serde_json::json!({
+        "circle_id": 1,
+        "name": "Made-up Club",
+        "members": [
+            { "viewer_id": 1, "year": 2026, "month": 3, "daily_fans": [100, 200, 300] },
+            { "viewer_id": 2, "year": 2026, "month": 3, "daily_fans": [100, 400, 700], "name": "Made-up Trainer" },
+        ],
+    }))
+    .unwrap();
+    let names: Vec<Option<String>> = members(&club).into_iter().map(|m| m.name).collect();
+    assert_eq!(names, [Some("Made-up Trainer".into()), None]);
+    let stored = serde_json::to_value(&club.members[0]).unwrap();
+    assert!(stored.get("name").is_none());
+}

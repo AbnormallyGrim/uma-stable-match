@@ -43,7 +43,7 @@ fn series(pace: i64) -> Vec<i64> {
 // Ten members from 4M to 8.5M a day, plus the trainer at 6M if `with_trainer`.
 fn club_detail(with_trainer: bool) -> Value {
     let mut members: Vec<Value> = (0..10)
-        .map(|i| json!({ "viewer_id": 9000 + i, "year": 2026, "month": 3, "daily_fans": series(4_000_000 + 500_000 * i) }))
+        .map(|i| json!({ "viewer_id": 9000 + i, "trainer_name": format!("Made-up Trainer {i}"), "year": 2026, "month": 3, "daily_fans": series(4_000_000 + 500_000 * i) }))
         .collect();
     if with_trainer {
         members.push(
@@ -184,6 +184,8 @@ async fn shows_a_loaded_clubs_members_fastest_first() {
         .collect();
     assert_eq!(paces(&body), expected);
     assert_eq!(body["members"][0]["daily_fans"], json!(series(8_500_000)));
+    assert_eq!(body["members"][0]["name"], "Made-up Trainer 9");
+    assert_eq!(body["members"][9]["name"], "Made-up Trainer 0");
     assert_eq!(body["trainer"], Value::Null);
 }
 

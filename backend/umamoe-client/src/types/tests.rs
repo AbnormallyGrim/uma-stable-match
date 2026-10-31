@@ -80,7 +80,13 @@ fn response_converts_with_members_and_tier() {
             circle_id: 42,
             ..Default::default()
         },
-        members: vec![member(1001, vec![10, 20, 30]), member(1002, vec![-5, 0, 8])],
+        members: vec![
+            CircleMember {
+                trainer_name: Some("Made-up Trainer".into()),
+                ..member(1001, vec![10, 20, 30])
+            },
+            member(1002, vec![-5, 0, 8]),
+        ],
         club_rank: Some(8),
         ..Default::default()
     });
@@ -91,6 +97,8 @@ fn response_converts_with_members_and_tier() {
     assert_eq!(club.members[1].daily_fans, vec![-5, 0, 8]);
     assert_eq!(club.members[0].year, Some(2026));
     assert_eq!(club.members[0].month, Some(1));
+    assert_eq!(club.members[0].name.as_deref(), Some("Made-up Trainer"));
+    assert_eq!(club.members[1].name, None);
 }
 
 #[test]

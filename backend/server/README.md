@@ -562,7 +562,7 @@ Errors come back as `{"error": "..."}`:
   "updated_at": "2026-03-19T15:00:00Z",
   "median_per_day": 5650000.0,
   "members": [
-    { "pace_per_day": 9120000.0, "daily_fans": [100000000, 109120000, 0] }
+    { "name": "Example Trainer", "pace_per_day": 9120000.0, "daily_fans": [100000000, 109120000, 0] }
   ],
   "trainer": { "trainer_id": 123456789012, "pace_per_day": 7600000.0, "daily_fans": [90000000, 97600000, 0], "in_club": false, "your_place": 12, "club_size": 30 }
 }
@@ -570,7 +570,7 @@ Errors come back as `{"error": "..."}`:
 
 - `club` has the same fields as a recommendation's club details.
 - `month` is the game month of the members' data, and `updated_at` when uma.moe last updated the club, if known.
-- `members` are the [current members](../scoring/README.md#current-members), fastest first. `pace_per_day` uses the same [blended pace](#blended-club-medians) as searches, so it matches `median_per_day` and the search results; it's `null` for members too new to rank, who come last. `daily_fans` is each day's cumulative fan count, with `0` for days without data.
+- `members` are the [current members](../scoring/README.md#current-members), fastest first. `name` is the trainer's name from uma.moe, or `null` if it has none. `pace_per_day` uses the same [blended pace](#blended-club-medians) as searches, so it matches `median_per_day` and the search results; it's `null` for members too new to rank, who come last. `daily_fans` is each day's cumulative fan count, with `0` for days without data.
 - `trainer` is `null` without `trainer_id`. As with [the trainer's own club](#the-trainers-own-club), their own row is left out of `members` and the club counts one member smaller, and `in_club` says they're a member. `daily_fans` is `null` when their pace came from the 7-day gain, and `your_place` and `club_size` are `null` when the club has fewer than 8 rankable members.
 
 The [human check](#human-check) and [rate limits](#rate-limits) apply as for recommendations. Errors are the same as [recommendations' errors](#errors) for a trainer, plus `400` when the club ID isn't a number, and `404` with `"club not loaded yet; try again later"`.
