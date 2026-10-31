@@ -66,6 +66,7 @@ describe('ClubPage', () => {
     const load = resolving(details());
     setup(load);
     expect(screen.getByRole('status')).toHaveTextContent('Loading the club…');
+    expect(screen.getByRole('status').querySelector('.track')).toBeInTheDocument();
 
     const link = await screen.findByRole('link', { name: 'Page Club' });
     expect(link).toHaveAttribute('href', 'https://uma.moe/circles/1');
