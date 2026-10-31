@@ -5,10 +5,10 @@ import { describe, expect, it } from 'vitest';
 import {
   clubPath,
   clubRoute,
-  isVoteRoute,
+  isWishlistRoute,
   rememberedSearch,
   rememberSearch,
-  VOTE_PATH,
+  WISHLIST_PATH,
 } from './route';
 
 describe('clubRoute', () => {
@@ -32,16 +32,16 @@ describe('clubRoute', () => {
   });
 });
 
-describe('isVoteRoute', () => {
-  it('matches the vote page, with or without a trailing slash', () => {
-    expect(VOTE_PATH).toBe('/vote');
-    expect(isVoteRoute('/vote')).toBe(true);
-    expect(isVoteRoute('/vote/')).toBe(true);
+describe('isWishlistRoute', () => {
+  it('matches the wishlist page, with or without a trailing slash', () => {
+    expect(WISHLIST_PATH).toBe('/wishlist');
+    expect(isWishlistRoute('/wishlist')).toBe(true);
+    expect(isWishlistRoute('/wishlist/')).toBe(true);
   });
 
   it('leaves other pages alone', () => {
-    for (const path of ['/', '/votes', '/vote/1', '/club/7']) {
-      expect(isVoteRoute(path), path).toBe(false);
+    for (const path of ['/', '/wishlists', '/wishlist/1', '/club/7']) {
+      expect(isWishlistRoute(path), path).toBe(false);
     }
   });
 });

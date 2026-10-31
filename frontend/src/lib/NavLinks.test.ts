@@ -9,7 +9,7 @@ import { currentPage } from './pages';
 afterEach(() => window.history.pushState({}, '', '/'));
 
 describe('NavLinks', () => {
-  it('links to the home page, the club finder and the vote page', () => {
+  it('links to the home page, the club finder and the wishlist page', () => {
     render(NavLinks);
     const nav = screen.getByRole('navigation', { name: 'Pages' });
     expect(
@@ -19,7 +19,7 @@ describe('NavLinks', () => {
     ).toEqual([
       ['Home', 'https://umastable.com'],
       ['Club finder', '/'],
-      ['Vote on ideas', '/vote'],
+      ['Wishlist', '/wishlist'],
     ]);
   });
 
@@ -27,7 +27,7 @@ describe('NavLinks', () => {
     for (const [path, name] of [
       ['/', 'Club finder'],
       ['/club/100000001', 'Club finder'],
-      ['/vote', 'Vote on ideas'],
+      ['/wishlist', 'Wishlist'],
     ] as const) {
       window.history.pushState({}, '', path);
       const { unmount } = render(NavLinks);
@@ -47,6 +47,6 @@ describe('currentPage', () => {
   it('puts the search and club pages under the finder', () => {
     expect(currentPage('/')).toBe('finder');
     expect(currentPage('/club/7')).toBe('finder');
-    expect(currentPage('/vote')).toBe('vote');
+    expect(currentPage('/wishlist')).toBe('wishlist');
   });
 });

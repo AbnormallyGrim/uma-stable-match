@@ -31,15 +31,15 @@ describe('SiteFooter', () => {
     }
   });
 
-  it('links to the vote page, except on the vote page', () => {
+  it('links to the wishlist page, except on the wishlist page', () => {
     const { unmount } = render(SiteFooter);
-    expect(screen.getByRole('link', { name: 'Vote on ideas' })).toHaveAttribute('href', '/vote');
+    expect(screen.getByRole('link', { name: 'Wishlist' })).toHaveAttribute('href', '/wishlist');
     expect(screen.getByText('Tips for switching clubs')).toBeInTheDocument();
     unmount();
-    window.history.pushState({}, '', '/vote');
+    window.history.pushState({}, '', '/wishlist');
     try {
       render(SiteFooter);
-      expect(screen.queryByRole('link', { name: 'Vote on ideas' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Wishlist' })).not.toBeInTheDocument();
       expect(screen.queryByText('Tips for switching clubs')).not.toBeInTheDocument();
     } finally {
       window.history.pushState({}, '', '/');

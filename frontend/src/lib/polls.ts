@@ -1,4 +1,4 @@
-/** The StrawPoll polls on the vote page. */
+/** The StrawPoll polls on the wishlist page. */
 
 import type { MessageKey } from './i18n';
 
@@ -14,8 +14,8 @@ export interface Poll {
 
 /** The polls, in the order they show. */
 export const POLLS: Poll[] = [
-  { id: '7MZ0k5l2mgo', title: 'vote.poll.dashboard', height: 440 },
-  { id: 'poy9kMvNAgJ', title: 'vote.poll.discord', height: 490 },
+  { id: '7MZ0k5l2mgo', title: 'wishlist.poll.dashboard', height: 440 },
+  { id: 'poy9kMvNAgJ', title: 'wishlist.poll.discord', height: 490 },
 ];
 
 /** The address of a poll's embeddable page. */

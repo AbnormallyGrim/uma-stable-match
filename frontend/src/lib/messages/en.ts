@@ -341,16 +341,16 @@ export const en = {
   'nav.pages': 'Pages',
   'nav.home': 'Home',
   'nav.finder': 'Club finder',
-  'vote.title': 'Vote on ideas · Uma Stable Match',
-  'vote.link': 'Vote on ideas',
-  'vote.heading': 'Help decide what gets built next',
-  'vote.intro':
+  'wishlist.title': 'Wishlist · Uma Stable Match',
+  'wishlist.link': 'Wishlist',
+  'wishlist.heading': 'Help decide what gets built next',
+  'wishlist.intro':
     "Here are some ideas I'm thinking of building. Vote on the ones you'd actually use.",
-  'vote.polls': 'Polls',
-  'vote.poll.dashboard': 'Leader Focused Applications Dashboard poll',
-  'vote.poll.discord': 'Discord Bot Applications Integration poll',
-  'vote.aboutLabel': 'About these polls',
-  'vote.about':
+  'wishlist.polls': 'Polls',
+  'wishlist.poll.dashboard': 'Leader Focused Applications Dashboard poll',
+  'wishlist.poll.discord': 'Discord Bot Applications Integration poll',
+  'wishlist.aboutLabel': 'About these polls',
+  'wishlist.about':
     'These polls are hosted by <a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>, not by Uma Stable Match. Your vote is stored and handled by StrawPoll under <a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">its privacy policy</a>.',
 
   'footer.tipsSummary': 'Tips for switching clubs',

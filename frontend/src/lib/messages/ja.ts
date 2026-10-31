@@ -318,16 +318,16 @@ export const ja: Catalog = {
   'nav.pages': 'ページ',
   'nav.home': 'ホーム',
   'nav.finder': 'サークル検索',
-  'vote.title': 'アイデアに投票 · Uma Stable Match',
-  'vote.link': 'アイデアに投票',
-  'vote.heading': '次に作るものを決める手伝いをしてください',
-  'vote.intro':
+  'wishlist.title': 'ウィッシュリスト · Uma Stable Match',
+  'wishlist.link': 'ウィッシュリスト',
+  'wishlist.heading': '次に作るものを決める手伝いをしてください',
+  'wishlist.intro':
     '作ってみたいアイデアをいくつか並べました。実際に使いたいと思うものに投票してください。',
-  'vote.polls': '投票',
-  'vote.poll.dashboard': 'リーダー向け応募ダッシュボードの投票',
-  'vote.poll.discord': 'Discord Botによる応募連携の投票',
-  'vote.aboutLabel': '投票について',
-  'vote.about':
+  'wishlist.polls': '投票',
+  'wishlist.poll.dashboard': 'リーダー向け応募ダッシュボードの投票',
+  'wishlist.poll.discord': 'Discord Botによる応募連携の投票',
+  'wishlist.aboutLabel': '投票について',
+  'wishlist.about':
     'これらの投票は<a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>が運営しており、Uma Stable Matchではありません。あなたの投票はStrawPollが<a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">プライバシーポリシー</a>に基づいて保存・管理します。',
 
   'footer.tipsSummary': 'サークル移籍のヒント',

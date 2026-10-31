@@ -53,9 +53,9 @@ public/theme-init.js          Applies the saved theme before the page renders
 public/favicon-32.png         Browser icon, with apple-touch-icon.png for home screens
 src/main.ts                   Mounts the search, or the club page for a /club/ address
 src/App.svelte                Root component: runs searches and keeps them in the URL
-src/lib/route.ts              Which page an address shows, and club and vote page addresses
-src/lib/VotePage.svelte       The vote page: StrawPoll polls for ideas, in frames
-src/lib/polls.ts              The polls on the vote page
+src/lib/route.ts              Which page an address shows, and club and wishlist page addresses
+src/lib/WishlistPage.svelte   The wishlist page: StrawPoll polls for ideas, in frames
+src/lib/polls.ts              The polls on the wishlist page
 src/lib/ClubPage.svelte       The club page: a club's details, its chart and member cards, with you added
 src/lib/roster.ts             The club page's member cards, with you placed where you'd rank
 src/lib/PaceChart.svelte      The club page chart: everyone's pace this month, with you, the median and a chosen member

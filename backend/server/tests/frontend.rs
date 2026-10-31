@@ -176,7 +176,7 @@ async fn csp_allows_only_same_origin_data_images_turnstile_and_strawpoll_frames(
     assert!(!CONTENT_SECURITY.contains("unsafe-eval"));
     assert!(!CONTENT_SECURITY.contains('*'));
     // Cloudflare is only for scripts and frames, so Turnstile's host appears twice, and StrawPoll
-    // (the vote page's polls) is only for frames.
+    // (the wishlist page's polls) is only for frames.
     assert_eq!(CONTENT_SECURITY.matches("strawpoll.com").count(), 1);
     assert_eq!(
         CONTENT_SECURITY

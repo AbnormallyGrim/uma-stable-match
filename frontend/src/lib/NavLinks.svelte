@@ -1,7 +1,7 @@
 <!--
   @component
   The pages as a pill of links in the navbar, like the theme switch: the website's home page, the
-  club finder and the vote page, each with an icon, and the page being shown raised. On narrow
+  club finder and the wishlist page, each with an icon, and the page being shown raised. On narrow
   screens only the icons show, and a tooltip names each page.
 -->
 

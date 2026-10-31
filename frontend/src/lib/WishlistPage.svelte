@@ -1,6 +1,6 @@
 <!--
   @component
-  The vote page: ideas for what to build next, each a StrawPoll poll in a frame. StrawPoll handles
+  The wishlist page: ideas for what to build next, each a StrawPoll poll in a frame. StrawPoll handles
   the voting, so there's nothing to store here.
 -->
 
@@ -28,7 +28,7 @@
 
   $effect(() => {
     document.documentElement.lang = language.current;
-    document.title = t('vote.title');
+    document.title = t('wishlist.title');
   });
 
   onMount(() => {
@@ -42,11 +42,11 @@
 
 <main>
   <header class="intro">
-    <h1>{t('vote.heading')}</h1>
-    <p>{t('vote.intro')}</p>
+    <h1>{t('wishlist.heading')}</h1>
+    <p>{t('wishlist.intro')}</p>
   </header>
 
-  <section class="polls" aria-label={t('vote.polls')}>
+  <section class="polls" aria-label={t('wishlist.polls')}>
     {#each POLLS as poll (poll.id)}
       <div class="poll">
         <iframe
@@ -59,7 +59,7 @@
     {/each}
   </section>
 
-  <aside class="about" aria-label={t('vote.aboutLabel')}>
+  <aside class="about" aria-label={t('wishlist.aboutLabel')}>
     <svg
       viewBox="0 0 16 16"
       width="18"
@@ -76,7 +76,7 @@
       <circle cx="8" cy="4.75" r=".5" fill="currentColor" stroke="none" />
     </svg>
     <!-- eslint-disable-next-line svelte/no-at-html-tags -- first-party text from the message catalog -->
-    <p>{@html t('vote.about')}</p>
+    <p>{@html t('wishlist.about')}</p>
   </aside>
 </main>
 

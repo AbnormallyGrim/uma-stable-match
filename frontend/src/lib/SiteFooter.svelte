@@ -1,14 +1,15 @@
 <!--
   @component
-  The page footer: tips for switching clubs (not on the vote page), the logo, links to the vote
-  page and to report a problem, and the disclaimer and attributions. Keep the wording in step with the root README's Disclaimer section.
+  The page footer: tips for switching clubs (not on the wishlist page), the logo, links to the
+  wishlist page and to report a problem, and the disclaimer and attributions. Keep the wording in
+  step with the root README's Disclaimer section.
 -->
 
 <script lang="ts">
   import carats from '../assets/carats/carats.webp';
   import BrandLogo from './BrandLogo.svelte';
   import { t } from './i18n';
-  import { isVoteRoute, VOTE_PATH } from './route';
+  import { isWishlistRoute, WISHLIST_PATH } from './route';
 
   const REPO = 'https://github.com/AbnormallyGrim/uma-stable-match';
   const KOFI = 'https://ko-fi.com/L5P6299MV1';
@@ -17,14 +18,14 @@
   let { today = new Date() }: { today?: Date } = $props();
   const open = (url: string) => window.open(url, '_blank', 'noopener,noreferrer');
 
-  const onVotePage = isVoteRoute(window.location.pathname);
+  const onWishlistPage = isWishlistRoute(window.location.pathname);
 
   const aprilFools = $derived(today.getMonth() === 3 && today.getDate() === 1);
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- first-party text from the message catalog -->
 <footer class="site-footer">
-  {#if !onVotePage}
+  {#if !onWishlistPage}
     <details class="tips">
       <summary>{t('footer.tipsSummary')}</summary>
       <ul>
@@ -44,8 +45,8 @@
     </div>
 
     <nav aria-label={t('footer.links')}>
-      {#if !onVotePage}
-        <a class="link" href={VOTE_PATH}>{t('vote.link')}</a>
+      {#if !onWishlistPage}
+        <a class="link" href={WISHLIST_PATH}>{t('wishlist.link')}</a>
       {/if}
       <button type="button" onclick={() => open(`${REPO}/issues`)}>{t('footer.report')}</button>
       <button type="button" class="kofi" onclick={() => open(KOFI)}

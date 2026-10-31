@@ -1,22 +1,22 @@
-// VotePage component tests. The polls are StrawPoll's; only their frames are checked.
+// WishlistPage component tests. The polls are StrawPoll's; only their frames are checked.
 
 import { render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 
 import { POLLS } from './polls';
-import VotePage from './VotePage.svelte';
+import WishlistPage from './WishlistPage.svelte';
 
-describe('VotePage', () => {
+describe('WishlistPage', () => {
   it('has a heading and sets the page title', () => {
-    render(VotePage);
+    render(WishlistPage);
     expect(
       screen.getByRole('heading', { level: 1, name: 'Help decide what gets built next' }),
     ).toBeInTheDocument();
-    expect(document.title).toBe('Vote on ideas · Uma Stable Match');
+    expect(document.title).toBe('Wishlist · Uma Stable Match');
   });
 
   it('embeds each poll in a frame from StrawPoll', () => {
-    const { container } = render(VotePage);
+    const { container } = render(WishlistPage);
     const frames = container.querySelectorAll('iframe');
     expect(frames).toHaveLength(POLLS.length);
     frames.forEach((frame, i) => {
@@ -27,7 +27,7 @@ describe('VotePage', () => {
   });
 
   it('says StrawPoll hosts the polls, with a link to its privacy policy', () => {
-    render(VotePage);
+    render(WishlistPage);
     const about = screen.getByRole('complementary', { name: 'About these polls' });
     expect(about).toHaveTextContent('hosted by StrawPoll, not by Uma Stable Match');
     const policy = within(about).getByRole('link', { name: 'its privacy policy' });
@@ -36,7 +36,7 @@ describe('VotePage', () => {
   });
 
   it('has the navbar and footer', () => {
-    render(VotePage);
+    render(WishlistPage);
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
   });
