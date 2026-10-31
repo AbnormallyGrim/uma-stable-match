@@ -198,6 +198,7 @@
             </button>
           </th>
         {/each}
+        <th scope="col" class="link"><span class="visually-hidden">{t('table.col.link')}</span></th>
       </tr>
     </thead>
     <tbody>
@@ -207,7 +208,6 @@
           <td><TierBadge tier={club.tier} size="small" /></td>
           <td class="name">
             <a href={club.url} target="_blank" rel="noopener noreferrer">{club.name}</a>
-            <MembersLink circleId={club.circle_id} name={club.name} {trainerId} compact />
           </td>
           <td>{club.monthly_rank ?? '–'}</td>
           <td>{club.last_month_rank ?? '–'}</td>
@@ -226,10 +226,13 @@
             </td>
             <td>{club.balance ? formatPercent(club.balance.top3_share) : '–'}</td>
           {/if}
+          <td class="link">
+            <MembersLink circleId={club.circle_id} name={club.name} {trainerId} compact />
+          </td>
         </tr>
       {:else}
         <tr>
-          <td class="empty" colspan={visibleColumns.length}>{t('table.empty')}</td>
+          <td class="empty" colspan={visibleColumns.length + 1}>{t('table.empty')}</td>
         </tr>
       {/each}
     </tbody>
@@ -262,7 +265,8 @@
   }
 
   .scroll {
-    overflow-x: auto;
+    overflow: auto;
+    max-height: 75dvh;
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -300,10 +304,6 @@
     text-align: left;
   }
 
-  td.name :global(.members) {
-    margin-left: 12px;
-  }
-
   tbody tr:last-child td {
     border-bottom: 0;
   }
@@ -314,8 +314,10 @@
 
   th {
     position: sticky;
+    z-index: 1;
     top: 0;
     background: var(--card);
+    box-shadow: inset 0 -1px 0 var(--border);
   }
 
   th button {
