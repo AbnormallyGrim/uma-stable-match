@@ -30,6 +30,11 @@ describe('NavBar', () => {
     expect(onhelp).toHaveBeenCalledOnce();
   });
 
+  it('has no help button without a tour', () => {
+    render(NavBar, { onreleases: () => {}, unseen: false });
+    expect(screen.queryByRole('button', { name: 'Take the tour' })).not.toBeInTheDocument();
+  });
+
   it('opens the release notes from its button', async () => {
     const onreleases = vi.fn();
     render(NavBar, { ...props, onreleases });

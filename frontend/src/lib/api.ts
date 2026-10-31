@@ -13,8 +13,8 @@ export interface Balance {
   top3_share: number;
 }
 
-/** One recommended club. Lower `fit` and `score` are better. */
-export interface Club {
+/** A club's listing details, shared by recommendations and the club page. */
+export interface ClubInfo {
   circle_id: number;
   name: string;
   url: string;
@@ -28,6 +28,10 @@ export interface Club {
   comment: string | null;
   /** Whether the description mentions Discord. A best guess. */
   has_discord: boolean;
+}
+
+/** One recommended club. Lower `fit` and `score` are better. */
+export interface Club extends ClubInfo {
   your_place: number;
   club_size: number;
   ranked_members: number;
@@ -66,6 +70,39 @@ export interface Recommendations {
   total: number;
   clubs: Club[];
   your_club: YourClub | null;
+}
+
+/** A current member on the club page. */
+export interface ClubMember {
+  /** Daily gain, or `null` for a member too new to rank. */
+  pace_per_day: number | null;
+  /** Cumulative fans for each day of the month, `0` for days without data. */
+  daily_fans: number[];
+}
+
+/** The trainer placed on the club page. */
+export interface ClubTrainer {
+  trainer_id: number;
+  pace_per_day: number;
+  /** Cumulative fans for each day of the month, or `null` when unknown. */
+  daily_fans: number[] | null;
+  /** Whether they're in this club. Their own row is then left out of the members. */
+  in_club: boolean;
+  /** Their place and the club's size once they join, or `null` for clubs too small to score. */
+  your_place: number | null;
+  club_size: number | null;
+}
+
+/** Response from `GET /api/v1/clubs/{id}`. */
+export interface ClubDetails {
+  club: ClubInfo;
+  /** Game month of the members' data, `YYYY-MM`. */
+  month: string | null;
+  updated_at: string | null;
+  median_per_day: number | null;
+  /** Current members, fastest first, with members too new to rank last. */
+  members: ClubMember[];
+  trainer: ClubTrainer | null;
 }
 
 /** Features the server has switched on. */
@@ -170,21 +207,39 @@ export async function fetchRecommendations(
   query: RecommendationQuery,
   options: RequestOptions = {},
 ): Promise<Recommendations> {
-  const path = `/api/v1/recommendations?${recommendationParams(query)}`;
+  return getChecked(`/api/v1/recommendations?${recommendationParams(query)}`, options);
+}
+
+/**
+ * Fetches a loaded club's members, placing the trainer among them if `trainerId` is given.
+ *
+ * Throws `ApiError`, or the caller's abort error when `signal` is aborted.
+ */
+export async function fetchClub(
+  circleId: string,
+  trainerId: string | null,
+  options: RequestOptions = {},
+): Promise<ClubDetails> {
+  const params = trainerId === null ? '' : `?${new URLSearchParams({ trainer_id: trainerId })}`;
+  return getChecked(`/api/v1/clubs/${encodeURIComponent(circleId)}${params}`, options);
+}
+
+// Fetches a path that needs the human check's token when `options.human` is given.
+async function getChecked<T>(path: string, options: RequestOptions): Promise<T> {
   const { human } = options;
   if (!human) {
-    return getJson<Recommendations>(path, options, null);
+    return getJson<T>(path, options, null);
   }
   const token = await human.token();
   try {
-    return await getJson<Recommendations>(path, options, token);
+    return await getJson<T>(path, options, token);
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 401) {
       throw error;
     }
     // The token expired or was refused: get a new one and try once more.
     human.invalidate();
-    return getJson<Recommendations>(path, options, await human.token());
+    return getJson<T>(path, options, await human.token());
   }
 }
 

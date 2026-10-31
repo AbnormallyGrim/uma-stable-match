@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
   DEFAULT_TIMEOUT_MS,
+  fetchClub,
   fetchFeatures,
   fetchRecommendations,
   recommendationParams,
@@ -269,5 +270,54 @@ describe('fetchFeatures', () => {
       kind: 'http',
       status: 500,
     });
+  });
+});
+
+describe('fetchClub', () => {
+  const details = {
+    club: recommendations.clubs[0],
+    month: '2026-03',
+    updated_at: '2026-03-19T15:00:00Z',
+    median_per_day: 6_400_000,
+    members: [{ pace_per_day: 6_400_000, daily_fans: [100_000_000, 106_400_000] }],
+    trainer: null,
+  };
+
+  it('requests a club alone', async () => {
+    const fetch = fetchReturning(json(details));
+    expect(await fetchClub('1', null, { fetch })).toEqual(details);
+    expect(fetch).toHaveBeenCalledWith('/api/v1/clubs/1', expect.anything());
+  });
+
+  it('places a trainer', async () => {
+    const fetch = fetchReturning(json(details));
+    await fetchClub('1', '123456789012', { fetch });
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/clubs/1?trainer_id=123456789012',
+      expect.anything(),
+    );
+  });
+
+  it('gets a new token and retries once after a 401', async () => {
+    const tokens = ['made-up-old', 'made-up-new'];
+    const human = { token: vi.fn(() => Promise.resolve(tokens.shift()!)), invalidate: vi.fn() };
+    const fetch = vi.fn<typeof globalThis.fetch>((_url, init) =>
+      Promise.resolve(
+        (init!.headers as Record<string, string>).Authorization === 'Bearer made-up-new'
+          ? json(details)
+          : json({ error: 'a human check token is required' }, { status: 401 }),
+      ),
+    );
+    expect(await fetchClub('1', null, { fetch, human })).toEqual(details);
+    expect(human.invalidate).toHaveBeenCalledOnce();
+  });
+
+  it('uses the server error message', async () => {
+    const fetch = fetchReturning(
+      json({ error: 'club not loaded yet; try again later' }, { status: 404 }),
+    );
+    const error = await rejection(fetchClub('1', null, { fetch }));
+    expect(error.status).toBe(404);
+    expect(error.message).toBe('club not loaded yet; try again later');
   });
 });

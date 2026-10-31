@@ -99,6 +99,19 @@ function describeStatus(error: ApiError): ErrorMessage {
   }
 }
 
+/** A friendly message for a club page that failed to load. */
+export function describeClubError(error: unknown): ErrorMessage {
+  // The server's 404 for a club, rather than for the trainer.
+  if (error instanceof ApiError && error.status === 404 && error.message.startsWith('club not')) {
+    return message(
+      () => t('clubPage.notLoaded.title'),
+      () => t('clubPage.notLoaded.detail'),
+      true,
+    );
+  }
+  return describeError(error);
+}
+
 /** Suggestions for widening a search that found nothing. */
 export function emptyHints(options: Recommendations['options']): string[] {
   const hints: string[] = [];

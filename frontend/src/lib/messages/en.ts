@@ -242,6 +242,27 @@ export const en = {
   'yourClub.topPick': 'Top pick',
   'yourClub.gap': 'Vs your pace',
 
+  'clubPage.back': 'Back to search',
+  'clubPage.title': ({ name }: { name: string }) => `${name} · Uma Stable Match`,
+  'clubPage.loading': 'Loading the club…',
+  'clubPage.median': 'Median/day',
+  'clubPage.yourPace': 'Your pace',
+  'clubPage.youdBe': "You'd be",
+  'clubPage.inClub': "This is your club. You're placed as if you were joining it.",
+  'clubPage.members': 'Members',
+  'clubPage.membersNote': ({ n }: { n: number }) =>
+    `${n} current ${plural(n, 'member', 'members')}, fastest first.`,
+  'clubPage.data': ({ month, updated }: { month: string; updated: string }) =>
+    `Data for ${month}, updated ${updated}.`,
+  'clubPage.col.place': '#',
+  'clubPage.col.pace': 'Pace/day',
+  'clubPage.col.gap': 'Vs you',
+  'clubPage.you': 'You',
+  'clubPage.new': 'Too new to rank',
+  'clubPage.notLoaded.title': "This club isn't loaded yet",
+  'clubPage.notLoaded.detail':
+    'Clubs load as searches reach them. Try again later, or go back and search.',
+
   'tour.step': ({ n, total }: { n: number; total: number }) => `Step ${n} of ${total}`,
   'tour.skip': 'Skip tour',
   'tour.back': 'Back',

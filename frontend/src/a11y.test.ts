@@ -5,7 +5,8 @@ import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App.svelte';
-import type { Recommendations } from './lib/api';
+import type { ClubDetails, Recommendations } from './lib/api';
+import ClubPage from './lib/ClubPage.svelte';
 import HowToUse from './lib/HowToUse.svelte';
 import ResultsTable from './lib/ResultsTable.svelte';
 import SearchForm from './lib/SearchForm.svelte';
@@ -124,6 +125,35 @@ describe('accessibility', () => {
     );
     render(App);
     await screen.findAllByTestId('result-notice');
+    expect(await violations(document.body, true)).toEqual([]);
+  });
+
+  it('has no violations on the club page with the trainer placed', async () => {
+    const details: ClubDetails = {
+      club: club(),
+      month: '2026-03',
+      updated_at: '2026-03-19T15:00:00Z',
+      median_per_day: 6_400_000,
+      members: [9_000_000, 5_000_000, null].map((pace) => ({ pace_per_day: pace, daily_fans: [] })),
+      trainer: {
+        trainer_id: 123456789012,
+        pace_per_day: 7_600_000,
+        daily_fans: null,
+        in_club: true,
+        your_place: 2,
+        club_size: 4,
+      },
+    };
+    stubApi(() => json(details));
+    render(ClubPage, { route: { circleId: '1', trainerId: '123456789012' } });
+    await screen.findByRole('table');
+    expect(await violations(document.body, true)).toEqual([]);
+  });
+
+  it('has no violations when the club page fails', async () => {
+    stubApi(() => json({ error: 'club not loaded yet; try again later' }, 404));
+    render(ClubPage, { route: { circleId: '1', trainerId: null } });
+    await screen.findByRole('alert');
     expect(await violations(document.body, true)).toEqual([]);
   });
 
