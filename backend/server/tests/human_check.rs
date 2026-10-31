@@ -10,7 +10,8 @@ use serde_json::{json, Value};
 use tower::ServiceExt;
 use uma_stable_match_server::{
     router, AppState, Cache, ClubDetails, DetailConfig, HumanCheck, MatchSettings, PaceLookup,
-    RateLimits, SharedPool, SigningKey, TurnstileSecret, DEFAULT_PACE_TTL, TOKEN_LIFETIME,
+    RateLimits, SharedPool, SigningKey, TurnstileSecret, DEFAULT_PACE_TTL, TOKEN_COOKIE,
+    TOKEN_LIFETIME,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig};
 use wiremock::matchers::{body_json, method, path};
@@ -51,6 +52,11 @@ async fn cloudflare(success: bool) -> MockServer {
 }
 
 async fn challenge(app: Router, body: &str) -> (StatusCode, Value) {
+    let (status, _, body) = challenge_with_cookie(app, body).await;
+    (status, body)
+}
+
+async fn challenge_with_cookie(app: Router, body: &str) -> (StatusCode, Option<String>, Value) {
     let response = app
         .oneshot(
             Request::post("/api/v1/challenge")
@@ -61,9 +67,14 @@ async fn challenge(app: Router, body: &str) -> (StatusCode, Value) {
         .await
         .unwrap();
     let status = response.status();
+    let cookie = response
+        .headers()
+        .get("set-cookie")
+        .map(|value| value.to_str().unwrap().to_owned());
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
     (
         status,
+        cookie,
         serde_json::from_slice(&bytes).unwrap_or(Value::Null),
     )
 }
@@ -80,11 +91,28 @@ async fn a_passed_challenge_gets_a_token_the_check_accepts() {
 }
 
 #[tokio::test]
+async fn a_passed_challenge_sets_the_token_as_a_cookie() {
+    let server = cloudflare(true).await;
+    let (_, cookie, body) =
+        challenge_with_cookie(app(check(&server)), r#"{"response":"made-up-response"}"#).await;
+    let token = body["token"].as_str().unwrap();
+    assert_eq!(
+        cookie.unwrap(),
+        format!(
+            "{TOKEN_COOKIE}={token}; Max-Age={}; Path=/api; HttpOnly; Secure; SameSite=Strict",
+            TOKEN_LIFETIME.as_secs()
+        )
+    );
+}
+
+#[tokio::test]
 async fn a_failed_challenge_is_forbidden() {
     let server = cloudflare(false).await;
-    let (status, body) = challenge(app(check(&server)), r#"{"response":"made-up-response"}"#).await;
+    let (status, cookie, body) =
+        challenge_with_cookie(app(check(&server)), r#"{"response":"made-up-response"}"#).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
     assert!(body.get("token").is_none());
+    assert!(cookie.is_none());
 }
 
 #[tokio::test]
@@ -192,6 +220,45 @@ async fn the_club_page_needs_a_valid_token_when_the_check_is_on() {
         .unwrap()
         .status();
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+async fn recommendations_with_cookie(app: Router, cookie: &str) -> StatusCode {
+    let request = Request::get("/api/v1/recommendations?pace=500").header("cookie", cookie);
+    app.oneshot(request.body(Body::empty()).unwrap())
+        .await
+        .unwrap()
+        .status()
+}
+
+#[tokio::test]
+async fn a_valid_token_cookie_gets_past_the_check() {
+    let server = cloudflare(true).await;
+    let human = check(&server);
+    let (_, body) = challenge(app(human.clone()), r#"{"response":"made-up-response"}"#).await;
+    let token = body["token"].as_str().unwrap();
+
+    for cookie in [
+        format!("{TOKEN_COOKIE}="),
+        format!("{TOKEN_COOKIE}=made-up-token"),
+        format!("other={token}"),
+    ] {
+        assert_eq!(
+            recommendations_with_cookie(app(human.clone()), &cookie).await,
+            StatusCode::UNAUTHORIZED,
+            "{cookie:?}"
+        );
+    }
+    // A stale cookie next to a valid one still passes; the first scan hasn't listed any clubs yet.
+    for cookie in [
+        format!("{TOKEN_COOKIE}={token}"),
+        format!("other=1; {TOKEN_COOKIE}=made-up-token; {TOKEN_COOKIE}={token}"),
+    ] {
+        assert_eq!(
+            recommendations_with_cookie(app(human.clone()), &cookie).await,
+            StatusCode::SERVICE_UNAVAILABLE,
+            "{cookie:?}"
+        );
+    }
 }
 
 #[tokio::test]

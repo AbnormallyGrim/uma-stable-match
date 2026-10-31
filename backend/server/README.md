@@ -554,7 +554,7 @@ Errors come back as `{"error": "..."}`:
 | Status | When |
 |---|---|
 | `400` | Any of these:<br>• the query string can't be read, for example because a parameter is repeated<br>• neither or both of `trainer_id` and `pace` are given<br>• `trainer_id` isn't a trainer ID<br>• `pace` isn't a number above zero<br>• `balance_weight` isn't a number from 0 to 1<br>• `balance=false` is given with `balance_weight`<br>• `balance`, `include_closed`, `include_full` or `has_discord` isn't `true` or `false`<br>• `join_style` names something other than `open`, `approval` and `closed`<br>• `playstyle` isn't a list of codes from 1 to 31<br>• `limit` isn't a positive whole number |
-| `401` | The [human check](#human-check) is on and the `Authorization: Bearer` token is missing, invalid or expired |
+| `401` | The [human check](#human-check) is on and the token, in the `Authorization: Bearer` header or the cookie, is missing, invalid or expired |
 | `404` | uma.moe doesn't know the trainer, or they aren't in their club's data |
 | `422` | The trainer has too little fan data this month to work out a pace |
 | `502` | uma.moe couldn't be reached for the trainer lookup |
@@ -611,7 +611,7 @@ IP addresses are kept in memory only while they're being limited, and they're ne
 
 With `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY` set, a visitor trades a [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) response for a short-lived token. Unset, the endpoint answers `404`, so local development and self-hosting need nothing.
 
-When it's on, `/api/v1/recommendations` and `/api/v1/clubs/{id}` need the token in an `Authorization: Bearer <token>` header and answers `401` without a valid, unexpired one. Health, `/status` and the frontend's files stay open. A request is rate limited before its token is checked.
+When it's on, `/api/v1/recommendations` and `/api/v1/clubs/{id}` need the token, in an `Authorization: Bearer <token>` header or the `usm_human` cookie, and answer `401` without a valid, unexpired one. Health, `/status` and the frontend's files stay open. A request is rate limited before its token is checked.
 
 `GET /api/v1/challenge` returns `{"site_key": "..."}` for the web app, or `404` when the check is off, which tells the app no token is needed.
 
@@ -619,13 +619,24 @@ When it's on, `/api/v1/recommendations` and `/api/v1/clubs/{id}` need the token 
 
 | Status | Meaning |
 |---|---|
-| `200` | `{"token": "...", "expires_in": 600}`. The token is the expiry time and an HMAC-SHA256 tag keyed by `TOKEN_SIGNING_KEY`, and holds nothing about the visitor |
+| `200` | `{"token": "...", "expires_in": 600}`, with the same token set as a [cookie](#token-cookie). The token is the expiry time and an HMAC-SHA256 tag keyed by `TOKEN_SIGNING_KEY`, and holds nothing about the visitor |
 | `400` | `response` is empty or over 2,048 bytes |
 | `403` | Turnstile rejected the response |
 | `404` | The human check is off |
 | `502` | Cloudflare didn't answer within 5 seconds, or answered with an error |
 
 Only the response and the secret key go to Cloudflare, not the visitor's address. The metric `human_checks_total` counts `passed`, `failed` and `unavailable` challenges, and `token_missing` for requests turned away without a valid token.
+
+#### Token cookie
+
+A passed challenge also answers with `Set-Cookie: usm_human=<token>; Max-Age=600; Path=/api; HttpOnly; Secure; SameSite=Strict`, so one check covers every page and tab until the token expires:
+
+- **`Path=/api`**: the browser sends it to the API only, not with the frontend's files.
+- **`HttpOnly`**: the page's scripts can't read it.
+- **`SameSite=Strict`**: other sites can't send it. The API it opens only answers `GET`, so it needs no other cross-site protection.
+- **`Secure`**: sent over HTTPS only. Chrome and Firefox also send it to `http://localhost`, but no browser sends it to a plain-HTTP LAN address; there, the bearer token still works.
+
+A browser may send more than one `usm_human` cookie; any valid one is enough.
 
 #### Turning it on at Fly.io
 
