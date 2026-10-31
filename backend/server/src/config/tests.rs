@@ -294,6 +294,62 @@ fn rejects_a_frontend_dir_without_index_html() {
 }
 
 #[test]
+fn reads_a_website() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("index.html"), "<!doctype html>").unwrap();
+    let path = dir.path().to_str().unwrap().to_owned();
+    let config = Config::from_lookup(lookup(&[
+        ("SITE_HOST", " Example.TEST "),
+        ("SITE_DIR", &path),
+    ]))
+    .unwrap();
+    let website = config.website.unwrap();
+    assert_eq!(website.host, "example.test");
+    assert_eq!(website.dir, dir.path());
+
+    let config = Config::from_lookup(lookup(&[])).unwrap();
+    assert_eq!(config.website, None);
+}
+
+#[test]
+fn website_needs_both_settings() {
+    for vars in [[("SITE_HOST", "example.test")], [("SITE_DIR", "site")]] {
+        let error = Config::from_lookup(lookup(&vars)).unwrap_err();
+        assert_eq!(error, ConfigError::IncompleteWebsite);
+    }
+}
+
+#[test]
+fn rejects_a_site_host_that_isnt_a_host_name() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("index.html"), "<!doctype html>").unwrap();
+    let path = dir.path().to_str().unwrap().to_owned();
+    for host in [
+        "https://example.test",
+        "example.test:443",
+        "example.test/",
+        "example..test",
+        ".example.test",
+    ] {
+        let error =
+            Config::from_lookup(lookup(&[("SITE_HOST", host), ("SITE_DIR", &path)])).unwrap_err();
+        assert_eq!(error, ConfigError::InvalidSiteHost(host.into()));
+    }
+}
+
+#[test]
+fn rejects_a_site_dir_without_index_html() {
+    let empty = tempfile::tempdir().unwrap();
+    let value = empty.path().to_str().unwrap().to_owned();
+    let error = Config::from_lookup(lookup(&[
+        ("SITE_HOST", "example.test"),
+        ("SITE_DIR", &value),
+    ]))
+    .unwrap_err();
+    assert_eq!(error, ConfigError::InvalidSiteDir(value));
+}
+
+#[test]
 fn detail_cache_is_unset_by_default_whatever_the_scan_interval() {
     let config = Config::from_lookup(lookup(&[
         ("UMAMOE_API_KEY", "test-key"),

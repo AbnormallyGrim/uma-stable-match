@@ -3,6 +3,7 @@
 !Cargo.lock
 !backend/
 !frontend/
+!site/
 **/target/
 **/node_modules/
 **/dist/

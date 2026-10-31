@@ -1,4 +1,5 @@
-# Fly.io settings for the public instance at app.umastable.com.
+# Fly.io settings for the public instance at app.umastable.com, which also serves the website at
+# umastable.com.
 # App names are global on Fly.io: change this if it's taken.
 app = "uma-stable-match"
 primary_region = "iad"
@@ -29,6 +30,9 @@ primary_region = "iad"
   # Scores twice this many clubs per search. The wide window packs thousands of clubs near slower
   # paces, so the default 120 misses some of the best fits there.
   SHORTLIST_SIZE = "480"
+  # The website, from `site/` in the image, for umastable.com. www.umastable.com redirects to it.
+  SITE_HOST = "umastable.com"
+  SITE_DIR = "/app/site"
 
 [http_service]
   internal_port = 8080

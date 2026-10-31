@@ -40,6 +40,8 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `ENABLE_JAPANESE` | `false` | `true` to offer the Japanese translation and its language button in the web app. Reported on `GET /api/v1/features` |
 | `WEB_ANALYTICS_TOKEN` | none | A [Cloudflare Web Analytics](https://developers.cloudflare.com/web-analytics/) site token, letters and digits only. Set, the web app loads Cloudflare's beacon and the `Content-Security-Policy` allows it. Reported on `GET /api/v1/features`. Unset, analytics are off |
 | `FRONTEND_DIR` | none | Built frontend to serve, such as `frontend/dist`. Unset, the server serves only the API |
+| `SITE_HOST` | none | Host name to serve a static website on, such as `example.com`. Set it with `SITE_DIR`. See [Serving the website](#serving-the-website) |
+| `SITE_DIR` | none | Required with `SITE_HOST`: the website's files, with an `index.html` |
 | `REDIS_URL` | none | A `redis://` or `rediss://` URL to share club details, trainer paces and scans with other instances. Unset, everything stays in this instance's memory. See [Shared cache](#shared-cache) |
 | `REDIS_KEY_SECRET` | none | Required with `REDIS_URL`: at least 32 characters, the same on every instance. Keys the hash that replaces trainer IDs in Redis |
 | `TURNSTILE_SITE_KEY` | none | Cloudflare Turnstile's public site key, which the web app uses to show the challenge. Set it with the next two to turn on the [human check](#human-check). Unset, the check is off |
@@ -57,6 +59,7 @@ Blank values count as unset. These stop the server at startup, with an error mes
 - a `PORT` outside 1 to 65535, a `TRUST_FORWARDED_FOR` or `ENABLE_JAPANESE` other than `true` or `false`, or a `LOG_FORMAT` other than `text` or `json`
 - a scan, cache or rate limit setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO`
 - a `FRONTEND_DIR` without an `index.html`
+- only one of `SITE_HOST` and `SITE_DIR`, a `SITE_HOST` that isn't a host name (no scheme, port or path), or a `SITE_DIR` without an `index.html`
 - a `WEB_ANALYTICS_TOKEN` with anything other than letters and digits
 - a `REDIS_URL` without a `redis://` or `rediss://` scheme, a missing or short `REDIS_KEY_SECRET`, or a Redis that can't be reached within 5 seconds
 - only some of `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY`, or a `TOKEN_SIGNING_KEY` under 32 characters
@@ -369,6 +372,30 @@ Every response, from the API and the frontend alike, carries these headers:
 | `Strict-Transport-Security` | `max-age=31536000`: browsers use HTTPS for the next year. They ignore it on plain-HTTP responses, so local setups are unaffected |
 
 The policy allows no inline scripts or styles, so the frontend must not add any. That's why the theme script lives in its own file.
+
+## Serving the website
+
+With `SITE_HOST` and `SITE_DIR` set, the server also serves a static website, such as the project's `site/`, by the request's host name:
+
+```bash
+SITE_HOST=site.localhost SITE_DIR=site FRONTEND_DIR=frontend/dist cargo run -p uma-stable-match-server
+```
+
+Then open <http://site.localhost:8080> for the website and <http://localhost:8080> for the app.
+
+| Request | Response |
+|---|---|
+| For `SITE_HOST` | A file from `SITE_DIR`, or `404`. No API and no page fallback |
+| For `www.` plus `SITE_HOST` | `308` to `https://` plus `SITE_HOST`, keeping the path and query |
+| For any other host, or without one | The API and frontend, as above |
+
+On the website, files under `/images/` are cached for a day and everything else gets `Cache-Control: no-cache`. Responses carry the same [security headers](#security-headers) as the app, with a different `Content-Security-Policy`:
+
+- styles also from `https://fonts.googleapis.com`, and fonts only from `https://fonts.gstatic.com`
+- the inline `<script>` and `<style>` elements in `index.html`, allowed by their SHA-256 hashes, which the server works out at startup, so editing them needs no other change
+- no Turnstile, StrawPoll or analytics
+
+Inline event handlers (`onclick=`) and `style=` attributes stay blocked, and so do inline elements in other HTML files.
 
 ### Request timeout
 

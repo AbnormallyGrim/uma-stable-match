@@ -4,7 +4,7 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use axum::extract::{Request, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, StatusCode};
 use axum::middleware::{from_fn, from_fn_with_state, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{any, get};
@@ -98,7 +98,7 @@ pub fn app_with_features(
         .layer(from_fn(time_limit))
         .layer(from_fn(track_requests))
         .layer(from_fn_with_state(
-            content_security,
+            HeaderValue::from_static(content_security),
             frontend::security_headers,
         ))
 }

@@ -12,6 +12,7 @@ use crate::pace::{ExcludedTrainers, DEFAULT_PACE_TTL};
 use crate::recommendations::MatchSettings;
 use crate::scanner::ScanConfig;
 use crate::shared::{KeySecret, RedisUrl};
+use crate::website::Website;
 
 /// Address the server listens on when `HOST` isn't set.
 pub const DEFAULT_HOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
@@ -97,6 +98,8 @@ pub struct Config {
     pub features: Features,
     /// Built frontend to serve, from `FRONTEND_DIR`. `None` serves only the API.
     pub frontend_dir: Option<PathBuf>,
+    /// Website to serve on its own host name, from `SITE_HOST` and `SITE_DIR`. `None` serves none.
+    pub website: Option<Website>,
     /// Redis to share caches with other instances, from `REDIS_URL`. `None` keeps everything local.
     pub redis_url: Option<RedisUrl>,
     /// Secret for hashing trainer IDs in Redis keys, from `REDIS_KEY_SECRET`. Set whenever
@@ -126,6 +129,15 @@ pub enum ConfigError {
     /// `FRONTEND_DIR` isn't a directory containing `index.html`.
     #[error("FRONTEND_DIR must be a directory containing index.html, got {0:?}")]
     InvalidFrontendDir(String),
+    /// `SITE_HOST` and `SITE_DIR` aren't set together.
+    #[error("SITE_HOST and SITE_DIR must be set together")]
+    IncompleteWebsite,
+    /// `SITE_HOST` isn't a host name.
+    #[error("SITE_HOST must be a host name, such as example.com, got {0:?}")]
+    InvalidSiteHost(String),
+    /// `SITE_DIR` isn't a directory containing `index.html`.
+    #[error("SITE_DIR must be a directory containing index.html, got {0:?}")]
+    InvalidSiteDir(String),
     /// `REDIS_URL` isn't a `redis://` or `rediss://` URL. The value isn't shown, as it can hold a
     /// password.
     #[error("REDIS_URL must be a redis:// or rediss:// URL")]
@@ -296,6 +308,26 @@ impl Config {
                 Some(dir)
             }
         };
+        let website = match (get("SITE_HOST"), get("SITE_DIR")) {
+            (None, None) => None,
+            (Some(host), Some(dir)) => {
+                let valid = host
+                    .split('.')
+                    .all(|label| !label.is_empty() && label.chars().all(is_host_char));
+                if !valid {
+                    return Err(ConfigError::InvalidSiteHost(host));
+                }
+                let path = PathBuf::from(&dir);
+                if !path.join("index.html").is_file() {
+                    return Err(ConfigError::InvalidSiteDir(dir));
+                }
+                Some(Website {
+                    host: host.to_ascii_lowercase(),
+                    dir: path,
+                })
+            }
+            _ => return Err(ConfigError::IncompleteWebsite),
+        };
         let redis_url = match get("REDIS_URL") {
             None => None,
             Some(value) => Some(RedisUrl::parse(&value).ok_or(ConfigError::InvalidRedisUrl)?),
@@ -368,6 +400,7 @@ impl Config {
             trust_forwarded_for,
             features,
             frontend_dir,
+            website,
             redis_url,
             redis_key_secret,
             human,
@@ -375,6 +408,10 @@ impl Config {
             excluded_trainers,
         })
     }
+}
+
+fn is_host_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '-'
 }
 
 fn trimmed(lookup: impl Fn(&str) -> Option<String>) -> impl Fn(&str) -> Option<String> {

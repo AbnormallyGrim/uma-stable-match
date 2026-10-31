@@ -131,6 +131,13 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
     if let Some(dir) = &config.frontend_dir {
         tracing::info!("serving the frontend from {}", dir.display());
     }
+    if let Some(site) = &config.website {
+        tracing::info!(
+            "serving the website for {} from {}",
+            site.host,
+            site.dir.display()
+        );
+    }
     let state = AppState {
         cache,
         paces: paces.with_details(details.clone()),
@@ -156,6 +163,10 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
         config.frontend_dir.as_deref(),
         config.features.clone(),
     );
+    let app = match &config.website {
+        Some(site) => site.wrap(app),
+        None => app,
+    };
     let served = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

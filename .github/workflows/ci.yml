@@ -52,7 +52,7 @@ jobs:
             'rust=^(backend/|Cargo\.(toml|lock)$|rust-toolchain\.toml$)' \
             'scoring=^(backend/scoring/|Cargo\.(toml|lock)$|rust-toolchain\.toml$)' \
             'frontend=^frontend/' \
-            'docker=^(backend/|frontend/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|Dockerfile$|\.dockerignore$)' \
+            'docker=^(backend/|frontend/|site/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|Dockerfile$|\.dockerignore$)' \
             < "$changed" | tee -a "$GITHUB_OUTPUT"
 
   rust:

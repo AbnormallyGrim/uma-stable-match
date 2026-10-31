@@ -135,8 +135,9 @@ jobs:
         with:
           version: 0.4.114
 
-      # Deploys unless main has moved on, or nothing the server is built from changed since the live
-      # commit, read from the image's git-<commit> label. An unknown label deploys.
+      # Deploys unless main has moved on, or nothing the server or website is built from changed since
+      # the live commit, read from the image's git-<commit> label. An unknown label deploys. The
+      # website's index.md is served, so only Markdown in backend and frontend is left out.
       - name: Check for server changes
         id: check
         env:
@@ -150,7 +151,8 @@ jobs:
           deployed=$(flyctl status --json 2>/dev/null | jq -r '.Machines[0].image_ref.tag // ""' | sed -n 's/^git-//p' || true)
           if [ -n "$deployed" ] && git cat-file -e "$deployed^{commit}" 2>/dev/null \
             && git diff --quiet "$deployed" "$HEAD_SHA" -- \
-              backend frontend Cargo.toml Cargo.lock rust-toolchain.toml Dockerfile .dockerignore fly.toml ':(exclude)*.md'; then
+              backend frontend site Cargo.toml Cargo.lock rust-toolchain.toml Dockerfile .dockerignore fly.toml \
+              ':(exclude)backend/*.md' ':(exclude)frontend/*.md'; then
             echo "Nothing the server is built from changed since $deployed."
             echo "deploy=false" >> "$GITHUB_OUTPUT"
             exit 0
