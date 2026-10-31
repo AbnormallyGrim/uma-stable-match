@@ -301,6 +301,7 @@ describe('fetchClub', () => {
   it('runs the check and retries once after a 401', async () => {
     const human = {
       cached: () => 'made-up-old',
+      verified: () => true,
       token: vi.fn(() => Promise.resolve('made-up-new')),
       invalidate: vi.fn(),
     };

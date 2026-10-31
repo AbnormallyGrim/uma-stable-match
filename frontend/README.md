@@ -437,11 +437,14 @@ try {
 
 ### Human check
 
-`src/lib/human.ts` gets the token the server asks for when its [human check](../backend/server/README.md#human-check) is on. Requests go out first without running the check: the browser sends the server's [token cookie](../backend/server/README.md#token-cookie) from an earlier check, on any page or tab, until it expires. Only a `401` runs the check, so with the check off, or a valid cookie, the page loads nothing from Cloudflare.
+`src/lib/human.ts` gets the token the server asks for when its [human check](../backend/server/README.md#human-check) is on.
 
-- **Challenge:** after a `401`, the page asks `GET /api/v1/challenge` for Turnstile's site key and loads Turnstile's script from `challenges.cloudflare.com`. A `404` means the check is off. The widget stays hidden unless the visitor has to interact. It's shown in a `.human-check` box at the bottom of the page and removed afterwards.
+- **Warm-up:** the search page starts the check as soon as it loads, unless one passed lately, so it has usually passed by the time the visitor presses **Find clubs**, even with a pasted trainer ID. A failure is left for the search to retry. The club page needs no warm-up: it loads the club as it opens, which runs the check if one is needed.
+- **Skipping a check:** a passed check stores only its expiry in local storage (`uma-stable-match:human-until`), as a sign that the [token cookie](../backend/server/README.md#token-cookie), which scripts can't read, is likely still valid in any page or tab. While that holds, the page loads nothing from Cloudflare and requests go out with the cookie alone.
+- **No probe:** without that sign, a request waits for the check rather than going out to learn of it from a `401`. With the check off, the one `GET /api/v1/challenge` answers `404` and the check isn't asked about again.
+- **Challenge:** the page asks `GET /api/v1/challenge` for Turnstile's site key and loads Turnstile's script from `challenges.cloudflare.com`. The widget stays hidden unless the visitor has to interact. It's shown in a `.human-check` box at the bottom of the page, above the tour and release notes, and removed afterwards.
 - **Token:** the response is traded at `POST /api/v1/challenge` for a token, which the server also sets as the cookie. The page keeps it in memory too (never in storage) and sends it as `Authorization: Bearer` until 30 seconds before it expires, for browsers that don't keep the cookie, such as over plain HTTP on a LAN address.
-- **Retry:** after the check, the request is repeated once. A second `401` fails. `fetchClub` does the same.
+- **Retry:** if a request still gets a `401`, for example because the cookie was cleared, the check runs and the request is repeated once. A second `401` fails. `fetchClub` does the same.
 - **Failure:** a challenge that fails, times out after 60 seconds or can't load shows "We couldn't confirm you're a person", with a retry.
 - **Needs the CSP:** the page can only load the script and widget if the server's content security policy allows `challenges.cloudflare.com`.
 

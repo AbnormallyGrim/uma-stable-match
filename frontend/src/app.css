@@ -376,13 +376,14 @@ input[type='range']:disabled {
   outline-offset: 1px;
 }
 
-/* Where Turnstile shows its challenge, when the visitor has to interact with it. */
+/* Where Turnstile shows its challenge, when the visitor has to interact with it. Above the tour and
+   release notes, since the check starts as the page opens. */
 .human-check {
   position: fixed;
   right: 0;
   bottom: 16px;
   left: 0;
-  z-index: 100;
+  z-index: 1100;
   display: flex;
   justify-content: center;
   pointer-events: none;
