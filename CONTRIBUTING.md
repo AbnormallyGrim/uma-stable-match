@@ -76,6 +76,18 @@ npm test
 
 Run `npm run format` to fix formatting. See the [frontend README](frontend/README.md) for every script.
 
+### End-to-end test
+
+A Playwright test loads the built page served by the real server, with made-up clubs and Cloudflare's always-pass Turnstile test keys, and runs a search by daily pace. Pull requests don't run it. To run it locally, which needs both Rust and Node:
+
+```bash
+cd frontend
+npx playwright install chromium
+npm run e2e
+```
+
+You only need to install the browser once. The frontend README's [End-to-end test](frontend/README.md#end-to-end-test) section explains how it works.
+
 ## Keep personal information out
 
 Everything committed to this repository is public, including commit history. Before committing, make sure your changes contain:

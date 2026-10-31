@@ -41,8 +41,9 @@ $env:API_TARGET="http://127.0.0.1:3000"; npm run dev
 | `npm run lint` | Runs ESLint, then checks formatting with Prettier |
 | `npm run format` | Formats the code with Prettier |
 | `npm test` | Runs the component tests once with Vitest |
+| `npm run e2e` | Runs the [end-to-end test](#end-to-end-test) with Playwright |
 
-CI runs `check`, `lint`, `test` and `build` on Node 22 for every push and pull request.
+CI runs `check`, `lint`, `test` and `build` on Node 22 for every push to `main` and every pull request that changes `frontend/`.
 
 ## Layout
 
@@ -449,6 +450,15 @@ try {
 - **ESLint** uses flat config, with the recommended JavaScript, TypeScript and Svelte rules.
 - **Prettier** uses single quotes and 100-character lines. Markdown files are left alone.
 - **Tests** use Vitest with jsdom and [Testing Library](https://testing-library.com/docs/svelte-testing-library/intro). Stub `fetch` with `vi.stubGlobal` rather than calling a real server.
+
+## End-to-end test
+
+`e2e/` holds a [Playwright](https://playwright.dev) test that drives the built page in Chromium against the real server: it searches by daily pace and checks for top picks and the results table. It catches broken wiring between the page, the human check and the server that the component tests, with their stubbed `fetch`, can't.
+
+- **Server.** `playwright.config.ts` builds the page, then starts the server's [`fixture_server` example](../backend/server/README.md#fixture-clubs) on port 8181, serving `dist/` with made-up clubs instead of uma.moe. A cold build of the server takes a few minutes.
+- **Human check.** The server uses Cloudflare's always-pass Turnstile test keys, so the check runs for real without anything to solve. Turnstile's script and token check still call Cloudflare.
+- **Running it.** It needs Rust as well as Node. Install the browser once with `npx playwright install chromium`, then run `npm run e2e`. Locally, a server already running on port 8181 is reused.
+- **Failures.** A failed test keeps a trace in `test-results/`; open it with `npx playwright show-trace <path to trace.zip>`.
 
 ## Analytics
 
