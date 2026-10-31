@@ -70,6 +70,7 @@ const SAMPLE = {
   balanced: true,
   rankings: 'https://example.com',
   build: '1.0.0',
+  updated: '3 hours ago',
 } as never;
 
 function text(message: unknown): string {

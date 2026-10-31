@@ -50,8 +50,11 @@ CI runs `check`, `lint`, `test` and `build` on Node 22 for every push and pull r
 index.html                    Page shell
 public/theme-init.js          Applies the saved theme before the page renders
 public/favicon-32.png         Browser icon, with apple-touch-icon.png for home screens
-src/main.ts                   Mounts the app
+src/main.ts                   Mounts the search, or the club page for a /club/ address
 src/App.svelte                Root component: runs searches and keeps them in the URL
+src/lib/route.ts              Which page an address shows, and club page addresses
+src/lib/ClubPage.svelte       The club page: a club's details and members, with you added
+src/lib/roster.ts             The club page's member rows, with you placed where you'd rank
 src/lib/runner.ts             Search state machine: loading, retries and countdowns
 src/lib/states.ts             Error messages and empty-result hints
 src/lib/HowToUse.svelte       Step-by-step instructions under the search form
@@ -82,6 +85,7 @@ src/lib/ResultsTable.svelte   Sortable, searchable table of the best fits
 src/lib/ResultsSummary.svelte Pace, clubs analysed, comfortable fits, typical place and data age
 src/lib/stats.ts              Comfortable fits and typical place, from the results
 src/lib/ClubCard.svelte       One top pick
+src/lib/ClubTags.svelte       A club's rank, trend, open spots and tags, on cards and the club page
 src/lib/Dropdown.svelte       A themed single-choice dropdown, used for playstyle
 src/lib/YourClub.svelte       The trainer's own club, compared with the top pick
 src/lib/TierBadge.svelte      Tier icon, with a fallback for unknown tiers
@@ -100,7 +104,7 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 
 ## Navbar
 
-`NavBar.svelte` is a bar across the top of the page, matching the website's at [umastable.com](https://umastable.com): the logo and "Uma Stable Match" on the left, linking back to the website, and on the right a round **?** button that starts the [product tour](#product-tour), then the theme switch. It stays at the top while scrolling, with a translucent, blurred background. The page's own heading, "Uma Stable Match club finder", is hidden visually and read by screen readers. On narrow screens a long title is cut short with an ellipsis rather than pushing the switch off the screen.
+`NavBar.svelte` is a bar across the top of the page, matching the website's at [umastable.com](https://umastable.com): the logo and "Uma Stable Match" on the left, linking back to the website, and on the right a round **?** button that starts the [product tour](#product-tour) (left out on the club page), then the theme switch. It stays at the top while scrolling, with a translucent, blurred background. The page's own heading, "Uma Stable Match club finder", is hidden visually and read by screen readers. On narrow screens a long title is cut short with an ellipsis rather than pushing the switch off the screen.
 
 ## Product tour
 
@@ -335,6 +339,20 @@ Starting a new search cancels any pending retry and any earlier request, so an o
 
 The runner takes the fetch function, a change callback, the retry delays and the timer functions as options. Its tests replace them, so they can check retries and countdowns to the second with fake timers.
 
+## Club page
+
+`/club/{id}` shows one club, and `/club/{id}?trainer={trainer ID}` places that trainer among its members. `main.ts` mounts `ClubPage.svelte` for these addresses and the search for everything else; the server answers any page address with `index.html`. A trainer ID that isn't 9 to 12 digits is dropped, so the club still shows. `clubPath()` builds the address.
+
+The page calls `fetchClub()`, which wraps [`GET /api/v1/clubs/{id}`](../backend/server/README.md#club-page) and uses the [human check](#human-check) like a search.
+
+- **Header:** the tier icon, the name linking to the club's uma.moe page, the same rank, spots and tags line as the cards (`ClubTags.svelte`), the description, and the median. With a trainer, their pace and "You'd be 6 of 30" too.
+- **Members:** a table of current members, fastest first, with their daily pace. With a trainer, a "Vs you" column shows each member's gap to their pace. Members too new to rank come last, without a place. The server sends no names, so members are shown by place only.
+- **You:** `rosterRows()` adds the trainer as a highlighted row after every member faster than them, the same rule the server uses for "You'd be". In their own club, their own row is left out and a note says they're placed as if joining.
+- **Errors:** a club that isn't loaded yet says so and offers a retry. Other errors read as they do for a search.
+- **Back to search** returns to the page the visitor came from when it's this site, and otherwise opens the search.
+
+The navbar keeps the release notes but has no tour button here.
+
 ## Display formatting
 
 `src/lib/format.ts` turns API values into display text. The functions are pure; `formatUpdated` takes the current time as a parameter, so tests can fix it.
@@ -397,7 +415,7 @@ try {
 
 - **Challenge:** the page loads Turnstile's script from `challenges.cloudflare.com` only then. The widget stays hidden unless the visitor has to interact. It's shown in a `.human-check` box at the bottom of the page and removed afterwards.
 - **Token:** the response is traded at `POST /api/v1/challenge` for a token, kept in memory (never stored) and sent to `/api/v1/recommendations` as `Authorization: Bearer`. A new one is fetched 30 seconds before it expires.
-- **Retry:** a `401` clears the token, fetches a new one and repeats the search once.
+- **Retry:** a `401` clears the token, fetches a new one and repeats the request once. `fetchClub` does the same.
 - **Failure:** a challenge that fails, times out after 60 seconds or can't load shows "We couldn't confirm you're a person", with a retry.
 - **Needs the CSP:** the page can only load the script and widget if the server's content security policy allows `challenges.cloudflare.com`.
 

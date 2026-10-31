@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ApiError, type JoinStyle } from './api';
 import {
+  describeClubError,
   describeError,
   emptyHints,
   filterNotice,
@@ -15,6 +16,22 @@ import { recommendations } from './test-data';
 
 const http = (status: number, message = 'server message') =>
   new ApiError('http', message, status, null);
+
+describe('describeClubError', () => {
+  it('explains a club that is not loaded, with a retry', () => {
+    expect(describeClubError(http(404, 'club not loaded yet; try again later'))).toMatchObject({
+      title: "This club isn't loaded yet",
+      canRetry: true,
+    });
+  });
+
+  it('treats other errors like a search', () => {
+    expect(describeClubError(http(404, 'trainer not found'))).toMatchObject({
+      title: "We couldn't find that trainer",
+    });
+    expect(describeClubError(http(502))).toEqual(describeError(http(502)));
+  });
+});
 
 describe('describeError', () => {
   it('explains trainer lookup problems without offering a retry', () => {
