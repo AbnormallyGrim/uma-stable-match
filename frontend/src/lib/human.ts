@@ -51,12 +51,19 @@ export class HumanCheck {
     this.now = options.now ?? Date.now;
   }
 
+  /** The token from an earlier check if it's valid for a while yet, without running a new one. */
+  cached(): string | null {
+    if (this.token_ && this.token_.expiresAt - this.now() > RENEW_BEFORE_MS) {
+      return this.token_.value;
+    }
+    return null;
+  }
+
   /** A token that's valid for a while yet, or `null` if the server needs none. */
   token(): Promise<string | null> {
     if (this.off) return Promise.resolve(null);
-    if (this.token_ && this.token_.expiresAt - this.now() > RENEW_BEFORE_MS) {
-      return Promise.resolve(this.token_.value);
-    }
+    const cached = this.cached();
+    if (cached !== null) return Promise.resolve(cached);
     this.pending ??= this.renew().finally(() => (this.pending = null));
     return this.pending;
   }

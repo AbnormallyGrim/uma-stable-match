@@ -298,9 +298,12 @@ describe('fetchClub', () => {
     );
   });
 
-  it('gets a new token and retries once after a 401', async () => {
-    const tokens = ['made-up-old', 'made-up-new'];
-    const human = { token: vi.fn(() => Promise.resolve(tokens.shift()!)), invalidate: vi.fn() };
+  it('runs the check and retries once after a 401', async () => {
+    const human = {
+      cached: () => 'made-up-old',
+      token: vi.fn(() => Promise.resolve('made-up-new')),
+      invalidate: vi.fn(),
+    };
     const fetch = vi.fn<typeof globalThis.fetch>((_url, init) =>
       Promise.resolve(
         (init!.headers as Record<string, string>).Authorization === 'Bearer made-up-new'
