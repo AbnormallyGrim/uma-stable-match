@@ -85,6 +85,19 @@ A source answers four calls, with uma.moe's request and response types:
 
 Calls fail with a `SourceError`: `UmaMoe` wraps the client's error, `NotFound` means the club or trainer doesn't exist (it counts as a 404), and `Unavailable` covers any other source, with a message that's shown to visitors. `origin()` and `status()` label logs and metrics, and `name()` (`"umamoe"`) is the `source` label of the detail and pace lookup metrics.
 
+### Fixture clubs
+
+The `fixture_server` example runs the same server with made-up clubs held in memory instead of uma.moe, for end-to-end tests. It needs no API key and reads the same settings as the server, except that it ignores `.env`:
+
+```bash
+cargo run -p uma-stable-match-server --example fixture_server
+```
+
+- **Clubs.** 24 clubs, `Fixture Club 1` to `Fixture Club 24`, ranked 101 to 124 so the default scan window lists them. Club `n` has 20 members gaining about `n / 4` million fans a day each, so a pace anywhere from 250,000 to 6 million has clubs nearby. Every fourth club takes applications; the rest are open.
+- **Trainers.** Member `k` of club `n` has trainer ID `n * 1000 + k`, so trainer lookups for IDs 1000 to 24019 find their club and pace.
+- **Fixed data.** The data was taken at 15:00 UTC on 19 March 2026, 18 days into the month, and never changes.
+- **Human check.** Cloudflare publishes [Turnstile test keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) that always pass: site key `1x00000000000000000000AA` with secret key `1x0000000000000000000000000000000AA`. With these and any `TOKEN_SIGNING_KEY` of at least 32 characters, the check runs end to end without anything to solve. Verifying still calls Cloudflare.
+
 ## Scanner
 
 `scan` builds a new [club pool](#club-pool) and decides which clubs' details to keep loaded:
