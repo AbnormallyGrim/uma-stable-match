@@ -1,7 +1,8 @@
 <!--
   @component
-  The club page: a loaded club's details and current members, fastest first, with the trainer
-  added as a highlighted row where they'd rank.
+  The club page: a loaded club's details, a chart of everyone's pace this month, and the current
+  members as numbered cards, fastest first, with the trainer added as a highlighted card where
+  they'd rank. Selecting a member's card highlights their line on the chart.
 -->
 
 <script lang="ts">
@@ -14,6 +15,7 @@
   import { t } from './i18n';
   import { language } from './language.svelte';
   import NavBar from './NavBar.svelte';
+  import PaceChart from './PaceChart.svelte';
   import ReleaseNotes from './ReleaseNotes.svelte';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
   import { rosterRows } from './roster';
@@ -78,6 +80,21 @@
 
   const rows = $derived(page.phase === 'done' ? rosterRows(page.details) : []);
 
+  // The member whose line the chart highlights, by index in `members`.
+  let selected = $state<number | null>(null);
+  let chart = $state<HTMLElement>();
+
+  function select(member: number) {
+    selected = selected === member ? null : member;
+    if (selected === null || !chart) return;
+    // Bring the chart into view, so the highlighted line is seen.
+    const box = chart.getBoundingClientRect();
+    if (box.top < 0 || box.bottom > window.innerHeight) {
+      const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      chart.scrollIntoView?.({ block: 'start', behavior: still ? 'auto' : 'smooth' });
+    }
+  }
+
   $effect(() => {
     document.documentElement.lang = language.current;
     document.title =
@@ -140,6 +157,10 @@
       {/if}
     </header>
 
+    <div class="chart-box" bind:this={chart}>
+      <PaceChart details={page.details} highlight={selected} />
+    </div>
+
     {#if trainer?.in_club}
       <p class="note">{t('clubPage.inClub')}</p>
     {/if}
@@ -154,34 +175,45 @@
             updated: formatUpdated(page.details.updated_at),
           })}
         {/if}
+        {t('clubPage.pickHint')}
       </p>
-      <div class="scroll">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">{t('clubPage.col.place')}</th>
-              <th scope="col">{t('clubPage.col.pace')}</th>
-              {#if trainer}<th scope="col">{t('clubPage.col.gap')}</th>{/if}
-            </tr>
-          </thead>
-          <tbody>
-            {#each rows as row, i (i)}
-              <tr class:you={row.you}>
-                <td>
-                  {row.place ?? '–'}
-                  {#if row.you}<span class="you-tag">{t('clubPage.you')}</span>{/if}
-                </td>
-                <td>
-                  {row.pace === null ? t('clubPage.new') : formatPace(row.pace)}
-                </td>
-                {#if trainer}
-                  <td>{row.gap === null ? '' : formatGap(row.gap)}</td>
-                {/if}
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+      <ol class="roster">
+        {#each rows as row, i (i)}
+          <li>
+            {#if row.member === null}
+              <div class="card you">
+                <span class="place">{row.place ?? '–'}</span>
+                <span class="who">
+                  <span class="name">{t('clubPage.you')}</span>
+                  <span class="pace">{row.pace === null ? '' : formatPace(row.pace)}</span>
+                </span>
+              </div>
+            {:else}
+              {@const member = row.member}
+              <button
+                type="button"
+                class="card"
+                class:chosen={selected === member}
+                aria-pressed={selected === member}
+                onclick={() => select(member)}
+              >
+                <span class="place">{row.place ?? '–'}</span>
+                <span class="who">
+                  <span class="name">{row.name ?? t('clubPage.unknown')}</span>
+                  <span class="stats">
+                    <span class="pace">
+                      {row.pace === null ? t('clubPage.new') : formatPace(row.pace)}
+                    </span>
+                    {#if row.gap !== null}
+                      <span class="gap">{t('clubPage.gap', { gap: formatGap(row.gap) })}</span>
+                    {/if}
+                  </span>
+                </span>
+              </button>
+            {/if}
+          </li>
+        {/each}
+      </ol>
     </section>
   {/if}
 </main>
@@ -225,6 +257,11 @@
   .title {
     color: var(--text);
     font-weight: 600;
+  }
+
+  /* Clears the sticky navbar when a selection scrolls the chart into view. */
+  .chart-box {
+    scroll-margin-top: 72px;
   }
 
   .club {
@@ -307,56 +344,92 @@
     font-size: 0.8125rem;
   }
 
-  .scroll {
-    max-width: 560px;
-    overflow-x: auto;
+  .roster {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .card {
+    display: grid;
+    grid-template-columns: 1.75rem minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 8px 12px;
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8125rem;
-    font-variant-numeric: tabular-nums;
-  }
-
-  th,
-  td {
-    padding: 6px 16px;
-    border-bottom: 1px solid var(--border);
-    text-align: right;
-    white-space: nowrap;
-  }
-
-  th {
-    color: var(--text-2);
-    font-size: 0.6875rem;
-    font-weight: 600;
-  }
-
-  th:first-child,
-  td:first-child {
+    color: var(--text);
+    font: inherit;
     text-align: left;
   }
 
-  tbody tr:last-child td {
-    border-bottom: 0;
+  button.card {
+    cursor: pointer;
   }
 
-  tr.you td {
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  button.card:hover {
+    border-color: var(--border-strong);
+  }
+
+  button.card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .card.chosen {
+    background: color-mix(in srgb, var(--highlight) 14%, var(--card));
+    border-color: var(--highlight);
+    box-shadow: inset 3px 0 var(--highlight);
+  }
+
+  .card.you {
+    background: color-mix(in srgb, var(--accent) 14%, var(--card));
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  .place {
+    color: var(--muted);
+    font-size: 0.875rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+
+  .who {
+    display: grid;
+    min-width: 0;
+  }
+
+  .name {
+    overflow: hidden;
+    font-size: 0.875rem;
     font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .you-tag {
-    margin-left: 6px;
-    padding: 1px 6px;
-    background: var(--accent);
-    border-radius: var(--radius-sm);
-    color: var(--card);
-    font-size: 0.6875rem;
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 10px;
+  }
+
+  .pace,
+  .gap {
+    color: var(--text-2);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .gap {
+    color: var(--muted);
   }
 
   @media (max-width: 720px) {

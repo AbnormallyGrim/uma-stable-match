@@ -40,6 +40,9 @@ function stubApi(recommendationsResponse: () => Response) {
   );
 }
 
+// Cumulative fans for five days at a made-up daily pace.
+const fansAt = (pace: number) => Array.from({ length: 5 }, (_, day) => 100_000_000 + pace * day);
+
 const balancedClubs = [1, 2, 3].map((id) =>
   club({
     circle_id: id,
@@ -134,11 +137,15 @@ describe('accessibility', () => {
       month: '2026-03',
       updated_at: '2026-03-19T15:00:00Z',
       median_per_day: 6_400_000,
-      members: [9_000_000, 5_000_000, null].map((pace) => ({ pace_per_day: pace, daily_fans: [] })),
+      members: [9_000_000, 5_000_000, 4_000_000].map((pace, i) => ({
+        name: i === 2 ? null : `Made-up Trainer ${i + 1}`,
+        pace_per_day: pace,
+        daily_fans: fansAt(pace),
+      })),
       trainer: {
         trainer_id: 123456789012,
         pace_per_day: 7_600_000,
-        daily_fans: null,
+        daily_fans: fansAt(7_600_000),
         in_club: true,
         your_place: 2,
         club_size: 4,
@@ -146,7 +153,7 @@ describe('accessibility', () => {
     };
     stubApi(() => json(details));
     render(ClubPage, { route: { circleId: '1', trainerId: '123456789012' } });
-    await screen.findByRole('table');
+    await screen.findByRole('slider');
     expect(await violations(document.body, true)).toEqual([]);
   });
 

@@ -232,14 +232,29 @@ export const ja: Catalog = {
   'clubPage.members': 'メンバー',
   'clubPage.membersNote': ({ n }) => `現在のメンバー${n}人(ペースの速い順)。`,
   'clubPage.data': ({ month, updated }) => `${month}のデータ(更新:${updated})。`,
-  'clubPage.col.place': '#',
-  'clubPage.col.pace': '1日のペース',
-  'clubPage.col.gap': 'あなたとの差',
+  'clubPage.gap': ({ gap }) => `あなたと${gap}`,
   'clubPage.you': 'あなた',
   'clubPage.new': '加入したばかり',
+  'clubPage.unknown': '名前不明のトレーナー',
+  'clubPage.pickHint': 'メンバーを選ぶと、グラフでその線が強調表示されます。',
   'clubPage.notLoaded.title': 'このサークルはまだ読み込まれていません',
   'clubPage.notLoaded.detail':
     'サークルは検索で必要になったときに読み込まれます。時間をおいて再度お試しいただくか、検索に戻ってください。',
+
+  'chart.heading': '今月のペース',
+  'chart.show': 'グラフの表示',
+  'chart.daily': '1日の獲得数',
+  'chart.month': '今月の獲得数',
+  'chart.labelDaily':
+    '今月の各メンバーの1日のファン獲得数を、サークルの中央値とあなたの線と合わせて示す折れ線グラフです。矢印キーで日ごとの値を確認できます。',
+  'chart.labelMonth':
+    '今月の各メンバーのファン獲得数の累計を、サークルの中央値とあなたの線と合わせて示す折れ線グラフです。矢印キーで日ごとの値を確認できます。',
+  'chart.members': 'メンバー',
+  'chart.median': 'サークルの中央値',
+  'chart.you': 'あなた',
+  'chart.day': ({ n }) => `${n}日目`,
+  'chart.range': ({ low, high }) => `${low}〜${high}`,
+  'chart.empty': 'グラフを表示できるだけのデータがまだありません。',
 
   'tour.step': ({ n, total }) => `ステップ ${n} / ${total}`,
   'tour.skip': 'ツアーをスキップ',

@@ -79,6 +79,7 @@ const pairs: [string, string, number][] = [
   ['control-border', 'card', UI],
   ['control-border', 'bg', UI],
   ['accent', 'surface', UI],
+  ['highlight', 'card', UI],
 ];
 
 describe.each([
