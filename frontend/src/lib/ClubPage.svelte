@@ -18,6 +18,7 @@
   import NavBar from './NavBar.svelte';
   import PaceChart from './PaceChart.svelte';
   import ReleaseNotes from './ReleaseNotes.svelte';
+  import RunnerProgress from './RunnerProgress.svelte';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
   import { rosterRows } from './roster';
   import { rememberedSearch, type ClubRoute } from './route';
@@ -123,7 +124,10 @@
   <a class="back" href={backHref} onclick={back}>← {t('clubPage.back')}</a>
 
   {#if page.phase === 'loading'}
-    <p class="status" role="status">{t('clubPage.loading')}</p>
+    <div class="status loading" role="status">
+      <RunnerProgress finished={() => page.phase === 'done'} />
+      <p>{t('clubPage.loading')}</p>
+    </div>
   {:else if page.phase === 'error'}
     <div class="status error" role="alert">
       <p class="title">{page.message.title}</p>
@@ -266,6 +270,11 @@
 
   .status p {
     margin: 0 0 6px;
+  }
+
+  .loading p {
+    margin: 8px 0 0;
+    color: var(--muted);
   }
 
   .error {

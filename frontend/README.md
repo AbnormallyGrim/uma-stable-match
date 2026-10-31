@@ -62,7 +62,7 @@ src/lib/runner.ts             Search state machine: loading, retries and countdo
 src/lib/states.ts             Error messages and empty-result hints
 src/lib/HowToUse.svelte       Step-by-step instructions under the search form
 src/lib/SearchStatus.svelte   Loading, waiting and error messages
-src/lib/RunnerProgress.svelte The running figure that moves along a track while a search runs
+src/lib/RunnerProgress.svelte The running figure that moves along a track while a search or club loads
 src/lib/progress.ts           The progress curve: how far along the track the runner is
 src/lib/NavBar.svelte         Top bar: the brand, linking to the website, the release notes and tour buttons, and the theme switch
 src/lib/ReleaseNotes.svelte   The release notes modal: a timeline of builds, newest first
@@ -356,6 +356,7 @@ The page calls `fetchClub()`, which wraps [`GET /api/v1/clubs/{id}`](../backend/
 - **Members:** a numbered list of cards under the chart, one per current member, fastest first, filling as many columns as fit. Each card shows the place, trainer name and daily pace. A member without a name shows as "Unknown trainer". With a trainer, each card also says how far its pace is from theirs, such as "+2.5M/day vs you". Members too new to rank come last, without a place.
 - **Highlighting a member:** each member card is a toggle button. Selecting it highlights the card and the member's line, scrolling the chart into view if it's off screen; selecting it again, or another card, clears or moves the highlight.
 - **You:** `rosterRows()` adds the trainer as a highlighted card after every member faster than them, the same rule the server uses for "You'd be". In their own club, their own entry is left out and a note says they're placed as if joining.
+- **Loading:** "Loading the club…" under the same running progress bar as a [search](#search-progress).
 - **Errors:** a club that isn't loaded yet says so and offers a retry. Other errors read as they do for a search.
 - **See how you fit:** every top pick card, both **Your club** panels and every table row have a gold outlined button to the club page, opening in the same tab. On cards it sits under "You'd be" and the median; in the table it's a smaller version beside the name. After a trainer ID search it reads **See how you fit** and carries the trainer, so the page places them. After a pace search the page can't place anyone, so it reads **See members** and shows the club alone. Each button's spoken name includes the club, such as "See how you fit in Example Club".
 - **Back to search:** following one of those buttons notes the search's address in this tab's session storage. The club page's **Back to search** then goes back in history to those results, with their scroll position. Without one, for example when the club page was opened from a shared link, it opens a new search. The server sends `Referrer-Policy: no-referrer`, so the referrer can't tell where the visitor came from.

@@ -1,6 +1,7 @@
 // RunnerProgress component tests.
 
 import { render } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PROGRESS_CAP } from './progress';
@@ -37,12 +38,16 @@ describe('RunnerProgress', () => {
     expect(progressOf(container)).toBeGreaterThan(early);
   });
 
+  // Minutes of frames, so time moves synchronously and Svelte updates once after.
   it('never reaches the end while the search runs', async () => {
     const { container } = render(RunnerProgress);
-    await vi.advanceTimersByTimeAsync(60 * 1000);
+    vi.advanceTimersByTime(60 * 1000);
+    await tick();
+    expect(progressOf(container)).toBeGreaterThan(PROGRESS_CAP - 0.01);
     expect(progressOf(container)).toBeLessThan(PROGRESS_CAP);
 
-    await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+    vi.advanceTimersByTime(10 * 60 * 1000);
+    await tick();
     expect(progressOf(container)).toBeLessThanOrEqual(PROGRESS_CAP);
   });
 
