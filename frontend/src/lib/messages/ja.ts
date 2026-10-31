@@ -26,6 +26,9 @@ export const ja: Catalog = {
   'releases.change.improved': '改善',
   'releases.change.fixed': '修正',
 
+  'releases.clubPage.title': 'サークルでのあなたの位置を確認',
+  'releases.clubPage.body':
+    '各サークルの「メンバーと比べる」を選ぶと、メンバー内でのあなたの順位と、今月の各メンバーの1日のファン獲得数の推移をグラフで確認できます。',
   'releases.earlyMonth.title': '月初めの結果が安定',
   'releases.earlyMonth.body':
     '月初めは先月のペースを取り入れ、今月のデータがそろうまで結果の変動を抑えます。',
