@@ -22,6 +22,9 @@
   --closed: light-dark(#b91c1c, #e57373);
   --policy: light-dark(#6d28d9, #ce93d8);
   --discord: light-dark(#4752c4, #a5b0ff);
+  /* The chosen member's line on the club page chart, apart from --accent and --text for every
+     kind of colour blindness. */
+  --highlight: light-dark(#4752c4, #a5b0ff);
   --gold: light-dark(#946100, #ffd700);
   --silver: light-dark(#53616b, #c0c0c0);
   --bronze: light-dark(#9b521b, #cd7f32);

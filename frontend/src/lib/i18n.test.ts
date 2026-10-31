@@ -71,6 +71,9 @@ const SAMPLE = {
   rankings: 'https://example.com',
   build: '1.0.0',
   updated: '3 hours ago',
+  low: '4.0M/day',
+  high: '8.0M/day',
+  gap: '+1.2M/day',
 } as never;
 
 function text(message: unknown): string {

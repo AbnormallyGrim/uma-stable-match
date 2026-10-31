@@ -74,6 +74,8 @@ export interface Recommendations {
 
 /** A current member on the club page. */
 export interface ClubMember {
+  /** Trainer name, or `null` when unknown. */
+  name: string | null;
   /** Daily gain, or `null` for a member too new to rank. */
   pace_per_day: number | null;
   /** Cumulative fans for each day of the month, `0` for days without data. */

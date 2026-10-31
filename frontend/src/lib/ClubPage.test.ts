@@ -9,15 +9,19 @@ import { club } from './test-data';
 
 const M = 1_000_000;
 
+// Cumulative fans from 100M for five days at a made-up pace.
+const fans = (pace: number) => Array.from({ length: 5 }, (_, d) => 100 * M + pace * d);
+
 function details(overrides: Partial<ClubDetails> = {}): ClubDetails {
   return {
     club: club({ name: 'Page Club', comment: 'Made-up description' }),
     month: '2026-03',
     updated_at: '2026-03-19T15:00:00Z',
     median_per_day: 6.5 * M,
-    members: [9 * M, 7 * M, 6 * M, 4 * M, null].map((pace) => ({
+    members: [9 * M, 7 * M, 6 * M, 4 * M, null].map((pace, i) => ({
+      name: i === 3 ? null : `Made-up Trainer ${'ABCDE'[i]}`,
       pace_per_day: pace,
-      daily_fans: [],
+      daily_fans: fans(pace ?? 0),
     })),
     trainer: null,
     ...overrides,
@@ -39,16 +43,13 @@ function setup(load: typeof fetchClub, trainerId: string | null = null) {
 
 const resolving = (value: ClubDetails) => vi.fn<typeof fetchClub>(() => Promise.resolve(value));
 
-function rows() {
-  const table = screen.getByRole('table');
-  return within(table)
-    .getAllByRole('row')
-    .slice(1)
-    .map((row) =>
-      within(row)
-        .getAllByRole('cell')
-        .map((cell) => cell.textContent?.replace(/\s+/g, ' ').trim()),
-    );
+// Each member card's place, name, pace and gap, as shown.
+function cards() {
+  return [...document.querySelectorAll('.roster li')].map((card) =>
+    [...card.querySelectorAll('.place, .name, .pace, .gap')].map((part) =>
+      part.textContent?.replace(/\s+/g, ' ').trim(),
+    ),
+  );
 }
 
 describe('ClubPage', () => {
@@ -65,32 +66,34 @@ describe('ClubPage', () => {
     expect(
       screen.getByText(/5 current members, fastest first\. Data for March 2026/),
     ).toBeVisible();
-    expect(rows()).toEqual([
-      ['1', '9.0M/day'],
-      ['2', '7.0M/day'],
-      ['3', '6.0M/day'],
-      ['4', '4.0M/day'],
-      ['–', 'Too new to rank'],
+    expect(cards()).toEqual([
+      ['1', 'Made-up Trainer A', '9.0M/day'],
+      ['2', 'Made-up Trainer B', '7.0M/day'],
+      ['3', 'Made-up Trainer C', '6.0M/day'],
+      ['4', 'Unknown trainer', '4.0M/day'],
+      ['–', 'Made-up Trainer E', 'Too new to rank'],
     ]);
     expect(load).toHaveBeenCalledWith('1', null, expect.anything());
     expect(document.title).toBe('Page Club · Uma Stable Match');
   });
 
-  it('adds the trainer as a highlighted row where they would rank', async () => {
+  it('adds the trainer as a highlighted card where they would rank', async () => {
     const load = resolving(details({ trainer }));
-    setup(load, '123456789012');
+    const { container } = setup(load, '123456789012');
 
-    await screen.findByRole('table');
+    await screen.findByRole('heading', { name: 'Members' });
     expect(load).toHaveBeenCalledWith('1', '123456789012', expect.anything());
-    expect(rows()).toEqual([
-      ['1', '9.0M/day', '+2.5M/day'],
-      ['2', '7.0M/day', '+500K/day'],
-      ['3 You', '6.5M/day', ''],
-      ['4', '6.0M/day', '−500K/day'],
-      ['5', '4.0M/day', '−2.5M/day'],
-      ['–', 'Too new to rank', ''],
+    expect(cards()).toEqual([
+      ['1', 'Made-up Trainer A', '9.0M/day', '+2.5M/day vs you'],
+      ['2', 'Made-up Trainer B', '7.0M/day', '+500K/day vs you'],
+      ['3', 'You', '6.5M/day'],
+      ['4', 'Made-up Trainer C', '6.0M/day', '−500K/day vs you'],
+      ['5', 'Unknown trainer', '4.0M/day', '−2.5M/day vs you'],
+      ['–', 'Made-up Trainer E', 'Too new to rank'],
     ]);
-    expect(screen.getAllByRole('row')[3]).toHaveClass('you');
+    const you = container.querySelectorAll('.roster li')[2]!.firstElementChild;
+    expect(you).toHaveClass('you');
+    expect(you?.tagName).not.toBe('BUTTON');
     expect(screen.getByText('3 of 6')).toBeInTheDocument();
     expect(screen.queryByText(/This is your club/)).not.toBeInTheDocument();
   });
@@ -110,7 +113,7 @@ describe('ClubPage', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent("This club isn't loaded yet");
     await fireEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByRole('table')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Members' })).toBeInTheDocument();
     expect(load).toHaveBeenCalledTimes(2);
   });
 
@@ -122,6 +125,39 @@ describe('ClubPage', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent("We couldn't find that trainer");
     expect(within(alert).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('shows the chart above the members', async () => {
+    setup(resolving(details()));
+    const chart = await screen.findByRole('heading', { name: 'Pace this month' });
+    const members = screen.getByRole('heading', { name: 'Members' });
+    expect(chart.compareDocumentPosition(members) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('lists members in numbered order', async () => {
+    const { container } = setup(resolving(details()));
+    await screen.findByRole('heading', { name: 'Members' });
+    expect(container.querySelector('ol.roster')).toBeInTheDocument();
+  });
+
+  it('highlights a member on the chart when their card is selected, and clears it again', async () => {
+    const { container } = setup(resolving(details()));
+    const name = await screen.findByRole('button', { name: /Made-up Trainer B/ });
+    expect(name).toHaveAttribute('aria-pressed', 'false');
+    expect(container.querySelector('path.chosen')).toBeNull();
+
+    await fireEvent.click(name);
+    expect(name).toHaveAttribute('aria-pressed', 'true');
+    expect(name).toHaveClass('chosen');
+    expect(container.querySelector('path.chosen')).toHaveAttribute('d');
+    expect(container.querySelector('.legend')).toHaveTextContent('Made-up Trainer B');
+
+    await fireEvent.click(screen.getByRole('button', { name: /Made-up Trainer C/ }));
+    expect(name).toHaveAttribute('aria-pressed', 'false');
+    expect(container.querySelectorAll('.card.chosen')).toHaveLength(1);
+
+    await fireEvent.click(screen.getByRole('button', { name: /Made-up Trainer C/ }));
+    expect(container.querySelector('path.chosen')).toBeNull();
   });
 
   it('links back to the search', () => {

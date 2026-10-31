@@ -254,14 +254,29 @@ export const en = {
     `${n} current ${plural(n, 'member', 'members')}, fastest first.`,
   'clubPage.data': ({ month, updated }: { month: string; updated: string }) =>
     `Data for ${month}, updated ${updated}.`,
-  'clubPage.col.place': '#',
-  'clubPage.col.pace': 'Pace/day',
-  'clubPage.col.gap': 'Vs you',
+  'clubPage.gap': ({ gap }: { gap: string }) => `${gap} vs you`,
   'clubPage.you': 'You',
   'clubPage.new': 'Too new to rank',
+  'clubPage.unknown': 'Unknown trainer',
+  'clubPage.pickHint': 'Select a member to highlight their line on the chart.',
   'clubPage.notLoaded.title': "This club isn't loaded yet",
   'clubPage.notLoaded.detail':
     'Clubs load as searches reach them. Try again later, or go back and search.',
+
+  'chart.heading': 'Pace this month',
+  'chart.show': 'Chart shows',
+  'chart.daily': 'Daily gain',
+  'chart.month': 'Fans this month',
+  'chart.labelDaily':
+    "Line chart of each member's daily fan gain this month, with the club median and your line. Use the arrow keys to read each day.",
+  'chart.labelMonth':
+    'Line chart of the fans each member has gained this month, with the club median and your line. Use the arrow keys to read each day.',
+  'chart.members': 'Members',
+  'chart.median': 'Club median',
+  'chart.you': 'You',
+  'chart.day': ({ n }: { n: number }) => `Day ${n}`,
+  'chart.range': ({ low, high }: { low: string; high: string }) => `${low} to ${high}`,
+  'chart.empty': 'There are too few days of data for a chart yet.',
 
   'tour.step': ({ n, total }: { n: number; total: number }) => `Step ${n} of ${total}`,
   'tour.skip': 'Skip tour',

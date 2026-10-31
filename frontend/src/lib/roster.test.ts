@@ -5,7 +5,11 @@ import { describe, expect, it } from 'vitest';
 import type { ClubMember, ClubTrainer } from './api';
 import { rosterRows } from './roster';
 
-const member = (pace: number | null): ClubMember => ({ pace_per_day: pace, daily_fans: [] });
+const member = (pace: number | null): ClubMember => ({
+  name: pace === null ? null : `Made-up ${pace}`,
+  pace_per_day: pace,
+  daily_fans: [],
+});
 
 const trainer = (pace: number): ClubTrainer => ({
   trainer_id: 123456789012,
@@ -17,6 +21,15 @@ const trainer = (pace: number): ClubTrainer => ({
 });
 
 describe('rosterRows', () => {
+  it('keeps each member’s name and index', () => {
+    const rows = rosterRows({ members: [member(9), member(null)], trainer: trainer(5) });
+    expect(rows.map((r) => [r.member, r.name])).toEqual([
+      [0, 'Made-up 9'],
+      [null, null],
+      [1, null],
+    ]);
+  });
+
   it('numbers ranked members and leaves new ones without a place', () => {
     const rows = rosterRows({ members: [member(9), member(5), member(null)], trainer: null });
     expect(rows.map((r) => [r.place, r.pace, r.gap, r.you])).toEqual([

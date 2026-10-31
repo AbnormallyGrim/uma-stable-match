@@ -53,8 +53,10 @@ public/favicon-32.png         Browser icon, with apple-touch-icon.png for home s
 src/main.ts                   Mounts the search, or the club page for a /club/ address
 src/App.svelte                Root component: runs searches and keeps them in the URL
 src/lib/route.ts              Which page an address shows, and club page addresses
-src/lib/ClubPage.svelte       The club page: a club's details and members, with you added
-src/lib/roster.ts             The club page's member rows, with you placed where you'd rank
+src/lib/ClubPage.svelte       The club page: a club's details, its chart and member cards, with you added
+src/lib/roster.ts             The club page's member cards, with you placed where you'd rank
+src/lib/PaceChart.svelte      The club page chart: everyone's pace this month, with you, the median and a chosen member
+src/lib/chart.ts              The chart's numbers: daily gains, fans this month, the median line and ticks
 src/lib/runner.ts             Search state machine: loading, retries and countdowns
 src/lib/states.ts             Error messages and empty-result hints
 src/lib/HowToUse.svelte       Step-by-step instructions under the search form
@@ -98,7 +100,7 @@ src/lib/SearchForm.svelte     The search form
 src/**/*.test.ts              Unit and component tests
 src/a11y.test.ts              axe-core checks for the main views and states
 src/contrast.test.ts          WCAG AA contrast for every colour token pair
-src/setup-tests.ts            Adds jest-dom matchers to Vitest
+src/setup-tests.ts            Adds jest-dom matchers to Vitest, and a stand-in ResizeObserver
 vite.config.ts                Vite, the /api proxy and Vitest settings
 ```
 
@@ -346,12 +348,30 @@ The runner takes the fetch function, a change callback, the retry delays and the
 The page calls `fetchClub()`, which wraps [`GET /api/v1/clubs/{id}`](../backend/server/README.md#club-page) and uses the [human check](#human-check) like a search.
 
 - **Header:** the tier icon, the name linking to the club's uma.moe page, the same rank, spots and tags line as the cards (`ClubTags.svelte`), the description, and the median. With a trainer, their pace and "You'd be 6 of 30" too.
-- **Members:** a table of current members, fastest first, with their daily pace. With a trainer, a "Vs you" column shows each member's gap to their pace. Members too new to rank come last, without a place. The server sends no names, so members are shown by place only.
-- **You:** `rosterRows()` adds the trainer as a highlighted row after every member faster than them, the same rule the server uses for "You'd be". In their own club, their own row is left out and a note says they're placed as if joining.
+- **Chart:** right under the header, `PaceChart.svelte` draws each member's line thin and muted, the club median in bold and the trainer's line in the accent colour, with an end dot. It shows **Daily gain** by default, and **Fans this month** shows the fans gained since each line's first day. A legend names the lines; see [Pace chart](#pace-chart).
+- **Members:** a numbered list of cards under the chart, one per current member, fastest first, filling as many columns as fit. Each card shows the place, trainer name and daily pace. A member without a name shows as "Unknown trainer". With a trainer, each card also says how far its pace is from theirs, such as "+2.5M/day vs you". Members too new to rank come last, without a place.
+- **Highlighting a member:** each member card is a toggle button. Selecting it highlights the card and the member's line, scrolling the chart into view if it's off screen; selecting it again, or another card, clears or moves the highlight.
+- **You:** `rosterRows()` adds the trainer as a highlighted card after every member faster than them, the same rule the server uses for "You'd be". In their own club, their own entry is left out and a note says they're placed as if joining.
 - **Errors:** a club that isn't loaded yet says so and offers a retry. Other errors read as they do for a search.
 - **Back to search** returns to the page the visitor came from when it's this site, and otherwise opens the search.
 
 The navbar keeps the release notes but has no tour button here.
+
+### Pace chart
+
+`chart.ts` turns each member's cumulative fans into what the chart plots:
+
+- **Daily gain:** each day's gain over the day before. After days without data, the gain is spread evenly over them. The first day has no gain, so the daily chart starts on day 2.
+- **Fans this month:** each day's fans minus the first day with data.
+- **Club median:** the median of the members' values on each day, drawn where at least 3 members have one. It's a day-by-day median, so it can differ from the blended **Median/day** in the header.
+
+- **The day under way:** uma.moe's daily update already includes the current day, so its gain is only part of a day and would show as a sharp drop. While the data is for the current game month (or has no month), the chart stops at the day before. Once a month is over, every day shows.
+
+Days are numbered from 1, with an axis label every fifth day. The y axis starts at 0 and steps through round values such as 2.5M. The chart is plain SVG sized to its container, with no chart library.
+
+- **Reading values:** a crosshair follows the pointer and snaps to the nearest day, and a readout lists the highlighted member's value, yours, the median and the members' range that day. The chart is a slider over the days: the arrow keys, Home and End move it, and screen readers hear the same values as the readout.
+- **Highlighted member:** their line is drawn on top in `--highlight`, with an end dot, and named in the legend.
+- **Colours:** members use `--muted` at 35% opacity, the median `--text`, you `--accent` and the highlighted member `--highlight`. Those three lines stay apart for colour-blind readers in both themes.
 
 ## Display formatting
 
