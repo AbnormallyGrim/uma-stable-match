@@ -6,6 +6,8 @@ const CHALLENGE_PATH = '/api/v1/challenge';
 const TURNSTILE_SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 const RENEW_BEFORE_MS = 30_000;
 const CHALLENGE_TIMEOUT_MS = 60_000;
+/** Local storage key for when the last check expires. The token itself is never stored. */
+export const HUMAN_UNTIL_KEY = 'uma-stable-match:human-until';
 
 /** The parts of Turnstile's widget API used here. */
 export interface Turnstile {
@@ -26,6 +28,7 @@ export interface HumanCheckOptions {
   fetch?: typeof fetch;
   loadTurnstile?: () => Promise<Turnstile>;
   now?: () => number;
+  storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 }
 
 interface Token {
@@ -44,11 +47,34 @@ export class HumanCheck {
   private readonly fetchFn: typeof fetch;
   private readonly loadTurnstile: () => Promise<Turnstile>;
   private readonly now: () => number;
+  private readonly storage: HumanCheckOptions['storage'];
 
   constructor(options: HumanCheckOptions = {}) {
     this.fetchFn = options.fetch ?? ((...args) => globalThis.fetch(...args));
     this.loadTurnstile = options.loadTurnstile ?? loadTurnstileScript;
     this.now = options.now ?? Date.now;
+    this.storage =
+      options.storage ?? (typeof localStorage === 'undefined' ? undefined : localStorage);
+  }
+
+  /**
+   * Whether a check has passed recently, in this tab or another, so the token cookie is likely
+   * still valid. The cookie is `HttpOnly`, so this is a guess from the stored expiry.
+   */
+  verified(): boolean {
+    if (this.cached() !== null) return true;
+    try {
+      const until = Number(this.storage?.getItem(HUMAN_UNTIL_KEY));
+      return until - this.now() > RENEW_BEFORE_MS;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Starts a check in the background if one is likely needed. A failure waits for `token()`. */
+  warm(): void {
+    if (this.off || this.verified()) return;
+    this.token().catch(() => {});
   }
 
   /** The token from an earlier check if it's valid for a while yet, without running a new one. */
@@ -71,6 +97,11 @@ export class HumanCheck {
   /** Forgets the token, after the server turned it away. */
   invalidate(): void {
     this.token_ = null;
+    try {
+      this.storage?.removeItem(HUMAN_UNTIL_KEY);
+    } catch {
+      // Blocked storage only costs the hint.
+    }
   }
 
   private async renew(): Promise<string | null> {
@@ -96,6 +127,11 @@ export class HumanCheck {
       throw new ApiError('human-check', 'The check failed. Try again.', reply.status);
     }
     this.token_ = { value: body.token, expiresAt: this.now() + body.expires_in * 1000 };
+    try {
+      this.storage?.setItem(HUMAN_UNTIL_KEY, String(this.token_.expiresAt));
+    } catch {
+      // Blocked storage only costs the hint.
+    }
     return body.token;
   }
 

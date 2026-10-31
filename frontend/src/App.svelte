@@ -94,6 +94,7 @@
   onMount(() => {
     const features = new AbortController();
     applyFeatures({ signal: features.signal });
+    human.warm();
     if (fromUrl) {
       const validation = validate(fromUrl);
       if (validation.ok) {

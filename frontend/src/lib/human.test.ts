@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError, fetchRecommendations } from './api';
-import { HumanCheck, type Turnstile } from './human';
+import { HUMAN_UNTIL_KEY, HumanCheck, type Turnstile } from './human';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -104,6 +104,81 @@ describe('HumanCheck', () => {
     expect(fetch).toHaveBeenCalledTimes(4);
   });
 
+  it('remembers when a check passed, so other pages can skip it', async () => {
+    const storage = window.localStorage;
+    storage.clear();
+    let time = 0;
+    const options = { loadTurnstile: () => Promise.resolve(turnstile()), now: () => time, storage };
+    const first = new HumanCheck({ ...options, fetch: on() });
+    expect(first.verified()).toBe(false);
+    await first.token();
+    expect(storage.getItem(HUMAN_UNTIL_KEY)).toBe('600000');
+    // Another tab or page load has no token in memory, only the stored expiry.
+    const second = new HumanCheck({ ...options, fetch: on() });
+    expect(second.cached()).toBeNull();
+    expect(second.verified()).toBe(true);
+    time = 571_000;
+    expect(second.verified()).toBe(false);
+    first.invalidate();
+    expect(storage.getItem(HUMAN_UNTIL_KEY)).toBeNull();
+    storage.clear();
+  });
+
+  it('is not verified when storage is blocked', async () => {
+    const storage = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('blocked');
+      },
+      removeItem: () => {
+        throw new Error('blocked');
+      },
+    };
+    const human = new HumanCheck({
+      fetch: on(),
+      loadTurnstile: () => Promise.resolve(turnstile()),
+      storage,
+    });
+    expect(human.verified()).toBe(false);
+    expect(await human.token()).toBe('made-up-token');
+    expect(human.verified()).toBe(true);
+    expect(() => human.invalidate()).not.toThrow();
+  });
+
+  it('warms up in the background, once, and leaves a failure for the next request', async () => {
+    const fetch = on();
+    const widget = turnstile();
+    const human = new HumanCheck({
+      fetch,
+      loadTurnstile: () => Promise.resolve(widget),
+      storage: undefined,
+    });
+    human.warm();
+    human.warm();
+    expect(await human.token()).toBe('made-up-token');
+    expect(widget.render).toHaveBeenCalledTimes(1);
+    human.warm();
+    expect(fetch).toHaveBeenCalledTimes(2);
+
+    const failing = new HumanCheck({
+      fetch: on(),
+      loadTurnstile: () => Promise.resolve(turnstile('fail')),
+      storage: undefined,
+    });
+    expect(() => failing.warm()).not.toThrow();
+    await expect(failing.token()).rejects.toMatchObject({ kind: 'human-check' });
+  });
+
+  it('does not warm up when the server has the check off', async () => {
+    const fetch = server(() => json({ error: 'off' }, 404));
+    const human = new HumanCheck({ fetch, storage: undefined });
+    await human.token();
+    human.warm();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('fails with a human-check error when the challenge or the server refuses', async () => {
     const failing = new HumanCheck({
       fetch: on(),
@@ -132,9 +207,10 @@ describe('fetchRecommendations with a human check', () => {
   const authorization = (fetch: ReturnType<typeof vi.fn<typeof globalThis.fetch>>, call: number) =>
     (fetch.mock.calls[call]![1]!.headers as Record<string, string>).Authorization;
 
-  function check(cached: string | null, tokens: (string | null)[] = []) {
+  function check(cached: string | null, tokens: (string | null)[] = [], verified = true) {
     return {
       cached: () => cached,
+      verified: () => verified,
       token: vi.fn(() => Promise.resolve(tokens.shift() ?? null)),
       invalidate: vi.fn(),
     };
@@ -147,6 +223,22 @@ describe('fetchRecommendations with a human check', () => {
     await fetchRecommendations(query, { fetch, human });
     expect(authorization(fetch, 0)).toBeUndefined();
     expect(human.token).not.toHaveBeenCalled();
+  });
+
+  it('runs the check first, with no probe request, when none has passed lately', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(() => Promise.resolve(json(recommendations)));
+    const human = check(null, ['made-up-new'], false);
+    await fetchRecommendations(query, { fetch, human });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(authorization(fetch, 0)).toBe('Bearer made-up-new');
+    expect(human.invalidate).not.toHaveBeenCalled();
+  });
+
+  it('sends no token when the check turns out to be off', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(() => Promise.resolve(json(recommendations)));
+    const human = check(null, [null], false);
+    await fetchRecommendations(query, { fetch, human });
+    expect(authorization(fetch, 0)).toBeUndefined();
   });
 
   it('sends a cached token as a bearer header', async () => {

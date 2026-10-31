@@ -169,6 +169,15 @@ describe('App', () => {
     expect(screen.getByLabelText('Daily fan gain (millions)')).toHaveValue('5');
   });
 
+  it('starts the human check when the page loads, before any search', async () => {
+    const { fetch, recommendationCalls } = stubApi(() => json(recommendations(0)));
+    render(App);
+    await vi.waitFor(() =>
+      expect(fetch.mock.calls.map(([input]) => String(input))).toContain('/api/v1/challenge'),
+    );
+    expect(recommendationCalls()).toHaveLength(0);
+  });
+
   it('does not search on load without a valid search in the URL', () => {
     setUrl('?trainer_id=abc');
     const { recommendationCalls } = stubApi(() => json(recommendations(0)));
