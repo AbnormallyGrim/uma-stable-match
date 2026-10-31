@@ -459,7 +459,7 @@ try {
 - **Human check.** The server uses Cloudflare's always-pass Turnstile test keys, so the check runs for real without anything to solve. Turnstile's script and token check still call Cloudflare.
 - **Running it.** It needs Rust as well as Node. Install the browser once with `npx playwright install chromium`, then run `npm run e2e`. Locally, a server already running on port 8181 is reused.
 - **Failures.** A failed test keeps a trace in `test-results/`; open it with `npx playwright show-trace <path to trace.zip>`.
-- **In CI.** After CI passes on `main`, the Deploy workflow runs the test, and deploys only if it passes. Pull requests don't run it. A failed run uploads the HTML report and traces as the `e2e-report` artifact.
+- **In CI.** After CI passes on `main`, the Deploy workflow runs the test, and deploys only if it passes. Pull requests don't run it. A failed run uploads the HTML report and traces as the `e2e-report` artifact. It also comments on the merged pull request and opens an issue labelled `e2e-failure`, or comments on the one already open. Close that issue once the test passes again.
 
 ## Analytics
 

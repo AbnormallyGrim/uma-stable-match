@@ -78,7 +78,7 @@ Run `npm run format` to fix formatting. See the [frontend README](frontend/READM
 
 ### End-to-end test
 
-A Playwright test loads the built page served by the real server, with made-up clubs and Cloudflare's always-pass Turnstile test keys, and runs a search by daily pace. It runs after every merge to `main`, and the deploy waits for it to pass. Pull requests don't run it. To run it locally, which needs both Rust and Node:
+A Playwright test loads the built page served by the real server, with made-up clubs and Cloudflare's always-pass Turnstile test keys, and runs a search by daily pace. It runs after every merge to `main`, and the deploy waits for it to pass. A failure comments on the merged pull request and opens or updates an issue labelled `e2e-failure`. Pull requests don't run it. To run it locally, which needs both Rust and Node:
 
 ```bash
 cd frontend
