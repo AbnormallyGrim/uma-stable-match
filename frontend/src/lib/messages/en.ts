@@ -338,6 +338,21 @@ export const en = {
   'howTo.note':
     "Works with the global (English) version of the game. If your trainer ID isn't found, search by your daily pace instead. Full clubs and your own club aren't in the results. Search by trainer ID to see how your club compares.",
 
+  'nav.pages': 'Pages',
+  'nav.home': 'Home',
+  'nav.finder': 'Club finder',
+  'vote.title': 'Vote on ideas · Uma Stable Match',
+  'vote.link': 'Vote on ideas',
+  'vote.heading': 'Help decide what gets built next',
+  'vote.intro':
+    "Here are some ideas I'm thinking of building. Vote on the ones you'd actually use.",
+  'vote.polls': 'Polls',
+  'vote.poll.dashboard': 'Leader Focused Applications Dashboard poll',
+  'vote.poll.discord': 'Discord Bot Applications Integration poll',
+  'vote.aboutLabel': 'About these polls',
+  'vote.about':
+    'These polls are hosted by <a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>, not by Uma Stable Match. Your vote is stored and handled by StrawPoll under <a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">its privacy policy</a>.',
+
   'footer.tipsSummary': 'Tips for switching clubs',
   'footer.tip14':
     '<strong>14-day rule:</strong> you need at least 14 days in a club during a month to receive its monthly reward, so switch early in the month.',

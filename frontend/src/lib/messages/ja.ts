@@ -315,6 +315,21 @@ export const ja: Catalog = {
   'howTo.note':
     'ゲームのグローバル版(英語版)に対応しています。トレーナーIDが見つからない場合は、1日の獲得ファン数で検索してください。満員のサークルとあなた自身のサークルは結果に含まれません。自分のサークルとの比較は、トレーナーIDで検索すると表示されます。',
 
+  'nav.pages': 'ページ',
+  'nav.home': 'ホーム',
+  'nav.finder': 'サークル検索',
+  'vote.title': 'アイデアに投票 · Uma Stable Match',
+  'vote.link': 'アイデアに投票',
+  'vote.heading': '次に作るものを決める手伝いをしてください',
+  'vote.intro':
+    '作ってみたいアイデアをいくつか並べました。実際に使いたいと思うものに投票してください。',
+  'vote.polls': '投票',
+  'vote.poll.dashboard': 'リーダー向け応募ダッシュボードの投票',
+  'vote.poll.discord': 'Discord Botによる応募連携の投票',
+  'vote.aboutLabel': '投票について',
+  'vote.about':
+    'これらの投票は<a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>が運営しており、Uma Stable Matchではありません。あなたの投票はStrawPollが<a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">プライバシーポリシー</a>に基づいて保存・管理します。',
+
   'footer.tipsSummary': 'サークル移籍のヒント',
   'footer.tip14':
     '<strong>14日ルール:</strong>月間報酬を受け取るには、その月にサークルへ14日以上所属している必要があります。移籍は月初に済ませましょう。',

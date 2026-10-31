@@ -362,7 +362,7 @@ Every response, from the API and the frontend alike, carries these headers:
 
 | Header | Value |
 |---|---|
-| `Content-Security-Policy` | `CONTENT_SECURITY`: scripts, styles, fonts and requests only from the site itself, images also from `data:` URLs, no plugins, and no framing of the page. Scripts and frames are also allowed from `https://challenges.cloudflare.com`, for the [human check](#human-check). With `WEB_ANALYTICS_TOKEN` set, it's `CONTENT_SECURITY_WITH_ANALYTICS` instead, which also allows scripts from `https://static.cloudflareinsights.com` and requests to `https://cloudflareinsights.com` |
+| `Content-Security-Policy` | `CONTENT_SECURITY`: scripts, styles, fonts and requests only from the site itself, images also from `data:` URLs, no plugins, and no framing of the page. Scripts and frames are also allowed from `https://challenges.cloudflare.com`, for the [human check](#human-check), and frames from `https://strawpoll.com`, for the polls on the vote page. With `WEB_ANALYTICS_TOKEN` set, it's `CONTENT_SECURITY_WITH_ANALYTICS` instead, which also allows scripts from `https://static.cloudflareinsights.com` and requests to `https://cloudflareinsights.com` |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `no-referrer` |
 | `X-Frame-Options` | `DENY` |

@@ -2,7 +2,14 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { clubPath, clubRoute, rememberedSearch, rememberSearch } from './route';
+import {
+  clubPath,
+  clubRoute,
+  isVoteRoute,
+  rememberedSearch,
+  rememberSearch,
+  VOTE_PATH,
+} from './route';
 
 describe('clubRoute', () => {
   it('reads the club and trainer', () => {
@@ -21,6 +28,20 @@ describe('clubRoute', () => {
   it('leaves other pages alone', () => {
     for (const path of ['/', '/club', '/club/', '/club/abc', '/club/7/members', '/clubs/7']) {
       expect(clubRoute(path, ''), path).toBeNull();
+    }
+  });
+});
+
+describe('isVoteRoute', () => {
+  it('matches the vote page, with or without a trailing slash', () => {
+    expect(VOTE_PATH).toBe('/vote');
+    expect(isVoteRoute('/vote')).toBe(true);
+    expect(isVoteRoute('/vote/')).toBe(true);
+  });
+
+  it('leaves other pages alone', () => {
+    for (const path of ['/', '/votes', '/vote/1', '/club/7']) {
+      expect(isVoteRoute(path), path).toBe(false);
     }
   });
 });

@@ -15,6 +15,13 @@ describe('NavBar', () => {
     expect(brand).toHaveAttribute('href', 'https://umastable.com');
   });
 
+  it('holds the pages', () => {
+    render(NavBar, { ...props });
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    const pages = within(nav).getByRole('navigation', { name: 'Pages' });
+    expect(within(pages).getAllByRole('link')).toHaveLength(3);
+  });
+
   it('holds the theme switch', () => {
     render(NavBar, { ...props });
     const nav = screen.getByRole('navigation', { name: 'Main' });

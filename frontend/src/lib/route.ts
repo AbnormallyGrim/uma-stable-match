@@ -1,4 +1,4 @@
-/** Which page an address shows: the search, or a club page at `/club/{id}?trainer=…`. */
+/** Which page an address shows: the search, a club page at `/club/{id}?trainer=…`, or the vote page. */
 
 import { isTrainerId, normaliseTrainerId } from './search';
 
@@ -28,6 +28,14 @@ export function clubRoute(pathname: string, search: string): ClubRoute | null {
 export function clubPath(circleId: number | string, trainerId: string | null = null): string {
   const path = `/club/${circleId}`;
   return trainerId === null ? path : `${path}?${new URLSearchParams({ trainer: trainerId })}`;
+}
+
+/** The address of the page for voting on ideas. */
+export const VOTE_PATH = '/vote';
+
+/** Whether `pathname` is the vote page. */
+export function isVoteRoute(pathname: string): boolean {
+  return pathname === VOTE_PATH || pathname === `${VOTE_PATH}/`;
 }
 
 const FROM_KEY = 'uma-stable-match:club-from';
