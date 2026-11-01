@@ -55,8 +55,8 @@ impl Website {
     }
 }
 
-/// The `Content-Security-Policy` for the website: like the app's, plus Google Fonts and the inline
-/// scripts and styles in `html`, allowed by their hashes.
+/// The `Content-Security-Policy` for the website: like the app's, plus Google Fonts, Cloudflare Web
+/// Analytics and the inline scripts and styles in `html`, allowed by their hashes.
 pub fn content_security(html: &str) -> String {
     let with = |sources: &[&str], tag| {
         let mut sources: Vec<String> = sources.iter().map(|s| (*s).to_owned()).collect();
@@ -65,9 +65,9 @@ pub fn content_security(html: &str) -> String {
     };
     format!(
         "default-src 'self'; script-src {}; style-src {}; img-src 'self' data:; \
-connect-src 'self'; font-src https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; \
+connect-src 'self' https://cloudflareinsights.com; font-src https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; \
 form-action 'self'; frame-ancestors 'none'",
-        with(&["'self'"], "script"),
+        with(&["'self'", "https://static.cloudflareinsights.com"], "script"),
         with(&["'self'", "https://fonts.googleapis.com"], "style"),
     )
 }

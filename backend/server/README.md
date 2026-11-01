@@ -393,7 +393,8 @@ On the website, files under `/images/` are cached for a day and everything else 
 
 - styles also from `https://fonts.googleapis.com`, and fonts only from `https://fonts.gstatic.com`
 - the inline `<script>` and `<style>` elements in `index.html`, allowed by their SHA-256 hashes, which the server works out at startup, so editing them needs no other change
-- no Turnstile, StrawPoll or analytics
+- scripts from `https://static.cloudflareinsights.com` and requests to `https://cloudflareinsights.com`, for the Web Analytics beacon Cloudflare adds to proxied pages, whatever `WEB_ANALYTICS_TOKEN` is
+- no Turnstile or StrawPoll
 
 Inline event handlers (`onclick=`) and `style=` attributes stay blocked, and so do inline elements in other HTML files.
 
