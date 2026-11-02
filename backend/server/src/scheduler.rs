@@ -19,6 +19,8 @@ use crate::shared::{ScanLease, ScanTurn, SharedCache};
 use crate::source::Source;
 
 const WAIT_POLL: Duration = Duration::from_secs(1);
+/// How long a serve-only instance waits before checking again for a scan it couldn't load.
+const FOLLOW_RETRY: Duration = Duration::from_secs(60);
 
 #[derive(Serialize, Deserialize)]
 struct PublishedScan {
@@ -73,9 +75,32 @@ pub async fn run_scheduler(
     config: ScanConfig,
     every: Option<Duration>,
     cache: Cache,
+    shutdown: watch::Receiver<bool>,
+) {
+    schedule(Some(source.into()), details, config, every, cache, shutdown).await;
+}
+
+/// Like [`run_scheduler`], but never scans: builds the pool from the scans another instance
+/// publishes in Redis, and waits while there is none. See the README's "Serve-only instances".
+pub async fn follow_scans(
+    details: ClubDetails,
+    config: ScanConfig,
+    every: Option<Duration>,
+    cache: Cache,
+    shutdown: watch::Receiver<bool>,
+) {
+    schedule(None, details, config, every, cache, shutdown).await;
+}
+
+/// The scan loop. Without a `source`, it only follows scans published in Redis.
+async fn schedule(
+    source: Option<Source>,
+    details: ClubDetails,
+    config: ScanConfig,
+    every: Option<Duration>,
+    cache: Cache,
     mut shutdown: watch::Receiver<bool>,
 ) {
-    let source: Source = source.into();
     let shared = details.shared().clone();
     let daily = every.is_none() && details.refreshes();
     let interval = every.unwrap_or(Duration::from_secs(
@@ -84,101 +109,122 @@ pub async fn run_scheduler(
     let mut applied: Option<String> = None;
     let mut pooled: Option<String> = None;
     loop {
-        let pause = match shared.scan_turn(&config).await {
-            ScanTurn::Alone => {
-                count_turn("alone");
-                cache.begin_scan();
-                tracing::info!("scan started");
-                let started = SystemTime::now();
-                cache.start_progress(ScanPhase::Listing, Some(started));
-                let work = scan_with(&source, &details, &config, &cache);
-                let Some(result) = until_stopped(work, &mut shutdown).await else {
-                    return cancelled(&cache);
-                };
-                let updated_at = result.as_ref().ok().and_then(|scan| scan.updated_at);
-                finish(&cache, result, "alone", started);
-                if daily {
-                    until_next_update(updated_at, utc_now())
-                } else {
-                    interval
-                }
-            }
-            ScanTurn::Lead { lease, progress } => {
-                count_turn("lead");
-                cache.begin_scan();
-                tracing::info!("scan started");
-                applied = Some(lease.id().to_owned());
-                let resumed = match progress {
-                    Some(_) => resumable(&shared, &config, interval).await,
-                    None => None,
-                };
-                let plan = match resumed {
-                    Some(saved) => Plan::Resume(saved),
-                    None => Plan::List {
-                        started: SystemTime::now(),
-                        keep_for: interval,
-                    },
-                };
-                let started = plan.started();
-                cache.start_progress(ScanPhase::Listing, Some(started));
-                let work = lead(&source, &details, &config, &cache, &lease, plan);
-                let Some(result) = until_stopped(work, &mut shutdown).await else {
-                    lease.release().await;
-                    return cancelled(&cache);
-                };
-                let (result, outcome) = match result {
-                    Ok((scan, rows)) => (Ok(scan), Ok(rows)),
-                    Err(error) => {
-                        let message = error.public_message();
-                        (Err(error), Err(message))
-                    }
-                };
-                let fresh_for = if daily {
-                    let updated_at = result.as_ref().ok().and_then(|scan| scan.updated_at);
-                    until_next_update(updated_at, utc_now())
-                } else {
-                    interval
-                };
-                lease.publish(&PublishedScan { outcome }, fresh_for).await;
-                finish(&cache, result, "lead", started);
-                fresh_for
-            }
-            ScanTurn::Wait { progress } => {
-                count_turn("wait");
-                cache.begin_scan();
-                if cache.status().progress.map(|p| p.phase) != Some(ScanPhase::Waiting) {
-                    cache.start_progress(ScanPhase::Waiting, None);
-                }
-                if let Some(id) = progress.filter(|id| pooled.as_ref() != Some(id)) {
-                    if let Some(saved) = resumable(&shared, &config, interval).await {
-                        let started = saved.started();
-                        let listed = saved.rows.len();
-                        install(&details, saved.rows, &config);
-                        details.restore_shared_medians().await;
-                        cache.update_progress(|p| {
-                            p.started_at = Some(started);
-                            p.listed = listed;
-                        });
-                        tracing::info!("built the pool from the scan in progress");
-                        pooled = Some(id);
-                    }
-                }
-                WAIT_POLL
-            }
-            ScanTurn::Fresh { id, remaining } => {
-                count_turn("fresh");
-                if applied.as_deref() != Some(id.as_str()) {
+        let pause = 'turn: {
+            match shared.scan_turn(&config, source.is_some()).await {
+                ScanTurn::Alone => {
+                    let Some(source) = &source else {
+                        // Redis isn't answering. Scanning here would put uma.moe's load on this
+                        // instance, so keep the current pool until Redis is back.
+                        count_turn("unavailable");
+                        tracing::warn!("Redis isn't answering; keeping the current club pool");
+                        break 'turn FOLLOW_RETRY;
+                    };
+                    count_turn("alone");
                     cache.begin_scan();
+                    tracing::info!("scan started");
                     let started = SystemTime::now();
-                    cache.start_progress(ScanPhase::Loading, Some(started));
-                    let work = sync(&source, &details, &config, &cache);
+                    cache.start_progress(ScanPhase::Listing, Some(started));
+                    let work = scan_with(source, &details, &config, &cache);
                     let Some(result) = until_stopped(work, &mut shutdown).await else {
                         return cancelled(&cache);
                     };
-                    finish(&cache, result, "published", started);
-                    applied = Some(id);
+                    let updated_at = result.as_ref().ok().and_then(|scan| scan.updated_at);
+                    finish(&cache, result, "alone", started);
+                    if daily {
+                        until_next_update(updated_at, utc_now())
+                    } else {
+                        interval
+                    }
                 }
-                remaining
+                ScanTurn::Lead { lease, progress } => {
+                    let Some(source) = &source else {
+                        // Not handed out without a source; give it back if it ever is.
+                        lease.release().await;
+                        break 'turn WAIT_POLL;
+                    };
+                    count_turn("lead");
+                    cache.begin_scan();
+                    tracing::info!("scan started");
+                    applied = Some(lease.id().to_owned());
+                    let resumed = match progress {
+                        Some(_) => resumable(&shared, &config, interval).await,
+                        None => None,
+                    };
+                    let plan = match resumed {
+                        Some(saved) => Plan::Resume(saved),
+                        None => Plan::List {
+                            started: SystemTime::now(),
+                            keep_for: interval,
+                        },
+                    };
+                    let started = plan.started();
+                    cache.start_progress(ScanPhase::Listing, Some(started));
+                    let work = lead(source, &details, &config, &cache, &lease, plan);
+                    let Some(result) = until_stopped(work, &mut shutdown).await else {
+                        lease.release().await;
+                        return cancelled(&cache);
+                    };
+                    let (result, outcome) = match result {
+                        Ok((scan, rows)) => (Ok(scan), Ok(rows)),
+                        Err(error) => {
+                            let message = error.public_message();
+                            (Err(error), Err(message))
+                        }
+                    };
+                    let fresh_for = if daily {
+                        let updated_at = result.as_ref().ok().and_then(|scan| scan.updated_at);
+                        until_next_update(updated_at, utc_now())
+                    } else {
+                        interval
+                    };
+                    lease.publish(&PublishedScan { outcome }, fresh_for).await;
+                    finish(&cache, result, "lead", started);
+                    fresh_for
+                }
+                ScanTurn::Wait { progress } => {
+                    count_turn("wait");
+                    cache.begin_scan();
+                    if cache.status().progress.map(|p| p.phase) != Some(ScanPhase::Waiting) {
+                        cache.start_progress(ScanPhase::Waiting, None);
+                    }
+                    if let Some(id) = progress.filter(|id| pooled.as_ref() != Some(id)) {
+                        if let Some(saved) = resumable(&shared, &config, interval).await {
+                            let started = saved.started();
+                            let listed = saved.rows.len();
+                            install(&details, saved.rows, &config);
+                            details.restore_shared_medians().await;
+                            cache.update_progress(|p| {
+                                p.started_at = Some(started);
+                                p.listed = listed;
+                            });
+                            tracing::info!("built the pool from the scan in progress");
+                            pooled = Some(id);
+                        }
+                    }
+                    WAIT_POLL
+                }
+                ScanTurn::Fresh { id, remaining } => {
+                    count_turn("fresh");
+                    if applied.as_deref() != Some(id.as_str()) {
+                        cache.begin_scan();
+                        let started = SystemTime::now();
+                        cache.start_progress(ScanPhase::Loading, Some(started));
+                        let work = sync(source.as_ref(), &details, &config, &cache);
+                        let Some(result) = until_stopped(work, &mut shutdown).await else {
+                            return cancelled(&cache);
+                        };
+                        let Some(result) = result else {
+                            cache.cancel_scan();
+                            tracing::warn!(
+                                "the published scan is missing; waiting for the next one"
+                            );
+                            break 'turn FOLLOW_RETRY;
+                        };
+                        finish(&cache, result, "published", started);
+                        applied = Some(id);
+                    }
+                    remaining
+                }
             }
         };
 
@@ -238,24 +284,27 @@ async fn lead(
     }
 }
 
+/// Loads the scan another instance published. If it's missing, scans here with `source`, or
+/// gives `None` without one.
 async fn sync(
-    source: &Source,
+    source: Option<&Source>,
     details: &ClubDetails,
     config: &ScanConfig,
     cache: &Cache,
-) -> Result<Scan, ScanError> {
+) -> Option<Result<Scan, ScanError>> {
     match details.shared().published_scan(config).await {
         Some(PublishedScan { outcome: Ok(rows) }) => {
             tracing::info!("loading the scan published by another instance");
-            Ok(load(details, rows, config, cache).await)
+            Some(Ok(load(details, rows, config, cache).await))
         }
         Some(PublishedScan {
             outcome: Err(message),
-        }) => Err(ScanError::Shared(message)),
+        }) => Some(Err(ScanError::Shared(message))),
         None => {
+            let source = source?;
             tracing::warn!("the published scan is missing; scanning here");
             cache.update_progress(|p| p.phase = ScanPhase::Listing);
-            scan_with(source, details, config, cache).await
+            Some(scan_with(source, details, config, cache).await)
         }
     }
 }

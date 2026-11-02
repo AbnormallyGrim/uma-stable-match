@@ -26,6 +26,22 @@ fn defaults() {
     assert!(!config.features.japanese);
     assert_eq!(config.features.web_analytics, None);
     assert!(config.excluded_trainers.is_empty());
+    assert!(!config.serve_only);
+}
+
+#[test]
+fn serve_only_needs_redis() {
+    assert_eq!(
+        Config::from_lookup(lookup(&[("SERVE_ONLY", "true")])).unwrap_err(),
+        ConfigError::ServeOnlyNeedsRedis
+    );
+    let config = Config::from_lookup(lookup(&[
+        ("SERVE_ONLY", "true"),
+        ("REDIS_URL", "redis://127.0.0.1:6379"),
+        ("REDIS_KEY_SECRET", "made-up-secret-made-up-secret-0001"),
+    ]))
+    .unwrap();
+    assert!(config.serve_only);
 }
 
 #[test]

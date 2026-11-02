@@ -112,6 +112,8 @@ pub struct Config {
     pub metrics_addr: Option<SocketAddr>,
     /// Trainer IDs left out of search metrics, from `METRICS_EXCLUDED_TRAINER_IDS`.
     pub excluded_trainers: ExcludedTrainers,
+    /// Whether this instance leaves scans and refreshes to another one, from `SERVE_ONLY`.
+    pub serve_only: bool,
 }
 
 /// Invalid or missing settings.
@@ -148,6 +150,11 @@ pub enum ConfigError {
     /// `REDIS_KEY_SECRET` is shorter than 32 characters. The value isn't shown.
     #[error("REDIS_KEY_SECRET must be at least 32 characters")]
     InvalidRedisKeySecret,
+    /// `SERVE_ONLY` is on without `REDIS_URL`, so no scans would reach this instance.
+    #[error(
+        "SERVE_ONLY needs REDIS_URL: the scans it serves come from another instance through Redis"
+    )]
+    ServeOnlyNeedsRedis,
     /// `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY` aren't set together.
     #[error("TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY and TOKEN_SIGNING_KEY must be set together")]
     IncompleteHumanCheck,
@@ -339,6 +346,10 @@ impl Config {
                 Some(KeySecret::parse(&value).ok_or(ConfigError::InvalidRedisKeySecret)?)
             }
         };
+        let serve_only = boolean("SERVE_ONLY")?;
+        if serve_only && redis_url.is_none() {
+            return Err(ConfigError::ServeOnlyNeedsRedis);
+        }
         let human = match (
             get("TURNSTILE_SITE_KEY"),
             get("TURNSTILE_SECRET_KEY"),
@@ -406,6 +417,7 @@ impl Config {
             human,
             metrics_addr,
             excluded_trainers,
+            serve_only,
         })
     }
 }

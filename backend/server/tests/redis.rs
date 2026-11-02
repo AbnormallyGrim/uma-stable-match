@@ -16,10 +16,10 @@ use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    club_key, install_metrics, metrics_router, router, run_scheduler, scan, AppState, Cache,
-    CacheStatus, ClubDetails, ClubPool, DetailConfig, ExcludedTrainers, KeySecret, ListedClub,
-    MatchSettings, PaceLookup, RateLimits, RedisUrl, RefreshConfig, ScanConfig, ScanPhase,
-    SharedCache, SharedPool, DEFAULT_PACE_TTL,
+    club_key, follow_scans, install_metrics, metrics_router, router, run_scheduler, scan, AppState,
+    Cache, CacheStatus, ClubDetails, ClubPool, DetailConfig, ExcludedTrainers, KeySecret,
+    ListedClub, MatchSettings, PaceLookup, RateLimits, RedisUrl, RefreshConfig, ScanConfig,
+    ScanPhase, SharedCache, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, Priority, RetryConfig};
 use wiremock::matchers::{path, query_param};
@@ -479,6 +479,77 @@ async fn a_failed_shared_scan_is_reported_by_every_instance() {
     }
 
     for running in [first, second] {
+        running.stop().await;
+    }
+}
+
+/// A serve-only instance: it follows published scans and never scans. Its own uma.moe stands in
+/// for visitor lookups, which these tests don't make, so it should see no requests at all.
+fn follower(server: &MockServer, config: ScanConfig, shared: SharedCache) -> Instance {
+    let cache = Cache::new();
+    let (details, _loader) = ClubDetails::with_shared(
+        client(server),
+        SharedPool::default(),
+        DetailConfig {
+            refresher: true,
+            ..DetailConfig::default()
+        },
+        shared,
+    );
+    let (stop, stopped) = watch::channel(false);
+    let handle = tokio::spawn(follow_scans(
+        details.clone(),
+        config,
+        Some(Duration::from_secs(3600)),
+        cache.clone(),
+        stopped,
+    ));
+    Instance {
+        cache,
+        details,
+        stop,
+        handle,
+    }
+}
+
+#[tokio::test]
+async fn a_serve_only_instance_never_scans_when_redis_stops_answering() {
+    let server = MockServer::start().await;
+    let shared = SharedCache::connect(&silent_after_ping().await, secret())
+        .await
+        .unwrap();
+
+    let only = follower(&server, scan_config(), shared);
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    assert!(only.cache.snapshot().is_none());
+    assert!(server.received_requests().await.unwrap().is_empty());
+    only.stop().await;
+}
+
+#[tokio::test]
+async fn a_serve_only_instance_follows_the_scan_another_instance_publishes() {
+    let Some(follower_shared) = redis().await else {
+        return;
+    };
+    let config = scan_config();
+    let own = MockServer::start().await;
+    let serving = follower(&own, config, follower_shared);
+
+    // Nothing published yet: it waits, and leaves the scan lock free.
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    assert!(serving.cache.snapshot().is_none());
+
+    let upstream = MockServer::start().await;
+    let id = unique_id();
+    mount_scan(&upstream, id).await;
+    let scanning = instance(&upstream, config, redis().await.unwrap());
+    scanning.wait_until(|s| s.snapshot.is_some()).await;
+
+    serving.wait_until(|s| s.snapshot.is_some()).await;
+    assert_eq!(serving.cache.snapshot().unwrap().candidates, 1);
+    assert!(own.received_requests().await.unwrap().is_empty());
+
+    for running in [serving, scanning] {
         running.stop().await;
     }
 }
