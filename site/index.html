@@ -239,9 +239,10 @@
             max-width: 1050px;
             margin: 0 auto;
             padding: 0 1.5rem;
-            display: flex;
+            /* Brand on the left, the pages pill in the middle, the rest on the right. */
+            display: grid;
+            grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
             align-items: center;
-            justify-content: space-between;
             gap: 1rem;
         }
 
@@ -267,9 +268,14 @@
             letter-spacing: -0.3px;
         }
 
+        .brand {
+            justify-self: start;
+        }
+
         .nav-links {
             display: flex;
             align-items: center;
+            justify-self: end;
             gap: 1.25rem;
         }
 
@@ -278,6 +284,7 @@
             font-size: 0.9rem;
             font-weight: 500;
             text-decoration: none;
+            white-space: nowrap;
         }
 
         .nav-link:hover {
@@ -758,6 +765,13 @@
             color: var(--text-main);
         }
 
+        /* Too narrow to keep the pages pill centered with the section links beside it. */
+        @media (max-width: 960px) {
+            .nav-link {
+                display: none;
+            }
+        }
+
         @media (max-width: 640px) {
             .hero {
                 padding: 4rem 0 3.5rem;
@@ -769,10 +783,6 @@
 
             .hero p {
                 font-size: 1.05rem;
-            }
-
-            .nav-link {
-                display: none;
             }
 
             .brand-title {
@@ -856,23 +866,23 @@
             <img src="images/logo.webp" alt="" width="42" height="42" class="nav-logo only-dark" />
             <span class="brand-title">Uma Stable Match</span>
         </a>
+        <nav class="pages" aria-label="Pages" data-i18n-attr="aria-label:nav.pages">
+            <a href="/" aria-current="page" data-tooltip="Home" data-i18n-attr="data-tooltip:nav.home">
+                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 7.5 8 2.5l6 5M3.5 6.5v6.5h3.25v-3.5h2.5V13H12.5V6.5" /></svg>
+                <span class="label" data-i18n="nav.home">Home</span>
+            </a>
+            <a href="https://app.umastable.com" data-tooltip="Club finder" data-i18n-attr="data-tooltip:nav.finder">
+                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
+                <span class="label" data-i18n="nav.finder">Club finder</span>
+            </a>
+            <a href="https://app.umastable.com/wishlist" data-tooltip="Wishlist" data-i18n-attr="data-tooltip:nav.wishlist">
+                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" /><path d="m5.25 8.25 2 2 3.5-4.5" /></svg>
+                <span class="label" data-i18n="nav.wishlist">Wishlist</span>
+            </a>
+        </nav>
         <div class="nav-links">
             <a href="#how-it-works" class="nav-link" data-i18n="nav.how">How it works</a>
             <a href="#faq" class="nav-link" data-i18n="nav.faq">FAQ</a>
-            <nav class="pages" aria-label="Pages" data-i18n-attr="aria-label:nav.pages">
-                <a href="/" aria-current="page" data-tooltip="Home" data-i18n-attr="data-tooltip:nav.home">
-                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 7.5 8 2.5l6 5M3.5 6.5v6.5h3.25v-3.5h2.5V13H12.5V6.5" /></svg>
-                    <span class="label" data-i18n="nav.home">Home</span>
-                </a>
-                <a href="https://app.umastable.com" data-tooltip="Club finder" data-i18n-attr="data-tooltip:nav.finder">
-                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
-                    <span class="label" data-i18n="nav.finder">Club finder</span>
-                </a>
-                <a href="https://app.umastable.com/wishlist" data-tooltip="Wishlist" data-i18n-attr="data-tooltip:nav.wishlist">
-                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" /><path d="m5.25 8.25 2 2 3.5-4.5" /></svg>
-                    <span class="label" data-i18n="nav.wishlist">Wishlist</span>
-                </a>
-            </nav>
             <button type="button" class="lang-switch" id="lang-switch" hidden aria-label="Switch to Japanese (日本語)" title="Switch to Japanese (日本語)" data-i18n-attr="aria-label:lang.switch;title:lang.switch">
                 <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M4.545 6.714 4.11 8H3l1.862-5h1.284L8 8H6.833l-.435-1.286zm1.634-.736L5.5 3.956h-.049l-.679 2.022z"/><path d="M0 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zm7.138 9.995q.289.451.63.846c-.748.575-1.673 1.001-2.768 1.292.178.217.451.635.555.867 1.125-.359 2.08-.844 2.886-1.494.777.665 1.739 1.165 2.93 1.472.133-.254.414-.673.629-.89-1.125-.253-2.057-.694-2.82-1.284.681-.747 1.222-1.651 1.621-2.757H14V8h-3v1.047h.765c-.318.844-.74 1.546-1.272 2.13a6 6 0 0 1-.415-.492 2 2 0 0 1-.94.31"/></svg>
             </button>
@@ -1099,6 +1109,16 @@
             });
         }
     })();
+</script>
+
+<script>
+    // Run locally, the website is on site.localhost and the app on localhost of the same server.
+    if (location.hostname === 'site.localhost') {
+        const app = `${location.protocol}//localhost${location.port ? `:${location.port}` : ''}`;
+        for (const link of document.querySelectorAll('a[href^="https://app.umastable.com"]')) {
+            link.href = app + link.getAttribute('href').slice('https://app.umastable.com'.length);
+        }
+    }
 </script>
 
 

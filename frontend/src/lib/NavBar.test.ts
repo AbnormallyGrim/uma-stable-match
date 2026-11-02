@@ -12,7 +12,8 @@ describe('NavBar', () => {
     render(NavBar, { ...props });
     const nav = screen.getByRole('navigation', { name: 'Main' });
     const brand = within(nav).getByRole('link', { name: 'Uma Stable Match' });
-    expect(brand).toHaveAttribute('href', 'https://umastable.com');
+    // jsdom runs on localhost, so the link is the local website.
+    expect(brand).toHaveAttribute('href', `http://site.localhost:${window.location.port}`);
   });
 
   it('holds the pages', () => {
