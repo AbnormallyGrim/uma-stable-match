@@ -105,6 +105,18 @@ export interface ClubDetails {
   /** Current members, fastest first, with members too new to rank last. */
   members: ClubMember[];
   trainer: ClubTrainer | null;
+  /** The club's previous month while this month has too few days for a chart, else `null`. */
+  previous: PreviousMonth | null;
+}
+
+/** Last month's daily fans for the club page chart. */
+export interface PreviousMonth {
+  /** `YYYY-MM`. */
+  month: string;
+  /** Each current member's cumulative fans last month, lined up with `members`, or `null`. */
+  members: (number[] | null)[];
+  /** The trainer's cumulative fans last month, or `null`. */
+  trainer: number[] | null;
 }
 
 /** Features the server has switched on. */

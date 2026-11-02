@@ -12,9 +12,12 @@ const M = 1_000_000;
 const fans = (pace: number, days = 6) =>
   Array.from({ length: 8 }, (_, d) => (d < days ? 100 * M + pace * d : 0));
 
-function details(withTrainer = true): Pick<ClubDetails, 'members' | 'trainer' | 'month'> {
+function details(
+  withTrainer = true,
+): Pick<ClubDetails, 'members' | 'trainer' | 'month' | 'previous'> {
   return {
     month: '2026-03',
+    previous: null,
     members: [4, 6, 8].map((p, i) => ({
       name: `Made-up Trainer ${'ABC'[i]}`,
       pace_per_day: p * M,
@@ -126,12 +129,39 @@ describe('PaceChart', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
+  it('shows last month, every day of it, while the server sends it', async () => {
+    // This month has one day; last month has eight, with no line for the member who joined.
+    const early = details();
+    early.members = early.members.map((m) => ({ ...m, daily_fans: fans(m.pace_per_day!, 1) }));
+    early.trainer = { ...early.trainer!, daily_fans: fans(7 * M, 1) };
+    early.previous = {
+      month: '2026-02',
+      members: [fans(3 * M, 8), fans(5 * M, 8), null],
+      trainer: fans(4 * M, 8),
+    };
+    const { container } = render(PaceChart, {
+      details: early,
+      highlight: 1,
+      now: new Date('2026-03-03T09:00:00Z'),
+    });
+    expect(slider()).toHaveAttribute('aria-valuemax', '8');
+    const paths = [...container.querySelectorAll('path.member')].map((p) => p.getAttribute('d'));
+    expect(paths.filter((d) => d !== '')).toHaveLength(2);
+    expect(container.querySelector('path.chosen')).toHaveAttribute('d');
+    await fireEvent.keyDown(slider(), { key: 'End' });
+    expect(slider()).toHaveAttribute(
+      'aria-valuetext',
+      'Day 8, Made-up Trainer B 5.0M/day, You 4.0M/day, Members 3.0M/day to 5.0M/day',
+    );
+  });
+
   it('says when there are too few days for a chart', () => {
     render(PaceChart, {
       details: {
         month: '2026-03',
         members: [{ name: null, pace_per_day: null, daily_fans: fans(M, 1) }],
         trainer: null,
+        previous: null,
       },
     });
     expect(screen.getByText('There are too few days of data for a chart yet.')).toBeVisible();

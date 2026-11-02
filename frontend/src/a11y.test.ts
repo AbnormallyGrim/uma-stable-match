@@ -135,6 +135,7 @@ describe('accessibility', () => {
     const details: ClubDetails = {
       club: club(),
       month: '2026-03',
+      previous: null,
       updated_at: '2026-03-19T15:00:00Z',
       median_per_day: 6_400_000,
       members: [9_000_000, 5_000_000, 4_000_000].map((pace, i) => ({

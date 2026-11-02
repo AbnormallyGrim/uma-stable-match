@@ -26,6 +26,7 @@ function details(overrides: Partial<ClubDetails> = {}): ClubDetails {
       daily_fans: fans(pace ?? 0),
     })),
     trainer: null,
+    previous: null,
     ...overrides,
   };
 }
