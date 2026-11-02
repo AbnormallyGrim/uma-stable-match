@@ -1,5 +1,7 @@
 //! `GET /api/v1/clubs/{id}`: a loaded club's members, and where a trainer would sit among them.
 
+use std::collections::HashMap;
+
 use axum::extract::rejection::QueryRejection;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -12,7 +14,8 @@ use uma_stable_match_scoring::{
 use crate::api_error::ApiError;
 use crate::app::{timestamp, AppState};
 use crate::limits::Visitor;
-use crate::priors::{data_period, month_label, CLUB_PRIOR_K};
+use crate::pool::Period;
+use crate::priors::{data_days, data_period, month_before, month_label, CLUB_PRIOR_K};
 use crate::recommendations::{blank_to_none, club_info, pace_error, without_trainer, ClubInfo};
 
 #[derive(Debug, Deserialize)]
@@ -28,6 +31,16 @@ pub(crate) struct ClubPage {
     median_per_day: Option<f64>,
     members: Vec<MemberView>,
     trainer: Option<TrainerView>,
+    previous: Option<PreviousView>,
+}
+
+// Last month's daily fans, while this month has too few days for a chart. `members` lines up with
+// the page's members, with `None` for those who weren't in the club.
+#[derive(Debug, Serialize)]
+struct PreviousView {
+    month: String,
+    members: Vec<Option<Vec<i64>>>,
+    trainer: Option<Vec<i64>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -83,6 +96,21 @@ pub(crate) async fn club(
     let mut info = club_info(&club);
     info.member_count = loaded.member_count;
     info.open_spots = loaded.open_spots();
+    let (ids, members): (Vec<u64>, Vec<MemberView>) = members(&club).into_iter().unzip();
+    let previous = match data_period(&loaded) {
+        Some(period) if data_days(&loaded) < PREVIOUS_MONTH_BELOW_DAYS => {
+            previous_view(
+                &state,
+                visitor,
+                circle_id,
+                month_before(period),
+                &ids,
+                trainer_id,
+            )
+            .await
+        }
+        _ => None,
+    };
 
     Ok(Json(ClubPage {
         club: info,
@@ -93,22 +121,74 @@ pub(crate) async fn club(
             .await
             .map(|at| timestamp(at.into())),
         median_per_day: blended_median(&club.members, CLUB_PRIOR_K),
-        members: members(&club),
+        members,
         trainer,
+        previous,
     }))
 }
 
-// Current members, fastest first; members too new to have a pace come last.
-fn members(club: &Club) -> Vec<MemberView> {
-    let mut members: Vec<MemberView> = current_members(&club.members)
+// Days of this month's data below which the page also gets the club's previous month.
+const PREVIOUS_MONTH_BELOW_DAYS: usize = 3;
+
+// The club's previous month for `ids`, its current members, and the trainer. `None` when the
+// visitor is over their lookup limit for an uncached month, or the fetch fails.
+async fn previous_view(
+    state: &AppState,
+    visitor: Visitor,
+    circle_id: u64,
+    period: Period,
+    ids: &[u64],
+    trainer_id: Option<u64>,
+) -> Option<PreviousView> {
+    if !state.details.has_previous_month(circle_id, period) {
+        state.limits.check_lookup(visitor).ok()?;
+    }
+    let club = state
+        .details
+        .previous_month(circle_id, period)
+        .await
+        .inspect_err(|error| {
+            tracing::warn!(circle_id, origin = error.origin(), %error, "previous month lookup failed");
+        })
+        .ok()?;
+    let fans: HashMap<u64, Vec<i64>> = club
+        .members
+        .iter()
+        .filter(|m| m.year.zip(m.month).is_none_or(|p| p == period))
+        .map(|m| (m.viewer_id, m.daily_fans.iter().map(|v| v.abs()).collect()))
+        .collect();
+    let trainer = match trainer_id {
+        Some(id) => state
+            .paces
+            .daily_fans(id, Some(period))
+            .await
+            .ok()
+            .flatten()
+            .map(|fans| fans.iter().map(|v| v.abs()).collect()),
+        None => None,
+    };
+    Some(PreviousView {
+        month: month_label(period),
+        members: ids.iter().map(|id| fans.get(id).cloned()).collect(),
+        trainer,
+    })
+}
+
+// Current members with their trainer IDs, fastest first; members too new to have a pace come last.
+fn members(club: &Club) -> Vec<(u64, MemberView)> {
+    let mut members: Vec<(u64, MemberView)> = current_members(&club.members)
         .into_iter()
-        .map(|m| MemberView {
-            name: m.name.clone(),
-            pace_per_day: blended_pace(&m.daily_fans, m.prior, CLUB_PRIOR_K).map(|p| p.max(0.0)),
-            daily_fans: m.daily_fans.iter().map(|v| v.abs()).collect(),
+        .map(|m| {
+            let view = MemberView {
+                name: m.name.clone(),
+                pace_per_day: blended_pace(&m.daily_fans, m.prior, CLUB_PRIOR_K)
+                    .map(|p| p.max(0.0)),
+                daily_fans: m.daily_fans.iter().map(|v| v.abs()).collect(),
+            };
+            (m.viewer_id, view)
         })
         .collect();
-    members.sort_by(|a, b| match (a.pace_per_day, b.pace_per_day) {
+    members.sort_by(|(_, a), (_, b)| match (a.pace_per_day, b.pace_per_day) {
         (Some(a), Some(b)) => b.total_cmp(&a),
         (a, b) => b.is_some().cmp(&a.is_some()),
     });

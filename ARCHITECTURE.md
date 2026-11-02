@@ -103,7 +103,7 @@ The private `/status`, on the metrics address, reports the running scan's phase 
 5. **Own club:** for a trainer lookup, their club is scored separately as if they were joining it, without their own member row.
 6. **Respond:** ranked clubs, the trainer's own club, `coverage` (considered, shortlisted, scored, still loading) and the data's `month`.
 
-`GET /api/v1/clubs/{id}` answers from clubs already in memory or Redis and never fetches one. With `trainer_id`, it looks up the trainer like a search and places them among the members.
+`GET /api/v1/clubs/{id}` answers from clubs already in memory or Redis and never fetches one. Early in the month it fetches a loaded club's previous month, kept in memory for 10 minutes, so the page can chart last month. With `trainer_id`, it looks up the trainer like a search and places them among the members.
 
 ## Caches
 
