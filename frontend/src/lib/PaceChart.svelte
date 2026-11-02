@@ -4,7 +4,7 @@
   median in bold, the trainer's line in the accent colour and the chosen member's line in the
   highlight colour. A crosshair shows every line's value for a day, on hover or with the arrow keys,
   which move it like a slider over the days. In the current month, the day still under way is left
-  out.
+  out. While this month has too few days, it shows the server's `previous` month instead.
 -->
 
 <script lang="ts">
@@ -22,7 +22,7 @@
   import { t } from './i18n';
 
   interface Props {
-    details: Pick<ClubDetails, 'members' | 'trainer' | 'month'>;
+    details: Pick<ClubDetails, 'members' | 'trainer' | 'month' | 'previous'>;
     /** The index in `details.members` of the member whose line stands out, if any. */
     highlight?: number | null;
     /** Replaceable in tests. */
@@ -38,13 +38,18 @@
   const HEIGHT = 260;
   const PAD = { top: 12, right: 16, bottom: 28, left: 48 };
 
-  const members = $derived(details.members.map((m) => toSeries(m.daily_fans, mode)));
-  const yours = $derived(
-    details.trainer?.daily_fans ? toSeries(details.trainer.daily_fans, mode) : null,
+  // While this month has too few days, the server sends last month, which the chart plots
+  // instead, every day of it.
+  const previous = $derived(details.previous ?? null);
+  const memberFans = $derived(
+    previous
+      ? previous.members.map((fans) => fans ?? [])
+      : details.members.map((m) => m.daily_fans),
   );
-  const days = $derived(
-    Math.max(0, ...details.members.map((m) => m.daily_fans.length), yours?.length ?? 0),
-  );
+  const yourFans = $derived(previous ? previous.trainer : (details.trainer?.daily_fans ?? null));
+  const members = $derived(memberFans.map((fans) => toSeries(fans, mode)));
+  const yours = $derived(yourFans ? toSeries(yourFans, mode) : null);
+  const days = $derived(Math.max(0, ...memberFans.map((fans) => fans.length), yours?.length ?? 0));
   const median = $derived(medianSeries(members, days));
   const chosen = $derived(
     highlight === null || !members[highlight]
@@ -55,7 +60,9 @@
         },
   );
   // In the current game month the latest day is still under way, so it would show as a sharp drop.
-  const today = $derived(details.month === null || details.month === gameMonth(now.toISOString()));
+  const today = $derived(
+    !previous && (details.month === null || details.month === gameMonth(now.toISOString())),
+  );
   const last = $derived(lastDay(yours ? [...members, yours] : members) - (today ? 1 : 0));
   const first = $derived(mode === 'daily' ? 1 : 0);
   const yTicks = $derived(

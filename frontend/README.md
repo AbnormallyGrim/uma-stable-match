@@ -375,6 +375,7 @@ The navbar keeps the release notes but has no tour button here.
 - **Fans this month:** each day's fans minus the first day with data.
 - **Club median:** the median of the members' values on each day, drawn where at least 3 members have one. It's a day-by-day median, so it can differ from the blended **Median/day** in the header.
 
+- **Early in the month:** while this month has fewer than 4 days of data, the fewest the daily chart needs, the server also sends the club's `previous` month, and the chart plots that instead: every member's line from last month, lined up with the member cards, plus your own. Members who joined this month have no line. Highlighting a member still works, and every day shows, since last month is over. From 4 days of data the server stops sending it and the chart shows this month.
 - **The day under way:** uma.moe's daily update already includes the current day, so its gain is only part of a day and would show as a sharp drop. While the data is for the current game month (or has no month), the chart stops at the day before. Once a month is over, every day shows.
 
 Days are numbered from 1, with an axis label every fifth day. The y axis starts at 0 and steps through round values such as 2.5M. The chart is plain SVG sized to its container, with no chart library.

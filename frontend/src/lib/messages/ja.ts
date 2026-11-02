@@ -26,6 +26,9 @@ export const ja: Catalog = {
   'releases.change.improved': '改善',
   'releases.change.fixed': '修正',
 
+  'releases.earlyChart.title': '月初めにサークルのグラフが表示されない問題を修正',
+  'releases.earlyChart.body':
+    '月初めにサークルページのグラフに「データが足りない」と表示されなくなり、今月のデータがそろうまでは先月のグラフを表示します。',
   'releases.clubPage.title': 'サークルでのあなたの位置を確認',
   'releases.clubPage.body':
     '各サークルの「メンバーと比べる」を選ぶと、メンバー内でのあなたの順位と、今月の各メンバーの1日のファン獲得数の推移をグラフで確認できます。',
