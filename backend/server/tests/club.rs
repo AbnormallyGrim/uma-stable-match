@@ -362,6 +362,33 @@ async fn early_in_the_month_it_adds_last_months_fans_once() {
 }
 
 #[tokio::test]
+async fn with_3_days_it_still_adds_last_month() {
+    let server = MockServer::start().await;
+    let mut detail = club_detail(false);
+    for member in detail["members"].as_array_mut().unwrap() {
+        for day in member["daily_fans"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .skip(3)
+        {
+            *day = json!(0);
+        }
+    }
+    let state = scanned(&server, detail).await;
+    mount_previous(
+        &server,
+        ResponseTemplate::new(200).set_body_json(previous_detail()),
+        1,
+    )
+    .await;
+
+    let (status, body) = get(&state, "/api/v1/clubs/1").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["previous"]["month"], "2026-02");
+}
+
+#[tokio::test]
 async fn with_enough_days_it_fetches_nothing_more() {
     let server = MockServer::start().await;
     let state = scanned(&server, club_detail(false)).await;

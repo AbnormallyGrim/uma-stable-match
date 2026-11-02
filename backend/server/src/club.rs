@@ -127,8 +127,9 @@ pub(crate) async fn club(
     }))
 }
 
-// Days of this month's data below which the page also gets the club's previous month.
-const PREVIOUS_MONTH_BELOW_DAYS: usize = 3;
+// Days of this month's data below which the page also gets the club's previous month. The daily
+// chart leaves out the day under way and needs two gains, so it takes 4 days.
+const PREVIOUS_MONTH_BELOW_DAYS: usize = 4;
 
 // The club's previous month for `ids`, its current members, and the trainer. `None` when the
 // visitor is over their lookup limit for an uncached month, or the fetch fails.
