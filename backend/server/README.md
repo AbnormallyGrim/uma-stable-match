@@ -592,7 +592,7 @@ Errors come back as `{"error": "..."}`:
 
 ### Club page
 
-`GET /api/v1/clubs/{id}` returns one club's current members for the web app's club page. It only serves clubs already loaded, in memory or in Redis, and never fetches the club. A club that isn't loaded is `404`; it's usually loaded once a search has scored it.
+`GET /api/v1/clubs/{id}` returns one club's current members for the web app's club page. It only serves clubs already loaded, in memory or in Redis, and never fetches this month's details. A club that isn't loaded is `404`; it's usually loaded once a search has scored it. Early in the month it may fetch the club's previous month; see `previous` below.
 
 | Parameter | Required | Description |
 |---|---|---|
@@ -607,13 +607,17 @@ Errors come back as `{"error": "..."}`:
   "members": [
     { "name": "Example Trainer", "pace_per_day": 9120000.0, "daily_fans": [100000000, 109120000, 0] }
   ],
-  "trainer": { "trainer_id": 123456789012, "pace_per_day": 7600000.0, "daily_fans": [90000000, 97600000, 0], "in_club": false, "your_place": 12, "club_size": 30 }
+  "trainer": { "trainer_id": 123456789012, "pace_per_day": 7600000.0, "daily_fans": [90000000, 97600000, 0], "in_club": false, "your_place": 12, "club_size": 30 },
+  "previous": null
 }
 ```
 
 - `club` has the same fields as a recommendation's club details.
 - `month` is the game month of the members' data, and `updated_at` when uma.moe last updated the club, if known.
 - `members` are the [current members](../scoring/README.md#current-members), fastest first. `name` is the trainer's name from uma.moe, or `null` if it has none. `pace_per_day` uses the same [blended pace](#blended-club-medians) as searches, so it matches `median_per_day` and the search results; it's `null` for members too new to rank, who come last. `daily_fans` is each day's cumulative fan count, with `0` for days without data.
+- `previous` is the club's previous month while this month has fewer than 4 days of data, the fewest the page's daily chart needs once it leaves out the day under way, so the page can chart last month instead; otherwise `null`. It holds the `month` (`YYYY-MM`), `members`, lined up with the page's `members`, with each one's daily fans last month or `null` for members who weren't in the club, and the trainer's daily fans last month as `trainer`, or `null`.
+  - The previous month is fetched from uma.moe the first time a club's page asks for it, in the interactive lane, and kept in memory for 10 minutes (`PREVIOUS_MONTH_TTL`), not in Redis. Concurrent requests for one club share the fetch.
+  - Only loaded clubs get it. Each fetch that isn't kept yet counts against the visitor's [trainer lookup limit](#rate-limits). Over the limit, or if the fetch fails, `previous` is `null`, and a later request tries again.
 - `trainer` is `null` without `trainer_id`. As with [the trainer's own club](#the-trainers-own-club), their own row is left out of `members` and the club counts one member smaller, and `in_club` says they're a member. `daily_fans` is `null` when their pace came from the 7-day gain, and `your_place` and `club_size` are `null` when the club has fewer than 8 rankable members.
 
 The [human check](#human-check) and [rate limits](#rate-limits) apply as for recommendations. Errors are the same as [recommendations' errors](#errors) for a trainer, plus `400` when the club ID isn't a number, and `404` with `"club not loaded yet; try again later"`.
@@ -623,7 +627,7 @@ The [human check](#human-check) and [rate limits](#rate-limits) apply as for rec
 `/api/v1/recommendations` and `/api/v1/clubs/{id}` are limited per visitor. Health isn't limited.
 
 - **All requests:** `RATE_LIMIT_PER_MINUTE` (30 by default).
-- **Trainer lookups:** `TRAINER_LOOKUPS_PER_MINUTE` (10 by default). This only counts `trainer_id` requests that need a call to uma.moe. Cached trainers and `pace` requests don't use it, so a public instance can't be used to flood uma.moe.
+- **Trainer lookups:** `TRAINER_LOOKUPS_PER_MINUTE` (10 by default). This only counts `trainer_id` requests that need a call to uma.moe, and club pages that fetch a club's [previous month](#club-page). Cached trainers and `pace` requests don't use it, so a public instance can't be used to flood uma.moe.
 
 Each limit allows a burst of its full size, then frees one request every 60 ÷ limit seconds. With the defaults, that's one request every 2 seconds and one trainer lookup every 6 seconds. Over the limit, the response is `429` with `Retry-After` and an error such as `"too many requests; try again in 2 seconds"`.
 

@@ -19,9 +19,11 @@ fn lists_current_members_fastest_first_and_new_ones_last() {
         member(5, vec![100, 200, 0]),
     ];
     let members = members(&club);
-    let paces: Vec<Option<f64>> = members.iter().map(|m| m.pace_per_day).collect();
+    let paces: Vec<Option<f64>> = members.iter().map(|(_, m)| m.pace_per_day).collect();
     assert_eq!(paces, [Some(300.0), Some(100.0), Some(50.0), None]);
-    assert_eq!(members[2].daily_fans, [100, 150, 200]);
+    assert_eq!(members[2].1.daily_fans, [100, 150, 200]);
+    let ids: Vec<u64> = members.iter().map(|(id, _)| *id).collect();
+    assert_eq!(ids, [3, 1, 4, 2]);
 }
 
 #[test]
@@ -36,7 +38,7 @@ fn shows_names_and_loads_members_stored_without_one() {
         ],
     }))
     .unwrap();
-    let names: Vec<Option<String>> = members(&club).into_iter().map(|m| m.name).collect();
+    let names: Vec<Option<String>> = members(&club).into_iter().map(|(_, m)| m.name).collect();
     assert_eq!(names, [Some("Made-up Trainer".into()), None]);
     let stored = serde_json::to_value(&club.members[0]).unwrap();
     assert!(stored.get("name").is_none());

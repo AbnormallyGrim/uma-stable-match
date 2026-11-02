@@ -26,6 +26,12 @@ use crate::traces::in_trace;
 /// The club pool, shared between requests and the detail cache.
 pub type SharedPool = Arc<RwLock<ClubPool>>;
 
+/// How long a club's previous month, fetched for the club page, is kept.
+pub const PREVIOUS_MONTH_TTL: Duration = Duration::from_secs(10 * 60);
+
+// Most previous months kept at once.
+const PREVIOUS_MONTH_CLUBS: u64 = 500;
+
 const KEEP_AFTER_DUE: Duration = Duration::from_secs(24 * 60 * 60);
 // Each load renews the whole month's medians, so they outlast any gap between loads.
 const KEEP_MEDIANS: Duration = Duration::from_secs(4 * 24 * 60 * 60);
@@ -68,6 +74,7 @@ pub struct ClubDetails {
 struct Inner {
     source: Source,
     cache: Cache<(u64, Option<Period>), Entry>,
+    previous: Cache<(u64, Period), Arc<Club>>,
     period: RwLock<Option<Period>>,
     prior_period: RwLock<Option<Period>>,
     priors: Priors,
@@ -220,6 +227,10 @@ impl ClubDetails {
                 queued: Mutex::new(HashSet::new()),
                 timing: config.refresh,
                 scan: config.scan,
+                previous: Cache::builder()
+                    .max_capacity(PREVIOUS_MONTH_CLUBS)
+                    .time_to_live(PREVIOUS_MONTH_TTL)
+                    .build(),
                 refreshing: config.refresher.then(|| {
                     Arc::new(Refreshing::new(
                         config.refresh,
@@ -391,6 +402,32 @@ impl ClubDetails {
             Some(club) => Some(club),
             None => self.load_shared(&[circle_id]).await.pop(),
         }
+    }
+
+    /// Whether a club's details for `period`, an earlier month, are kept from
+    /// [`ClubDetails::previous_month`].
+    pub fn has_previous_month(&self, circle_id: u64, period: Period) -> bool {
+        self.inner.previous.contains_key(&(circle_id, period))
+    }
+
+    /// A club's details for `period`, an earlier month, fetched in the interactive lane and kept
+    /// in memory for [`PREVIOUS_MONTH_TTL`]. Concurrent calls share one fetch, and failures aren't
+    /// kept.
+    pub async fn previous_month(
+        &self,
+        circle_id: u64,
+        period: Period,
+    ) -> Result<Arc<Club>, Arc<SourceError>> {
+        let source = &self.inner.source;
+        self.inner
+            .previous
+            .try_get_with((circle_id, period), async {
+                let (year, month) = period;
+                let request = CircleRequest::by_circle_id(circle_id).for_month(year, month);
+                let response = source.club(&request, Priority::Interactive).await?;
+                Ok(Arc::new(Club::from(response)))
+            })
+            .await
     }
 
     pub(crate) async fn load_shared(&self, ids: &[u64]) -> Vec<Arc<Club>> {

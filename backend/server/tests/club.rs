@@ -279,3 +279,151 @@ async fn a_blank_trainer_id_shows_the_club_alone() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["trainer"], Value::Null);
 }
+
+// Early in the month: ten members with only 2 days of data, from 4M to 8.5M a day.
+fn early_detail() -> Value {
+    let mut detail = club_detail(false);
+    for member in detail["members"].as_array_mut().unwrap() {
+        let fans = member["daily_fans"].as_array_mut().unwrap();
+        for day in fans.iter_mut().skip(2) {
+            *day = json!(0);
+        }
+    }
+    detail
+}
+
+// Last month's details for club 1: members 9000 to 9007, who are still in it, and one who left.
+fn previous_detail() -> Value {
+    let mut members: Vec<Value> = (0..8)
+        .map(|i| json!({ "viewer_id": 9000 + i, "year": 2026, "month": 2, "daily_fans": series(3_000_000 + 100_000 * i) }))
+        .collect();
+    members.push(
+        json!({ "viewer_id": 9100, "year": 2026, "month": 2, "daily_fans": series(1_000_000) }),
+    );
+    json!({ "circle": { "circle_id": 1, "name": "Page Club" }, "members": members })
+}
+
+async fn mount_previous(server: &MockServer, response: ResponseTemplate, times: u64) {
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "1"))
+        .and(query_param("year", "2026"))
+        .and(query_param("month", "2"))
+        .respond_with(response)
+        .with_priority(1)
+        .expect(times)
+        .mount(server)
+        .await;
+}
+
+async fn mount_previous_trainer(server: &MockServer) {
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("viewer_id", TRAINER.to_string()))
+        .and(query_param("month", "2"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "circle": { "circle_id": 2, "name": "Home Club" },
+            "members": [{ "viewer_id": TRAINER, "year": 2026, "month": 2, "daily_fans": series(5_000_000) }],
+        })))
+        .with_priority(1)
+        .mount(server)
+        .await;
+}
+
+#[tokio::test]
+async fn early_in_the_month_it_adds_last_months_fans_once() {
+    let server = MockServer::start().await;
+    let state = scanned(&server, early_detail()).await;
+    mount_previous(
+        &server,
+        ResponseTemplate::new(200).set_body_json(previous_detail()),
+        1,
+    )
+    .await;
+    mount_trainer(&server, home_club()).await;
+    mount_previous_trainer(&server).await;
+
+    let uri = format!("/api/v1/clubs/1?trainer_id={TRAINER}");
+    let (status, body) = get(&state, &uri).await;
+    assert_eq!(status, StatusCode::OK);
+    let previous = &body["previous"];
+    assert_eq!(previous["month"], "2026-02");
+    // No member has a pace from 2 days without a prior, so they keep their listed order. Members
+    // 9008 and 9009 joined this month, so they have no line.
+    let members = previous["members"].as_array().unwrap();
+    assert_eq!(members.len(), body["members"].as_array().unwrap().len());
+    assert_eq!(members[0], json!(series(3_000_000)));
+    assert_eq!(members[7], json!(series(3_700_000)));
+    assert_eq!(members[8], Value::Null);
+    assert_eq!(members[9], Value::Null);
+    assert_eq!(previous["trainer"], json!(series(5_000_000)));
+
+    let (status, again) = get(&state, &uri).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(again["previous"], body["previous"]);
+}
+
+#[tokio::test]
+async fn with_3_days_it_still_adds_last_month() {
+    let server = MockServer::start().await;
+    let mut detail = club_detail(false);
+    for member in detail["members"].as_array_mut().unwrap() {
+        for day in member["daily_fans"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .skip(3)
+        {
+            *day = json!(0);
+        }
+    }
+    let state = scanned(&server, detail).await;
+    mount_previous(
+        &server,
+        ResponseTemplate::new(200).set_body_json(previous_detail()),
+        1,
+    )
+    .await;
+
+    let (status, body) = get(&state, "/api/v1/clubs/1").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["previous"]["month"], "2026-02");
+}
+
+#[tokio::test]
+async fn with_enough_days_it_fetches_nothing_more() {
+    let server = MockServer::start().await;
+    let state = scanned(&server, club_detail(false)).await;
+    mount_previous(&server, ResponseTemplate::new(200), 0).await;
+
+    let (status, body) = get(&state, "/api/v1/clubs/1").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["previous"], Value::Null);
+}
+
+#[tokio::test]
+async fn over_the_lookup_limit_it_shows_this_month_alone() {
+    let server = MockServer::start().await;
+    let mut state = scanned(&server, early_detail()).await;
+    // The trainer lookup takes the one lookup this visitor has.
+    state.limits = RateLimits::new(10_000, 1, false);
+    mount_previous(&server, ResponseTemplate::new(200), 0).await;
+    mount_trainer(&server, home_club()).await;
+    mount_previous_trainer(&server).await;
+
+    let (status, body) = get(&state, &format!("/api/v1/clubs/1?trainer_id={TRAINER}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["previous"], Value::Null);
+    assert_eq!(body["members"].as_array().unwrap().len(), 10);
+}
+
+#[tokio::test]
+async fn a_failed_fetch_shows_this_month_alone_and_tries_again_later() {
+    let server = MockServer::start().await;
+    let state = scanned(&server, early_detail()).await;
+    mount_previous(&server, ResponseTemplate::new(500), 2).await;
+
+    for _ in 0..2 {
+        let (status, body) = get(&state, "/api/v1/clubs/1").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["previous"], Value::Null);
+    }
+}
