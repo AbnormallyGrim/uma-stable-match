@@ -89,7 +89,7 @@ fn scan_keys_depend_on_the_scan_window() {
 async fn without_redis_every_instance_scans_alone() {
     let cache = SharedCache::none();
     assert!(matches!(
-        cache.scan_turn(&ScanConfig::default()).await,
+        cache.scan_turn(&ScanConfig::default(), true).await,
         ScanTurn::Alone
     ));
     assert_eq!(

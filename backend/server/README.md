@@ -44,6 +44,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `SITE_DIR` | none | Required with `SITE_HOST`: the website's files, with an `index.html` |
 | `REDIS_URL` | none | A `redis://` or `rediss://` URL to share club details, trainer paces and scans with other instances. Unset, everything stays in this instance's memory. See [Shared cache](#shared-cache) |
 | `REDIS_KEY_SECRET` | none | Required with `REDIS_URL`: at least 32 characters, the same on every instance. Keys the hash that replaces trainer IDs in Redis |
+| `SERVE_ONLY` | `false` | `true` leaves scans and refreshes to another instance: this one never takes the scan lock or the refresher lease, and builds its pool from the scans published in Redis. Needs `REDIS_URL`. See [Serve-only instances](#serve-only-instances) |
 | `TURNSTILE_SITE_KEY` | none | Cloudflare Turnstile's public site key, which the web app uses to show the challenge. Set it with the next two to turn on the [human check](#human-check). Unset, the check is off |
 | `TURNSTILE_SECRET_KEY` | none | Required with `TURNSTILE_SITE_KEY`: Turnstile's secret key |
 | `TOKEN_SIGNING_KEY` | none | Required with `TURNSTILE_SITE_KEY`: at least 32 characters, the same on every instance. Signs the tokens the human check issues |
@@ -56,12 +57,13 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 Blank values count as unset. These stop the server at startup, with an error message and exit code 1:
 
 - a missing key, or a `HOST` that isn't an IP address (hostnames such as `localhost` aren't accepted)
-- a `PORT` outside 1 to 65535, a `TRUST_FORWARDED_FOR` or `ENABLE_JAPANESE` other than `true` or `false`, or a `LOG_FORMAT` other than `text` or `json`
+- a `PORT` outside 1 to 65535, a `TRUST_FORWARDED_FOR`, `ENABLE_JAPANESE` or `SERVE_ONLY` other than `true` or `false`, or a `LOG_FORMAT` other than `text` or `json`
 - a scan, cache or rate limit setting that isn't a positive whole number, or `SCAN_RANK_FROM` above `SCAN_RANK_TO`
 - a `FRONTEND_DIR` without an `index.html`
 - only one of `SITE_HOST` and `SITE_DIR`, a `SITE_HOST` that isn't a host name (no scheme, port or path), or a `SITE_DIR` without an `index.html`
 - a `WEB_ANALYTICS_TOKEN` with anything other than letters and digits
 - a `REDIS_URL` without a `redis://` or `rediss://` scheme, a missing or short `REDIS_KEY_SECRET`, or a Redis that can't be reached within 5 seconds
+- `SERVE_ONLY` without `REDIS_URL`
 - only some of `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY`, or a `TOKEN_SIGNING_KEY` under 32 characters
 - a `METRICS_ADDR` that isn't an IP address and port, or that can't be listened on
 - a `METRICS_EXCLUDED_TRAINER_IDS` that isn't a comma-separated list of trainer IDs
@@ -306,6 +308,19 @@ With Redis, instances that have the same `SCAN_RANK_FROM`, `SCAN_RANK_TO` and `S
 - **Resuming.** As soon as the leader has listed the clubs, it saves the list in Redis with when it was listed. An instance that takes the lock later, after a restart, redeploy or crash, continues that scan instead of listing again, if the list is less than `SCAN_INTERVAL_MINUTES` old (180 minutes when unset) and from the current game month. The resumed scan keeps its original start time in [`/status`](#status) and the metrics. Publishing the finished scan deletes the saved list.
 - **Failures.** A failed scan is published too: every instance records the same error, keeps its last results, and waits until the next scan is due.
 - **Missing data.** If a scan is marked current but its rows are gone from Redis, the instance scans on its own.
+
+### Serve-only instances
+
+With `SERVE_ONLY=true`, an instance serves searches but leaves the scans and refreshes to another instance with the same scan window, such as one running only the background work with its own API key. The daily refresh then sends its requests from that instance, so when uma.moe throttles them, this instance's rate limit, API key and address aren't affected.
+
+| Situation | What a serve-only instance does |
+|---|---|
+| A published scan is still current | Loads it, as any instance does |
+| No recent scan | Waits, without taking the scan lock, and checks again every second |
+| A scan is marked current but its rows are gone | Waits a minute and checks again, instead of scanning |
+| Redis doesn't answer | Keeps its current pool and checks again a minute later, instead of scanning |
+
+It doesn't run the refresher, so it never takes the refresher lease. It still loads club details on a miss (from Redis, then uma.moe) and queues clubs for the background loader as searches need them, so a club the other instance hasn't stored yet is still found. `scan_turns_total` counts its turns as `wait` and `fresh`, and as `unavailable` while Redis doesn't answer.
 
 The keys are `usm:v1:scan:<from>-<to>-<max>:lock` (with `-<lower>` added after `<max>` when there's a [lower range](#lower-range)), `:fresh`, `:latest`, `:progress`, `:progress-id`, `:schedule`, `:schedule-full`, `:schedule-lower` and `:refresher`, so instances with different scan windows don't share.
 
@@ -735,7 +750,7 @@ Keep the address private: `127.0.0.1:<port>` on its own. With Docker Compose, se
 | `scan_clubs_to_load`, `scan_clubs_loaded`, `scan_clubs_failed` | gauge | | Progress of a scan's prefetch. The server's scans don't prefetch, as the refresher loads details |
 | `scans_total` | counter | `source`: `alone`, `lead` or `published`; `result`: `ok` or `error` | Scans finished, whether run here or loaded from another instance |
 | `scan_duration_seconds` | histogram | `source` | Time from a scan's start to its end. A resumed scan counts from its original start, before the restart |
-| `scan_turns_total` | counter | `turn`: `alone`, `lead`, `wait` or `fresh` | What the instance did when a scan was due; see [Shared scans](#shared-scans) |
+| `scan_turns_total` | counter | `turn`: `alone`, `lead`, `wait`, `fresh` or `unavailable` | What the instance did when a scan was due; see [Shared scans](#shared-scans) and [Serve-only instances](#serve-only-instances) |
 | `scan_last_success_timestamp_seconds` | gauge | | Unix time of the last successful scan |
 | `pool_clubs`, `pool_exact_medians` | gauge | | Clubs in the pool, and how many have an exact median |
 | `pool_calibration_factor`, `pool_calibration_samples` | gauge | | The mean-to-median factor and how many clubs it's based on |

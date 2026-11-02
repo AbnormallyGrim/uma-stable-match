@@ -14,7 +14,7 @@ use crate::details::{ClubDetails, DetailConfig, SharedPool};
 use crate::limits::RateLimits;
 use crate::pace::PaceLookup;
 use crate::refresher::RefreshConfig;
-use crate::scheduler::run_scheduler;
+use crate::scheduler::{follow_scans, run_scheduler};
 use crate::shared::{SharedCache, SharedCacheError};
 use crate::source::Source;
 use crate::telemetry::{install_metrics, metrics_router};
@@ -116,17 +116,29 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
         shared,
     );
     tokio::spawn(loader.run());
-    if let Some(refresher) = details.refresher() {
-        tokio::spawn(refresher.run());
-    }
-    let scheduler = tokio::spawn(run_scheduler(
-        source,
-        details.clone(),
-        config.scan,
-        config.scan_interval,
-        cache.clone(),
-        stopped,
-    ));
+    // A serve-only instance leaves scans and refreshes to another one, through Redis.
+    let scheduler = if config.serve_only {
+        tracing::info!("serve-only: scans and refreshes are left to another instance");
+        tokio::spawn(follow_scans(
+            details.clone(),
+            config.scan,
+            config.scan_interval,
+            cache.clone(),
+            stopped,
+        ))
+    } else {
+        if let Some(refresher) = details.refresher() {
+            tokio::spawn(refresher.run());
+        }
+        tokio::spawn(run_scheduler(
+            source,
+            details.clone(),
+            config.scan,
+            config.scan_interval,
+            cache.clone(),
+            stopped,
+        ))
+    };
 
     if let Some(dir) = &config.frontend_dir {
         tracing::info!("serving the frontend from {}", dir.display());

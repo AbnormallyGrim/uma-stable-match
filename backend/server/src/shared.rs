@@ -462,7 +462,7 @@ impl SharedCache {
     }
 
     /// Decides in one Redis script whether this instance scans, waits, or loads a published scan.
-    pub(crate) async fn scan_turn(&self, config: &ScanConfig) -> ScanTurn {
+    pub(crate) async fn scan_turn(&self, config: &ScanConfig, may_lead: bool) -> ScanTurn {
         let Backend::Redis(redis) = &self.backend else {
             return ScanTurn::Alone;
         };
@@ -475,7 +475,8 @@ impl SharedCache {
             .key(&keys.lock)
             .key(&keys.progress_id)
             .arg(&token)
-            .arg(millis(SCAN_LEASE));
+            .arg(millis(SCAN_LEASE))
+            .arg(if may_lead { "1" } else { "0" });
         let Some(reply) = redis.invoke::<Vec<String>>(&invocation, OP_TIMEOUT).await else {
             return ScanTurn::Alone;
         };
@@ -867,7 +868,7 @@ if ttl > 0 then
   return {'fresh', tostring(ttl), redis.call('GET', KEYS[1])}
 end
 local progress = redis.call('GET', KEYS[3]) or ''
-if redis.call('SET', KEYS[2], ARGV[1], 'NX', 'PX', ARGV[2]) then
+if ARGV[3] == '1' and redis.call('SET', KEYS[2], ARGV[1], 'NX', 'PX', ARGV[2]) then
   return {'lead', progress}
 end
 return {'wait', progress}

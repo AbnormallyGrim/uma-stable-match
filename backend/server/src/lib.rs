@@ -55,7 +55,7 @@ pub use recommendations::{MatchSettings, DEFAULT_FETCH_BUDGET};
 pub use refresher::{RefreshConfig, RefreshStatus, Refresher, StoredTtl, TierStatus};
 pub use run::{run, RunError};
 pub use scanner::{scan, Scan, ScanConfig, ScanError};
-pub use scheduler::run_scheduler;
+pub use scheduler::{follow_scans, run_scheduler};
 pub use shared::{club_key, KeySecret, RedisUrl, SharedCache, SharedCacheError};
 pub use source::{ClubSource, Source, SourceError, SourceFuture, UmaMoeSource};
 pub use telemetry::{install_metrics, metrics_router};
