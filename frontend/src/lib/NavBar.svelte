@@ -10,6 +10,7 @@
   import { t } from './i18n';
   import LanguageToggle from './LanguageToggle.svelte';
   import NavLinks from './NavLinks.svelte';
+  import { websiteUrl } from './pages';
   import ThemeToggle from './ThemeToggle.svelte';
 
   interface Props {
@@ -23,7 +24,7 @@
 
   let { onhelp, onreleases, unseen }: Props = $props();
 
-  const WEBSITE = 'https://umastable.com';
+  const WEBSITE = websiteUrl(window.location);
 </script>
 
 <nav class="navbar" aria-label={t('nav.label')}>

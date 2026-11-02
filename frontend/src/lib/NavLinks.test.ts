@@ -4,7 +4,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import NavLinks from './NavLinks.svelte';
-import { currentPage } from './pages';
+import { currentPage, websiteUrl } from './pages';
 
 afterEach(() => window.history.pushState({}, '', '/'));
 
@@ -17,7 +17,7 @@ describe('NavLinks', () => {
         .getAllByRole('link')
         .map((link) => [link.textContent?.trim(), link.getAttribute('href')]),
     ).toEqual([
-      ['Home', 'https://umastable.com'],
+      ['Home', `http://site.localhost:${window.location.port}`],
       ['Club finder', '/'],
       ['Wishlist', '/wishlist'],
     ]);
@@ -48,5 +48,26 @@ describe('currentPage', () => {
     expect(currentPage('/')).toBe('finder');
     expect(currentPage('/club/7')).toBe('finder');
     expect(currentPage('/wishlist')).toBe('wishlist');
+  });
+});
+
+describe('websiteUrl', () => {
+  it('is umastable.com everywhere but locally', () => {
+    for (const hostname of ['app.umastable.com', 'example.com']) {
+      expect(websiteUrl({ protocol: 'https:', hostname, port: '' })).toBe('https://umastable.com');
+    }
+  });
+
+  it('is site.localhost on the same server locally', () => {
+    expect(websiteUrl({ protocol: 'http:', hostname: 'localhost', port: '8080' })).toBe(
+      'http://site.localhost:8080',
+    );
+    expect(websiteUrl({ protocol: 'http:', hostname: '127.0.0.1', port: '' })).toBe(
+      'http://site.localhost',
+    );
+    // Without SITE_HOST, the server sends the app to site.localhost too.
+    expect(websiteUrl({ protocol: 'http:', hostname: 'site.localhost', port: '8080' })).toBe(
+      'http://site.localhost:8080',
+    );
   });
 });

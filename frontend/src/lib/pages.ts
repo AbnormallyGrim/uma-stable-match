@@ -12,11 +12,24 @@ export interface Page {
   icon: string;
 }
 
+/** Where a page's address points: its protocol, host name and port. */
+export type Origin = Pick<Location, 'protocol' | 'hostname' | 'port'>;
+
+/**
+ * The website's address. Run locally, on `localhost` or a name under it, it's `site.localhost` of
+ * the same server.
+ */
+export function websiteUrl({ protocol, hostname, port }: Origin): string {
+  return hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '127.0.0.1'
+    ? `${protocol}//site.localhost${port ? `:${port}` : ''}`
+    : 'https://umastable.com';
+}
+
 /** The website's home page, the club finder and the wishlist page. */
 export const PAGES: Page[] = [
   {
     id: 'home',
-    href: 'https://umastable.com',
+    href: websiteUrl(window.location),
     label: 'nav.home',
     icon: '<path d="M2 7.5 8 2.5l6 5M3.5 6.5v6.5h3.25v-3.5h2.5V13H12.5V6.5" />',
   },

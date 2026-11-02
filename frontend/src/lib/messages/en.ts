@@ -352,6 +352,7 @@ export const en = {
   'wishlist.polls': 'Polls',
   'wishlist.poll.dashboard': 'Leader Focused Applications Dashboard poll',
   'wishlist.poll.discord': 'Discord Bot Applications Integration poll',
+  'wishlist.poll.jpTrainers': 'JP Trainer and Circles poll',
   'wishlist.aboutLabel': 'About these polls',
   'wishlist.about':
     'These polls are hosted by <a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>, not by Uma Stable Match. Your vote is stored and handled by StrawPoll under <a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">its privacy policy</a>.',

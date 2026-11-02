@@ -329,6 +329,7 @@ export const ja: Catalog = {
   'wishlist.polls': '投票',
   'wishlist.poll.dashboard': 'リーダー向け応募ダッシュボードの投票',
   'wishlist.poll.discord': 'Discord Botによる応募連携の投票',
+  'wishlist.poll.jpTrainers': '日本版のトレーナーとサークルの投票',
   'wishlist.aboutLabel': '投票について',
   'wishlist.about':
     'これらの投票は<a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>が運営しており、Uma Stable Matchではありません。あなたの投票はStrawPollが<a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">プライバシーポリシー</a>に基づいて保存・管理します。',

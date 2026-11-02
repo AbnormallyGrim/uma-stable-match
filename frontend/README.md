@@ -113,7 +113,7 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 
 ## Navbar
 
-`NavBar.svelte` is a bar across the top of the page, matching the website's at [umastable.com](https://umastable.com): the logo and "Uma Stable Match" on the left, linking back to the website, and on the right a round **?** button that starts the [product tour](#product-tour) (left out on the club page), then the theme switch. It stays at the top while scrolling, with a translucent, blurred background. The page's own heading, "Uma Stable Match club finder", is hidden visually and read by screen readers. On narrow screens a long title is cut short with an ellipsis rather than pushing the switch off the screen.
+`NavBar.svelte` is a bar across the top of the page, matching the website's at [umastable.com](https://umastable.com): the logo and "Uma Stable Match" on the left, linking back to the website (`site.localhost` on the same port when the app runs on `localhost` or a name under it, as when the [server serves both](../backend/server/README.md#serving-the-website)), and on the right a round **?** button that starts the [product tour](#product-tour) (left out on the club page), then the theme switch. It stays at the top while scrolling, with a translucent, blurred background. The page's own heading, "Uma Stable Match club finder", is hidden visually and read by screen readers. On narrow screens a long title is cut short with an ellipsis rather than pushing the switch off the screen.
 
 ## Product tour
 

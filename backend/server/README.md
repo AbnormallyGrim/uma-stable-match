@@ -381,7 +381,7 @@ With `SITE_HOST` and `SITE_DIR` set, the server also serves a static website, su
 SITE_HOST=site.localhost SITE_DIR=site FRONTEND_DIR=frontend/dist cargo run -p uma-stable-match-server
 ```
 
-Then open <http://site.localhost:8080> for the website and <http://localhost:8080> for the app.
+Then open <http://site.localhost:8080> for the website and <http://localhost:8080> for the app. Their links to each other follow these local addresses rather than going to the live sites.
 
 | Request | Response |
 |---|---|

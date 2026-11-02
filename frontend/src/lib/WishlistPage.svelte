@@ -121,6 +121,13 @@
       grid-template-columns: 1fr 1fr;
       align-items: start;
     }
+
+    /* An odd poll out sits centered on its own row rather than in the left column. */
+    .poll:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+      justify-self: center;
+      width: calc(50% - 12px);
+    }
   }
 
   .poll {
