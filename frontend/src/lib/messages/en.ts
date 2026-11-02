@@ -28,6 +28,9 @@ export const en = {
   'releases.change.improved': 'Improved',
   'releases.change.fixed': 'Fixed',
 
+  'releases.earlyChart.title': 'Fixed the empty club chart early in the month',
+  'releases.earlyChart.body':
+    "The club page chart no longer says there are too few days of data at the start of the month, and shows last month's until this month has enough.",
   'releases.clubPage.title': 'See how you fit in a club',
   'releases.clubPage.body':
     "Select See how you fit on any club to see where you'd rank among its members and follow everyone's daily fan gain this month on a chart.",

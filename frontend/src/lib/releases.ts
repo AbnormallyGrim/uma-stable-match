@@ -28,6 +28,18 @@ export interface Release {
 /** Every published release, newest first. See the frontend README before adding one. */
 export const RELEASES: Release[] = [
   {
+    build: '1.3.1',
+    date: '2026-11-02',
+    kind: 'hotfix',
+    changes: [
+      {
+        kind: 'fixed',
+        title: 'releases.earlyChart.title',
+        body: 'releases.earlyChart.body',
+      },
+    ],
+  },
+  {
     build: '1.3.0',
     date: '2026-10-31',
     kind: 'update',
