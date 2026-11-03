@@ -1,12 +1,11 @@
 name: Deploy
 
-# Runs the end-to-end test after CI passes for a push to main, then deploys the server to Fly.io if
-# it passes.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
 
 # No permissions by default; each job asks only for what it needs.
 permissions: {}
@@ -22,9 +21,10 @@ jobs:
     # Only CI runs for pushes to this repository's main. Without the last two checks, a pull request
     # from a fork's own main branch would match too.
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+      github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -84,12 +84,12 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - name: Report the failure
         run: |
-          message="The end-to-end test failed for ${HEAD_SHA:0:7}, so it wasn't deployed. See the [run]($RUN_URL) and its \`e2e-report\` artifact."
+          message="The end-to-end test failed for ${HEAD_SHA:0:7}. See the [run]($RUN_URL) and its \`e2e-report\` artifact."
           pr=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/pulls" \
             --jq '[.[] | select(.merged_at != null)][0].number // empty')
           if [ -n "$pr" ]; then
@@ -110,12 +110,7 @@ jobs:
   deploy:
     name: Deploy to Fly.io
     needs: e2e
-    # Only CI runs for pushes to this repository's main. Without the last two checks, a pull request
-    # from a fork's own main branch would match too.
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # FLY_API_TOKEN is a secret of this environment, which can be limited to main. Create it with
     # `fly tokens create deploy -a uma-stable-match`.
@@ -123,11 +118,11 @@ jobs:
     permissions:
       contents: read
     env:
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      HEAD_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
