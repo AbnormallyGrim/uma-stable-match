@@ -29,11 +29,12 @@ const PONG: u8 = 1;
 const CHANNEL_MESSAGE: u8 = 4;
 const EPHEMERAL: u32 = 1 << 6;
 
-/// Serves `POST /discord/interactions`.
+/// Serves `POST /discord/interactions` and the sign-in routes.
 pub fn router(discord: Discord) -> Router {
     Router::new()
         .route(INTERACTIONS_PATH, post(interactions))
-        .with_state(discord)
+        .with_state(discord.clone())
+        .merge(crate::auth::router(discord))
 }
 
 #[derive(Deserialize)]

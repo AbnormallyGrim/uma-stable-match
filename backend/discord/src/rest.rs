@@ -13,7 +13,7 @@ use crate::error::Error;
 use crate::rate_limit::{retry_after, route_key, RateLimits};
 
 /// The user agent Discord asks bots to send.
-const BOT_USER_AGENT: &str = concat!(
+pub(crate) const BOT_USER_AGENT: &str = concat!(
     "DiscordBot (https://github.com/AbnormallyGrim/uma-stable-match, ",
     env!("CARGO_PKG_VERSION"),
     ")"
@@ -145,7 +145,7 @@ fn to_value(body: &impl Serialize) -> Result<Value, Error> {
     serde_json::to_value(body).map_err(Error::Decode)
 }
 
-fn api_error(status: StatusCode, body: &[u8]) -> Error {
+pub(crate) fn api_error(status: StatusCode, body: &[u8]) -> Error {
     #[derive(serde::Deserialize)]
     struct Body {
         code: Option<u32>,

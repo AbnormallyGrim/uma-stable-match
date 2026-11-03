@@ -642,7 +642,7 @@ fn rejects_a_partial_or_short_human_check() {
     );
 }
 
-/// Discord settings with made-up values, plus Redis. The key is the Ed25519 base point.
+/// Discord settings with made-up values, plus Redis, the signing key and the site's address. The key is the Ed25519 base point.
 fn discord_vars() -> Vec<(&'static str, &'static str)> {
     vec![
         ("REDIS_URL", "redis://127.0.0.1:6379"),
@@ -654,6 +654,8 @@ fn discord_vars() -> Vec<(&'static str, &'static str)> {
         ),
         ("DISCORD_BOT_TOKEN", "made-up-bot-token"),
         ("DISCORD_CLIENT_SECRET", "made-up-client-secret"),
+        ("TOKEN_SIGNING_KEY", "made-up-signing-key-of-32-chars!"),
+        ("PUBLIC_URL", "https://example.test"),
     ]
 }
 
@@ -671,6 +673,9 @@ fn reads_discord_settings_without_showing_secrets() {
     let debug = format!("{config:?}");
     assert!(!debug.contains("made-up-bot-token"));
     assert!(!debug.contains("made-up-client-secret"));
+    assert!(!debug.contains("made-up-signing-key"));
+    // The signing key alone doesn't turn the human check on.
+    assert!(config.human.is_none());
 }
 
 #[test]
@@ -804,4 +809,47 @@ fn excluded_trainer_ids_stay_out_of_debug_output_and_errors() {
     .unwrap_err();
     assert_eq!(error, ConfigError::InvalidExcludedTrainers);
     assert!(!error.to_string().contains("111111111111"));
+}
+
+#[test]
+fn discord_needs_a_signing_key_and_a_public_url() {
+    let without = |name: &str| {
+        let vars: Vec<_> = discord_vars()
+            .into_iter()
+            .filter(|(n, _)| *n != name)
+            .collect();
+        Config::from_lookup(lookup(&vars)).unwrap_err()
+    };
+    assert_eq!(
+        without("TOKEN_SIGNING_KEY"),
+        ConfigError::DiscordNeedsSigningKey
+    );
+    assert_eq!(without("PUBLIC_URL"), ConfigError::MissingPublicUrl);
+}
+
+#[test]
+fn rejects_a_short_signing_key_or_a_bad_public_url_for_discord() {
+    let with = |name: &'static str, value: &'static str| {
+        let mut vars = discord_vars();
+        vars.retain(|(n, _)| *n != name);
+        vars.push((name, value));
+        Config::from_lookup(lookup(&vars)).unwrap_err()
+    };
+    assert_eq!(
+        with("TOKEN_SIGNING_KEY", "too-short"),
+        ConfigError::InvalidTokenSigningKey
+    );
+    assert_eq!(
+        with("PUBLIC_URL", "example.test/app"),
+        ConfigError::InvalidPublicUrl("example.test/app".into())
+    );
+}
+
+#[test]
+fn discord_and_the_human_check_can_share_the_signing_key() {
+    let mut vars = discord_vars();
+    vars.push(("TURNSTILE_SITE_KEY", "made-up-site-key"));
+    vars.push(("TURNSTILE_SECRET_KEY", "made-up-secret"));
+    let config = Config::from_lookup(lookup(&vars)).unwrap();
+    assert!(config.human.is_some() && config.discord.is_some());
 }

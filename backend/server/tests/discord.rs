@@ -2,10 +2,11 @@
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
+use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uma_stable_match_discord::{
     router as discord_router, ApplicationId, BotToken, ClientSecret, Discord, DiscordConfig,
-    PublicKey, INTERACTIONS_PATH,
+    PublicKey, PublicUrl, SigningKey, INTERACTIONS_PATH,
 };
 use uma_stable_match_server::{
     app, app_with_routes, AppState, Cache, ClubDetails, DetailConfig, Features, MatchSettings,
@@ -37,6 +38,8 @@ fn discord() -> Discord {
             .unwrap(),
         BotToken::parse("made-up-bot-token").unwrap(),
         ClientSecret::parse("made-up-client-secret").unwrap(),
+        SigningKey::parse("made-up-signing-key-of-32-chars!").unwrap(),
+        PublicUrl::parse("https://example.test").unwrap(),
     ))
     .unwrap()
 }
@@ -65,4 +68,25 @@ async fn interactions_are_served_with_the_security_headers() {
 async fn interactions_arent_served_without_discord() {
     let response = app(state(), None).oneshot(unsigned_ping()).await.unwrap();
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn sign_in_routes_are_served_before_the_api_not_found() {
+    let app = app_with_routes(
+        state(),
+        None,
+        Features::default(),
+        discord_router(discord()),
+    );
+    let response = app
+        .oneshot(
+            Request::get("/api/v1/leaders/me")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(&body[..], br#"{"error":"not signed in"}"#);
 }

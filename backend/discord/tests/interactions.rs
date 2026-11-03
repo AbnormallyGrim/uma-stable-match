@@ -9,8 +9,8 @@ use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 use uma_stable_match_discord::{
-    router, ApplicationId, BotToken, ClientSecret, Discord, DiscordConfig, PublicKey,
-    INTERACTIONS_PATH,
+    router, ApplicationId, BotToken, ClientSecret, Discord, DiscordConfig, PublicKey, PublicUrl,
+    SigningKey as TokenKey, INTERACTIONS_PATH,
 };
 
 fn hex(bytes: &[u8]) -> String {
@@ -28,6 +28,8 @@ fn app() -> axum::Router {
         PublicKey::parse(&public).unwrap(),
         BotToken::parse("made-up-bot-token").unwrap(),
         ClientSecret::parse("made-up-client-secret").unwrap(),
+        TokenKey::parse("made-up-signing-key-of-32-chars!").unwrap(),
+        PublicUrl::parse("https://example.test").unwrap(),
     );
     router(Discord::new(config).unwrap())
 }

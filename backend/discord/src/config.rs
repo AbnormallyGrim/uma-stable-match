@@ -8,6 +8,9 @@ use ed25519_dalek::VerifyingKey;
 /// Discord's REST API, version 10.
 pub const DEFAULT_API_BASE: &str = "https://discord.com/api/v10";
 
+/// Discord's OAuth2 authorize page.
+pub const DEFAULT_AUTHORIZE_URL: &str = "https://discord.com/oauth2/authorize";
+
 /// The Discord application's ID.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ApplicationId(u64);
@@ -72,11 +75,69 @@ impl ClientSecret {
         let value = value.trim();
         (!value.is_empty()).then(|| Self(value.to_owned()))
     }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl fmt::Debug for ClientSecret {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("ClientSecret(<redacted>)")
+    }
+}
+
+/// The secret that signs the sign-in `state` and session cookies. `Debug` output hides it.
+#[derive(Clone, PartialEq, Eq)]
+pub struct SigningKey(String);
+
+impl SigningKey {
+    /// Shortest key accepted.
+    pub const MIN_LEN: usize = 32;
+
+    /// The key, or `None` if it's shorter than [`MIN_LEN`](Self::MIN_LEN) characters.
+    pub fn parse(value: &str) -> Option<Self> {
+        let value = value.trim();
+        (value.len() >= Self::MIN_LEN).then(|| Self(value.to_owned()))
+    }
+
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
+impl fmt::Debug for SigningKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("SigningKey(<redacted>)")
+    }
+}
+
+/// The site's public address, such as `https://example.com`: where Discord sends people back to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PublicUrl(String);
+
+impl PublicUrl {
+    /// The address, or `None` unless it's an `http` or `https` origin: a host with no path, query,
+    /// fragment or login.
+    pub fn parse(value: &str) -> Option<Self> {
+        let url = reqwest::Url::parse(value.trim()).ok()?;
+        let origin_only = matches!(url.path(), "" | "/")
+            && url.query().is_none()
+            && url.fragment().is_none()
+            && url.username().is_empty()
+            && url.password().is_none();
+        (matches!(url.scheme(), "http" | "https") && url.host().is_some() && origin_only)
+            .then(|| Self(url.origin().ascii_serialization()))
+    }
+
+    /// The address without a trailing slash.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Whether the site is served over HTTPS, so cookies can be `Secure`.
+    pub fn is_https(&self) -> bool {
+        self.0.starts_with("https://")
     }
 }
 
@@ -109,6 +170,12 @@ pub struct DiscordConfig {
     pub bot_token: BotToken,
     /// OAuth2 client secret.
     pub client_secret: ClientSecret,
+    /// Secret that signs the sign-in `state` and session cookies.
+    pub signing_key: SigningKey,
+    /// The site's public address, which the OAuth2 redirect URI is built from.
+    pub public_url: PublicUrl,
+    /// Discord's OAuth2 authorize page.
+    pub authorize_url: String,
     /// REST API base URL, without a trailing slash.
     pub api_base: String,
     /// Rate-limit waits and retries.
@@ -122,12 +189,17 @@ impl DiscordConfig {
         public_key: PublicKey,
         bot_token: BotToken,
         client_secret: ClientSecret,
+        signing_key: SigningKey,
+        public_url: PublicUrl,
     ) -> Self {
         Self {
             app_id,
             public_key,
             bot_token,
             client_secret,
+            signing_key,
+            public_url,
+            authorize_url: DEFAULT_AUTHORIZE_URL.to_owned(),
             api_base: DEFAULT_API_BASE.to_owned(),
             rate_limit: RateLimitConfig::default(),
         }

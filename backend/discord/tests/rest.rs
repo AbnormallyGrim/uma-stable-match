@@ -4,8 +4,8 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 use uma_stable_match_discord::{
-    ApplicationId, BotToken, ClientSecret, DiscordConfig, Error, PublicKey, RateLimitConfig, Rest,
-    StatusCode,
+    ApplicationId, BotToken, ClientSecret, DiscordConfig, Error, PublicKey, PublicUrl,
+    RateLimitConfig, Rest, SigningKey, StatusCode,
 };
 use wiremock::matchers::{body_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -18,6 +18,8 @@ fn config(server: &MockServer) -> DiscordConfig {
             .unwrap(),
         BotToken::parse("made-up-bot-token").unwrap(),
         ClientSecret::parse("made-up-client-secret").unwrap(),
+        SigningKey::parse("made-up-signing-key-of-32-chars!").unwrap(),
+        PublicUrl::parse("https://example.test").unwrap(),
     );
     config.api_base = server.uri();
     config.rate_limit = RateLimitConfig {

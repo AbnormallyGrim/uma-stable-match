@@ -1,4 +1,4 @@
-//! The Discord application: its settings and REST client.
+//! The Discord application: its settings and clients.
 
 use std::sync::Arc;
 
@@ -16,14 +16,18 @@ pub struct Discord {
 struct Inner {
     config: DiscordConfig,
     rest: Rest,
+    http: reqwest::Client,
 }
 
 impl Discord {
     /// The application with these settings.
     pub fn new(config: DiscordConfig) -> Result<Self, Error> {
         let rest = Rest::new(&config)?;
+        let http = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()?;
         Ok(Self {
-            inner: Arc::new(Inner { config, rest }),
+            inner: Arc::new(Inner { config, rest, http }),
         })
     }
 
@@ -35,5 +39,10 @@ impl Discord {
     /// The REST client, authenticated as the bot.
     pub fn rest(&self) -> &Rest {
         &self.inner.rest
+    }
+
+    /// The HTTP client for calls made as the signed-in user instead of the bot.
+    pub(crate) fn http(&self) -> &reqwest::Client {
+        &self.inner.http
     }
 }

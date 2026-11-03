@@ -4,7 +4,10 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use uma_stable_match_discord::{ApplicationId, BotToken, ClientSecret, DiscordConfig, PublicKey};
+use uma_stable_match_discord::{
+    ApplicationId, BotToken, ClientSecret, DiscordConfig, PublicKey, PublicUrl,
+    SigningKey as DiscordSigningKey,
+};
 use uma_stable_match_umamoe_client::{ApiKey, ClientConfig};
 
 use crate::features::Features;
@@ -116,7 +119,8 @@ pub struct Config {
     /// Whether this instance leaves scans and refreshes to another one, from `SERVE_ONLY`.
     pub serve_only: bool,
     /// The Discord application for club applications, from `DISCORD_APP_ID`,
-    /// `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_SECRET`. `None` turns them off.
+    /// `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_SECRET`, with
+    /// `TOKEN_SIGNING_KEY` and `PUBLIC_URL`. `None` turns them off.
     pub discord: Option<DiscordConfig>,
 }
 
@@ -182,6 +186,17 @@ pub enum ConfigError {
     /// Discord is configured without `REDIS_URL`, where its data is kept.
     #[error("Discord applications need REDIS_URL: their data is kept in Redis")]
     DiscordNeedsRedis,
+    /// Discord is configured without `TOKEN_SIGNING_KEY`, which signs its sign-in cookies.
+    #[error("Discord applications need TOKEN_SIGNING_KEY: it signs the sign-in cookies")]
+    DiscordNeedsSigningKey,
+    /// Discord is configured without `PUBLIC_URL`, which its sign-in redirects back to.
+    #[error(
+        "Discord applications need PUBLIC_URL, the site's address such as https://example.com"
+    )]
+    MissingPublicUrl,
+    /// `PUBLIC_URL` isn't an `http` or `https` address without a path.
+    #[error("PUBLIC_URL must be an address such as https://example.com, with no path, got {0:?}")]
+    InvalidPublicUrl(String),
     /// `METRICS_ADDR` isn't an IP address with a port from 1 to 65535.
     #[error("METRICS_ADDR must be an IP address and port, such as 127.0.0.1:9464, got {0:?}")]
     InvalidMetricsAddr(String),
@@ -371,17 +386,28 @@ impl Config {
         if serve_only && redis_url.is_none() {
             return Err(ConfigError::ServeOnlyNeedsRedis);
         }
-        let human = match (
-            get("TURNSTILE_SITE_KEY"),
-            get("TURNSTILE_SECRET_KEY"),
-            get("TOKEN_SIGNING_KEY"),
-        ) {
-            (None, None, None) => None,
-            (Some(site), Some(secret), Some(key)) => Some((
-                site,
-                TurnstileSecret::parse(&secret).ok_or(ConfigError::IncompleteHumanCheck)?,
-                SigningKey::parse(&key).ok_or(ConfigError::InvalidTokenSigningKey)?,
-            )),
+        let signing_key = get("TOKEN_SIGNING_KEY");
+        let uses_discord = [
+            "DISCORD_APP_ID",
+            "DISCORD_PUBLIC_KEY",
+            "DISCORD_BOT_TOKEN",
+            "DISCORD_CLIENT_SECRET",
+        ]
+        .iter()
+        .any(|name| get(name).is_some());
+        let human = match (get("TURNSTILE_SITE_KEY"), get("TURNSTILE_SECRET_KEY")) {
+            // The signing key alone is for Discord's sign-in.
+            (None, None) if signing_key.is_none() || uses_discord => None,
+            (Some(site), Some(secret)) => {
+                let key = signing_key
+                    .as_deref()
+                    .ok_or(ConfigError::IncompleteHumanCheck)?;
+                Some((
+                    site,
+                    TurnstileSecret::parse(&secret).ok_or(ConfigError::IncompleteHumanCheck)?,
+                    SigningKey::parse(key).ok_or(ConfigError::InvalidTokenSigningKey)?,
+                ))
+            }
             _ => return Err(ConfigError::IncompleteHumanCheck),
         };
         let discord = match (
@@ -395,6 +421,10 @@ impl Config {
                 if redis_url.is_none() {
                     return Err(ConfigError::DiscordNeedsRedis);
                 }
+                let key = signing_key
+                    .as_deref()
+                    .ok_or(ConfigError::DiscordNeedsSigningKey)?;
+                let public_url = get("PUBLIC_URL").ok_or(ConfigError::MissingPublicUrl)?;
                 Some(DiscordConfig::new(
                     ApplicationId::parse(&app_id)
                         .ok_or(ConfigError::InvalidDiscordAppId(app_id))?,
@@ -402,6 +432,9 @@ impl Config {
                         .ok_or(ConfigError::InvalidDiscordPublicKey(public_key))?,
                     BotToken::parse(&token).ok_or(ConfigError::IncompleteDiscord)?,
                     ClientSecret::parse(&secret).ok_or(ConfigError::IncompleteDiscord)?,
+                    DiscordSigningKey::parse(key).ok_or(ConfigError::InvalidTokenSigningKey)?,
+                    PublicUrl::parse(&public_url)
+                        .ok_or(ConfigError::InvalidPublicUrl(public_url))?,
                 ))
             }
             _ => return Err(ConfigError::IncompleteDiscord),
