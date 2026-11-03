@@ -87,7 +87,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "scan_phase",
+          "expr": "max(scan_phase)",
           "legendFormat": "",
           "instant": true,
           "range": false
@@ -169,7 +169,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "refresh_loaded_clubs",
+          "expr": "max(refresh_loaded_clubs)",
           "legendFormat": "loaded",
           "instant": true,
           "range": false
@@ -180,7 +180,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "refresh_scheduled_clubs",
+          "expr": "max(refresh_scheduled_clubs)",
           "legendFormat": "scheduled",
           "instant": true,
           "range": false
@@ -191,7 +191,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "refresh_due_clubs",
+          "expr": "max(refresh_due_clubs)",
           "legendFormat": "due",
           "instant": true,
           "range": false
@@ -255,7 +255,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "scan_listed_clubs",
+          "expr": "max(scan_listed_clubs)",
           "legendFormat": "",
           "instant": true,
           "range": false
@@ -318,7 +318,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "time() - scan_last_success_timestamp_seconds",
+          "expr": "time() - max(scan_last_success_timestamp_seconds)",
           "legendFormat": "",
           "instant": true,
           "range": false
@@ -382,8 +382,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (source, result) (increase(scans_total[1h]))",
-          "legendFormat": "{{source}} {{result}}"
+          "expr": "sum by (app, source, result) (increase(scans_total[1h]))",
+          "legendFormat": "{{app}} {{source}} {{result}}"
         }
       ],
       "options": {
@@ -479,8 +479,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (source) (rate(scan_duration_seconds_sum[6h])) / sum by (source) (rate(scan_duration_seconds_count[6h]))",
-          "legendFormat": "{{source}}"
+          "expr": "sum by (app, source) (rate(scan_duration_seconds_sum[6h])) / sum by (app, source) (rate(scan_duration_seconds_count[6h]))",
+          "legendFormat": "{{app}} {{source}}"
         }
       ],
       "options": {
@@ -577,7 +577,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "100 * refresh_loaded_clubs / clamp_min(refresh_scheduled_clubs, 1)",
+          "expr": "100 * max(refresh_loaded_clubs) / clamp_min(max(refresh_scheduled_clubs), 1)",
           "legendFormat": "",
           "instant": true,
           "range": false
@@ -654,8 +654,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (turn) (rate(scan_turns_total[5m])) * 60",
-          "legendFormat": "{{turn}}"
+          "expr": "sum by (app, turn) (rate(scan_turns_total[5m])) * 60",
+          "legendFormat": "{{app}} {{turn}}"
         }
       ],
       "options": {
@@ -752,7 +752,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "refresh_overdue_seconds",
+          "expr": "max(refresh_overdue_seconds)",
           "legendFormat": "overdue"
         }
       ],
@@ -851,7 +851,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "refresh_full_loaded_clubs",
+          "expr": "max(refresh_full_loaded_clubs)",
           "legendFormat": "loaded",
           "instant": true,
           "range": false
@@ -862,7 +862,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "refresh_full_scheduled_clubs",
+          "expr": "max(refresh_full_scheduled_clubs)",
           "legendFormat": "scheduled",
           "instant": true,
           "range": false
@@ -873,7 +873,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "refresh_full_due_clubs",
+          "expr": "max(refresh_full_due_clubs)",
           "legendFormat": "due",
           "instant": true,
           "range": false
@@ -937,7 +937,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "100 * refresh_full_loaded_clubs / clamp_min(refresh_full_scheduled_clubs, 1)",
+          "expr": "100 * max(refresh_full_loaded_clubs) / clamp_min(max(refresh_full_scheduled_clubs), 1)",
           "legendFormat": "",
           "instant": true,
           "range": false
@@ -1015,7 +1015,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "refresh_lower_loaded_clubs",
+          "expr": "max(refresh_lower_loaded_clubs)",
           "legendFormat": "loaded",
           "instant": true,
           "range": false
@@ -1026,7 +1026,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "refresh_lower_scheduled_clubs",
+          "expr": "max(refresh_lower_scheduled_clubs)",
           "legendFormat": "scheduled",
           "instant": true,
           "range": false
@@ -1037,7 +1037,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "refresh_lower_due_clubs",
+          "expr": "max(refresh_lower_due_clubs)",
           "legendFormat": "due",
           "instant": true,
           "range": false
@@ -1101,7 +1101,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "100 * refresh_lower_loaded_clubs / clamp_min(refresh_lower_scheduled_clubs, 1)",
+          "expr": "100 * max(refresh_lower_loaded_clubs) / clamp_min(max(refresh_lower_scheduled_clubs), 1)",
           "legendFormat": "",
           "instant": true,
           "range": false
@@ -1192,8 +1192,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (source) (rate(pace_lookups_total[5m])) * 60",
-          "legendFormat": "{{source}}"
+          "expr": "sum by (app, source) (rate(pace_lookups_total[5m])) * 60",
+          "legendFormat": "{{app}} {{source}}"
         }
       ],
       "options": {
@@ -1289,8 +1289,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (source) (rate(club_detail_lookups_total[5m])) * 60",
-          "legendFormat": "{{source}}"
+          "expr": "sum by (app, source) (rate(club_detail_lookups_total[5m])) * 60",
+          "legendFormat": "{{app}} {{source}}"
         }
       ],
       "options": {
@@ -1387,8 +1387,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "detail_cache_clubs",
-          "legendFormat": "cached clubs"
+          "expr": "sum by (app) (detail_cache_clubs)",
+          "legendFormat": "{{app}} cached clubs"
         },
         {
           "refId": "B",
@@ -1396,8 +1396,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "detail_queue_clubs",
-          "legendFormat": "queued clubs"
+          "expr": "sum by (app) (detail_queue_clubs)",
+          "legendFormat": "{{app}} queued clubs"
         },
         {
           "refId": "C",
@@ -1405,8 +1405,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "detail_cache_bytes",
-          "legendFormat": "cached bytes"
+          "expr": "sum by (app) (detail_cache_bytes)",
+          "legendFormat": "{{app}} cached bytes"
         }
       ],
       "options": {
@@ -1532,8 +1532,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (status) (rate(umamoe_requests_total[1m]))",
-          "legendFormat": "{{status}}"
+          "expr": "sum by (app, status) (rate(umamoe_requests_total[1m]))",
+          "legendFormat": "{{app}} {{status}}"
         }
       ],
       "options": {
@@ -1630,8 +1630,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (endpoint, lane) (rate(umamoe_requests_total[1m]))",
-          "legendFormat": "{{endpoint}} {{lane}}"
+          "expr": "sum by (app, endpoint, lane) (rate(umamoe_requests_total[1m]))",
+          "legendFormat": "{{app}} {{endpoint}} {{lane}}"
         }
       ],
       "options": {
@@ -1728,8 +1728,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.5, sum by (le, endpoint) (rate(umamoe_request_duration_seconds_bucket[5m])))",
-          "legendFormat": "p50 {{endpoint}}"
+          "expr": "histogram_quantile(0.5, sum by (le, app, endpoint) (rate(umamoe_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50 {{app}} {{endpoint}}"
         },
         {
           "refId": "B",
@@ -1737,8 +1737,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, endpoint) (rate(umamoe_request_duration_seconds_bucket[5m])))",
-          "legendFormat": "p95 {{endpoint}}"
+          "expr": "histogram_quantile(0.95, sum by (le, app, endpoint) (rate(umamoe_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95 {{app}} {{endpoint}}"
         }
       ],
       "options": {
@@ -1835,8 +1835,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (status) (rate(umamoe_requests_total{status!~\"2..\"}[5m])) * 60",
-          "legendFormat": "{{status}}"
+          "expr": "sum by (app, status) (rate(umamoe_requests_total{status!~\"2..\"}[5m])) * 60",
+          "legendFormat": "{{app}} {{status}}"
         }
       ],
       "options": {
@@ -1933,8 +1933,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, lane) (rate(umamoe_queue_wait_seconds_bucket[5m])))",
-          "legendFormat": "{{lane}}"
+          "expr": "histogram_quantile(0.95, sum by (le, app, lane) (rate(umamoe_queue_wait_seconds_bucket[5m])))",
+          "legendFormat": "{{app}} {{lane}}"
         }
       ],
       "options": {

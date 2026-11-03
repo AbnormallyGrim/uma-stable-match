@@ -149,6 +149,8 @@ Every dashboard links to the other three at the top, keeping the time range. The
 | | uma.moe calls | Calls per second by status code and by endpoint and lane, response times, errors per minute by status, and time waiting for the 500 ms spacing |
 | Redis | Redis | Keys and keys with a TTL, memory used against the limit, when the stored club details expire (soonest and average), TTLs over time, keys expired and evicted per hour, up or down, operation times and errors |
 
+The Data pipeline dashboard also works when a separate app runs the scans and refreshes and the site is [serve-only](../backend/server/README.md#serve-only-instances). The phase and clubs listed come from whichever instance is scanning, and the last scan and refresh counts are the same on every instance, so these show once, as the highest any instance reports. The rest are per app, split by Fly's `app` label; a local Prometheus has no such label, so there the legends show no app name.
+
 Per-hour bars line up with whole hours, so they fill in once there's an hour of data. Some panels stay empty until something happens: Redis panels need `REDIS_URL`, error panels need errors, and rates need about a minute of data.
 
 ### Links to Axiom
