@@ -85,12 +85,25 @@ pub fn app_with_features(
     frontend_dir: Option<&Path>,
     features: Features,
 ) -> Router {
+    app_with_routes(state, frontend_dir, features, Router::new())
+}
+
+/// Like [`app_with_features`], also serving `routes`, such as the Discord interactions endpoint,
+/// behind the same headers, time limit and panic handling.
+pub fn app_with_routes(
+    state: AppState,
+    frontend_dir: Option<&Path>,
+    features: Features,
+    routes: Router,
+) -> Router {
     let content_security = if features.web_analytics.is_some() {
         frontend::CONTENT_SECURITY_WITH_ANALYTICS
     } else {
         frontend::CONTENT_SECURITY
     };
-    let mut app = router(state).merge(features::router(features));
+    let mut app = router(state)
+        .merge(features::router(features))
+        .merge(routes);
     if let Some(dir) = frontend_dir {
         app = app.fallback_service(frontend::service(dir));
     }

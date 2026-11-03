@@ -4,6 +4,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::time::Duration;
 
+use uma_stable_match_discord::{ApplicationId, BotToken, ClientSecret, DiscordConfig, PublicKey};
 use uma_stable_match_umamoe_client::{ApiKey, ClientConfig};
 
 use crate::features::Features;
@@ -114,6 +115,9 @@ pub struct Config {
     pub excluded_trainers: ExcludedTrainers,
     /// Whether this instance leaves scans and refreshes to another one, from `SERVE_ONLY`.
     pub serve_only: bool,
+    /// The Discord application for club applications, from `DISCORD_APP_ID`,
+    /// `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_SECRET`. `None` turns them off.
+    pub discord: Option<DiscordConfig>,
 }
 
 /// Invalid or missing settings.
@@ -161,6 +165,23 @@ pub enum ConfigError {
     /// `TOKEN_SIGNING_KEY` is shorter than 32 characters. The value isn't shown.
     #[error("TOKEN_SIGNING_KEY must be at least 32 characters")]
     InvalidTokenSigningKey,
+    /// `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_SECRET`
+    /// aren't set together.
+    #[error(
+        "DISCORD_APP_ID, DISCORD_PUBLIC_KEY, DISCORD_BOT_TOKEN and DISCORD_CLIENT_SECRET must be set together"
+    )]
+    IncompleteDiscord,
+    /// `DISCORD_APP_ID` isn't a positive whole number.
+    #[error("DISCORD_APP_ID must be a positive whole number, got {0:?}")]
+    InvalidDiscordAppId(String),
+    /// `DISCORD_PUBLIC_KEY` isn't a valid Ed25519 public key in hex.
+    #[error(
+        "DISCORD_PUBLIC_KEY must be the application's public key: 64 hex characters, got {0:?}"
+    )]
+    InvalidDiscordPublicKey(String),
+    /// Discord is configured without `REDIS_URL`, where its data is kept.
+    #[error("Discord applications need REDIS_URL: their data is kept in Redis")]
+    DiscordNeedsRedis,
     /// `METRICS_ADDR` isn't an IP address with a port from 1 to 65535.
     #[error("METRICS_ADDR must be an IP address and port, such as 127.0.0.1:9464, got {0:?}")]
     InvalidMetricsAddr(String),
@@ -363,6 +384,28 @@ impl Config {
             )),
             _ => return Err(ConfigError::IncompleteHumanCheck),
         };
+        let discord = match (
+            get("DISCORD_APP_ID"),
+            get("DISCORD_PUBLIC_KEY"),
+            get("DISCORD_BOT_TOKEN"),
+            get("DISCORD_CLIENT_SECRET"),
+        ) {
+            (None, None, None, None) => None,
+            (Some(app_id), Some(public_key), Some(token), Some(secret)) => {
+                if redis_url.is_none() {
+                    return Err(ConfigError::DiscordNeedsRedis);
+                }
+                Some(DiscordConfig::new(
+                    ApplicationId::parse(&app_id)
+                        .ok_or(ConfigError::InvalidDiscordAppId(app_id))?,
+                    PublicKey::parse(&public_key)
+                        .ok_or(ConfigError::InvalidDiscordPublicKey(public_key))?,
+                    BotToken::parse(&token).ok_or(ConfigError::IncompleteDiscord)?,
+                    ClientSecret::parse(&secret).ok_or(ConfigError::IncompleteDiscord)?,
+                ))
+            }
+            _ => return Err(ConfigError::IncompleteDiscord),
+        };
         let metrics_addr = match get("METRICS_ADDR") {
             None => None,
             Some(value) => Some(
@@ -418,6 +461,7 @@ impl Config {
             metrics_addr,
             excluded_trainers,
             serve_only,
+            discord,
         })
     }
 }

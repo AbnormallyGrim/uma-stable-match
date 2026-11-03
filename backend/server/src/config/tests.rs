@@ -642,6 +642,87 @@ fn rejects_a_partial_or_short_human_check() {
     );
 }
 
+/// Discord settings with made-up values, plus Redis. The key is the Ed25519 base point.
+fn discord_vars() -> Vec<(&'static str, &'static str)> {
+    vec![
+        ("REDIS_URL", "redis://127.0.0.1:6379"),
+        ("REDIS_KEY_SECRET", "made-up-redis-key-secret-of-32-chars"),
+        ("DISCORD_APP_ID", "1000"),
+        (
+            "DISCORD_PUBLIC_KEY",
+            "5866666666666666666666666666666666666666666666666666666666666666",
+        ),
+        ("DISCORD_BOT_TOKEN", "made-up-bot-token"),
+        ("DISCORD_CLIENT_SECRET", "made-up-client-secret"),
+    ]
+}
+
+#[test]
+fn discord_is_off_unless_configured() {
+    let config = Config::from_lookup(lookup(&[])).unwrap();
+    assert!(config.discord.is_none());
+}
+
+#[test]
+fn reads_discord_settings_without_showing_secrets() {
+    let config = Config::from_lookup(lookup(&discord_vars())).unwrap();
+    let discord = config.discord.as_ref().unwrap();
+    assert_eq!(discord.app_id.get(), 1000);
+    let debug = format!("{config:?}");
+    assert!(!debug.contains("made-up-bot-token"));
+    assert!(!debug.contains("made-up-client-secret"));
+}
+
+#[test]
+fn rejects_partial_discord_settings() {
+    for missing in [
+        "DISCORD_APP_ID",
+        "DISCORD_PUBLIC_KEY",
+        "DISCORD_BOT_TOKEN",
+        "DISCORD_CLIENT_SECRET",
+    ] {
+        let vars: Vec<_> = discord_vars()
+            .into_iter()
+            .filter(|(name, _)| *name != missing)
+            .collect();
+        assert_eq!(
+            Config::from_lookup(lookup(&vars)).unwrap_err(),
+            ConfigError::IncompleteDiscord,
+            "without {missing}"
+        );
+    }
+}
+
+#[test]
+fn rejects_invalid_discord_ids_and_keys() {
+    let with = |name: &'static str, value: &'static str| {
+        let mut vars = discord_vars();
+        vars.retain(|(n, _)| *n != name);
+        vars.push((name, value));
+        Config::from_lookup(lookup(&vars)).unwrap_err()
+    };
+    assert_eq!(
+        with("DISCORD_APP_ID", "abc"),
+        ConfigError::InvalidDiscordAppId("abc".into())
+    );
+    assert_eq!(
+        with("DISCORD_PUBLIC_KEY", "abcd"),
+        ConfigError::InvalidDiscordPublicKey("abcd".into())
+    );
+}
+
+#[test]
+fn discord_needs_redis() {
+    let vars: Vec<_> = discord_vars()
+        .into_iter()
+        .filter(|(name, _)| !name.starts_with("REDIS_"))
+        .collect();
+    assert_eq!(
+        Config::from_lookup(lookup(&vars)).unwrap_err(),
+        ConfigError::DiscordNeedsRedis
+    );
+}
+
 #[test]
 fn reads_the_japanese_flag() {
     let config = Config::from_lookup(lookup(&[
