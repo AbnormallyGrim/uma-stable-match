@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use tower::ServiceExt;
 use uma_stable_match_discord::{
     router, ApplicationId, BotToken, ClientSecret, Discord, DiscordConfig, PublicKey, PublicUrl,
-    SigningKey, CALLBACK_PATH, LEADERS_ME_PATH, LOGIN_PATH, SIGN_OUT_PATH,
+    SigningKey, CALLBACK_PATH, LEADERS_ME_PATH, LOGIN_PATH, OPT_IN_PATH, SIGN_OUT_PATH,
 };
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -342,4 +342,12 @@ async fn sign_out_clears_the_session() {
     // Signing out is a POST, so a link or image on another site can't trigger it.
     let response = get(&app, SIGN_OUT_PATH, None).await;
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+}
+
+#[tokio::test]
+async fn opting_in_isnt_served_without_it_being_set_up() {
+    let server = MockServer::start().await;
+    let app = app(&server);
+    let response = get(&app, &format!("{OPT_IN_PATH}?club=1"), None).await;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }

@@ -7,6 +7,7 @@ mod calibration;
 mod club;
 mod config;
 mod details;
+mod discord_clubs;
 mod features;
 mod frontend;
 mod human;
@@ -35,6 +36,7 @@ pub use config::{
     DEFAULT_TRAINER_LOOKUPS_PER_MINUTE,
 };
 pub use details::{club_weight, BackgroundLoader, ClubDetails, DetailConfig, SharedPool};
+pub use discord_clubs::club_lookup;
 pub use features::Features;
 pub use frontend::{CONTENT_SECURITY, CONTENT_SECURITY_WITH_ANALYTICS};
 pub use human::{HumanCheck, SigningKey, TurnstileSecret, TOKEN_COOKIE, TOKEN_LIFETIME};

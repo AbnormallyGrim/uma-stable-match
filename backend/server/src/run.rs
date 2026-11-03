@@ -2,16 +2,19 @@
 
 use std::io;
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use metrics_exporter_prometheus::BuildError;
+use redis::aio::ConnectionManager;
 use tokio::net::TcpListener;
 use tokio::sync::watch;
-use uma_stable_match_discord::Discord;
+use uma_stable_match_discord::{ClubStore, Discord, OptIn};
 
 use crate::app::{app_with_routes, AppState};
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::details::{ClubDetails, DetailConfig, SharedPool};
+use crate::discord_clubs::club_lookup;
 use crate::limits::RateLimits;
 use crate::pace::PaceLookup;
 use crate::refresher::RefreshConfig;
@@ -40,6 +43,9 @@ pub enum RunError {
     /// The Discord client couldn't be set up.
     #[error("could not set up Discord: {0}")]
     Discord(#[source] uma_stable_match_discord::Error),
+    /// Redis couldn't be reached for Discord's club links, with the kind of failure.
+    #[error("could not connect Discord's club links to Redis ({0})")]
+    DiscordStore(String),
     /// The listen address couldn't be bound.
     #[error("could not listen on {addr}: {source}")]
     Listen {
@@ -154,6 +160,7 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
             site.dir.display()
         );
     }
+    let club_details = details.clone();
     let state = AppState {
         cache,
         paces: paces.with_details(details.clone()),
@@ -176,8 +183,20 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
     }
     let discord_routes = match &config.discord {
         Some(discord) => {
-            let discord = Discord::new(discord.clone()).map_err(RunError::Discord)?;
-            tracing::info!("serving Discord interactions");
+            let url = config
+                .redis_url
+                .as_ref()
+                .expect("Discord settings need REDIS_URL");
+            let conn = tokio::time::timeout(Duration::from_secs(5), async {
+                ConnectionManager::new(redis::Client::open(url.expose())?).await
+            })
+            .await
+            .map_err(|_| RunError::DiscordStore("timed out".into()))?
+            .map_err(|e| RunError::DiscordStore(format!("{:?}", e.kind())))?;
+            let discord = Discord::new(discord.clone())
+                .map_err(RunError::Discord)?
+                .with_opt_in(OptIn::new(ClubStore::new(conn), club_lookup(club_details)));
+            tracing::info!("serving Discord interactions and club opt-in");
             uma_stable_match_discord::router(discord)
         }
         None => axum::Router::new(),

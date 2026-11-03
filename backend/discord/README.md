@@ -84,7 +84,7 @@ Discord sends a signed PING, and a badly signed request, when the URL is saved i
 
 **Session.** A signed cookie holds the Discord ID and a 12-hour expiry (`MAX_SESSION_AGE`), also `HttpOnly`, `Secure` and `SameSite=Lax`. Nothing is stored server-side, so signing out removes the cookie but can't revoke a copy of it before it expires. The signed values carry a purpose, so a `state` can't be used as a session, and neither can the human check's tokens that share the key. `Secure` is left off only when `PUBLIC_URL` is `http://`, for local development.
 
-**What's kept.** The access token is used for one `GET /users/@me` inside the callback request and then dropped; only the ID is kept, inside the session cookie. Nothing from Discord is logged: a failed sign-in logs Discord's error message, not the user. Results are counted in `discord_sign_ins_total`, labelled by `result` (`success`, `invalid_state`, `denied` or `discord_error`).
+**What's kept.** The access token is used for one `GET /users/@me` inside the callback request and then dropped; only the ID is kept, inside the session cookie. Nothing from Discord is logged: a failed sign-in logs Discord's error message, not the user. Results are counted in `discord_sign_ins_total`, labelled by `result` (`success`, `invalid_state`, `denied`, `discord_error`, or for opting a club in `no_server`, `wrong_server` and `unavailable`).
 
 ## Finding a club's server
 
@@ -113,3 +113,31 @@ Many clubs can share a server, and a club is linked to one server at a time:
 - `club(club_id)` reads the `ClubRecord`, and `clubs_on(server_id)` lists a server's clubs, lowest ID first.
 
 Each of `link` and `unlink` is one Lua script, so a crash can't leave a club in one set and not the other. Calls time out after 5 seconds. Errors name only the kind of Redis failure, as Redis's own messages can include its URL.
+
+## Opting a club in
+
+A leader opts a club in by showing they control the Discord server the club points to. Two things are checked, and Discord vouches for both:
+
+- **The club points to the server:** its description has a working invite to it (see [Finding a club's server](#finding-a-clubs-server)).
+- **The person controls the server:** they add the bot to that same server, which Discord only allows with Manage Server or Administrator.
+
+`GET /api/v1/discord/opt-in?club=ID&next=/path` starts it. It needs a leader session (sign in first), so a visitor can't make the server call Discord for nothing. It answers:
+
+| Status | When |
+|---|---|
+| 401 | Not signed in |
+| 400 | `club` isn't a club ID |
+| 404 | No such club |
+| 422 | The description has no working invite, or invites to more than one server |
+| 502 | The club or Discord couldn't be reached; try again |
+| 307 | To Discord's add-bot screen (`scope=bot identify`) with `guild_id` set and the server picker locked |
+
+The club, the expected server and the signed-in user go inside the signed `state`, so editing the callback's query string can't change them. `permissions` is `BOT_PERMISSIONS`: View Channels, Manage Channels, Manage Roles, Send Messages, Embed Links, Read Message History and Create Instant Invite. No `guilds` scope is asked for: adding the bot already proves the person's rights, and their server list isn't needed.
+
+The callback never reads the redirect's own `guild_id` or `permissions` parameters. It exchanges the code, and Discord's token response says which server the bot was actually added to:
+
+- **Same server as the invite's, and the same person who started it:** the club is linked (`ClubStore::link`) and the visitor goes to `next`. If the club was linked to another server, it moves; when no club is left on the old one, the bot leaves it.
+- **Another server:** nothing is linked (403) and the bot leaves that server, unless a club is linked to it.
+- **No server** (the bot wasn't added) **or a different person:** nothing is linked (400).
+
+Opting in needs the app set up with `Discord::with_opt_in(OptIn::new(store, clubs))`. `ClubLookup` is how clubs are found, since this crate doesn't know where they come from; it answers `Ok(None)` for a club that doesn't exist. Without it, the route isn't served.
