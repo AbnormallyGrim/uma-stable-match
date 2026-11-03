@@ -10,13 +10,14 @@ use axum::body::Body;
 use axum::http::header::{COOKIE, LOCATION, SET_COOKIE};
 use axum::http::{Request, Response, StatusCode};
 use axum::Router;
+use http_body_util::BodyExt;
 use redis::aio::ConnectionManager;
 use serde_json::json;
 use tower::ServiceExt;
 use uma_stable_match_discord::{
     router, ApplicationId, BotToken, ClientSecret, ClubLookup, ClubStore, ClubSummary, Discord,
     DiscordConfig, LookupError, OptIn, PublicKey, PublicUrl, SigningKey, BOT_PERMISSIONS,
-    CALLBACK_PATH, LOGIN_PATH, OPT_IN_PATH, UNLINK_PATH,
+    CALLBACK_PATH, LOGIN_PATH, OPT_IN_PATH, SETTINGS_PATH, UNLINK_PATH,
 };
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -177,8 +178,9 @@ impl World {
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "owner_id": "999",
                 "roles": [
-                    { "id": a.to_string(), "permissions": "0" },
-                    { "id": manager_role.to_string(), "permissions": "32" },
+                    { "id": a.to_string(), "name": "@everyone", "permissions": "0" },
+                    { "id": manager_role.to_string(), "name": "Managers", "permissions": "32" },
+                    { "id": (a + 1001).to_string(), "name": "officers", "permissions": "0" },
                 ],
             })))
             .mount(&self.mock)
@@ -193,6 +195,15 @@ impl World {
                 .mount(&self.mock)
                 .await;
         }
+        Mock::given(method("GET"))
+            .and(path(format!("/guilds/{a}/channels")))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                { "id": (a + 2000).to_string(), "name": "Applications", "type": 4 },
+                { "id": (a + 2001).to_string(), "name": "general", "type": 0 },
+                { "id": (a + 2002).to_string(), "name": "archive", "type": 4 },
+            ])))
+            .mount(&self.mock)
+            .await;
         // Server B is down.
         Mock::given(method("GET"))
             .and(path(format!("/guilds/{}", self.server_b())))
@@ -206,13 +217,18 @@ impl World {
     }
 
     async fn send(&self, method: &str, uri: &str, cookie: &str) -> Response<Body> {
+        self.send_body(method, uri, cookie, "").await
+    }
+
+    async fn send_body(&self, method: &str, uri: &str, cookie: &str, body: &str) -> Response<Body> {
         let request = Request::builder()
             .method(method)
             .uri(uri)
+            .header("content-type", "application/json")
             .header(COOKIE, cookie);
         self.app
             .clone()
-            .oneshot(request.body(Body::empty()).unwrap())
+            .oneshot(request.body(Body::from(body.to_owned())).unwrap())
             .await
             .unwrap()
     }
@@ -251,6 +267,20 @@ impl World {
     async fn unlink(&self, session: &str, club: u64) -> Response<Body> {
         let uri = UNLINK_PATH.replace("{club}", &club.to_string());
         self.send("DELETE", &uri, session).await
+    }
+
+    fn settings_uri(&self, club: u64) -> String {
+        SETTINGS_PATH.replace("{club}", &club.to_string())
+    }
+
+    async fn settings(&self, session: &str, club: u64) -> Response<Body> {
+        self.get(&self.settings_uri(club), session).await
+    }
+
+    async fn change(&self, session: &str, club: u64, body: serde_json::Value) -> Response<Body> {
+        let uri = self.settings_uri(club);
+        self.send_body("PATCH", &uri, session, &body.to_string())
+            .await
     }
 
     async fn left(&self) -> Vec<String> {
@@ -689,5 +719,204 @@ async fn a_server_the_bot_cant_see_or_a_discord_outage_leaves_the_link() {
     assert_eq!(outage.status(), StatusCode::BAD_GATEWAY);
     assert!(world.store.club(world.club(1)).await.unwrap().is_some());
     assert!(world.store.club(world.club(2)).await.unwrap().is_some());
+    world.clean_up().await;
+}
+
+async fn json_body(response: Response<Body>) -> serde_json::Value {
+    serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap()
+}
+
+#[tokio::test]
+async fn a_server_manager_reads_the_clubs_settings_with_the_servers_lists() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    world
+        .store
+        .link(world.club(1), world.server_a())
+        .await
+        .unwrap();
+    let session = world.sign_in().await;
+    let response = world.settings(&session, world.club(1)).await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let a = world.server_a();
+    assert_eq!(
+        json_body(response).await,
+        json!({
+            "guild_id": a.to_string(),
+            "category": null,
+            "leader_roles": [],
+            "auto_join": true,
+            "open": true,
+            "problem": null,
+            "categories": [
+                { "id": (a + 2000).to_string(), "name": "Applications" },
+                { "id": (a + 2002).to_string(), "name": "archive" },
+            ],
+            "roles": [
+                { "id": (a + 1000).to_string(), "name": "Managers" },
+                { "id": (a + 1001).to_string(), "name": "officers" },
+            ],
+        })
+    );
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn only_someone_with_manage_server_reads_or_changes_settings() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    world
+        .store
+        .link(world.club(1), world.server_a())
+        .await
+        .unwrap();
+    let a = world.server_a();
+    let patch = json!({ "open": false, "category": (a + 2000).to_string() });
+
+    let anonymous = world.settings("", world.club(1)).await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    let anonymous = world.change("", world.club(1), patch.clone()).await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+
+    // Signed in, but without Manage Server there.
+    let session = world.sign_in_with("other-code").await;
+    let read = world.settings(&session, world.club(1)).await;
+    assert_eq!(read.status(), StatusCode::FORBIDDEN);
+    let change = world.change(&session, world.club(1), patch).await;
+    assert_eq!(change.status(), StatusCode::FORBIDDEN);
+    let record = world.store.club(world.club(1)).await.unwrap().unwrap();
+    assert!(record.open && record.category.is_none());
+
+    // And a club that isn't linked has nothing to read.
+    let session = world.sign_in().await;
+    let missing = world.settings(&session, world.club(2)).await;
+    assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn every_read_and_change_asks_discord_again() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    world
+        .store
+        .link(world.club(1), world.server_a())
+        .await
+        .unwrap();
+    let session = world.sign_in().await;
+    world.settings(&session, world.club(1)).await;
+    world.settings(&session, world.club(1)).await;
+    world
+        .change(&session, world.club(1), json!({ "auto_join": false }))
+        .await;
+
+    let member = format!("/guilds/{}/members/{LEADER}", world.server_a());
+    let checks = world
+        .mock
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .filter(|request| request.url.path() == member)
+        .count();
+    assert_eq!(checks, 3);
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn changing_settings_saves_them_and_answers_with_the_result() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    world
+        .store
+        .link(world.club(1), world.server_a())
+        .await
+        .unwrap();
+    let a = world.server_a();
+    let session = world.sign_in().await;
+    let response = world
+        .change(
+            &session,
+            world.club(1),
+            json!({
+                "category": (a + 2000).to_string(),
+                "leader_roles": [(a + 1001).to_string(), (a + 1001).to_string()],
+                "auto_join": false,
+                "open": false,
+            }),
+        )
+        .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    assert_eq!(body["category"], (a + 2000).to_string());
+    assert_eq!(body["leader_roles"], json!([(a + 1001).to_string()]));
+    assert_eq!(body["auto_join"], false);
+    assert_eq!(body["open"], false);
+    let record = world.store.club(world.club(1)).await.unwrap().unwrap();
+    assert_eq!(record.category, Some(a + 2000));
+    assert_eq!(record.leader_roles, [a + 1001]);
+    assert!(!record.auto_join && !record.open);
+
+    // `null` clears the category; fields left out stay.
+    let response = world
+        .change(
+            &session,
+            world.club(1),
+            json!({ "category": null, "leader_roles": [] }),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let record = world.store.club(world.club(1)).await.unwrap().unwrap();
+    assert_eq!(record.category, None);
+    assert!(record.leader_roles.is_empty());
+    assert!(!record.open);
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn settings_must_name_the_servers_own_categories_and_roles() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    world
+        .store
+        .link(world.club(1), world.server_a())
+        .await
+        .unwrap();
+    let a = world.server_a();
+    let session = world.sign_in().await;
+    for (what, patch) in [
+        (
+            "a text channel",
+            json!({ "category": (a + 2001).to_string() }),
+        ),
+        ("another server's category", json!({ "category": "42" })),
+        ("junk", json!({ "category": "abc" })),
+        ("@everyone", json!({ "leader_roles": [a.to_string()] })),
+        ("an unknown role", json!({ "leader_roles": ["42"] })),
+        ("nothing", json!({})),
+        ("an unknown field", json!({ "problem": "none" })),
+        ("a wrong type", json!({ "open": "yes" })),
+    ] {
+        let response = world.change(&session, world.club(1), patch).await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{what}");
+    }
+    let invalid = world
+        .send_body(
+            "PATCH",
+            &world.settings_uri(world.club(1)),
+            &session,
+            "not json",
+        )
+        .await;
+    assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
+    let record = world.store.club(world.club(1)).await.unwrap().unwrap();
+    assert!(record.open && record.auto_join && record.category.is_none());
     world.clean_up().await;
 }

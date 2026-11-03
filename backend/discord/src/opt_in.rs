@@ -15,10 +15,10 @@ use serde::Deserialize;
 
 use crate::auth::{begin, error, safe_next, send_to_discord, session_user, Failure, Flow, Target};
 use crate::bot::Discord;
-use crate::guild_access::manages;
+use crate::guild_access::{verify, Access};
 use crate::invites::servers_in_description;
 use crate::oauth::Authorized;
-use crate::store::ClubStore;
+use crate::store::{ClubRecord, ClubStore};
 
 /// Path that starts opting a club in. Needs a leader session.
 pub const OPT_IN_PATH: &str = "/api/v1/discord/opt-in";
@@ -101,7 +101,8 @@ pub(crate) fn router(discord: Discord) -> Router {
     Router::new()
         .route(OPT_IN_PATH, get(start))
         .route(UNLINK_PATH, delete(unlink))
-        .with_state(discord)
+        .with_state(discord.clone())
+        .merge(crate::settings::router(discord))
 }
 
 #[derive(Deserialize)]
@@ -181,54 +182,13 @@ async fn unlink(
     Path(club): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (Some(opt_in), config) = (discord.opt_in(), discord.config()) else {
+    let (club_id, _, _) = match managed_club(&discord, &headers, &club).await {
+        Ok(found) => found,
+        Err(response) => return *response,
+    };
+    let Some(opt_in) = discord.opt_in() else {
         return error(StatusCode::NOT_FOUND, "not found");
     };
-    let Some(user) = session_user(config, &headers) else {
-        return error(StatusCode::UNAUTHORIZED, "sign in with Discord first");
-    };
-    let Ok(club_id) = club.parse::<u64>() else {
-        return error(StatusCode::BAD_REQUEST, "club must be a club ID");
-    };
-    let unavailable = |err: &dyn std::fmt::Display| {
-        tracing::warn!(error = %err, "could not unlink a club from its Discord server");
-        error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "couldn't reach the saved links; try again",
-        )
-    };
-    let record = match opt_in.store.club(club_id).await {
-        Ok(Some(record)) => record,
-        Ok(None) => return error(StatusCode::NOT_FOUND, "that club isn't linked to a server"),
-        Err(err) => return unavailable(&err),
-    };
-    // Whoever may add the bot to the server may take the club off it, so the same rights are
-    // needed. Anyone else, or a server the bot can't see, can't prove them.
-    let allowed = match manages(discord.rest(), record.guild_id, user).await {
-        Ok(allowed) => allowed,
-        Err(err)
-            if matches!(
-                err.status(),
-                Some(StatusCode::FORBIDDEN | StatusCode::NOT_FOUND)
-            ) =>
-        {
-            false
-        }
-        Err(err) => {
-            tracing::warn!(error = %err, "could not check who manages a Discord server");
-            return error(
-                StatusCode::BAD_GATEWAY,
-                "couldn't check your rights on the server; try again",
-            );
-        }
-    };
-    if !allowed {
-        metrics::counter!("discord_unlinks_total", "result" => "forbidden").increment(1);
-        return error(
-            StatusCode::FORBIDDEN,
-            "you need Manage Server on the club's Discord server to unlink it",
-        );
-    }
     match opt_in.store.unlink(club_id).await {
         Ok(left) => {
             // Nothing needs the bot on a server once its last club is gone.
@@ -238,8 +198,78 @@ async fn unlink(
             metrics::counter!("discord_unlinks_total", "result" => "success").increment(1);
             StatusCode::NO_CONTENT.into_response()
         }
-        Err(err) => unavailable(&err),
+        Err(err) => store_unavailable(&err),
     }
+}
+
+/// The club with this ID, as `club`, and who may manage it: the signed-in user must own its
+/// server or have Administrator or Manage Server there, checked with Discord each time, as the
+/// same rights are needed to add the bot. Anyone else, or a server the bot can't see, can't prove
+/// them. The `Err` is the response to send.
+pub(crate) async fn managed_club(
+    discord: &Discord,
+    headers: &HeaderMap,
+    club: &str,
+) -> Result<(u64, ClubRecord, Access), Box<Response>> {
+    let (Some(opt_in), config) = (discord.opt_in(), discord.config()) else {
+        return Err(Box::new(error(StatusCode::NOT_FOUND, "not found")));
+    };
+    let Some(user) = session_user(config, headers) else {
+        return Err(Box::new(error(
+            StatusCode::UNAUTHORIZED,
+            "sign in with Discord first",
+        )));
+    };
+    let Ok(club_id) = club.parse::<u64>() else {
+        return Err(Box::new(error(
+            StatusCode::BAD_REQUEST,
+            "club must be a club ID",
+        )));
+    };
+    let record = match opt_in.store.club(club_id).await {
+        Ok(Some(record)) => record,
+        Ok(None) => {
+            return Err(Box::new(error(
+                StatusCode::NOT_FOUND,
+                "that club isn't linked to a server",
+            )))
+        }
+        Err(err) => return Err(Box::new(store_unavailable(&err))),
+    };
+    let access = match verify(discord.rest(), record.guild_id, user).await {
+        Ok(access) => access,
+        Err(err)
+            if matches!(
+                err.status(),
+                Some(StatusCode::FORBIDDEN | StatusCode::NOT_FOUND)
+            ) =>
+        {
+            None
+        }
+        Err(err) => {
+            tracing::warn!(error = %err, "could not check who manages a Discord server");
+            return Err(Box::new(error(
+                StatusCode::BAD_GATEWAY,
+                "couldn't check your rights on the server; try again",
+            )));
+        }
+    };
+    let Some(access) = access else {
+        metrics::counter!("discord_club_access_total", "result" => "forbidden").increment(1);
+        return Err(Box::new(error(
+            StatusCode::FORBIDDEN,
+            "you need Manage Server on the club's Discord server for this",
+        )));
+    };
+    Ok((club_id, record, access))
+}
+
+pub(crate) fn store_unavailable(err: &dyn std::fmt::Display) -> Response {
+    tracing::warn!(error = %err, "could not reach the Discord club links");
+    error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "couldn't reach the saved links; try again",
+    )
 }
 
 /// Finishes an opt-in from the callback. Links the club only when the same person who started it

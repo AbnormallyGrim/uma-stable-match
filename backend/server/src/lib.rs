@@ -2,6 +2,7 @@
 
 mod api_error;
 mod app;
+mod applications;
 mod cache;
 mod calibration;
 mod club;
@@ -28,6 +29,7 @@ mod traces;
 mod website;
 
 pub use app::{app, app_with_features, app_with_routes, router, status_router, AppState};
+pub use applications::Applications;
 pub use cache::{Cache, CacheStatus, ScanFailure, ScanPhase, ScanProgress, Snapshot};
 pub use calibration::{club_median, Calibration, MIN_CALIBRATION_SAMPLES};
 pub use config::{

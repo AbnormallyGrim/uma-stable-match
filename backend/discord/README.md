@@ -109,6 +109,9 @@ These are only guesses. A code is an invite once Discord resolves it: `resolve_i
 Many clubs can share a server, and a club is linked to one server at a time:
 
 - `link(club_id, server_id)` links a club. Linking it to another server moves it: it leaves the old server's set and loses its `category`, `leader_roles` and `problem`, which name things on the old one, and keeps its `auto_join` and `open` choices. It returns the `Departure` (server and clubs still linked there) if the club moved.
+- A new link starts open and with auto-join on (`open` and `auto_join` are set only if the club has none, so a moved club keeps its choices).
+- `update(club_id, server_id, &SettingsUpdate)` changes the category, leader roles, auto-join or open fields, and only while the club is still linked to `server_id`, so a club that moved meanwhile isn't changed. It returns whether it did.
+- `takes_applications(club_ids)` says for each club whether it is linked, open and has no setup problem, in one round trip. The server adds the club's own join style and spots to decide the `applications` badge.
 - `unlink(club_id)` deletes the club's hash and takes it out of its server's set, returning the `Departure` if it was linked. A `remaining` of 0 means no club needs the bot on that server any more.
 - `club(club_id)` reads the `ClubRecord`, and `clubs_on(server_id)` lists a server's clubs, lowest ID first.
 
@@ -159,3 +162,22 @@ Opting in needs the app set up with `Discord::with_opt_in(OptIn::new(store, club
 It is a `DELETE`, which a browser doesn't send across sites with the session cookie. When the last club on a server is unlinked the bot leaves it; while another club is linked there the bot stays.
 
 A club whose server has removed the bot can't prove anyone's rights, so it can't be unlinked this way. Opting the club in again, to the same or another server, replaces the link.
+
+## Club settings
+
+`GET` and `PATCH /api/v1/discord/clubs/{club}/settings` (`SETTINGS_PATH`) read and change a club's settings. Both need a leader session and the same rights as [unlinking](#unlinking-a-club): the person owns the server or has Administrator or Manage Server there, checked with Discord on every call (the server's roles and the person's roles, with no copy kept), so losing the rights ends access at once. Someone without them gets 403 and can neither read nor change anything.
+
+`GET` answers with the settings and the lists to choose from. IDs are strings, as Discord's are larger than JSON numbers can hold safely:
+
+| Field | Meaning |
+|---|---|
+| `guild_id` | The linked server |
+| `category` | The category for the club's ticket channels, or `null` |
+| `leader_roles` | Roles whose members count as the club's leaders |
+| `auto_join` | Whether applicants are added to the server automatically |
+| `open` | Whether the club takes applications (`false` is paused) |
+| `problem` | The club's setup problem, if any; it can't be changed here |
+| `categories` | The server's categories, `{id, name}`, to choose the ticket category from |
+| `roles` | The server's roles except `@everyone`, `{id, name}`, to choose the leader roles from |
+
+`PATCH` takes a JSON object with any of `category` (an ID, or `null` to clear), `leader_roles` (a list of IDs, duplicates dropped, at most `MAX_LEADER_ROLES`, 25), `auto_join` and `open`. Fields left out stay as they are. The category must be one of the server's categories and the roles must be the server's roles; otherwise, an unknown field, a wrong type, or no field at all gets 400 and nothing changes. It answers with the new settings, as `GET` does. A 409 means the club moved to another server or was unlinked while the change was made.

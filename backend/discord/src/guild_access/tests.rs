@@ -7,6 +7,7 @@ fn guild(roles: &[(&str, &str)]) -> Guild {
             .iter()
             .map(|(id, permissions)| Role {
                 id: (*id).into(),
+                name: format!("role {id}"),
                 permissions: (*permissions).into(),
             })
             .collect(),
