@@ -13,9 +13,9 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
 use tower::ServiceExt;
 use uma_stable_match_server::{
-    app, install_metrics, metrics_router, scan, AppState, Cache, ClubDetails, DetailConfig,
-    KeySecret, MatchSettings, PaceLookup, RateLimits, RedisUrl, ScanConfig, SharedCache,
-    SharedPool, DEFAULT_PACE_TTL,
+    app, install_metrics, metrics_router, record_background, scan, AppState, Cache, ClubDetails,
+    DetailConfig, KeySecret, MatchSettings, PaceLookup, RateLimits, RedisUrl, ScanConfig,
+    SharedCache, SharedPool, DEFAULT_PACE_TTL,
 };
 use uma_stable_match_umamoe_client::{
     ApiKey, Client, ClientConfig, ListCirclesRequest, Priority, RetryConfig,
@@ -172,6 +172,27 @@ async fn the_metrics_route_reports_the_pool_and_caches() {
         "refresh_scheduled_clubs",
         "refresh_loaded_clubs",
         "refresh_due_clubs",
+        "refresh_overdue_seconds",
+    ] {
+        assert!(
+            rendered.lines().any(|l| l.starts_with(&format!("{name} "))),
+            "missing {name}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn background_values_can_be_recorded_without_the_metrics_route() {
+    let handle = handle();
+    let state = state();
+    record_background(&state.details, &state.cache).await;
+    let rendered = handle.render();
+    for name in [
+        "detail_cache_clubs",
+        "detail_cache_bytes",
+        "detail_queue_clubs",
+        "refresh_scheduled_clubs",
+        "refresh_loaded_clubs",
         "refresh_overdue_seconds",
     ] {
         assert!(
