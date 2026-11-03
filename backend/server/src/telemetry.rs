@@ -11,6 +11,8 @@ use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder, Promet
 use tracing::Instrument;
 
 use crate::app::{status_router, AppState};
+use crate::cache::Cache;
+use crate::details::ClubDetails;
 use crate::refresher::utc_now;
 
 const BUCKETS: &[f64] = &[
@@ -97,10 +99,7 @@ fn route_label(request: &Request) -> String {
 }
 
 async fn record_state(state: &AppState) {
-    if let Some(snapshot) = state.cache.snapshot() {
-        metrics::gauge!("scan_last_success_timestamp_seconds")
-            .set(unix_seconds(snapshot.scanned_at));
-    }
+    record_background(&state.details, &state.cache).await;
 
     let (clubs, exact, factor, samples) = {
         let pool = state
@@ -121,12 +120,35 @@ async fn record_state(state: &AppState) {
     metrics::gauge!("pool_calibration_factor").set(factor);
     metrics::gauge!("pool_calibration_samples").set(samples as f64);
 
-    state.details.settle().await;
-    metrics::gauge!("detail_cache_clubs").set(state.details.cached_clubs() as f64);
-    metrics::gauge!("detail_cache_bytes").set(state.details.cached_bytes() as f64);
-    metrics::gauge!("detail_queue_clubs").set(state.details.queued() as f64);
+    if let Some(total) = state.details.shared().searches().await {
+        metrics::counter!("searches_total").absolute(total);
+    }
 
-    let refresh = state.details.refresh_status().await;
+    if let Some(stats) = state.details.shared().stats().await {
+        metrics::gauge!("redis_keys").set(stats.keys as f64);
+        metrics::gauge!("redis_keys_expiring").set(stats.expiring as f64);
+        metrics::gauge!("redis_average_ttl_seconds").set(stats.average_ttl.as_secs_f64());
+        metrics::gauge!("redis_memory_used_bytes").set(stats.used_memory as f64);
+        metrics::gauge!("redis_memory_max_bytes").set(stats.max_memory as f64);
+        metrics::counter!("redis_evicted_keys_total").absolute(stats.evicted);
+        metrics::counter!("redis_expired_keys_total").absolute(stats.expired);
+    }
+}
+
+/// Sets the last scan, detail cache and refresh gauges. [`metrics_router`] does this on each
+/// request; an app that runs only the scans and refreshes calls it before rendering.
+pub async fn record_background(details: &ClubDetails, cache: &Cache) {
+    if let Some(snapshot) = cache.snapshot() {
+        metrics::gauge!("scan_last_success_timestamp_seconds")
+            .set(unix_seconds(snapshot.scanned_at));
+    }
+
+    details.settle().await;
+    metrics::gauge!("detail_cache_clubs").set(details.cached_clubs() as f64);
+    metrics::gauge!("detail_cache_bytes").set(details.cached_bytes() as f64);
+    metrics::gauge!("detail_queue_clubs").set(details.queued() as f64);
+
+    let refresh = details.refresh_status().await;
     metrics::gauge!("refresh_scheduled_clubs").set(refresh.scheduled as f64);
     metrics::gauge!("refresh_loaded_clubs").set(refresh.loaded as f64);
     metrics::gauge!("refresh_due_clubs").set(refresh.due as f64);
@@ -147,20 +169,6 @@ async fn record_state(state: &AppState) {
     if let Some(ttl) = refresh.stored_ttl {
         metrics::gauge!("redis_club_ttl_shortest_seconds").set(ttl.shortest.as_secs_f64());
         metrics::gauge!("redis_club_ttl_average_seconds").set(ttl.average.as_secs_f64());
-    }
-
-    if let Some(total) = state.details.shared().searches().await {
-        metrics::counter!("searches_total").absolute(total);
-    }
-
-    if let Some(stats) = state.details.shared().stats().await {
-        metrics::gauge!("redis_keys").set(stats.keys as f64);
-        metrics::gauge!("redis_keys_expiring").set(stats.expiring as f64);
-        metrics::gauge!("redis_average_ttl_seconds").set(stats.average_ttl.as_secs_f64());
-        metrics::gauge!("redis_memory_used_bytes").set(stats.used_memory as f64);
-        metrics::gauge!("redis_memory_max_bytes").set(stats.max_memory as f64);
-        metrics::counter!("redis_evicted_keys_total").absolute(stats.evicted);
-        metrics::counter!("redis_expired_keys_total").absolute(stats.expired);
     }
 }
 
