@@ -102,8 +102,24 @@ where
             .with(filter)
             .with(lines)
             .with(CountProblems)
+            .with(sentry_layers())
             .with(export_spans(tracer)),
     )
+}
+
+/// Sends errors to Sentry as issues, and info, warning and error lines as Sentry logs, with the
+/// spans as its traces. It does nothing until [`crate::init_sentry`] has started a client.
+fn sentry_layers<S>() -> Vec<Box<dyn Layer<S> + Send + Sync>>
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+{
+    use sentry::integrations::tracing::{ErrorLayer, LogLayer, SpanLayer};
+    use tracing_subscriber::filter::LevelFilter;
+    vec![
+        ErrorLayer::new().with_filter(LevelFilter::ERROR).boxed(),
+        LogLayer::new().with_filter(LevelFilter::INFO).boxed(),
+        SpanLayer::new().with_filter(LevelFilter::INFO).boxed(),
+    ]
 }
 
 // Events stay out of exported spans, so traces never hold what log lines do.

@@ -755,7 +755,11 @@ Error lines carry an `origin`: `umamoe` for an error status, rate limit or unexp
 - **Panics.** A panic logs one `panicked` error with the `panic` message, its `location` and a full `backtrace`, and the request gets `500 {"error":"internal error"}`.
 - **Line numbers.** Release builds keep line tables (`debug = "line-tables-only"` in the workspace `Cargo.toml`), so backtraces show files and lines.
 
-A log search service such as Axiom can then filter by those fields. If a log shipper wraps each line in its own record, as Fly.io's does, the line arrives as a string in `message`; read its fields with `parse_json(message)` in Axiom.
+A log search service can then filter by those fields. The server also sends its logs to Sentry itself when `SENTRY_DSN` is set (see [Sentry](#sentry)), so no log shipper is needed.
+
+### Sentry
+
+Set `SENTRY_DSN` to send errors (as issues), info, warning and error log lines (as Sentry Logs) and traces to [Sentry](https://sentry.io). `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE` tag them, and `SENTRY_TRACES_SAMPLE_RATE` (default `0.1`) sets the share of requests traced. Unset, nothing is sent. No personal data is attached; keep `RUST_LOG` at `info` as above.
 
 At `info`, logs hold no trainer IDs or IP addresses. Keep `RUST_LOG` at `info` when logs leave the server.
 

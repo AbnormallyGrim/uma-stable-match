@@ -2,12 +2,16 @@
 
 use std::process::ExitCode;
 
-use uma_stable_match_server::{init_logging, run, Config, LogFormat, TraceExport, UmaMoeConfig};
+use uma_stable_match_server::{
+    init_logging, init_sentry, run, Config, LogFormat, TraceExport, UmaMoeConfig,
+};
 use uma_stable_match_umamoe_client::Client;
 
 #[tokio::main]
 async fn main() -> ExitCode {
     dotenvy::dotenv().ok();
+    // Held to the end of `main`, so queued events are sent when the server stops.
+    let _sentry = init_sentry();
     let log_format = LogFormat::from_env();
     let traces = TraceExport::from_env();
     init_logging(
