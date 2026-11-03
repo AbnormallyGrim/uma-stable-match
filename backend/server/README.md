@@ -48,6 +48,10 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `TURNSTILE_SITE_KEY` | none | Cloudflare Turnstile's public site key, which the web app uses to show the challenge. Set it with the next two to turn on the [human check](#human-check). Unset, the check is off |
 | `TURNSTILE_SECRET_KEY` | none | Required with `TURNSTILE_SITE_KEY`: Turnstile's secret key |
 | `TOKEN_SIGNING_KEY` | none | Required with `TURNSTILE_SITE_KEY`: at least 32 characters, the same on every instance. Signs the tokens the human check issues |
+| `DISCORD_APP_ID` | none | The Discord application's ID. Set it with the next three to turn on [Discord applications](#discord-applications). Needs `REDIS_URL`. Unset, they're off |
+| `DISCORD_PUBLIC_KEY` | none | Required with `DISCORD_APP_ID`: the application's public key, 64 hex characters, which checks that interactions come from Discord |
+| `DISCORD_BOT_TOKEN` | none | Required with `DISCORD_APP_ID`: the bot's token |
+| `DISCORD_CLIENT_SECRET` | none | Required with `DISCORD_APP_ID`: the application's OAuth2 client secret |
 | `METRICS_ADDR` | none | IP address and port to serve Prometheus metrics and the full [status](#status) on, such as `127.0.0.1:9464`. Unset, no metrics are recorded. See [Metrics](#metrics) |
 | `METRICS_EXCLUDED_TRAINER_IDS` | none | Comma-separated trainer IDs whose searches are left out of search metrics and the search total. See [Excluded trainers](#excluded-trainers) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none | OTLP/HTTP base URL to send traces to, such as `http://127.0.0.1:4318`. Unset, no traces are recorded. See [Traces](#traces) |
@@ -65,11 +69,12 @@ Blank values count as unset. These stop the server at startup, with an error mes
 - a `REDIS_URL` without a `redis://` or `rediss://` scheme, a missing or short `REDIS_KEY_SECRET`, or a Redis that can't be reached within 5 seconds
 - `SERVE_ONLY` without `REDIS_URL`
 - only some of `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY`, or a `TOKEN_SIGNING_KEY` under 32 characters
+- only some of `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_SECRET`, a `DISCORD_APP_ID` that isn't a positive whole number, a `DISCORD_PUBLIC_KEY` that isn't a valid key, or Discord without `REDIS_URL`
 - a `METRICS_ADDR` that isn't an IP address and port, or that can't be listened on
 - a `METRICS_EXCLUDED_TRAINER_IDS` that isn't a comma-separated list of trainer IDs
 - an `OTEL_EXPORTER_OTLP_ENDPOINT` that isn't a valid URL
 
-The trainer IDs in `METRICS_EXCLUDED_TRAINER_IDS` are never logged or shown in errors either; `Debug` output and the startup log give only how many there are. The API key, `REDIS_URL` (which can hold a password), `REDIS_KEY_SECRET`, `TURNSTILE_SECRET_KEY`, `TOKEN_SIGNING_KEY` and `OTEL_EXPORTER_OTLP_HEADERS` are never logged, never included in errors and are redacted in `Debug` output. `.env` is git-ignored; never commit it.
+The trainer IDs in `METRICS_EXCLUDED_TRAINER_IDS` are never logged or shown in errors either; `Debug` output and the startup log give only how many there are. The API key, `REDIS_URL` (which can hold a password), `REDIS_KEY_SECRET`, `TURNSTILE_SECRET_KEY`, `TOKEN_SIGNING_KEY`, `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_SECRET` and `OTEL_EXPORTER_OTLP_HEADERS` are never logged, never included in errors and are redacted in `Debug` output. `.env` is git-ignored; never commit it.
 
 ## Data source
 
@@ -696,6 +701,20 @@ fly secrets set TURNSTILE_SITE_KEY=<site key> TURNSTILE_SECRET_KEY=<secret key> 
 ```
 
 Setting them before that version is live makes every search fail with `401`. To turn the check off, unset them with `fly secrets unset TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY TOKEN_SIGNING_KEY`. With more than one instance, give each the same `TOKEN_SIGNING_KEY`. The content security policy already allows Turnstile's script and frame, and nothing else from Cloudflare.
+
+## Discord applications
+
+Club applications through Discord are being built in steps; so far the server only answers Discord's interactions endpoint. With `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_SECRET` set, it serves `POST /discord/interactions` from the [`uma-stable-match-discord`](../discord/README.md) crate, behind the same security headers, time limit and panic handling as the API. Unset, the path isn't served and nothing else changes.
+
+Discord's data will be kept in Redis, so these settings need `REDIS_URL`.
+
+To set it up:
+
+1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications). Copy its application ID and public key from **General Information**, and its client secret from **OAuth2**. Under **Bot**, reset and copy the token.
+2. Set the four variables. At Fly.io, set them as secrets: `fly secrets set DISCORD_APP_ID=… DISCORD_PUBLIC_KEY=… DISCORD_BOT_TOKEN=… DISCORD_CLIENT_SECRET=…`.
+3. Once the server is running with them, set **Interactions Endpoint URL** in **General Information** to `https://<your host>/discord/interactions`. Discord checks it with a signed PING and a badly signed request before saving; the server must answer the first and reject the second.
+
+The bot never needs privileged gateway intents. Calls to Discord are counted in `discord_requests_total`, by status; see the crate's [rate limits](../discord/README.md#rate-limits).
 
 ## Logs
 

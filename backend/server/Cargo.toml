@@ -41,6 +41,7 @@ tower-http = { version = "0.7", features = ["catch-panic", "fs", "set-header"] }
 tracing = "0.1"
 tracing-opentelemetry = { version = "0.34", default-features = false }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+uma-stable-match-discord = { version = "0.1.0", path = "../discord" }
 uma-stable-match-scoring = { version = "0.1.0", path = "../scoring", features = ["serde"] }
 uma-stable-match-umamoe-client = { version = "0.1.0", path = "../umamoe-client" }
 

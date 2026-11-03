@@ -6,8 +6,9 @@ use std::net::SocketAddr;
 use metrics_exporter_prometheus::BuildError;
 use tokio::net::TcpListener;
 use tokio::sync::watch;
+use uma_stable_match_discord::Discord;
 
-use crate::app::{app_with_features, AppState};
+use crate::app::{app_with_routes, AppState};
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::details::{ClubDetails, DetailConfig, SharedPool};
@@ -36,6 +37,9 @@ pub enum RunError {
     /// Redis couldn't be reached.
     #[error(transparent)]
     Redis(#[from] SharedCacheError),
+    /// The Discord client couldn't be set up.
+    #[error("could not set up Discord: {0}")]
+    Discord(#[source] uma_stable_match_discord::Error),
     /// The listen address couldn't be bound.
     #[error("could not listen on {addr}: {source}")]
     Listen {
@@ -170,10 +174,19 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
                 .ok();
         });
     }
-    let app = app_with_features(
+    let discord_routes = match &config.discord {
+        Some(discord) => {
+            let discord = Discord::new(discord.clone()).map_err(RunError::Discord)?;
+            tracing::info!("serving Discord interactions");
+            uma_stable_match_discord::router(discord)
+        }
+        None => axum::Router::new(),
+    };
+    let app = app_with_routes(
         state,
         config.frontend_dir.as_deref(),
         config.features.clone(),
+        discord_routes,
     );
     let app = match &config.website {
         Some(site) => site.wrap(app),

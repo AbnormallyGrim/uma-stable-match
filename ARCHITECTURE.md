@@ -63,6 +63,7 @@ The scanner, club details and trainer lookups read uma.moe through a `ClubSource
 backend/
   scoring/         Club scoring (no network or storage dependencies)
   umamoe-client/   uma.moe API client
+  discord/         Discord REST client and interactions endpoint, for club applications
   server/          API server, scheduled club scanner and cache
 frontend/          Web interface (Svelte + TypeScript)
 observability/     Prometheus config and Grafana dashboards for local metrics
@@ -74,7 +75,8 @@ docs/images/       README screenshots and the website's original artwork
 |---|---|---|---|
 | Scoring | `uma-stable-match-scoring` (library, published separately) | `serde`, optional | [backend/scoring/README.md](backend/scoring/README.md) |
 | uma.moe client | `uma-stable-match-umamoe-client` (library) | scoring, `reqwest`, `tokio` | [backend/umamoe-client/README.md](backend/umamoe-client/README.md) |
-| Server | `uma-stable-match-server` (binary and library) | scoring, client, `axum`, `moka`, `chrono` | [backend/server/README.md](backend/server/README.md) |
+| Discord | `uma-stable-match-discord` (library) | `axum`, `reqwest`, `ed25519-dalek` | [backend/discord/README.md](backend/discord/README.md) |
+| Server | `uma-stable-match-server` (binary and library) | scoring, client, Discord, `axum`, `moka`, `chrono` | [backend/server/README.md](backend/server/README.md) |
 | Web page | `frontend` | Svelte, Vite | [frontend/README.md](frontend/README.md) |
 
 The scoring crate has no network or storage code: club and member data go in, scores come out. That keeps it reusable, for example inside uma.moe's own backend, and it has its own version, minimum Rust version (1.71) and changelog.
@@ -153,5 +155,6 @@ The page is a single Svelte app, built by Vite into static files that the server
 - **Logs:** stdout, as readable text or, with `LOG_FORMAT=json`, one JSON object per line for a log search service. See the [server README](backend/server/README.md#logs).
 - **Metrics:** with `METRICS_ADDR` set, the server serves Prometheus metrics on that address, apart from the app: requests by route and status code, uma.moe calls by status code with retries and wait times, rate limits, scan progress, where club details and paces come from, Redis health, the club pool and the total of searches since launch, which Redis keeps. See the [server README](backend/server/README.md#metrics), and [observability/README.md](observability/README.md) for local Prometheus and Grafana dashboards.
 - **Traces:** with `OTEL_EXPORTER_OTLP_ENDPOINT` set, the server sends a span per request over OTLP/HTTP to a trace store such as Grafana Tempo. Log lines stay out of traces. See the [server README](backend/server/README.md#traces).
+- **Discord:** with the `DISCORD_*` settings, the server also answers Discord's interactions endpoint, checking each request's signature. Club applications through Discord are built on it; see [Discord applications](backend/server/README.md#discord-applications).
 - **Configuration:** environment variables only, read once at start-up and validated; see [Configuration](README.md#configuration). The API key is never logged or baked into the image.
-- **CI:** formatting, clippy and tests for the Rust workspace, with a Redis service container for the Redis tests; docs, minimum Rust version and a publish dry run for the scoring crate; type check, lint, tests and build for the page; and a Docker image build. After CI passes on `main`, a Deploy workflow runs the [end-to-end test](frontend/README.md#end-to-end-test). Merging doesn't deploy: running the workflow by hand from `main` deploys the server to Fly.io if anything it is built from changed. A failed test comments on the merged pull request and opens or updates an `e2e-failure` issue.
+- **CI:** formatting, clippy and tests for the Rust workspace, with a Redis service container for the Redis tests; docs, minimum Rust version and a publish dry run for the scoring crate; type check, lint, tests and build for the page; and a Docker image build. After CI passes on `main`, a Deploy workflow runs the [end-to-end test](frontend/README.md#end-to-end-test). A failed test comments on the merged pull request and opens or updates an `e2e-failure` issue.
