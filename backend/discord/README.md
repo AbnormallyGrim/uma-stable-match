@@ -141,3 +141,21 @@ The callback never reads the redirect's own `guild_id` or `permissions` paramete
 - **No server** (the bot wasn't added) **or a different person:** nothing is linked (400).
 
 Opting in needs the app set up with `Discord::with_opt_in(OptIn::new(store, clubs))`. `ClubLookup` is how clubs are found, since this crate doesn't know where they come from; it answers `Ok(None)` for a club that doesn't exist. Without it, the route isn't served.
+
+## Unlinking a club
+
+`DELETE /api/v1/discord/clubs/{club}` (`UNLINK_PATH`) takes a club off its server, deleting everything kept about it. It needs a leader session, and the person must have the rights that let them add the bot: they own the server or have Administrator or Manage Server there. The bot checks this itself with two calls, `GET /guilds/{id}` (the owner and the roles' permissions) and `GET /guilds/{id}/members/{user}` (the person's roles), and combines the permissions of `@everyone` and the person's roles.
+
+| Status | When |
+|---|---|
+| 204 | The club is unlinked |
+| 401 | Not signed in |
+| 400 | `club` isn't a club ID |
+| 404 | The club isn't linked to a server |
+| 403 | The person isn't a member with those rights, or the bot can't see the server any more, so nothing proves their rights |
+| 502 | Discord couldn't be reached to check; try again |
+| 503 | The saved links couldn't be reached |
+
+It is a `DELETE`, which a browser doesn't send across sites with the session cookie. When the last club on a server is unlinked the bot leaves it; while another club is linked there the bot stays.
+
+A club whose server has removed the bot can't prove anyone's rights, so it can't be unlinked this way. Opting the club in again, to the same or another server, replaces the link.

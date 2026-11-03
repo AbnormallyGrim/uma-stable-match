@@ -6,21 +6,26 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::response::Response;
-use axum::routing::get;
+use axum::response::{IntoResponse, Response};
+use axum::routing::{delete, get};
 use axum::Router;
 use serde::Deserialize;
 
 use crate::auth::{begin, error, safe_next, send_to_discord, session_user, Failure, Flow, Target};
 use crate::bot::Discord;
+use crate::guild_access::manages;
 use crate::invites::servers_in_description;
 use crate::oauth::Authorized;
 use crate::store::ClubStore;
 
 /// Path that starts opting a club in. Needs a leader session.
 pub const OPT_IN_PATH: &str = "/api/v1/discord/opt-in";
+
+/// Path that unlinks a club from its server, with `{club}` the club's ID. `DELETE`, and needs a
+/// leader session with Manage Server on the club's server.
+pub const UNLINK_PATH: &str = "/api/v1/discord/clubs/{club}";
 
 /// The permissions the bot asks for: View Channels, Manage Channels, Manage Roles, Send Messages,
 /// Embed Links, Read Message History and Create Instant Invite.
@@ -95,6 +100,7 @@ pub(crate) fn router(discord: Discord) -> Router {
     }
     Router::new()
         .route(OPT_IN_PATH, get(start))
+        .route(UNLINK_PATH, delete(unlink))
         .with_state(discord)
 }
 
@@ -168,6 +174,72 @@ async fn start(
             ("permissions", &BOT_PERMISSIONS.to_string()),
         ],
     )
+}
+
+async fn unlink(
+    State(discord): State<Discord>,
+    Path(club): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let (Some(opt_in), config) = (discord.opt_in(), discord.config()) else {
+        return error(StatusCode::NOT_FOUND, "not found");
+    };
+    let Some(user) = session_user(config, &headers) else {
+        return error(StatusCode::UNAUTHORIZED, "sign in with Discord first");
+    };
+    let Ok(club_id) = club.parse::<u64>() else {
+        return error(StatusCode::BAD_REQUEST, "club must be a club ID");
+    };
+    let unavailable = |err: &dyn std::fmt::Display| {
+        tracing::warn!(error = %err, "could not unlink a club from its Discord server");
+        error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "couldn't reach the saved links; try again",
+        )
+    };
+    let record = match opt_in.store.club(club_id).await {
+        Ok(Some(record)) => record,
+        Ok(None) => return error(StatusCode::NOT_FOUND, "that club isn't linked to a server"),
+        Err(err) => return unavailable(&err),
+    };
+    // Whoever may add the bot to the server may take the club off it, so the same rights are
+    // needed. Anyone else, or a server the bot can't see, can't prove them.
+    let allowed = match manages(discord.rest(), record.guild_id, user).await {
+        Ok(allowed) => allowed,
+        Err(err)
+            if matches!(
+                err.status(),
+                Some(StatusCode::FORBIDDEN | StatusCode::NOT_FOUND)
+            ) =>
+        {
+            false
+        }
+        Err(err) => {
+            tracing::warn!(error = %err, "could not check who manages a Discord server");
+            return error(
+                StatusCode::BAD_GATEWAY,
+                "couldn't check your rights on the server; try again",
+            );
+        }
+    };
+    if !allowed {
+        metrics::counter!("discord_unlinks_total", "result" => "forbidden").increment(1);
+        return error(
+            StatusCode::FORBIDDEN,
+            "you need Manage Server on the club's Discord server to unlink it",
+        );
+    }
+    match opt_in.store.unlink(club_id).await {
+        Ok(left) => {
+            // Nothing needs the bot on a server once its last club is gone.
+            if let Some(left) = left.filter(|left| left.remaining == 0) {
+                leave(&discord, left.guild_id).await;
+            }
+            metrics::counter!("discord_unlinks_total", "result" => "success").increment(1);
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Err(err) => unavailable(&err),
+    }
 }
 
 /// Finishes an opt-in from the callback. Links the club only when the same person who started it

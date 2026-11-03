@@ -16,7 +16,7 @@ use tower::ServiceExt;
 use uma_stable_match_discord::{
     router, ApplicationId, BotToken, ClientSecret, ClubLookup, ClubStore, ClubSummary, Discord,
     DiscordConfig, LookupError, OptIn, PublicKey, PublicUrl, SigningKey, BOT_PERMISSIONS,
-    CALLBACK_PATH, LOGIN_PATH, OPT_IN_PATH,
+    CALLBACK_PATH, LOGIN_PATH, OPT_IN_PATH, UNLINK_PATH,
 };
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -123,6 +123,7 @@ impl World {
         };
         for (code, body) in [
             token("leader-code", "leader-token", None),
+            token("other-code", "other-token", None),
             token("install-a", "leader-token", Some(self.server_a())),
             token("install-b", "leader-token", Some(self.server_b())),
             token("install-nothing", "leader-token", None),
@@ -166,10 +167,49 @@ impl World {
             .respond_with(ResponseTemplate::new(204))
             .mount(&self.mock)
             .await;
+
+        // Server A: someone else owns it; one role has Manage Server, and `@everyone` (the role
+        // with the server's ID) has nothing. The leader has that role, the other user doesn't.
+        let a = self.server_a();
+        let manager_role = a + 1000;
+        Mock::given(method("GET"))
+            .and(path(format!("/guilds/{a}")))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "owner_id": "999",
+                "roles": [
+                    { "id": a.to_string(), "permissions": "0" },
+                    { "id": manager_role.to_string(), "permissions": "32" },
+                ],
+            })))
+            .mount(&self.mock)
+            .await;
+        for (user, roles) in [
+            (LEADER, vec![manager_role.to_string()]),
+            (OTHER_USER, vec![]),
+        ] {
+            Mock::given(method("GET"))
+                .and(path(format!("/guilds/{a}/members/{user}")))
+                .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "roles": roles })))
+                .mount(&self.mock)
+                .await;
+        }
+        // Server B is down.
+        Mock::given(method("GET"))
+            .and(path(format!("/guilds/{}", self.server_b())))
+            .respond_with(ResponseTemplate::new(503))
+            .mount(&self.mock)
+            .await;
     }
 
     async fn get(&self, uri: &str, cookie: &str) -> Response<Body> {
-        let request = Request::get(uri).header(COOKIE, cookie);
+        self.send("GET", uri, cookie).await
+    }
+
+    async fn send(&self, method: &str, uri: &str, cookie: &str) -> Response<Body> {
+        let request = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header(COOKIE, cookie);
         self.app
             .clone()
             .oneshot(request.body(Body::empty()).unwrap())
@@ -179,10 +219,14 @@ impl World {
 
     /// A leader session cookie, from signing in as `LEADER`.
     async fn sign_in(&self) -> String {
+        self.sign_in_with("leader-code").await
+    }
+
+    async fn sign_in_with(&self, code: &str) -> String {
         let login = self.get(LOGIN_PATH, "").await;
         let state = query(&location(&login), "state");
         let nonce = cookie(&login, "uma_discord_nonce");
-        let uri = format!("{CALLBACK_PATH}?code=leader-code&state={state}");
+        let uri = format!("{CALLBACK_PATH}?code={code}&state={state}");
         let response = self.get(&uri, &nonce).await;
         assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
         cookie(&response, "uma_leader_session")
@@ -202,6 +246,11 @@ impl World {
         let nonce = cookie(started, "uma_discord_nonce");
         let uri = format!("{CALLBACK_PATH}?code={code}&state={state}{extra}");
         self.get(&uri, &nonce).await
+    }
+
+    async fn unlink(&self, session: &str, club: u64) -> Response<Body> {
+        let uri = UNLINK_PATH.replace("{club}", &club.to_string());
+        self.send("DELETE", &uri, session).await
     }
 
     async fn left(&self) -> Vec<String> {
@@ -508,5 +557,137 @@ async fn the_nonce_still_has_to_match() {
     let response = world.get(&uri, "").await;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     assert_eq!(world.store.club(world.club(1)).await.unwrap(), None);
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn a_server_manager_unlinks_a_club_and_the_bot_leaves_an_unused_server() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    world
+        .store
+        .link(world.club(1), world.server_a())
+        .await
+        .unwrap();
+    let session = world.sign_in().await;
+    let response = world.unlink(&session, world.club(1)).await;
+
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    assert_eq!(world.store.club(world.club(1)).await.unwrap(), None);
+    assert!(world
+        .store
+        .clubs_on(world.server_a())
+        .await
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        world.left().await,
+        [format!("/users/@me/guilds/{}", world.server_a())]
+    );
+    // Unlinking again finds nothing.
+    let again = world.unlink(&session, world.club(1)).await;
+    assert_eq!(again.status(), StatusCode::NOT_FOUND);
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn unlinking_one_club_keeps_the_bot_while_a_sibling_uses_the_server() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    world
+        .store
+        .link(world.club(1), world.server_a())
+        .await
+        .unwrap();
+    world
+        .store
+        .link(world.club(2), world.server_a())
+        .await
+        .unwrap();
+    let session = world.sign_in().await;
+    let response = world.unlink(&session, world.club(1)).await;
+
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    assert!(world.left().await.is_empty());
+    assert_eq!(
+        world.store.clubs_on(world.server_a()).await.unwrap(),
+        [world.club(2)]
+    );
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn someone_without_manage_server_cant_unlink() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    world
+        .store
+        .link(world.club(1), world.server_a())
+        .await
+        .unwrap();
+    let session = world.sign_in_with("other-code").await;
+    let response = world.unlink(&session, world.club(1)).await;
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert!(world.store.club(world.club(1)).await.unwrap().is_some());
+    assert!(world.left().await.is_empty());
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn unlinking_needs_a_session_a_club_id_and_a_linked_club() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    world
+        .store
+        .link(world.club(1), world.server_a())
+        .await
+        .unwrap();
+    let session = world.sign_in().await;
+
+    let without = world.unlink("", world.club(1)).await;
+    assert_eq!(without.status(), StatusCode::UNAUTHORIZED);
+    let bad = world
+        .send("DELETE", "/api/v1/discord/clubs/abc", &session)
+        .await;
+    assert_eq!(bad.status(), StatusCode::BAD_REQUEST);
+    let unlinked = world.unlink(&session, world.club(2)).await;
+    assert_eq!(unlinked.status(), StatusCode::NOT_FOUND);
+    // A link needs a DELETE; a GET from another site can't remove it.
+    let uri = UNLINK_PATH.replace("{club}", &world.club(1).to_string());
+    let get = world.get(&uri, &session).await;
+    assert_eq!(get.status(), StatusCode::METHOD_NOT_ALLOWED);
+    assert!(world.store.club(world.club(1)).await.unwrap().is_some());
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn a_server_the_bot_cant_see_or_a_discord_outage_leaves_the_link() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    // The old server isn't known to the mock, as if the bot had been removed from it.
+    world
+        .store
+        .link(world.club(1), world.old_server())
+        .await
+        .unwrap();
+    world
+        .store
+        .link(world.club(2), world.server_b())
+        .await
+        .unwrap();
+    let session = world.sign_in().await;
+
+    let unseen = world.unlink(&session, world.club(1)).await;
+    assert_eq!(unseen.status(), StatusCode::FORBIDDEN);
+    let outage = world.unlink(&session, world.club(2)).await;
+    assert_eq!(outage.status(), StatusCode::BAD_GATEWAY);
+    assert!(world.store.club(world.club(1)).await.unwrap().is_some());
+    assert!(world.store.club(world.club(2)).await.unwrap().is_some());
     world.clean_up().await;
 }
