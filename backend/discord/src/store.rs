@@ -17,6 +17,23 @@ const CLUB_PREFIX: &str = "discord:club:";
 const GUILD_PREFIX: &str = "discord:guild:";
 const LIMIT: Duration = Duration::from_secs(5);
 
+/// Changes a club's settings, only while it is still linked to the server they were checked
+/// against. ARGV is that server, then pairs of field and value; an empty value removes the field.
+/// Returns 1 if it changed them.
+const UPDATE: &str = r"
+if redis.call('HGET', KEYS[1], 'server') ~= ARGV[1] then
+  return 0
+end
+for i = 2, #ARGV, 2 do
+  if ARGV[i + 1] == '' then
+    redis.call('HDEL', KEYS[1], ARGV[i])
+  else
+    redis.call('HSET', KEYS[1], ARGV[i], ARGV[i + 1])
+  end
+end
+return 1
+";
+
 /// Moves a club to a server. Returns the server it left and how many clubs are still linked there,
 /// or nothing if it wasn't linked elsewhere. Changing servers drops the settings that name things
 /// on the old one. The guild keys are built here from the prefix because the old server isn't
@@ -29,6 +46,8 @@ if moved then
   redis.call('HDEL', KEYS[1], 'category', 'leader_roles', 'problem')
 end
 redis.call('HSET', KEYS[1], 'server', ARGV[2])
+redis.call('HSETNX', KEYS[1], 'open', '1')
+redis.call('HSETNX', KEYS[1], 'auto_join', '1')
 redis.call('SADD', ARGV[3] .. ARGV[2], ARGV[1])
 if moved then
   return { old, tostring(redis.call('SCARD', ARGV[3] .. old)) }
@@ -73,6 +92,44 @@ pub struct ClubRecord {
     pub open: bool,
     /// The problem with the club's setup, if there is one.
     pub problem: Option<String>,
+}
+
+/// Changes to a club's settings. A field left `None` stays as it is.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SettingsUpdate {
+    /// The category for the club's channels; `Some(None)` clears it.
+    pub category: Option<Option<u64>>,
+    /// Roles whose members count as the club's leaders; empty clears them.
+    pub leader_roles: Option<Vec<u64>>,
+    /// Whether applicants are added to the server automatically.
+    pub auto_join: Option<bool>,
+    /// Whether the club takes applications.
+    pub open: Option<bool>,
+}
+
+impl SettingsUpdate {
+    /// Field and value pairs for the update script.
+    fn pairs(&self) -> Vec<(&'static str, String)> {
+        let flag = |on: bool| if on { "1" } else { "0" }.to_owned();
+        let mut pairs = Vec::new();
+        if let Some(category) = self.category {
+            pairs.push((
+                "category",
+                category.map(|id| id.to_string()).unwrap_or_default(),
+            ));
+        }
+        if let Some(roles) = &self.leader_roles {
+            let roles: Vec<String> = roles.iter().map(u64::to_string).collect();
+            pairs.push(("leader_roles", roles.join(",")));
+        }
+        if let Some(on) = self.auto_join {
+            pairs.push(("auto_join", flag(on)));
+        }
+        if let Some(on) = self.open {
+            pairs.push(("open", flag(on)));
+        }
+        pairs
+    }
 }
 
 /// Why a store call failed. Holds only the kind of failure, as Redis's messages can hold the URL.
@@ -133,6 +190,53 @@ impl ClubStore {
             .run(invocation.invoke_async(&mut self.conn.clone()))
             .await?;
         Ok(departure(&reply))
+    }
+
+    /// Applies `update` to a club, if it is still linked to `guild_id`. Returns whether it did, so
+    /// a club that moved or was unlinked meanwhile isn't changed.
+    pub async fn update(
+        &self,
+        club_id: u64,
+        guild_id: u64,
+        update: &SettingsUpdate,
+    ) -> Result<bool, StoreError> {
+        let script = Script::new(UPDATE);
+        let mut invocation = script.key(club_key(club_id));
+        invocation.arg(guild_id);
+        for (field, value) in update.pairs() {
+            invocation.arg(field).arg(value);
+        }
+        let changed: i64 = self
+            .run(invocation.invoke_async(&mut self.conn.clone()))
+            .await?;
+        Ok(changed == 1)
+    }
+
+    /// For each club, whether it is linked, takes applications and has no setup problem.
+    pub async fn takes_applications(&self, club_ids: &[u64]) -> Result<Vec<bool>, StoreError> {
+        if club_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut pipeline = redis::pipe();
+        for club_id in club_ids {
+            pipeline
+                .cmd("HMGET")
+                .arg(club_key(*club_id))
+                .arg("server")
+                .arg("open")
+                .arg("problem");
+        }
+        let rows: Vec<(Option<String>, Option<String>, Option<String>)> = self
+            .run(pipeline.query_async(&mut self.conn.clone()))
+            .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(server, open, problem)| {
+                server.is_some()
+                    && open.as_deref() == Some("1")
+                    && problem.is_none_or(|p| p.is_empty())
+            })
+            .collect())
     }
 
     /// What's kept about a club, or `None` if it isn't linked.

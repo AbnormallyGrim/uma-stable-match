@@ -11,6 +11,7 @@ use tokio::sync::watch;
 use uma_stable_match_discord::{ClubStore, Discord, OptIn};
 
 use crate::app::{app_with_routes, AppState};
+use crate::applications::Applications;
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::details::{ClubDetails, DetailConfig, SharedPool};
@@ -181,7 +182,7 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
                 .ok();
         });
     }
-    let discord_routes = match &config.discord {
+    let (discord_routes, applications) = match &config.discord {
         Some(discord) => {
             let url = config
                 .redis_url
@@ -193,13 +194,17 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
             .await
             .map_err(|_| RunError::DiscordStore("timed out".into()))?
             .map_err(|e| RunError::DiscordStore(format!("{:?}", e.kind())))?;
+            let store = ClubStore::new(conn);
             let discord = Discord::new(discord.clone())
                 .map_err(RunError::Discord)?
-                .with_opt_in(OptIn::new(ClubStore::new(conn), club_lookup(club_details)));
-            tracing::info!("serving Discord interactions and club opt-in");
-            uma_stable_match_discord::router(discord)
+                .with_opt_in(OptIn::new(store.clone(), club_lookup(club_details)));
+            tracing::info!("serving Discord interactions, club opt-in and settings");
+            (
+                uma_stable_match_discord::router(discord),
+                Some(Applications::new(store)),
+            )
         }
-        None => axum::Router::new(),
+        None => (axum::Router::new(), None),
     };
     let app = app_with_routes(
         state,
@@ -207,6 +212,11 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
         config.features.clone(),
         discord_routes,
     );
+    // Handlers that mark the clubs open to Discord applications read this.
+    let app = match applications {
+        Some(applications) => app.layer(axum::Extension(applications)),
+        None => app,
+    };
     let app = match &config.website {
         Some(site) => site.wrap(app),
         None => app,

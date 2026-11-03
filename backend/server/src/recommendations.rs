@@ -22,6 +22,7 @@ use uma_stable_match_umamoe_client::Priority;
 use crate::api_error::ApiError;
 use crate::app::timestamp;
 use crate::app::AppState;
+use crate::applications::{mark, Applications};
 use crate::details::ClubDetails;
 use crate::limits::Visitor;
 use crate::pace::PaceError;
@@ -139,6 +140,16 @@ pub(crate) struct ClubInfo {
     last_month_rank: Option<u32>,
     comment: Option<String>,
     has_discord: bool,
+    /// `"discord"` if people can apply to the club through Discord.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) applications: Option<&'static str>,
+}
+
+impl ClubInfo {
+    /// Whether the club can be joined: not closed and not full.
+    pub(crate) fn joinable(&self) -> bool {
+        self.join_style != Some("closed") && self.open_spots != Some(0)
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -168,13 +179,17 @@ struct BalanceView {
 pub(crate) async fn recommendations(
     state: State<AppState>,
     visitor: Extension<Visitor>,
+    applications: Option<Extension<Applications>>,
     RawQuery(query): RawQuery,
     params: Result<Query<Params>, QueryRejection>,
 ) -> Result<Json<Recommendations>, ApiError> {
     let started = Instant::now();
     let shared = state.details.shared().clone();
     let paces = state.paces.clone();
-    let result = search(state, visitor, params).await;
+    let mut result = search(state, visitor, params).await;
+    if let Ok(Json(found)) = &mut result {
+        mark(&applications, found.clubs.iter_mut().map(|c| &mut c.info)).await;
+    }
     // Searches by excluded trainers are answered and logged but left out of the counts.
     let counted = match &result {
         Ok(Json(found)) => found
@@ -683,6 +698,7 @@ pub(crate) fn club_info(club: &Club) -> ClubInfo {
         last_month_rank: club.last_month_rank,
         comment: club.comment.clone(),
         has_discord: club.comment.as_deref().is_some_and(mentions_discord),
+        applications: None,
     }
 }
 

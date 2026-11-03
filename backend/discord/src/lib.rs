@@ -11,6 +11,7 @@ mod oauth;
 mod opt_in;
 mod rate_limit;
 mod rest;
+mod settings;
 mod store;
 mod token;
 
@@ -32,4 +33,5 @@ pub use opt_in::{
 };
 pub use reqwest::StatusCode;
 pub use rest::Rest;
-pub use store::{ClubRecord, ClubStore, Departure, StoreError};
+pub use settings::{MAX_LEADER_ROLES, SETTINGS_PATH};
+pub use store::{ClubRecord, ClubStore, Departure, SettingsUpdate, StoreError};

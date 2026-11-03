@@ -587,6 +587,7 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
 - `tier` runs from `D` to `SS`, or is `null` when unknown.
 - `policy` is uma.moe's playstyle code.
 - `has_discord` says whether the club's description [mentions Discord](#discord).
+- `applications` is `"discord"` when people can apply to the club through Discord, and is left out otherwise. The club must be linked to a Discord server, open to applications, joinable (not closed or full) and without a setup problem. It's on clubs in recommendations and on the club page, and only when [Discord applications](#discord-applications) are set up. If the links in Redis can't be read, no club is marked.
 - `balance` is `null` unless balance scoring is on.
 - Lower `fit` and `score` are better.
 
@@ -721,6 +722,8 @@ The bot never needs privileged gateway intents. Sign-in is `GET /api/v1/auth/dis
 **Opting a club in.** A signed-in leader opens `GET /api/v1/discord/opt-in?club=<club ID>`. The server resolves the invites in the club's description, then sends the leader to add the bot to that server. The club is linked only if Discord says the bot went to that same server; otherwise the bot leaves, unless another club uses the server. The bot asks for View Channels, Manage Channels, Manage Roles, Send Messages, Embed Links, Read Message History and Create Instant Invite. See [Opting a club in](../discord/README.md#opting-a-club-in) for the checks and responses.
 
 **Bot permissions.** The add-bot link asks for these, as one permissions number (`BOT_PERMISSIONS`): View Channels and Manage Channels, to create the club's channels; Manage Roles, to give them permission overrides for members and leaders; Send Messages, Embed Links and Read Message History, to post and edit the application buttons; and Create Instant Invite, which `guilds.join` needs to add applicants. Manage Roles is the one to drop if channel overrides turn out not to need it.
+
+**Settings.** A signed-in person with Manage Server on a linked club's server reads and changes its settings with `GET` and `PATCH /api/v1/discord/clubs/<club ID>/settings`: the ticket category, leader roles, auto-join (on by default) and open or paused (open by default). Each call re-checks their rights with Discord, so losing Manage Server ends access at once. See [Club settings](../discord/README.md#club-settings).
 
 **Unlinking.** `DELETE /api/v1/discord/clubs/<club ID>` unlinks a club for a signed-in person with Manage Server on its server, and the bot leaves when no club is left there. See [Unlinking a club](../discord/README.md#unlinking-a-club). Calls to Discord are counted in `discord_requests_total`, by status, and sign-ins in `discord_sign_ins_total`; see the crate's [rate limits](../discord/README.md#rate-limits).
 

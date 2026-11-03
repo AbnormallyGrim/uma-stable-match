@@ -6,7 +6,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use redis::aio::ConnectionManager;
-use uma_stable_match_discord::{ClubStore, Departure};
+use uma_stable_match_discord::{ClubStore, Departure, SettingsUpdate};
 
 /// A store and its connection, or `None` without `REDIS_TEST_URL`.
 async fn connect() -> Option<(ClubStore, ConnectionManager)> {
@@ -61,7 +61,7 @@ async fn links_a_club_to_a_server_without_expiry() {
 
     let record = store.club(club).await.unwrap().unwrap();
     assert_eq!(record.guild_id, guild);
-    assert!(!record.auto_join && !record.open && record.category.is_none());
+    assert!(record.auto_join && record.open && record.category.is_none());
     assert_eq!(store.clubs_on(guild).await.unwrap(), [club]);
     assert_eq!(ttl(&conn, format!("discord:club:{club}")).await, -1);
     assert_eq!(ttl(&conn, format!("discord:guild:{guild}")).await, -1);
@@ -166,4 +166,103 @@ async fn unlinking_an_unlinked_club_does_nothing() {
     };
     let (club, ..) = ids();
     assert_eq!(store.unlink(club).await.unwrap(), None);
+}
+
+#[tokio::test]
+async fn a_new_link_is_open_with_auto_join_and_keeps_its_choices_when_moved() {
+    let Some((store, _)) = connect().await else {
+        return;
+    };
+    let (club, _, old, new) = ids();
+    store.link(club, old).await.unwrap();
+    let paused = SettingsUpdate {
+        open: Some(false),
+        auto_join: Some(false),
+        ..SettingsUpdate::default()
+    };
+    assert!(store.update(club, old, &paused).await.unwrap());
+    store.link(club, new).await.unwrap();
+
+    let record = store.club(club).await.unwrap().unwrap();
+    assert!(!record.open && !record.auto_join, "choices survive a move");
+    store.unlink(club).await.unwrap();
+}
+
+#[tokio::test]
+async fn updates_change_only_the_fields_given() {
+    let Some((store, _)) = connect().await else {
+        return;
+    };
+    let (club, _, guild, _) = ids();
+    store.link(club, guild).await.unwrap();
+    let update = SettingsUpdate {
+        category: Some(Some(77)),
+        leader_roles: Some(vec![1, 2]),
+        ..SettingsUpdate::default()
+    };
+    assert!(store.update(club, guild, &update).await.unwrap());
+    let record = store.club(club).await.unwrap().unwrap();
+    assert_eq!(record.category, Some(77));
+    assert_eq!(record.leader_roles, [1, 2]);
+    assert!(record.open && record.auto_join);
+
+    let clear = SettingsUpdate {
+        category: Some(None),
+        leader_roles: Some(vec![]),
+        open: Some(false),
+        ..SettingsUpdate::default()
+    };
+    assert!(store.update(club, guild, &clear).await.unwrap());
+    let record = store.club(club).await.unwrap().unwrap();
+    assert_eq!(record.category, None);
+    assert!(record.leader_roles.is_empty());
+    assert!(!record.open && record.auto_join);
+    store.unlink(club).await.unwrap();
+}
+
+#[tokio::test]
+async fn updates_are_refused_for_another_server_or_an_unlinked_club() {
+    let Some((store, _)) = connect().await else {
+        return;
+    };
+    let (club, _, guild, other) = ids();
+    let update = SettingsUpdate {
+        open: Some(false),
+        ..SettingsUpdate::default()
+    };
+    assert!(!store.update(club, guild, &update).await.unwrap());
+    store.link(club, guild).await.unwrap();
+    assert!(!store.update(club, other, &update).await.unwrap());
+    assert!(store.club(club).await.unwrap().unwrap().open);
+    store.unlink(club).await.unwrap();
+}
+
+#[tokio::test]
+async fn reports_which_clubs_take_applications() {
+    let Some((store, conn)) = connect().await else {
+        return;
+    };
+    let (open, paused, broken, unlinked) = ids();
+    let guild = unlinked + 1;
+    for club in [open, paused, broken] {
+        store.link(club, guild).await.unwrap();
+    }
+    let pause = SettingsUpdate {
+        open: Some(false),
+        ..SettingsUpdate::default()
+    };
+    store.update(paused, guild, &pause).await.unwrap();
+    set(&conn, broken, "problem", "made-up problem").await;
+
+    assert_eq!(
+        store
+            .takes_applications(&[open, paused, broken, unlinked])
+            .await
+            .unwrap(),
+        [true, false, false, false]
+    );
+    assert!(store.takes_applications(&[]).await.unwrap().is_empty());
+    for club in [open, paused, broken] {
+        store.unlink(club).await.unwrap();
+    }
 }

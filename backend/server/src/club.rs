@@ -13,6 +13,7 @@ use uma_stable_match_scoring::{
 
 use crate::api_error::ApiError;
 use crate::app::{timestamp, AppState};
+use crate::applications::{mark, Applications};
 use crate::limits::Visitor;
 use crate::pool::Period;
 use crate::priors::{data_days, data_period, month_before, month_label, CLUB_PRIOR_K};
@@ -65,6 +66,7 @@ struct TrainerView {
 pub(crate) async fn club(
     State(state): State<AppState>,
     Extension(visitor): Extension<Visitor>,
+    applications: Option<Extension<Applications>>,
     Path(id): Path<String>,
     params: Result<Query<Params>, QueryRejection>,
 ) -> Result<Json<ClubPage>, ApiError> {
@@ -96,6 +98,7 @@ pub(crate) async fn club(
     let mut info = club_info(&club);
     info.member_count = loaded.member_count;
     info.open_spots = loaded.open_spots();
+    mark(&applications, [&mut info]).await;
     let (ids, members): (Vec<u64>, Vec<MemberView>) = members(&club).into_iter().unzip();
     let previous = match data_period(&loaded) {
         Some(period) if data_days(&loaded) < PREVIOUS_MONTH_BELOW_DAYS => {
