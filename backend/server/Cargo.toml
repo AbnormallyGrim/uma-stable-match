@@ -44,6 +44,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"]
 uma-stable-match-discord = { version = "0.1.0", path = "../discord" }
 uma-stable-match-scoring = { version = "0.1.0", path = "../scoring", features = ["serde"] }
 uma-stable-match-umamoe-client = { version = "0.1.0", path = "../umamoe-client" }
+sentry = { version = "0.49.5", default-features = false, features = ["backtrace", "contexts", "reqwest", "rustls", "tracing", "logs"] }
 
 [dev-dependencies]
 http-body-util = "0.1"

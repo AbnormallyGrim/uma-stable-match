@@ -171,7 +171,8 @@ async fn csp_allows_only_same_origin_data_images_turnstile_and_strawpoll_frames(
     assert!(CONTENT_SECURITY.contains("script-src 'self' https://challenges.cloudflare.com;"));
     assert!(CONTENT_SECURITY
         .contains("frame-src https://challenges.cloudflare.com https://strawpoll.com;"));
-    assert!(CONTENT_SECURITY.contains("connect-src 'self';"));
+    assert!(CONTENT_SECURITY
+        .contains("connect-src 'self' https://o4512370149097472.ingest.us.sentry.io;"));
     assert!(!CONTENT_SECURITY.contains("unsafe-inline"));
     assert!(!CONTENT_SECURITY.contains("unsafe-eval"));
     assert!(!CONTENT_SECURITY.contains('*'));
@@ -212,7 +213,7 @@ async fn analytics_csp_adds_only_the_beacon_script_and_its_endpoint() {
     assert!(with.contains(
         "script-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com;"
     ));
-    assert!(with.contains("connect-src 'self' https://cloudflareinsights.com;"));
+    assert!(with.contains("connect-src 'self' https://o4512370149097472.ingest.us.sentry.io https://cloudflareinsights.com;"));
     let base: String = with
         .replace(" https://static.cloudflareinsights.com", "")
         .replace(" https://cloudflareinsights.com", "");

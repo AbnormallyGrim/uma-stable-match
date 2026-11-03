@@ -9,7 +9,7 @@ server (/metrics on 127.0.0.1:9464)  ←  Prometheus (127.0.0.1:9090)  ←  Graf
 | File | What it is |
 |---|---|
 | `prometheus.yml` | Scrapes the server's metrics from `127.0.0.1:9464` every 5 seconds |
-| `dashboard-overview.json` | Searches, health at a glance, web traffic and logged errors. It asks which Prometheus data source to use and your Axiom organization ID |
+| `dashboard-overview.json` | Searches, health at a glance, web traffic and logged errors. It asks which Prometheus data source to use |
 | `dashboard-search-quality.json` | How deep into the rankings searches go, and the club pool |
 | `dashboard-data-pipeline.json` | Scans, refreshes, caches and calls to uma.moe |
 | `dashboard-redis.json` | Redis keys, memory, TTLs, timings and errors |
@@ -130,7 +130,7 @@ In Grafana, go to **Connections → Data sources → Add data source → Prometh
 
 ## 7. Import the dashboards
 
-For each `observability/dashboard-*.json` file, go to **Dashboards → New → Import**, upload the file, choose the Prometheus data source from step 6, and click **Import**. The Overview also asks for your **Axiom organization ID** (the part after `app.axiom.co/` in your Axiom URLs; leave it empty without Axiom). Importing a file again later replaces that dashboard rather than adding a copy. The Overview replaces the single dashboard from earlier versions.
+For each `observability/dashboard-*.json` file, go to **Dashboards → New → Import**, upload the file, choose the Prometheus data source from step 6, and click **Import**. Importing a file again later replaces that dashboard rather than adding a copy. The Overview replaces the single dashboard from earlier versions.
 
 Every dashboard links to the other three at the top, keeping the time range. The links find the dashboards by their `uma-stable-match` tag.
 
@@ -141,7 +141,7 @@ Every dashboard links to the other three at the top, keeping the time range. The
 | Overview | Searches | Searches in the dashboard's time range, the total since launch, the same by status code, and searches per hour |
 | | Health | Redis up or down, time since the last successful scan, and uma.moe calls without a 2xx answer in the last hour |
 | | Web traffic | Requests per second by route and status code, error responses, response times, rate-limited visitors and a count of each status code in the dashboard's time range |
-| | Errors | Warnings and errors logged per hour, and a table of them by the file and line that logged them. Each file links to [Axiom](#links-to-axiom) |
+| | Errors | Warnings and errors logged per hour, and a table of them by the file and line that logged them. Each file links to [Sentry Logs](#links-to-sentry) |
 | Search quality | Search depth | How deep into the rankings searches go (worst shortlisted and top-pick rank, median and 90th percentile), the share of searches that reached the slowest clubs in the pool, and searches by deepest shortlisted rank |
 | | Club pool | Clubs in the pool, clubs with an exact median, and the calibration factor and samples |
 | Data pipeline | Scan and refresh | Phase, refresh counts for joinable clubs (loaded, scheduled and due), clubs listed, time since the last successful scan, scans finished, scan duration, club details loaded as a percentage of the scheduled clubs (in Redis with Redis), what the instance did when a scan was due, how long the longest-waiting due club has waited, and the same counts and percentage loaded for full clubs and for the lower range |
@@ -153,11 +153,9 @@ The Data pipeline dashboard also works when a separate app runs the scans and re
 
 Per-hour bars line up with whole hours, so they fill in once there's an hour of data. Some panels stay empty until something happens: Redis panels need `REDIS_URL`, error panels need errors, and rates need about a minute of data.
 
-### Links to Axiom
+### Links to Sentry
 
-With logs in [Axiom](https://axiom.co), the Overview links straight to them. Each file in the Errors table opens Axiom with a query for that log line over the dashboard's time range, showing every occurrence with its message, error, origin and any trainer, club or request query. **Warnings and errors in Axiom**, at the top of the Overview, opens all of them.
-
-The links use the Axiom organization ID entered on import and the **Axiom dataset** box at the top of the Overview (`uma-stable-match` by default). Axiom opens a query from a link's `initForm` parameter: URL-encoded JSON with the APL query in `apl` and the time range in `queryOptions`.
+With the server sending logs to Sentry (`SENTRY_DSN`), the Overview links straight to them. Each file in the Errors table, and **Warnings and errors in Sentry** at the top, open Sentry Logs filtered to warnings and errors over the dashboard's time range. The links point at the `uma-stable-match` organization and the `uma-stable-match-server` project; edit them in the dashboard if yours differ.
 
 ## Traces
 
@@ -191,4 +189,4 @@ To start again with no history, delete `observability/data/`.
 
 ## Changing a dashboard
 
-Edit it in Grafana, then export it with **Export → Export as JSON**, turning on the option to export for sharing externally. That keeps the data source as a choice made on import, rather than your own data source's ID. Check the file holds nothing from your own instance, such as user IDs or your Axiom organization ID, before replacing its `dashboard-*.json` file.
+Edit it in Grafana, then export it with **Export → Export as JSON**, turning on the option to export for sharing externally. That keeps the data source as a choice made on import, rather than your own data source's ID. Check the file holds nothing from your own instance, such as user IDs, before replacing its `dashboard-*.json` file.

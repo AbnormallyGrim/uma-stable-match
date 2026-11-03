@@ -23,7 +23,7 @@ macro_rules! content_security {
             "default-src 'self'; \
 script-src 'self' https://challenges.cloudflare.com",
             $script,
-            "; style-src 'self'; img-src 'self' data:; connect-src 'self'",
+            "; style-src 'self'; img-src 'self' data:; connect-src 'self' https://o4512370149097472.ingest.us.sentry.io",
             $connect,
             "; font-src 'self'; frame-src https://challenges.cloudflare.com https://strawpoll.com; \
 object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"

@@ -7,13 +7,6 @@
       "type": "datasource",
       "pluginId": "prometheus",
       "pluginName": "Prometheus"
-    },
-    {
-      "name": "VAR_AXIOM_ORG",
-      "type": "constant",
-      "label": "Axiom organization ID",
-      "value": "",
-      "description": "The ID in your Axiom URLs, as in app.axiom.co/<ID>/datasets"
     }
   ],
   "__requires": [
@@ -58,9 +51,9 @@
       "icon": "external link"
     },
     {
-      "title": "Warnings and errors in Axiom",
+      "title": "Warnings and errors in Sentry",
       "type": "link",
-      "url": "https://app.axiom.co/${axiom_org}/query?initForm=%7B%22apl%22%3A%22%5B%27${axiom_dataset}%27%5D%20%7C%20extend%20log%20%3D%20parse_json%28message%29%20%7C%20where%20log.level%20in%20%28%5C%22WARN%5C%22%2C%20%5C%22ERROR%5C%22%29%20%7C%20project%20_time%2C%20level%20%3D%20log.level%2C%20message%20%3D%20log.message%2C%20error%20%3D%20log.error%2C%20origin%20%3D%20log.origin%2C%20filename%20%3D%20log.filename%2C%20line_number%20%3D%20log.line_number%2C%20raw%20%3D%20message%20%7C%20order%20by%20_time%20desc%22%2C%22queryOptions%22%3A%7B%22startTime%22%3A%22${__from:date:iso}%22%2C%22endTime%22%3A%22${__to:date:iso}%22%7D%7D",
+      "url": "https://uma-stable-match.sentry.io/explore/logs/?project=uma-stable-match-server&logsQuery=severity%3A%5Bwarn%2Cerror%5D&start=${__from:date:iso}&end=${__to:date:iso}",
       "targetBlank": true,
       "icon": "external link",
       "tooltip": "Opens every warning and error for the dashboard's time range"
@@ -1198,7 +1191,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Each row is one log line in the code. Select a row's file to open those log lines in Axiom, for the dashboard's time range. Rows with no file are warnings from libraries the server uses.",
+      "description": "Each row is one log line in the code. Select a row's file to open the warnings and errors in Sentry Logs, for the dashboard's time range. Rows with no file are warnings from libraries the server uses.",
       "gridPos": {
         "h": 9,
         "w": 24,
@@ -1280,8 +1273,8 @@
                 "id": "links",
                 "value": [
                   {
-                    "title": "Open in Axiom",
-                    "url": "https://app.axiom.co/${axiom_org}/query?initForm=%7B%22apl%22%3A%22%5B%27${axiom_dataset}%27%5D%20%7C%20extend%20log%20%3D%20parse_json%28message%29%20%7C%20where%20log.filename%20%3D%3D%20%5C%22${__data.fields.file}%5C%22%20and%20log.line_number%20%3D%3D%20${__data.fields.line}%20%7C%20project%20_time%2C%20level%20%3D%20log.level%2C%20message%20%3D%20log.message%2C%20error%20%3D%20log.error%2C%20origin%20%3D%20log.origin%2C%20trainer_id%20%3D%20log.trainer_id%2C%20circle_id%20%3D%20log.circle_id%2C%20query%20%3D%20log.query%2C%20raw%20%3D%20message%20%7C%20order%20by%20_time%20desc%22%2C%22queryOptions%22%3A%7B%22startTime%22%3A%22${__from:date:iso}%22%2C%22endTime%22%3A%22${__to:date:iso}%22%7D%7D",
+                    "title": "Open in Sentry Logs",
+                    "url": "https://uma-stable-match.sentry.io/explore/logs/?project=uma-stable-match-server&logsQuery=severity%3A%5Bwarn%2Cerror%5D&start=${__from:date:iso}&end=${__to:date:iso}",
                     "targetBlank": true
                   }
                 ]
@@ -1330,34 +1323,7 @@
     "uma-stable-match"
   ],
   "templating": {
-    "list": [
-      {
-        "type": "constant",
-        "name": "axiom_org",
-        "label": "Axiom organization ID",
-        "query": "${VAR_AXIOM_ORG}",
-        "hide": 2,
-        "skipUrlSync": true
-      },
-      {
-        "type": "textbox",
-        "name": "axiom_dataset",
-        "label": "Axiom dataset",
-        "query": "uma-stable-match",
-        "current": {
-          "text": "uma-stable-match",
-          "value": "uma-stable-match"
-        },
-        "options": [
-          {
-            "selected": true,
-            "text": "uma-stable-match",
-            "value": "uma-stable-match"
-          }
-        ],
-        "hide": 0
-      }
-    ]
+    "list": []
   },
   "time": {
     "from": "now-1h",

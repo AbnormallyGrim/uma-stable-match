@@ -22,6 +22,7 @@ mod refresher;
 mod run;
 mod scanner;
 mod scheduler;
+mod sentry_setup;
 mod shared;
 mod source;
 mod telemetry;
@@ -60,6 +61,7 @@ pub use refresher::{RefreshConfig, RefreshStatus, Refresher, StoredTtl, TierStat
 pub use run::{run, RunError};
 pub use scanner::{scan, Scan, ScanConfig, ScanError};
 pub use scheduler::{follow_scans, run_scheduler};
+pub use sentry_setup::init_sentry;
 pub use shared::{club_key, KeySecret, RedisUrl, SharedCache, SharedCacheError};
 pub use source::{ClubSource, Source, SourceError, SourceFuture, UmaMoeSource};
 pub use telemetry::{install_metrics, metrics_router, record_background};
