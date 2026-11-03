@@ -10,6 +10,19 @@ use crate::rest::{api_error, BOT_USER_AGENT};
 #[derive(Deserialize)]
 struct Token {
     access_token: String,
+    /// Present when the bot scope was granted: the server the bot was added to.
+    guild: Option<Guild>,
+}
+
+#[derive(Deserialize)]
+struct Guild {
+    id: String,
+}
+
+/// Who approved a code, and the server the bot was added to if it was.
+pub(crate) struct Authorized {
+    pub(crate) user_id: u64,
+    pub(crate) guild_id: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -17,13 +30,14 @@ struct User {
     id: String,
 }
 
-/// The Discord ID of the user who approved `code`. The access token lives only inside this call.
-pub(crate) async fn signed_in_user(
+/// Who approved `code`, and the server it added the bot to. The access token lives only inside
+/// this call.
+pub(crate) async fn authorize(
     http: &reqwest::Client,
     config: &DiscordConfig,
     code: &str,
     redirect_uri: &str,
-) -> Result<u64, Error> {
+) -> Result<Authorized, Error> {
     let base = config.api_base.trim_end_matches('/');
     let app_id = config.app_id.get().to_string();
     let response = http
@@ -47,9 +61,18 @@ pub(crate) async fn signed_in_user(
         .send()
         .await?;
     let user: User = read(response).await?;
-    user.id
-        .parse()
-        .map_err(|_| Error::Decode(serde::de::Error::custom("the user ID isn't a whole number")))
+    let id = |id: &str| {
+        id.parse::<u64>()
+            .map_err(|_| Error::Decode(serde::de::Error::custom("an ID isn't a whole number")))
+    };
+    Ok(Authorized {
+        user_id: id(&user.id)?,
+        guild_id: token
+            .guild
+            .as_ref()
+            .map(|guild| id(&guild.id))
+            .transpose()?,
+    })
 }
 
 async fn read<T: serde::de::DeserializeOwned>(response: reqwest::Response) -> Result<T, Error> {

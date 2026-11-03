@@ -705,9 +705,9 @@ Setting them before that version is live makes every search fail with `401`. To 
 
 ## Discord applications
 
-Club applications through Discord are being built in steps; so far the server answers Discord's interactions endpoint and offers Sign in with Discord. With `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_SECRET`, `TOKEN_SIGNING_KEY` and `PUBLIC_URL` set, it serves `POST /discord/interactions` and the [sign-in routes](../discord/README.md#sign-in-with-discord) from the [`uma-stable-match-discord`](../discord/README.md) crate, behind the same security headers, time limit and panic handling as the API. Unset, the path isn't served and nothing else changes.
+Club applications through Discord are being built in steps; so far the server answers Discord's interactions endpoint, offers Sign in with Discord, and lets a club opt in. With `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_SECRET`, `TOKEN_SIGNING_KEY` and `PUBLIC_URL` set, it serves `POST /discord/interactions` and the [sign-in routes](../discord/README.md#sign-in-with-discord) from the [`uma-stable-match-discord`](../discord/README.md) crate, behind the same security headers, time limit and panic handling as the API. Unset, the path isn't served and nothing else changes.
 
-Discord's data will be kept in Redis, so these settings need `REDIS_URL`.
+Discord's data is kept in Redis, so these settings need `REDIS_URL`: which club is linked to which Discord server (`discord:club:{id}` and `discord:guild:{id}`), without a TTL so eviction never removes it. The server finds a club's description through its club details cache.
 
 To set it up:
 
@@ -716,7 +716,9 @@ To set it up:
 3. Once the server is running with them, set **Interactions Endpoint URL** in **General Information** to `https://<your host>/discord/interactions`. Discord checks it with a signed PING and a badly signed request before saving; the server must answer the first and reject the second.
 4. Under **OAuth2** → **Redirects**, add `<PUBLIC_URL>/api/v1/auth/discord/callback`. Sign-in fails until it's listed exactly.
 
-The bot never needs privileged gateway intents. Sign-in is `GET /api/v1/auth/discord/login`, which sends the visitor to Discord and back to the callback; a signed 12-hour cookie then identifies a club leader to `GET /api/v1/leaders/me`, and `POST /api/v1/auth/sign-out` ends it. Discord's access token is dropped after one call, and nothing from Discord is logged. Calls to Discord are counted in `discord_requests_total`, by status, and sign-ins in `discord_sign_ins_total`; see the crate's [rate limits](../discord/README.md#rate-limits).
+The bot never needs privileged gateway intents. Sign-in is `GET /api/v1/auth/discord/login`, which sends the visitor to Discord and back to the callback; a signed 12-hour cookie then identifies a club leader to `GET /api/v1/leaders/me`, and `POST /api/v1/auth/sign-out` ends it. Discord's access token is dropped after one call, and nothing from Discord is logged.
+
+**Opting a club in.** A signed-in leader opens `GET /api/v1/discord/opt-in?club=<club ID>`. The server resolves the invites in the club's description, then sends the leader to add the bot to that server. The club is linked only if Discord says the bot went to that same server; otherwise the bot leaves, unless another club uses the server. The bot asks for View Channels, Manage Channels, Manage Roles, Send Messages, Embed Links, Read Message History and Create Instant Invite. See [Opting a club in](../discord/README.md#opting-a-club-in) for the checks and responses. Calls to Discord are counted in `discord_requests_total`, by status, and sign-ins in `discord_sign_ins_total`; see the crate's [rate limits](../discord/README.md#rate-limits).
 
 ## Logs
 

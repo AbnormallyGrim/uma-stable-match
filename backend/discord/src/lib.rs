@@ -7,6 +7,7 @@ mod error;
 mod interactions;
 mod invites;
 mod oauth;
+mod opt_in;
 mod rate_limit;
 mod rest;
 mod store;
@@ -25,6 +26,7 @@ pub use interactions::{router, INTERACTIONS_PATH, MAX_TIMESTAMP_SKEW};
 pub use invites::{
     invite_candidates, resolve_invite, servers_in_description, MAX_INVITE_CANDIDATES,
 };
+pub use opt_in::{ClubLookup, ClubSummary, LookupError, OptIn, BOT_PERMISSIONS, OPT_IN_PATH};
 pub use reqwest::StatusCode;
 pub use rest::Rest;
 pub use store::{ClubRecord, ClubStore, Departure, StoreError};

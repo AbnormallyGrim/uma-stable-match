@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use crate::config::DiscordConfig;
 use crate::error::Error;
+use crate::opt_in::OptIn;
 use crate::rest::Rest;
 
 /// The Discord application, shared by every route. Cheap to clone.
@@ -17,6 +18,7 @@ struct Inner {
     config: DiscordConfig,
     rest: Rest,
     http: reqwest::Client,
+    opt_in: Option<OptIn>,
 }
 
 impl Discord {
@@ -27,7 +29,12 @@ impl Discord {
             .timeout(std::time::Duration::from_secs(10))
             .build()?;
         Ok(Self {
-            inner: Arc::new(Inner { config, rest, http }),
+            inner: Arc::new(Inner {
+                config,
+                rest,
+                http,
+                opt_in: None,
+            }),
         })
     }
 
@@ -44,5 +51,22 @@ impl Discord {
     /// The HTTP client for calls made as the signed-in user instead of the bot.
     pub(crate) fn http(&self) -> &reqwest::Client {
         &self.inner.http
+    }
+
+    /// The same application, also serving the opt-in routes with `opt_in`.
+    pub fn with_opt_in(self, opt_in: OptIn) -> Self {
+        let inner = &self.inner;
+        Self {
+            inner: Arc::new(Inner {
+                config: inner.config.clone(),
+                rest: inner.rest.clone(),
+                http: inner.http.clone(),
+                opt_in: Some(opt_in),
+            }),
+        }
+    }
+
+    pub(crate) fn opt_in(&self) -> Option<&OptIn> {
+        self.inner.opt_in.as_ref()
     }
 }

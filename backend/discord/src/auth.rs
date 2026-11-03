@@ -86,6 +86,21 @@ pub(crate) struct OAuthState {
     n: String,
     /// Where to send the visitor afterwards.
     r: String,
+    /// For opting a club in: what the install callback must find.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) t: Option<Target>,
+}
+
+/// What an opt-in is meant to do, signed into the `state` so the callback's query string can't
+/// change it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Target {
+    /// The club to link.
+    pub(crate) club: u64,
+    /// The server the club's invite points to, which the bot must be added to.
+    pub(crate) guild: u64,
+    /// The signed-in user who started it.
+    pub(crate) user: u64,
 }
 
 /// Serves the sign-in routes.
@@ -95,7 +110,8 @@ pub(crate) fn router(discord: Discord) -> Router {
         .route(CALLBACK_PATH, get(callback))
         .route(LEADERS_ME_PATH, get(leaders_me))
         .route(SIGN_OUT_PATH, post(sign_out))
-        .with_state(discord)
+        .with_state(discord.clone())
+        .merge(crate::opt_in::router(discord))
 }
 
 #[derive(Deserialize)]
@@ -121,20 +137,36 @@ async fn login(State(discord): State<Discord>, Query(params): Query<LoginParams>
     };
     let config = discord.config();
     let next = safe_next(params.next.as_deref().unwrap_or("/"));
-    let (state, nonce) = begin(config, flow, next, SystemTime::now());
+    let (state, nonce) = begin(config, flow, next, None, SystemTime::now());
+    send_to_discord(config, flow, &state, &nonce, &[("prompt", "none")])
+}
 
+/// Redirects to Discord's authorize page for `flow`, with the nonce set as a cookie. `extra` adds
+/// to the query.
+pub(crate) fn send_to_discord(
+    config: &DiscordConfig,
+    flow: Flow,
+    state: &str,
+    nonce: &str,
+    extra: &[(&str, &str)],
+) -> Response {
     let mut url = reqwest::Url::parse(&config.authorize_url).expect("the authorize URL is valid");
-    url.query_pairs_mut()
-        .append_pair("client_id", &config.app_id.get().to_string())
-        .append_pair("redirect_uri", &redirect_uri(config))
-        .append_pair("response_type", "code")
-        .append_pair("scope", flow.scopes())
-        .append_pair("state", &state)
-        .append_pair("prompt", "none");
+    {
+        let mut query = url.query_pairs_mut();
+        query
+            .append_pair("client_id", &config.app_id.get().to_string())
+            .append_pair("redirect_uri", &redirect_uri(config))
+            .append_pair("response_type", "code")
+            .append_pair("scope", flow.scopes())
+            .append_pair("state", state);
+        for (name, value) in extra {
+            query.append_pair(name, value);
+        }
+    }
     let cookie = set_cookie(
         config,
         NONCE_COOKIE,
-        &nonce,
+        nonce,
         "/api/v1/auth/discord",
         MAX_STATE_AGE,
     );
@@ -181,14 +213,14 @@ async fn callback(
     response
 }
 
-struct Failure {
-    label: &'static str,
+pub(crate) struct Failure {
+    pub(crate) label: &'static str,
     status: StatusCode,
     message: &'static str,
 }
 
 impl Failure {
-    fn new(label: &'static str, status: StatusCode, message: &'static str) -> Self {
+    pub(crate) fn new(label: &'static str, status: StatusCode, message: &'static str) -> Self {
         Self {
             label,
             status,
@@ -231,7 +263,7 @@ async fn finish(
         .as_deref()
         .filter(|code| !code.is_empty())
         .ok_or_else(invalid)?;
-    let id = crate::oauth::signed_in_user(discord.http(), config, code, &redirect_uri(config))
+    let authorized = crate::oauth::authorize(discord.http(), config, code, &redirect_uri(config))
         .await
         .map_err(|err| {
             tracing::warn!(error = %err, "Discord sign-in failed");
@@ -241,7 +273,14 @@ async fn finish(
                 "Discord didn't accept the sign-in; try again",
             )
         })?;
-    Ok((id, state.r))
+    match (state.f, state.t) {
+        (Flow::Leader, _) => Ok((authorized.user_id, state.r)),
+        (Flow::OptIn, Some(target)) => {
+            crate::opt_in::install(discord, target, &authorized).await?;
+            Ok((authorized.user_id, state.r))
+        }
+        _ => Err(invalid()),
+    }
 }
 
 #[derive(Serialize)]
@@ -249,18 +288,27 @@ struct Me {
     discord_id: String,
 }
 
+/// The Discord ID in the request's leader session, if it has a valid one.
+pub(crate) fn session_user(config: &DiscordConfig, headers: &HeaderMap) -> Option<u64> {
+    cookie_values(headers, SESSION_COOKIE)
+        .find_map(|token| {
+            open::<String>(
+                &config.signing_key,
+                SESSION_PURPOSE,
+                token,
+                SystemTime::now(),
+            )
+        })
+        .and_then(|id| id.parse().ok())
+}
+
 async fn leaders_me(State(discord): State<Discord>, headers: HeaderMap) -> Response {
-    let config = discord.config();
-    let id = cookie_values(&headers, SESSION_COOKIE).find_map(|token| {
-        open::<String>(
-            &config.signing_key,
-            SESSION_PURPOSE,
-            token,
-            SystemTime::now(),
-        )
-    });
+    let id = session_user(discord.config(), &headers);
     let mut response = match id {
-        Some(discord_id) => Json(Me { discord_id }).into_response(),
+        Some(id) => Json(Me {
+            discord_id: id.to_string(),
+        })
+        .into_response(),
         None => error(StatusCode::UNAUTHORIZED, "not signed in"),
     };
     response
@@ -279,6 +327,7 @@ pub(crate) fn begin(
     config: &DiscordConfig,
     flow: Flow,
     next: &str,
+    target: Option<Target>,
     now: SystemTime,
 ) -> (String, String) {
     let nonce = random();
@@ -286,6 +335,7 @@ pub(crate) fn begin(
         f: flow,
         n: nonce.clone(),
         r: next.to_owned(),
+        t: target,
     };
     let token = seal(
         &config.signing_key,
@@ -320,7 +370,7 @@ pub(crate) fn safe_next(next: &str) -> &str {
     }
 }
 
-fn redirect_uri(config: &DiscordConfig) -> String {
+pub(crate) fn redirect_uri(config: &DiscordConfig) -> String {
     format!("{}{CALLBACK_PATH}", config.public_url.as_str())
 }
 
@@ -355,7 +405,7 @@ fn cookie_values<'a>(headers: &'a HeaderMap, name: &'a str) -> impl Iterator<Ite
         .map(|(_, value)| value)
 }
 
-fn error(status: StatusCode, message: &str) -> Response {
+pub(crate) fn error(status: StatusCode, message: &str) -> Response {
     (status, Json(json!({ "error": message }))).into_response()
 }
 
