@@ -1,12 +1,9 @@
 name: Deploy
 
-# Runs the end-to-end test after CI passes for a push to main, then deploys the server to Fly.io if
-# it passes.
+# Deploys the server to Fly.io when run by hand from main. Kept apart from the end-to-end test,
+# which checks out the commit CI ran for, so the manual trigger never reaches that checkout.
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
+  workflow_dispatch:
 
 # No permissions by default; each job asks only for what it needs.
 permissions: {}
@@ -17,105 +14,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  e2e:
-    name: End-to-end test
-    # Only CI runs for pushes to this repository's main. Without the last two checks, a pull request
-    # from a fork's own main branch would match too.
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          persist-credentials: false
-
-      # Installs the toolchain and components from rust-toolchain.toml.
-      - name: Install Rust
-        run: rustup toolchain install
-
-      - name: Cache build
-        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-
-      - name: Install Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      # Builds the page and the fixture server, then runs the test. See the frontend README.
-      - name: End-to-end test
-        run: npm run e2e
-
-      - name: Upload report
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: e2e-report
-          path: |
-            frontend/playwright-report/
-            frontend/test-results/
-          retention-days: 14
-
-  # Comments on the merged pull request, and opens the e2e-failure issue or comments on the open
-  # one, so repeated failures don't pile up issues.
-  report:
-    name: Report end-to-end failure
-    needs: e2e
-    if: failure()
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write # Create the label, and open or comment on the issue.
-      pull-requests: write # Comment on the merged pull request.
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-    steps:
-      - name: Report the failure
-        run: |
-          message="The end-to-end test failed for ${HEAD_SHA:0:7}, so it wasn't deployed. See the [run]($RUN_URL) and its \`e2e-report\` artifact."
-          pr=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/pulls" \
-            --jq '[.[] | select(.merged_at != null)][0].number // empty')
-          if [ -n "$pr" ]; then
-            gh pr comment "$pr" --body "$message"
-          fi
-
-          gh label create e2e-failure --color B60205 \
-            --description "The end-to-end test failed on main" 2>/dev/null || true
-          issue=$(gh issue list --label e2e-failure --state open --limit 1 --json number \
-            --jq '.[0].number // empty')
-          if [ -n "$issue" ]; then
-            gh issue comment "$issue" --body "$message${pr:+ Merged in #$pr.}"
-          else
-            gh issue create --label e2e-failure --title "End-to-end test failing on main" \
-              --body "$message${pr:+ Merged in #$pr.} Close this once it passes again."
-          fi
-
   deploy:
     name: Deploy to Fly.io
-    needs: e2e
-    # Only CI runs for pushes to this repository's main. Without the last two checks, a pull request
-    # from a fork's own main branch would match too.
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+    # Only a run from main deploys.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # FLY_API_TOKEN is a secret of this environment, which can be limited to main. Create it with
     # `fly tokens create deploy -a uma-stable-match`.
@@ -123,11 +25,11 @@ jobs:
     permissions:
       contents: read
     env:
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      HEAD_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
