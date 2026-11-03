@@ -1,5 +1,7 @@
 name: Deploy
 
+# Runs the end-to-end test after CI passes for a push to main. Merges don't deploy; run this
+# workflow from main by hand to deploy the server to Fly.io.
 on:
   workflow_run:
     workflows: [CI]
@@ -21,10 +23,9 @@ jobs:
     # Only CI runs for pushes to this repository's main. Without the last two checks, a pull request
     # from a fork's own main branch would match too.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_repository.full_name == github.repository)
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -84,7 +85,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - name: Report the failure
@@ -109,8 +110,10 @@ jobs:
 
   deploy:
     name: Deploy to Fly.io
+    # The end-to-end test only runs after a merge, so it is skipped here; !cancelled() lets the
+    # deploy run anyway. Only a manual run from main deploys.
     needs: e2e
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     # FLY_API_TOKEN is a secret of this environment, which can be limited to main. Create it with
     # `fly tokens create deploy -a uma-stable-match`.
