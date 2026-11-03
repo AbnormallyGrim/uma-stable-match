@@ -36,3 +36,39 @@ fn decodes_hex() {
     assert_eq!(decode_hex("abc"), None);
     assert_eq!(decode_hex("zz"), None);
 }
+
+#[test]
+fn signing_key_must_be_long_enough_and_is_redacted() {
+    assert!(SigningKey::parse(&"k".repeat(31)).is_none());
+    let key = SigningKey::parse(&format!("  {}  ", "k".repeat(32))).unwrap();
+    assert_eq!(format!("{key:?}"), "SigningKey(<redacted>)");
+}
+
+#[test]
+fn public_url_must_be_an_origin() {
+    let parse = |value| PublicUrl::parse(value).map(|url| url.as_str().to_owned());
+    assert_eq!(
+        parse("https://example.test"),
+        Some("https://example.test".into())
+    );
+    assert_eq!(
+        parse(" https://example.test/ "),
+        Some("https://example.test".into())
+    );
+    assert_eq!(
+        parse("http://localhost:8080"),
+        Some("http://localhost:8080".into())
+    );
+    for bad in [
+        "example.test",
+        "ftp://example.test",
+        "https://example.test/app",
+        "https://example.test?x=1",
+        "https://example.test/#x",
+        "https://user:pass@example.test",
+    ] {
+        assert_eq!(parse(bad), None, "{bad}");
+    }
+    assert!(PublicUrl::parse("https://example.test").unwrap().is_https());
+    assert!(!PublicUrl::parse("http://localhost").unwrap().is_https());
+}

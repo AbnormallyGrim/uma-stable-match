@@ -47,11 +47,12 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `SERVE_ONLY` | `false` | `true` leaves scans and refreshes to another instance: this one never takes the scan lock or the refresher lease, and builds its pool from the scans published in Redis. Needs `REDIS_URL`. See [Serve-only instances](#serve-only-instances) |
 | `TURNSTILE_SITE_KEY` | none | Cloudflare Turnstile's public site key, which the web app uses to show the challenge. Set it with the next two to turn on the [human check](#human-check). Unset, the check is off |
 | `TURNSTILE_SECRET_KEY` | none | Required with `TURNSTILE_SITE_KEY`: Turnstile's secret key |
-| `TOKEN_SIGNING_KEY` | none | Required with `TURNSTILE_SITE_KEY`: at least 32 characters, the same on every instance. Signs the tokens the human check issues |
+| `TOKEN_SIGNING_KEY` | none | Required with `TURNSTILE_SITE_KEY` and with `DISCORD_APP_ID`: at least 32 characters, the same on every instance. Signs the tokens the human check issues and Discord's sign-in cookies |
 | `DISCORD_APP_ID` | none | The Discord application's ID. Set it with the next three to turn on [Discord applications](#discord-applications). Needs `REDIS_URL`. Unset, they're off |
 | `DISCORD_PUBLIC_KEY` | none | Required with `DISCORD_APP_ID`: the application's public key, 64 hex characters, which checks that interactions come from Discord |
 | `DISCORD_BOT_TOKEN` | none | Required with `DISCORD_APP_ID`: the bot's token |
 | `DISCORD_CLIENT_SECRET` | none | Required with `DISCORD_APP_ID`: the application's OAuth2 client secret |
+| `PUBLIC_URL` | none | Required with `DISCORD_APP_ID`: the site's address, such as `https://example.com`, with no path. Discord's sign-in redirects back to it, and cookies are `Secure` when it's `https` |
 | `METRICS_ADDR` | none | IP address and port to serve Prometheus metrics and the full [status](#status) on, such as `127.0.0.1:9464`. Unset, no metrics are recorded. See [Metrics](#metrics) |
 | `METRICS_EXCLUDED_TRAINER_IDS` | none | Comma-separated trainer IDs whose searches are left out of search metrics and the search total. See [Excluded trainers](#excluded-trainers) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none | OTLP/HTTP base URL to send traces to, such as `http://127.0.0.1:4318`. Unset, no traces are recorded. See [Traces](#traces) |
@@ -69,7 +70,7 @@ Blank values count as unset. These stop the server at startup, with an error mes
 - a `REDIS_URL` without a `redis://` or `rediss://` scheme, a missing or short `REDIS_KEY_SECRET`, or a Redis that can't be reached within 5 seconds
 - `SERVE_ONLY` without `REDIS_URL`
 - only some of `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY`, or a `TOKEN_SIGNING_KEY` under 32 characters
-- only some of `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_SECRET`, a `DISCORD_APP_ID` that isn't a positive whole number, a `DISCORD_PUBLIC_KEY` that isn't a valid key, or Discord without `REDIS_URL`
+- only some of `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_SECRET`, a `DISCORD_APP_ID` that isn't a positive whole number, a `DISCORD_PUBLIC_KEY` that isn't a valid key, or Discord without `REDIS_URL`, `TOKEN_SIGNING_KEY` (at least 32 characters) or a valid `PUBLIC_URL`
 - a `METRICS_ADDR` that isn't an IP address and port, or that can't be listened on
 - a `METRICS_EXCLUDED_TRAINER_IDS` that isn't a comma-separated list of trainer IDs
 - an `OTEL_EXPORTER_OTLP_ENDPOINT` that isn't a valid URL
@@ -704,17 +705,18 @@ Setting them before that version is live makes every search fail with `401`. To 
 
 ## Discord applications
 
-Club applications through Discord are being built in steps; so far the server only answers Discord's interactions endpoint. With `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_SECRET` set, it serves `POST /discord/interactions` from the [`uma-stable-match-discord`](../discord/README.md) crate, behind the same security headers, time limit and panic handling as the API. Unset, the path isn't served and nothing else changes.
+Club applications through Discord are being built in steps; so far the server answers Discord's interactions endpoint and offers Sign in with Discord. With `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_SECRET`, `TOKEN_SIGNING_KEY` and `PUBLIC_URL` set, it serves `POST /discord/interactions` and the [sign-in routes](../discord/README.md#sign-in-with-discord) from the [`uma-stable-match-discord`](../discord/README.md) crate, behind the same security headers, time limit and panic handling as the API. Unset, the path isn't served and nothing else changes.
 
 Discord's data will be kept in Redis, so these settings need `REDIS_URL`.
 
 To set it up:
 
 1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications). Copy its application ID and public key from **General Information**, and its client secret from **OAuth2**. Under **Bot**, reset and copy the token.
-2. Set the four variables. At Fly.io, set them as secrets: `fly secrets set DISCORD_APP_ID=… DISCORD_PUBLIC_KEY=… DISCORD_BOT_TOKEN=… DISCORD_CLIENT_SECRET=…`.
+2. Set the variables, with `PUBLIC_URL` the site's address (`https://app.example.com`, no path) and `TOKEN_SIGNING_KEY` from `openssl rand -hex 32`. At Fly.io, set them as secrets: `fly secrets set DISCORD_APP_ID=… DISCORD_PUBLIC_KEY=… DISCORD_BOT_TOKEN=… DISCORD_CLIENT_SECRET=… TOKEN_SIGNING_KEY=… PUBLIC_URL=…`.
 3. Once the server is running with them, set **Interactions Endpoint URL** in **General Information** to `https://<your host>/discord/interactions`. Discord checks it with a signed PING and a badly signed request before saving; the server must answer the first and reject the second.
+4. Under **OAuth2** → **Redirects**, add `<PUBLIC_URL>/api/v1/auth/discord/callback`. Sign-in fails until it's listed exactly.
 
-The bot never needs privileged gateway intents. Calls to Discord are counted in `discord_requests_total`, by status; see the crate's [rate limits](../discord/README.md#rate-limits).
+The bot never needs privileged gateway intents. Sign-in is `GET /api/v1/auth/discord/login`, which sends the visitor to Discord and back to the callback; a signed 12-hour cookie then identifies a club leader to `GET /api/v1/leaders/me`, and `POST /api/v1/auth/sign-out` ends it. Discord's access token is dropped after one call, and nothing from Discord is logged. Calls to Discord are counted in `discord_requests_total`, by status, and sign-ins in `discord_sign_ins_total`; see the crate's [rate limits](../discord/README.md#rate-limits).
 
 ## Logs
 

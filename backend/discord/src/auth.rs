@@ -1,0 +1,363 @@
+//! Sign in with Discord: the OAuth2 redirect and callback, and the leader session they start.
+
+use std::time::{Duration, SystemTime};
+
+use axum::extract::{Query, State};
+use axum::http::header::{CACHE_CONTROL, COOKIE, SET_COOKIE};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
+use axum::response::{IntoResponse, Redirect, Response};
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+
+use crate::bot::Discord;
+use crate::config::DiscordConfig;
+use crate::token::{open, random, seal, seconds};
+
+/// Path that sends the visitor to Discord to sign in.
+pub const LOGIN_PATH: &str = "/api/v1/auth/discord/login";
+
+/// Path Discord sends the visitor back to. Set `<public URL>` plus this as a Redirect in the
+/// Discord Developer Portal.
+pub const CALLBACK_PATH: &str = "/api/v1/auth/discord/callback";
+
+/// Path that answers with the signed-in leader.
+pub const LEADERS_ME_PATH: &str = "/api/v1/leaders/me";
+
+/// Path that ends the session.
+pub const SIGN_OUT_PATH: &str = "/api/v1/auth/sign-out";
+
+/// How long a sign-in link is good for, from the redirect to Discord until the callback.
+pub const MAX_STATE_AGE: Duration = Duration::from_secs(10 * 60);
+
+/// How long a leader session lasts.
+pub const MAX_SESSION_AGE: Duration = Duration::from_secs(12 * 60 * 60);
+
+const STATE_PURPOSE: &str = "state";
+const SESSION_PURPOSE: &str = "session";
+const NONCE_COOKIE: &str = "uma_discord_nonce";
+const SESSION_COOKIE: &str = "uma_leader_session";
+/// Longest `next` path kept.
+const MAX_NEXT_LEN: usize = 200;
+
+/// What a sign-in is for, which sets the scopes asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum Flow {
+    /// A club leader managing settings.
+    Leader,
+    /// A club leader adding the bot to a server.
+    OptIn,
+    /// A player applying to a club.
+    Apply,
+}
+
+impl Flow {
+    fn parse(name: &str) -> Option<Self> {
+        match name {
+            "leader" => Some(Self::Leader),
+            "opt_in" => Some(Self::OptIn),
+            "apply" => Some(Self::Apply),
+            _ => None,
+        }
+    }
+
+    /// The OAuth2 scopes to ask for.
+    pub(crate) fn scopes(self) -> &'static str {
+        match self {
+            Self::Leader => "identify",
+            Self::OptIn => "bot identify",
+            Self::Apply => "identify guilds.join",
+        }
+    }
+
+    /// Whether the callback can finish this flow yet.
+    fn available(self) -> bool {
+        self == Self::Leader
+    }
+}
+
+/// What the signed `state` carries.
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct OAuthState {
+    f: Flow,
+    /// Must match the nonce cookie.
+    n: String,
+    /// Where to send the visitor afterwards.
+    r: String,
+}
+
+/// Serves the sign-in routes.
+pub(crate) fn router(discord: Discord) -> Router {
+    Router::new()
+        .route(LOGIN_PATH, get(login))
+        .route(CALLBACK_PATH, get(callback))
+        .route(LEADERS_ME_PATH, get(leaders_me))
+        .route(SIGN_OUT_PATH, post(sign_out))
+        .with_state(discord)
+}
+
+#[derive(Deserialize)]
+struct LoginParams {
+    flow: Option<String>,
+    next: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct CallbackParams {
+    code: Option<String>,
+    state: Option<String>,
+    error: Option<String>,
+}
+
+async fn login(State(discord): State<Discord>, Query(params): Query<LoginParams>) -> Response {
+    let flow = params
+        .flow
+        .as_deref()
+        .map_or(Some(Flow::Leader), Flow::parse);
+    let Some(flow) = flow.filter(|flow| flow.available()) else {
+        return error(StatusCode::NOT_FOUND, "that sign-in isn't available");
+    };
+    let config = discord.config();
+    let next = safe_next(params.next.as_deref().unwrap_or("/"));
+    let (state, nonce) = begin(config, flow, next, SystemTime::now());
+
+    let mut url = reqwest::Url::parse(&config.authorize_url).expect("the authorize URL is valid");
+    url.query_pairs_mut()
+        .append_pair("client_id", &config.app_id.get().to_string())
+        .append_pair("redirect_uri", &redirect_uri(config))
+        .append_pair("response_type", "code")
+        .append_pair("scope", flow.scopes())
+        .append_pair("state", &state)
+        .append_pair("prompt", "none");
+    let cookie = set_cookie(
+        config,
+        NONCE_COOKIE,
+        &nonce,
+        "/api/v1/auth/discord",
+        MAX_STATE_AGE,
+    );
+    ([(SET_COOKIE, cookie)], Redirect::temporary(url.as_str())).into_response()
+}
+
+async fn callback(
+    State(discord): State<Discord>,
+    Query(params): Query<CallbackParams>,
+    headers: HeaderMap,
+) -> Response {
+    let config = discord.config();
+    // Whatever happens, the nonce is used up.
+    let clear = set_cookie(
+        config,
+        NONCE_COOKIE,
+        "",
+        "/api/v1/auth/discord",
+        Duration::ZERO,
+    );
+    let outcome = finish(&discord, &params, &headers).await;
+    let (result, mut response) = match outcome {
+        Ok((id, next)) => {
+            let session = set_cookie(
+                config,
+                SESSION_COOKIE,
+                &seal(
+                    &config.signing_key,
+                    SESSION_PURPOSE,
+                    &id.to_string(),
+                    seconds(SystemTime::now() + MAX_SESSION_AGE),
+                ),
+                "/",
+                MAX_SESSION_AGE,
+            );
+            let mut response = Redirect::temporary(&next).into_response();
+            response.headers_mut().append(SET_COOKIE, session);
+            ("success", response)
+        }
+        Err(failure) => (failure.label, error(failure.status, failure.message)),
+    };
+    metrics::counter!("discord_sign_ins_total", "result" => result).increment(1);
+    response.headers_mut().append(SET_COOKIE, clear);
+    response
+}
+
+struct Failure {
+    label: &'static str,
+    status: StatusCode,
+    message: &'static str,
+}
+
+impl Failure {
+    fn new(label: &'static str, status: StatusCode, message: &'static str) -> Self {
+        Self {
+            label,
+            status,
+            message,
+        }
+    }
+}
+
+/// Checks the callback and trades its code for the user's ID and where to send them next.
+async fn finish(
+    discord: &Discord,
+    params: &CallbackParams,
+    headers: &HeaderMap,
+) -> Result<(u64, String), Failure> {
+    let config = discord.config();
+    let invalid = || {
+        Failure::new(
+            "invalid_state",
+            StatusCode::BAD_REQUEST,
+            "this sign-in link is invalid or has expired; start again",
+        )
+    };
+    let state = params.state.as_deref().ok_or_else(invalid)?;
+    let state = check_state(
+        config,
+        state,
+        cookie_values(headers, NONCE_COOKIE),
+        SystemTime::now(),
+    )
+    .ok_or_else(invalid)?;
+    if params.error.is_some() {
+        return Err(Failure::new(
+            "denied",
+            StatusCode::BAD_REQUEST,
+            "sign-in was cancelled",
+        ));
+    }
+    let code = params
+        .code
+        .as_deref()
+        .filter(|code| !code.is_empty())
+        .ok_or_else(invalid)?;
+    let id = crate::oauth::signed_in_user(discord.http(), config, code, &redirect_uri(config))
+        .await
+        .map_err(|err| {
+            tracing::warn!(error = %err, "Discord sign-in failed");
+            Failure::new(
+                "discord_error",
+                StatusCode::BAD_GATEWAY,
+                "Discord didn't accept the sign-in; try again",
+            )
+        })?;
+    Ok((id, state.r))
+}
+
+#[derive(Serialize)]
+struct Me {
+    discord_id: String,
+}
+
+async fn leaders_me(State(discord): State<Discord>, headers: HeaderMap) -> Response {
+    let config = discord.config();
+    let id = cookie_values(&headers, SESSION_COOKIE).find_map(|token| {
+        open::<String>(
+            &config.signing_key,
+            SESSION_PURPOSE,
+            token,
+            SystemTime::now(),
+        )
+    });
+    let mut response = match id {
+        Some(discord_id) => Json(Me { discord_id }).into_response(),
+        None => error(StatusCode::UNAUTHORIZED, "not signed in"),
+    };
+    response
+        .headers_mut()
+        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
+}
+
+async fn sign_out(State(discord): State<Discord>) -> Response {
+    let cookie = set_cookie(discord.config(), SESSION_COOKIE, "", "/", Duration::ZERO);
+    (StatusCode::NO_CONTENT, [(SET_COOKIE, cookie)]).into_response()
+}
+
+/// The `state` to send to Discord and the nonce to set as a cookie, for a sign-in starting `now`.
+pub(crate) fn begin(
+    config: &DiscordConfig,
+    flow: Flow,
+    next: &str,
+    now: SystemTime,
+) -> (String, String) {
+    let nonce = random();
+    let state = OAuthState {
+        f: flow,
+        n: nonce.clone(),
+        r: next.to_owned(),
+    };
+    let token = seal(
+        &config.signing_key,
+        STATE_PURPOSE,
+        &state,
+        seconds(now + MAX_STATE_AGE),
+    );
+    (token, nonce)
+}
+
+/// The `state` if it's signed, unexpired at `now`, and carries the nonce one of `nonces` holds.
+pub(crate) fn check_state<'a>(
+    config: &DiscordConfig,
+    state: &str,
+    mut nonces: impl Iterator<Item = &'a str>,
+    now: SystemTime,
+) -> Option<OAuthState> {
+    let state: OAuthState = open(&config.signing_key, STATE_PURPOSE, state, now)?;
+    nonces.any(|nonce| nonce == state.n).then_some(state)
+}
+
+/// `next` if it's a path on this site, else `/`.
+pub(crate) fn safe_next(next: &str) -> &str {
+    let local = next.starts_with('/')
+        && !next.starts_with("//")
+        && next.len() <= MAX_NEXT_LEN
+        && !next.chars().any(|c| c == '\\' || c.is_control());
+    if local {
+        next
+    } else {
+        "/"
+    }
+}
+
+fn redirect_uri(config: &DiscordConfig) -> String {
+    format!("{}{CALLBACK_PATH}", config.public_url.as_str())
+}
+
+fn set_cookie(
+    config: &DiscordConfig,
+    name: &str,
+    value: &str,
+    path: &str,
+    max_age: Duration,
+) -> HeaderValue {
+    let secure = if config.public_url.is_https() {
+        "; Secure"
+    } else {
+        ""
+    };
+    HeaderValue::from_str(&format!(
+        "{name}={value}; Path={path}; Max-Age={}; HttpOnly; SameSite=Lax{secure}",
+        max_age.as_secs()
+    ))
+    .expect("cookie values are visible ASCII")
+}
+
+/// Every value of the cookie `name`, since a browser can send more than one.
+fn cookie_values<'a>(headers: &'a HeaderMap, name: &'a str) -> impl Iterator<Item = &'a str> {
+    headers
+        .get_all(COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(';'))
+        .filter_map(|pair| pair.trim().split_once('='))
+        .filter(move |(cookie, _)| *cookie == name)
+        .map(|(_, value)| value)
+}
+
+fn error(status: StatusCode, message: &str) -> Response {
+    (status, Json(json!({ "error": message }))).into_response()
+}
+
+#[cfg(test)]
+mod tests;
