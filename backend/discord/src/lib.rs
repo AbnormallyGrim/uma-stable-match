@@ -4,6 +4,7 @@ mod auth;
 mod bot;
 mod config;
 mod error;
+mod guild_access;
 mod interactions;
 mod invites;
 mod oauth;
@@ -26,7 +27,9 @@ pub use interactions::{router, INTERACTIONS_PATH, MAX_TIMESTAMP_SKEW};
 pub use invites::{
     invite_candidates, resolve_invite, servers_in_description, MAX_INVITE_CANDIDATES,
 };
-pub use opt_in::{ClubLookup, ClubSummary, LookupError, OptIn, BOT_PERMISSIONS, OPT_IN_PATH};
+pub use opt_in::{
+    ClubLookup, ClubSummary, LookupError, OptIn, BOT_PERMISSIONS, OPT_IN_PATH, UNLINK_PATH,
+};
 pub use reqwest::StatusCode;
 pub use rest::Rest;
 pub use store::{ClubRecord, ClubStore, Departure, StoreError};
