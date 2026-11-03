@@ -2659,6 +2659,7 @@ dependencies = [
  "hmac",
  "http-body-util",
  "metrics",
+ "redis",
  "reqwest",
  "serde",
  "serde_json",

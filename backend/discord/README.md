@@ -1,6 +1,6 @@
 # uma-stable-match-discord
 
-The Discord side of club applications: a REST client that calls Discord as the bot, the endpoint Discord sends interactions to, such as button clicks, and Sign in with Discord. The server mounts it when Discord is configured; see [Discord](../server/README.md#discord-applications) in the server README.
+The Discord side of club applications: a REST client that calls Discord as the bot, the endpoint Discord sends interactions to, such as button clicks, Sign in with Discord, and the club-to-server links kept in Redis. The server mounts it when Discord is configured; see [Discord](../server/README.md#discord-applications) in the server README.
 
 There's no gateway connection and no always-on bot process. Everything the bot does is a REST call, and everything Discord tells it arrives as a signed HTTP request.
 
@@ -85,3 +85,31 @@ Discord sends a signed PING, and a badly signed request, when the URL is saved i
 **Session.** A signed cookie holds the Discord ID and a 12-hour expiry (`MAX_SESSION_AGE`), also `HttpOnly`, `Secure` and `SameSite=Lax`. Nothing is stored server-side, so signing out removes the cookie but can't revoke a copy of it before it expires. The signed values carry a purpose, so a `state` can't be used as a session, and neither can the human check's tokens that share the key. `Secure` is left off only when `PUBLIC_URL` is `http://`, for local development.
 
 **What's kept.** The access token is used for one `GET /users/@me` inside the callback request and then dropped; only the ID is kept, inside the session cookie. Nothing from Discord is logged: a failed sign-in logs Discord's error message, not the user. Results are counted in `discord_sign_ins_total`, labelled by `result` (`success`, `invalid_state`, `denied` or `discord_error`).
+
+## Finding a club's server
+
+A club points to its Discord server with an invite in its in-game description. `invite_candidates(description)` pulls out the codes to try, at most 5 (`MAX_INVITE_CANDIDATES`), in the order they appear and without repeats:
+
+- **Links:** `discord.gg/…`, `discord.com/invite/…` and `discordapp.com/invite/…`, with or without `https://` and `www.`, in any case.
+- **Bare codes:** a code after the word "discord", such as `Discord: aB3dEfG` or `Discord invite - 8xk2mQ`. To keep ordinary words out (`Discord server`), it must be 6 to 12 characters and have a digit or capitals inside it.
+
+These are only guesses. A code is an invite once Discord resolves it: `resolve_invite(rest, code)` calls `GET /invites/{code}` and gives the server's ID. Discord's `404 Unknown Invite` (expired, deleted or never real) and an invite that isn't for a server give `None`; any other failure, such as an outage or a rate limit that runs out, is an `Error`, so it's never read as a missing invite.
+
+`servers_in_description(rest, description)` does both and returns the distinct server IDs, in order. Servers are compared by ID, never by link text, so any working invite to a server counts. An empty list means the club points to no server. If invites point to different servers, all are returned and the caller decides.
+
+## Club links
+
+`ClubStore` keeps which club is linked to which server, in Redis, through a `redis::aio::ConnectionManager`. Neither key has a TTL, so `volatile-lru` eviction can't remove them.
+
+| Key | Holds |
+|---|---|
+| `discord:club:{club_id}` | A hash: `server`, `category`, `leader_roles` (comma-separated), `auto_join` and `open` (`1` or absent), and `problem` |
+| `discord:guild:{guild_id}` | A set of the IDs of the clubs linked to that server |
+
+Many clubs can share a server, and a club is linked to one server at a time:
+
+- `link(club_id, server_id)` links a club. Linking it to another server moves it: it leaves the old server's set and loses its `category`, `leader_roles` and `problem`, which name things on the old one, and keeps its `auto_join` and `open` choices. It returns the `Departure` (server and clubs still linked there) if the club moved.
+- `unlink(club_id)` deletes the club's hash and takes it out of its server's set, returning the `Departure` if it was linked. A `remaining` of 0 means no club needs the bot on that server any more.
+- `club(club_id)` reads the `ClubRecord`, and `clubs_on(server_id)` lists a server's clubs, lowest ID first.
+
+Each of `link` and `unlink` is one Lua script, so a crash can't leave a club in one set and not the other. Calls time out after 5 seconds. Errors name only the kind of Redis failure, as Redis's own messages can include its URL.
