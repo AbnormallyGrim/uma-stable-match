@@ -63,7 +63,7 @@ The scanner, club details and trainer lookups read uma.moe through a `ClubSource
 backend/
   scoring/         Club scoring (no network or storage dependencies)
   umamoe-client/   uma.moe API client
-  discord/         Discord REST client, interactions endpoint and sign-in, for club applications
+  discord/         Discord REST client, interactions endpoint, sign-in and club links, for club applications
   server/          API server, scheduled club scanner and cache
 frontend/          Web interface (Svelte + TypeScript)
 observability/     Prometheus config and Grafana dashboards for local metrics
@@ -75,7 +75,7 @@ docs/images/       README screenshots and the website's original artwork
 |---|---|---|---|
 | Scoring | `uma-stable-match-scoring` (library, published separately) | `serde`, optional | [backend/scoring/README.md](backend/scoring/README.md) |
 | uma.moe client | `uma-stable-match-umamoe-client` (library) | scoring, `reqwest`, `tokio` | [backend/umamoe-client/README.md](backend/umamoe-client/README.md) |
-| Discord | `uma-stable-match-discord` (library) | `axum`, `reqwest`, `ed25519-dalek`, `hmac` | [backend/discord/README.md](backend/discord/README.md) |
+| Discord | `uma-stable-match-discord` (library) | `axum`, `reqwest`, `ed25519-dalek`, `hmac`, `redis` | [backend/discord/README.md](backend/discord/README.md) |
 | Server | `uma-stable-match-server` (binary and library) | scoring, client, Discord, `axum`, `moka`, `chrono` | [backend/server/README.md](backend/server/README.md) |
 | Web page | `frontend` | Svelte, Vite | [frontend/README.md](frontend/README.md) |
 

@@ -1,0 +1,205 @@
+//! Which club is linked to which Discord server, kept in Redis.
+//!
+//! - `discord:club:{club_id}`: a hash with the club's `server`, `category`, `leader_roles`,
+//!   `auto_join`, `open` and `problem`.
+//! - `discord:guild:{guild_id}`: a set of the club IDs linked to that server.
+//!
+//! Neither key has a TTL, so `volatile-lru` eviction never removes them.
+
+use std::collections::HashMap;
+use std::time::Duration;
+
+use redis::aio::ConnectionManager;
+use redis::Script;
+use tokio::time::timeout;
+
+const CLUB_PREFIX: &str = "discord:club:";
+const GUILD_PREFIX: &str = "discord:guild:";
+const LIMIT: Duration = Duration::from_secs(5);
+
+/// Moves a club to a server. Returns the server it left and how many clubs are still linked there,
+/// or nothing if it wasn't linked elsewhere. Changing servers drops the settings that name things
+/// on the old one. The guild keys are built here from the prefix because the old server isn't
+/// known until the club is read.
+const LINK: &str = r"
+local old = redis.call('HGET', KEYS[1], 'server')
+local moved = old and old ~= ARGV[2]
+if moved then
+  redis.call('SREM', ARGV[3] .. old, ARGV[1])
+  redis.call('HDEL', KEYS[1], 'category', 'leader_roles', 'problem')
+end
+redis.call('HSET', KEYS[1], 'server', ARGV[2])
+redis.call('SADD', ARGV[3] .. ARGV[2], ARGV[1])
+if moved then
+  return { old, tostring(redis.call('SCARD', ARGV[3] .. old)) }
+end
+return {}
+";
+
+/// Forgets a club. Returns the server it was linked to and how many clubs are still linked there,
+/// or nothing if it wasn't linked.
+const UNLINK: &str = r"
+local old = redis.call('HGET', KEYS[1], 'server')
+if not old then
+  return {}
+end
+redis.call('DEL', KEYS[1])
+redis.call('SREM', ARGV[2] .. old, ARGV[1])
+return { old, tostring(redis.call('SCARD', ARGV[2] .. old)) }
+";
+
+/// A server a club has left, and how many clubs are still linked to it. At zero, nothing needs the
+/// bot there any more.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Departure {
+    /// The Discord server's ID.
+    pub guild_id: u64,
+    /// Clubs still linked to it.
+    pub remaining: u64,
+}
+
+/// What's kept about a linked club.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClubRecord {
+    /// The Discord server the club is linked to.
+    pub guild_id: u64,
+    /// The category for the club's channels, if set.
+    pub category: Option<u64>,
+    /// Roles whose members count as the club's leaders.
+    pub leader_roles: Vec<u64>,
+    /// Whether applicants are added to the server automatically.
+    pub auto_join: bool,
+    /// Whether the club takes applications.
+    pub open: bool,
+    /// The problem with the club's setup, if there is one.
+    pub problem: Option<String>,
+}
+
+/// Why a store call failed. Holds only the kind of failure, as Redis's messages can hold the URL.
+#[derive(Debug, thiserror::Error)]
+pub enum StoreError {
+    /// Redis answered with an error.
+    #[error("Redis error ({0})")]
+    Redis(String),
+    /// Redis didn't answer within 5 seconds.
+    #[error("Redis timed out")]
+    TimedOut,
+}
+
+impl From<redis::RedisError> for StoreError {
+    fn from(error: redis::RedisError) -> Self {
+        Self::Redis(format!("{:?}", error.kind()))
+    }
+}
+
+/// The links between clubs and Discord servers. Cheap to clone.
+#[derive(Clone)]
+pub struct ClubStore {
+    conn: ConnectionManager,
+}
+
+impl std::fmt::Debug for ClubStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClubStore").finish_non_exhaustive()
+    }
+}
+
+impl ClubStore {
+    /// A store using this connection.
+    pub fn new(conn: ConnectionManager) -> Self {
+        Self { conn }
+    }
+
+    /// Links a club to a server. A club is linked to one server at a time, so linking it to
+    /// another moves it, dropping its category, leader roles and problem. Returns the server it
+    /// left, if it moved.
+    pub async fn link(&self, club_id: u64, guild_id: u64) -> Result<Option<Departure>, StoreError> {
+        let script = Script::new(LINK);
+        let mut invocation = script.key(club_key(club_id));
+        invocation.arg(club_id).arg(guild_id).arg(GUILD_PREFIX);
+        let reply: Vec<String> = self
+            .run(invocation.invoke_async(&mut self.conn.clone()))
+            .await?;
+        Ok(departure(&reply))
+    }
+
+    /// Unlinks a club, deleting everything kept about it. Returns the server it was linked to, if
+    /// it was linked.
+    pub async fn unlink(&self, club_id: u64) -> Result<Option<Departure>, StoreError> {
+        let script = Script::new(UNLINK);
+        let mut invocation = script.key(club_key(club_id));
+        invocation.arg(club_id).arg(GUILD_PREFIX);
+        let reply: Vec<String> = self
+            .run(invocation.invoke_async(&mut self.conn.clone()))
+            .await?;
+        Ok(departure(&reply))
+    }
+
+    /// What's kept about a club, or `None` if it isn't linked.
+    pub async fn club(&self, club_id: u64) -> Result<Option<ClubRecord>, StoreError> {
+        let fields: HashMap<String, String> = self
+            .run(
+                redis::cmd("HGETALL")
+                    .arg(club_key(club_id))
+                    .query_async(&mut self.conn.clone()),
+            )
+            .await?;
+        Ok(parse_record(&fields))
+    }
+
+    /// The clubs linked to a server, lowest ID first.
+    pub async fn clubs_on(&self, guild_id: u64) -> Result<Vec<u64>, StoreError> {
+        let members: Vec<String> = self
+            .run(
+                redis::cmd("SMEMBERS")
+                    .arg(format!("{GUILD_PREFIX}{guild_id}"))
+                    .query_async(&mut self.conn.clone()),
+            )
+            .await?;
+        let mut clubs: Vec<u64> = members.iter().filter_map(|id| id.parse().ok()).collect();
+        clubs.sort_unstable();
+        Ok(clubs)
+    }
+
+    async fn run<T>(
+        &self,
+        call: impl std::future::Future<Output = redis::RedisResult<T>>,
+    ) -> Result<T, StoreError> {
+        timeout(LIMIT, call)
+            .await
+            .map_err(|_| StoreError::TimedOut)?
+            .map_err(StoreError::from)
+    }
+}
+
+fn club_key(club_id: u64) -> String {
+    format!("{CLUB_PREFIX}{club_id}")
+}
+
+fn departure(reply: &[String]) -> Option<Departure> {
+    match reply {
+        [guild, remaining] => Some(Departure {
+            guild_id: guild.parse().ok()?,
+            remaining: remaining.parse().ok()?,
+        }),
+        _ => None,
+    }
+}
+
+fn parse_record(fields: &HashMap<String, String>) -> Option<ClubRecord> {
+    let guild_id = fields.get("server")?.parse().ok()?;
+    Some(ClubRecord {
+        guild_id,
+        category: fields.get("category").and_then(|id| id.parse().ok()),
+        leader_roles: fields
+            .get("leader_roles")
+            .map(|roles| roles.split(',').filter_map(|id| id.parse().ok()).collect())
+            .unwrap_or_default(),
+        auto_join: fields.get("auto_join").is_some_and(|v| v == "1"),
+        open: fields.get("open").is_some_and(|v| v == "1"),
+        problem: fields.get("problem").filter(|v| !v.is_empty()).cloned(),
+    })
+}
+
+#[cfg(test)]
+mod tests;
