@@ -233,7 +233,7 @@ impl World {
             .unwrap()
     }
 
-    /// A leader session cookie, from signing in as `LEADER`.
+    /// A session cookie, from signing in as `LEADER`.
     async fn sign_in(&self) -> String {
         self.sign_in_with("leader-code").await
     }
@@ -245,7 +245,7 @@ impl World {
         let uri = format!("{CALLBACK_PATH}?code={code}&state={state}");
         let response = self.get(&uri, &nonce).await;
         assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
-        cookie(&response, "uma_leader_session")
+        cookie(&response, "uma_session")
     }
 
     async fn start(&self, session: &str, club: u64) -> Response<Body> {

@@ -1,4 +1,4 @@
-//! Signed, expiring values for the sign-in `state` and the leader session. Nothing is stored
+//! Signed, expiring values for the sign-in `state` and the session. Nothing is stored
 //! server-side: the signature is the proof.
 
 use std::time::{SystemTime, UNIX_EPOCH};

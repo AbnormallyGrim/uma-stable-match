@@ -4,12 +4,13 @@ import { render, screen, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import NavLinks from './NavLinks.svelte';
-import { currentPage, websiteUrl } from './pages';
+import { APPLICATIONS_ENABLED } from './flags';
+import { currentPage, visiblePages, websiteUrl } from './pages';
 
 afterEach(() => window.history.pushState({}, '', '/'));
 
 describe('NavLinks', () => {
-  it('links to the home page, the club finder and the wishlist page', () => {
+  it('links to the home page, the club finder, the wishlist page and, when it is on, applications', () => {
     render(NavLinks);
     const nav = screen.getByRole('navigation', { name: 'Pages' });
     expect(
@@ -20,6 +21,17 @@ describe('NavLinks', () => {
       ['Home', `http://site.localhost:${window.location.port}`],
       ['Club finder', '/'],
       ['Wishlist', '/wishlist'],
+      ...(APPLICATIONS_ENABLED ? [['Applications', '/applications']] : []),
+    ]);
+  });
+
+  it('keeps the applications page out of the navbar unless its flag is on', () => {
+    expect(visiblePages(false).map((page) => page.id)).toEqual(['home', 'finder', 'wishlist']);
+    expect(visiblePages(true).map((page) => page.id)).toEqual([
+      'home',
+      'finder',
+      'wishlist',
+      'applications',
     ]);
   });
 
@@ -48,6 +60,8 @@ describe('currentPage', () => {
     expect(currentPage('/')).toBe('finder');
     expect(currentPage('/club/7')).toBe('finder');
     expect(currentPage('/wishlist')).toBe('wishlist');
+    expect(currentPage('/applications')).toBe('applications');
+    expect(currentPage('/applications/club/7')).toBe('applications');
   });
 });
 

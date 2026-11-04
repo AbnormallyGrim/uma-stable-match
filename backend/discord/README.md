@@ -73,12 +73,12 @@ Discord sends a signed PING, and a badly signed request, when the URL is saved i
 
 | Route | Does |
 |---|---|
-| `GET /api/v1/auth/discord/login?flow=leader&next=/path` | Redirects to Discord's authorize page. `next` is where the visitor lands afterwards: a path on this site, else `/` |
-| `GET /api/v1/auth/discord/callback` | Where Discord sends the visitor back. Checks the `state`, trades the code for the visitor's Discord ID, starts the session and redirects to `next` |
-| `GET /api/v1/leaders/me` | `{"discord_id": "…"}` for a signed-in leader, else 401. Never cached |
+| `GET /api/v1/auth/discord/login?flow=sign_in&next=/path` | Redirects to Discord's authorize page. `next` is where the visitor lands afterwards: a path on this site, else `/` |
+| `GET /api/v1/auth/discord/callback` | Where Discord sends the visitor back. Checks the `state`, trades the code for the visitor's Discord ID, starts the session and redirects to `next`. When it fails, a browser (a request that accepts `text/html`) is redirected to `/applications?error=<result>` (`APPLICATIONS_PAGE`) instead of seeing JSON |
+| `GET /api/v1/applications/me` | `{"discord_id": "…"}` for a signed-in leader, else 401. Never cached |
 | `POST /api/v1/auth/sign-out` | Clears the session cookie (204). A POST, so another site can't trigger it with a link |
 
-**Flows.** The scopes depend on what the sign-in is for: `leader` asks for `identify`, `opt_in` for `bot identify` and `apply` for `identify guilds.join`. Only `leader` is open so far; the others answer 404 until the features that use them land.
+**Flows.** The scopes depend on what the sign-in is for: `sign_in` asks for `identify`, `opt_in` for `bot identify` and `apply` for `identify guilds.join`. Only `sign_in` is open so far; the others answer 404 until the features that use them land.
 
 **State and nonce.** `login` sends Discord a `state` signed with `TOKEN_SIGNING_KEY` (HMAC-SHA256): the flow, where to go next, a random nonce and a 10-minute expiry (`MAX_STATE_AGE`). The same nonce goes to the browser in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie that only the callback path receives. The callback needs both, and the `state` must verify and not have expired, so a forged, tampered, expired or someone else's callback gets a 400 before Discord is called. The nonce cookie is cleared by every callback, so a replay from the same browser carries none. Discord's own codes work once.
 
@@ -124,7 +124,7 @@ A leader opts a club in by showing they control the Discord server the club poin
 - **The club points to the server:** its description has a working invite to it (see [Finding a club's server](#finding-a-clubs-server)).
 - **The person controls the server:** they add the bot to that same server, which Discord only allows with Manage Server or Administrator.
 
-`GET /api/v1/discord/opt-in?club=ID&next=/path` starts it. It needs a leader session (sign in first), so a visitor can't make the server call Discord for nothing. It answers:
+`GET /api/v1/discord/opt-in?club=ID&next=/path` starts it. It needs a session (sign in first), so a visitor can't make the server call Discord for nothing. It answers:
 
 | Status | When |
 |---|---|
@@ -147,7 +147,7 @@ Opting in needs the app set up with `Discord::with_opt_in(OptIn::new(store, club
 
 ## Unlinking a club
 
-`DELETE /api/v1/discord/clubs/{club}` (`UNLINK_PATH`) takes a club off its server, deleting everything kept about it. It needs a leader session, and the person must have the rights that let them add the bot: they own the server or have Administrator or Manage Server there. The bot checks this itself with two calls, `GET /guilds/{id}` (the owner and the roles' permissions) and `GET /guilds/{id}/members/{user}` (the person's roles), and combines the permissions of `@everyone` and the person's roles.
+`DELETE /api/v1/discord/clubs/{club}` (`UNLINK_PATH`) takes a club off its server, deleting everything kept about it. It needs a session, and the person must have the rights that let them add the bot: they own the server or have Administrator or Manage Server there. The bot checks this itself with two calls, `GET /guilds/{id}` (the owner and the roles' permissions) and `GET /guilds/{id}/members/{user}` (the person's roles), and combines the permissions of `@everyone` and the person's roles.
 
 | Status | When |
 |---|---|
@@ -165,7 +165,7 @@ A club whose server has removed the bot can't prove anyone's rights, so it can't
 
 ## Club settings
 
-`GET` and `PATCH /api/v1/discord/clubs/{club}/settings` (`SETTINGS_PATH`) read and change a club's settings. Both need a leader session and the same rights as [unlinking](#unlinking-a-club): the person owns the server or has Administrator or Manage Server there, checked with Discord on every call (the server's roles and the person's roles, with no copy kept), so losing the rights ends access at once. Someone without them gets 403 and can neither read nor change anything.
+`GET` and `PATCH /api/v1/discord/clubs/{club}/settings` (`SETTINGS_PATH`) read and change a club's settings. Both need a session and the same rights as [unlinking](#unlinking-a-club): the person owns the server or has Administrator or Manage Server there, checked with Discord on every call (the server's roles and the person's roles, with no copy kept), so losing the rights ends access at once. Someone without them gets 403 and can neither read nor change anything.
 
 `GET` answers with the settings and the lists to choose from. IDs are strings, as Discord's are larger than JSON numbers can hold safely:
 

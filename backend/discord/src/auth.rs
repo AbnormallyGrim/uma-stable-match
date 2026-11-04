@@ -1,9 +1,9 @@
-//! Sign in with Discord: the OAuth2 redirect and callback, and the leader session they start.
+//! Sign in with Discord: the OAuth2 redirect and callback, and the session they start.
 
 use std::time::{Duration, SystemTime};
 
 use axum::extract::{Query, State};
-use axum::http::header::{CACHE_CONTROL, COOKIE, SET_COOKIE};
+use axum::http::header::{ACCEPT, CACHE_CONTROL, COOKIE, SET_COOKIE};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
@@ -23,7 +23,7 @@ pub const LOGIN_PATH: &str = "/api/v1/auth/discord/login";
 pub const CALLBACK_PATH: &str = "/api/v1/auth/discord/callback";
 
 /// Path that answers with the signed-in leader.
-pub const LEADERS_ME_PATH: &str = "/api/v1/leaders/me";
+pub const APPLICATIONS_ME_PATH: &str = "/api/v1/applications/me";
 
 /// Path that ends the session.
 pub const SIGN_OUT_PATH: &str = "/api/v1/auth/sign-out";
@@ -31,13 +31,13 @@ pub const SIGN_OUT_PATH: &str = "/api/v1/auth/sign-out";
 /// How long a sign-in link is good for, from the redirect to Discord until the callback.
 pub const MAX_STATE_AGE: Duration = Duration::from_secs(10 * 60);
 
-/// How long a leader session lasts.
+/// How long a session lasts.
 pub const MAX_SESSION_AGE: Duration = Duration::from_secs(12 * 60 * 60);
 
 const STATE_PURPOSE: &str = "state";
 const SESSION_PURPOSE: &str = "session";
 const NONCE_COOKIE: &str = "uma_discord_nonce";
-const SESSION_COOKIE: &str = "uma_leader_session";
+const SESSION_COOKIE: &str = "uma_session";
 /// Longest `next` path kept.
 const MAX_NEXT_LEN: usize = 200;
 
@@ -45,8 +45,8 @@ const MAX_NEXT_LEN: usize = 200;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Flow {
-    /// A club leader managing settings.
-    Leader,
+    /// Signing in to use the applications pages.
+    SignIn,
     /// A club leader adding the bot to a server.
     OptIn,
     /// A player applying to a club.
@@ -56,7 +56,7 @@ pub(crate) enum Flow {
 impl Flow {
     fn parse(name: &str) -> Option<Self> {
         match name {
-            "leader" => Some(Self::Leader),
+            "sign_in" => Some(Self::SignIn),
             "opt_in" => Some(Self::OptIn),
             "apply" => Some(Self::Apply),
             _ => None,
@@ -66,7 +66,7 @@ impl Flow {
     /// The OAuth2 scopes to ask for.
     pub(crate) fn scopes(self) -> &'static str {
         match self {
-            Self::Leader => "identify",
+            Self::SignIn => "identify",
             Self::OptIn => "bot identify",
             Self::Apply => "identify guilds.join",
         }
@@ -74,7 +74,7 @@ impl Flow {
 
     /// Whether the callback can finish this flow yet.
     fn available(self) -> bool {
-        self == Self::Leader
+        self == Self::SignIn
     }
 }
 
@@ -89,6 +89,17 @@ pub(crate) struct OAuthState {
     /// For opting a club in: what the install callback must find.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) t: Option<Target>,
+}
+
+/// Where a browser is sent when a sign-in or opt-in fails, with `?error=` and the failure's label.
+pub const APPLICATIONS_PAGE: &str = "/applications";
+
+/// Whether the request is a page load, which asks for HTML.
+fn wants_html(headers: &HeaderMap) -> bool {
+    headers
+        .get(ACCEPT)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|accept| accept.contains("text/html"))
 }
 
 /// What an opt-in is meant to do, signed into the `state` so the callback's query string can't
@@ -108,7 +119,7 @@ pub(crate) fn router(discord: Discord) -> Router {
     Router::new()
         .route(LOGIN_PATH, get(login))
         .route(CALLBACK_PATH, get(callback))
-        .route(LEADERS_ME_PATH, get(leaders_me))
+        .route(APPLICATIONS_ME_PATH, get(session_info))
         .route(SIGN_OUT_PATH, post(sign_out))
         .with_state(discord.clone())
         .merge(crate::opt_in::router(discord))
@@ -131,7 +142,7 @@ async fn login(State(discord): State<Discord>, Query(params): Query<LoginParams>
     let flow = params
         .flow
         .as_deref()
-        .map_or(Some(Flow::Leader), Flow::parse);
+        .map_or(Some(Flow::SignIn), Flow::parse);
     let Some(flow) = flow.filter(|flow| flow.available()) else {
         return error(StatusCode::NOT_FOUND, "that sign-in isn't available");
     };
@@ -206,6 +217,12 @@ async fn callback(
             response.headers_mut().append(SET_COOKIE, session);
             ("success", response)
         }
+        // A browser lands on the applications page, which explains what went wrong; anything else
+        // gets the JSON error.
+        Err(failure) if wants_html(&headers) => (
+            failure.label,
+            Redirect::to(&format!("{APPLICATIONS_PAGE}?error={}", failure.label)).into_response(),
+        ),
         Err(failure) => (failure.label, error(failure.status, failure.message)),
     };
     metrics::counter!("discord_sign_ins_total", "result" => result).increment(1);
@@ -274,7 +291,7 @@ async fn finish(
             )
         })?;
     match (state.f, state.t) {
-        (Flow::Leader, _) => Ok((authorized.user_id, state.r)),
+        (Flow::SignIn, _) => Ok((authorized.user_id, state.r)),
         (Flow::OptIn, Some(target)) => {
             crate::opt_in::install(discord, target, &authorized).await?;
             Ok((authorized.user_id, state.r))
@@ -288,7 +305,7 @@ struct Me {
     discord_id: String,
 }
 
-/// The Discord ID in the request's leader session, if it has a valid one.
+/// The Discord ID in the request's session, if it has a valid one.
 pub(crate) fn session_user(config: &DiscordConfig, headers: &HeaderMap) -> Option<u64> {
     cookie_values(headers, SESSION_COOKIE)
         .find_map(|token| {
@@ -302,7 +319,7 @@ pub(crate) fn session_user(config: &DiscordConfig, headers: &HeaderMap) -> Optio
         .and_then(|id| id.parse().ok())
 }
 
-async fn leaders_me(State(discord): State<Discord>, headers: HeaderMap) -> Response {
+async fn session_info(State(discord): State<Discord>, headers: HeaderMap) -> Response {
     let id = session_user(discord.config(), &headers);
     let mut response = match id {
         Some(id) => Json(Me {

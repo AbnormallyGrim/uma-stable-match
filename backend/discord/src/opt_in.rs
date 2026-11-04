@@ -20,11 +20,11 @@ use crate::invites::servers_in_description;
 use crate::oauth::Authorized;
 use crate::store::{ClubRecord, ClubStore};
 
-/// Path that starts opting a club in. Needs a leader session.
+/// Path that starts opting a club in. Needs a session.
 pub const OPT_IN_PATH: &str = "/api/v1/discord/opt-in";
 
 /// Path that unlinks a club from its server, with `{club}` the club's ID. `DELETE`, and needs a
-/// leader session with Manage Server on the club's server.
+/// session with Manage Server on the club's server.
 pub const UNLINK_PATH: &str = "/api/v1/discord/clubs/{club}";
 
 /// The permissions the bot asks for: View Channels, Manage Channels, Manage Roles, Send Messages,

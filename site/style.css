@@ -1,0 +1,853 @@
+/* Colours follow the web app's palette. Each is light-dark(light, dark); color-scheme picks
+   one, and the theme switch can force it with data-theme on <html>. */
+:root {
+    color-scheme: light dark;
+    --bg-color: light-dark(#eef1f5, #0f1217);
+    --card-bg: light-dark(#ffffff, #181d26);
+    --border-color: light-dark(rgb(20 33 61 / 12%), #27303f);
+    --border-strong: light-dark(rgb(20 33 61 / 22%), rgb(255 255 255 / 18%));
+    --surface: light-dark(#e6eaf0, rgb(255 255 255 / 6%));
+    --text-main: light-dark(#14213d, #f0f4f8);
+    --text-muted: light-dark(#526077, #94a3b8);
+    --accent-gold: light-dark(#806210, #d4af37);
+    --accent-gold-hover: light-dark(#6b520d, #c29f2e);
+    --accent-silver: light-dark(#334155, #e2e8f0);
+    --on-accent: light-dark(#ffffff, #0f1217);
+    --heading-top: light-dark(#14213d, #ffffff);
+    --heading-bottom: light-dark(#334155, #cbd5e1);
+    --shadow: light-dark(rgb(20 33 61 / 14%), rgb(0 0 0 / 45%));
+    --hero-image: url('images/hero-light.webp');
+    --hero-opacity: 0.6;
+}
+
+:root {
+    --gutter: 16px;
+}
+
+@media (min-width: 721px) {
+    :root {
+        --gutter: 24px;
+    }
+}
+
+@media (min-width: 1600px) {
+    :root {
+        --gutter: 32px;
+    }
+}
+
+:root[data-theme='light'] {
+    color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+    color-scheme: dark;
+    --hero-image: url('images/hero.webp');
+    --hero-opacity: 0.55;
+}
+
+.only-dark {
+    display: none;
+}
+
+:root[data-theme='dark'] .only-dark {
+    display: revert;
+}
+
+:root[data-theme='dark'] .only-light {
+    display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+        --hero-image: url('images/hero.webp');
+        --hero-opacity: 0.55;
+    }
+
+    :root:not([data-theme='light']) .only-dark {
+        display: revert;
+    }
+
+    :root:not([data-theme='light']) .only-light {
+        display: none;
+    }
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+a {
+    color: var(--accent-gold);
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+.navbar {
+    border-bottom: 1px solid var(--border-color);
+    background-color: color-mix(in srgb, var(--bg-color) 85%, transparent);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+/* The same measurements as the web app's navbar, so it sits in the same place on every page. */
+.nav-container {
+    max-width: 1760px;
+    margin: 0 auto;
+    padding: 10px var(--gutter);
+    /* Brand on the left, the pages pill in the middle, the rest on the right. */
+    display: grid;
+    grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
+    align-items: center;
+    gap: 8px 16px;
+}
+
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: var(--text-main);
+}
+
+.nav-logo {
+    height: 40px;
+    width: 40px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.brand-title {
+    white-space: nowrap;
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: -0.02em;
+}
+
+.brand {
+    justify-self: start;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    justify-self: end;
+    gap: 1.25rem;
+}
+
+.nav-link {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.nav-link:hover {
+    color: var(--text-main);
+}
+
+/* The pages as a pill of icon links, like the theme switch. Phones show only the icons,
+   with a tooltip. */
+.pages {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+}
+
+.pages a {
+    position: relative;
+    display: inline-flex;
+    gap: 7px;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.pages a:hover {
+    color: var(--text-main);
+}
+
+.pages a[aria-current='page'] {
+    background: var(--card-bg);
+    box-shadow: 0 0 0 1px var(--border-color);
+    color: var(--accent-gold);
+    font-weight: 700;
+}
+
+.pages a:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 1px;
+}
+
+.pages a::after {
+    position: absolute;
+    z-index: 1;
+    top: calc(100% + 8px);
+    left: 50%;
+    display: none;
+    padding: 3px 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+    color: var(--text-main);
+    font-size: 0.75rem;
+    font-weight: 400;
+    white-space: nowrap;
+    content: attr(data-tooltip);
+    transform: translateX(-50%);
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+/* System / Light / Dark switch, as in the web app: a pill of icon buttons with tooltips. */
+.theme-switch {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+}
+
+.theme-switch label {
+    position: relative;
+    display: inline-flex;
+    padding: 6px 9px;
+    border-radius: 999px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.theme-switch label:has(input:checked) {
+    background: var(--card-bg);
+    color: var(--text-main);
+    box-shadow: 0 0 0 1px var(--border-color);
+}
+
+.theme-switch input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.theme-switch label:has(input:focus-visible) {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 1px;
+}
+
+.theme-switch label::after {
+    position: absolute;
+    z-index: 1;
+    top: calc(100% + 8px);
+    left: 50%;
+    padding: 3px 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+    color: var(--text-main);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    content: attr(data-tooltip);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -2px);
+    transition: opacity 0.12s, transform 0.12s;
+}
+
+.theme-switch label:hover::after,
+.theme-switch label:has(input:focus-visible)::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+/* Round translate button, shown only when Japanese is enabled. Icon: Bootstrap Icons (MIT). */
+.lang-switch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.lang-switch[hidden] {
+    display: none;
+}
+
+.lang-switch:hover {
+    background: var(--card-bg);
+    color: var(--text-main);
+}
+
+.lang-switch:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 1px;
+}
+
+.container {
+    max-width: 1050px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    width: 100%;
+}
+
+/* The background artwork is drawn exactly as in the web app (app.css), so it sits in the same
+   place and at the same size on every page. */
+.hero {
+    position: relative;
+    isolation: isolate;
+    padding: 6rem 0 5rem;
+    text-align: center;
+}
+
+.hero::before {
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    z-index: -1;
+    height: min(100% + 64px, 520px);
+    aspect-ratio: 1456 / 720;
+    content: '';
+    background: var(--hero-image) center / cover no-repeat;
+    opacity: var(--hero-opacity);
+    transform: translateX(-50%);
+    mask-image: radial-gradient(closest-side, #000 45%, transparent 100%);
+    pointer-events: none;
+}
+
+@media (max-width: 720px) {
+    .hero::before {
+        top: auto;
+        bottom: -24px;
+        height: min(100%, 120vw);
+    }
+}
+
+/* The app's artwork sits behind cards; here it sits behind the headline, so it is dimmed
+   to keep the text readable. */
+.hero::after {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    content: '';
+    background: radial-gradient(closest-side at 50% 50%, color-mix(in srgb, var(--bg-color) 70%, transparent) 0%, color-mix(in srgb, var(--bg-color) 55%, transparent) 60%, transparent 100%);
+    pointer-events: none;
+}
+
+
+.hero h1 {
+    font-size: 2.75rem;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.8px;
+    margin-bottom: 1.25rem;
+    background: linear-gradient(180deg, var(--heading-top) 0%, var(--heading-bottom) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.hero p {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    max-width: 700px;
+    margin: 0 auto 2.25rem;
+}
+
+.cta-group {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.85rem 1.75rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background-color: var(--accent-gold);
+    color: var(--on-accent);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-gold) 25%, transparent);
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-gold-hover);
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background-color: color-mix(in srgb, var(--card-bg) 90%, transparent);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(8px);
+}
+
+.btn-secondary:hover {
+    background-color: var(--border-color);
+    transform: translateY(-2px);
+}
+
+
+
+
+
+section {
+    margin-bottom: 5rem;
+}
+
+.section-title {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.section-title h2 {
+    font-size: 1.85rem;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    margin-bottom: 0.5rem;
+}
+
+.section-title p {
+    color: var(--text-muted);
+    font-size: 1rem;
+    max-width: 640px;
+    margin: 0 auto;
+}
+
+.showcase {
+    margin: 0;
+}
+
+.showcase-frame {
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    overflow: hidden;
+    background-color: var(--card-bg);
+    box-shadow:
+            0 0 0 1px color-mix(in srgb, var(--accent-gold) 8%, transparent),
+            0 24px 60px var(--shadow),
+            0 0 80px color-mix(in srgb, var(--accent-gold) 6%, transparent);
+}
+
+.showcase-frame img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.showcase figcaption {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-top: 0.9rem;
+}
+
+.grid-3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+    gap: 1.5rem;
+}
+
+.card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 1.75rem;
+    border-radius: 12px;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+    border-color: color-mix(in srgb, var(--accent-gold) 40%, transparent);
+    transform: translateY(-3px);
+}
+
+.card-icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+.card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.6rem;
+    color: var(--text-main);
+}
+
+.card p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 1rem;
+    margin-top: 2.5rem;
+}
+
+.field {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem 1.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.field:hover {
+    border-color: color-mix(in srgb, var(--accent-gold) 40%, transparent);
+    transform: translateY(-3px);
+}
+
+.field dt {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.field .field-value {
+    color: var(--accent-gold);
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+}
+
+.field dd {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.field .field-note {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+
+
+
+
+
+.faq {
+    max-width: 780px;
+    margin: 0 auto;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.faq details {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0 1.25rem;
+    transition: border-color 0.2s ease;
+}
+
+.faq details[open] {
+    border-color: color-mix(in srgb, var(--accent-gold) 35%, transparent);
+}
+
+.faq summary {
+    cursor: pointer;
+    list-style: none;
+    font-weight: 600;
+    padding: 1rem 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.faq summary::-webkit-details-marker {
+    display: none;
+}
+
+.faq summary::after {
+    content: "+";
+    color: var(--accent-gold);
+    font-weight: 700;
+}
+
+.faq details[open] summary::after {
+    content: "−";
+}
+
+.faq details p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    padding-bottom: 1.1rem;
+}
+
+/* The footer, as in the web app (SiteFooter.svelte), so it looks the same on every page. */
+footer {
+    width: 100%;
+    max-width: 1760px;
+    margin: auto auto 0;
+    padding: 40px var(--gutter) 48px;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+footer .meta {
+    display: grid;
+    gap: 18px;
+    justify-items: center;
+    text-align: center;
+}
+
+footer .footer-brand {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    color: var(--text-main);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+footer .footer-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+footer nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+footer nav a {
+    padding: 6px 14px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-main);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+footer nav a:hover {
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
+}
+
+footer nav a.kofi {
+    background: var(--accent-gold);
+    border-color: var(--accent-gold);
+    color: var(--on-accent);
+}
+
+footer nav a.kofi:hover {
+    background: color-mix(in srgb, var(--accent-gold) 88%, var(--text-main));
+    color: var(--on-accent);
+}
+
+footer .support {
+    margin: -8px 0 0;
+}
+
+footer .notes {
+    max-width: 760px;
+}
+
+footer .notes p {
+    margin: 0 0 8px;
+}
+
+footer strong {
+    color: var(--accent-silver);
+}
+
+/* Too narrow to keep the pages pill centered with the section links beside it. */
+@media (max-width: 960px) {
+    .nav-link {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .hero {
+        padding: 4rem 0 3.5rem;
+    }
+
+    .hero h1 {
+        font-size: 2.1rem;
+    }
+
+    .hero p {
+        font-size: 1.05rem;
+    }
+
+    .brand-title {
+        font-size: 1rem;
+    }
+
+    .pages a {
+        padding: 6px 9px;
+    }
+
+    .pages .label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .pages a:hover::after,
+    .pages a:focus-visible::after {
+        display: block;
+    }
+
+    .section-title h2 {
+        font-size: 1.55rem;
+    }
+}
+
+/* Phones: the logo stands in for the title, so the app button and theme switch fit. */
+@media (max-width: 480px) {
+    .brand-title {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .nav-links {
+        gap: 0.6rem;
+    }
+
+    .theme-switch label {
+        padding: 6px 7px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    .btn,
+    .card,
+    .field,
+    .theme-switch label::after {
+        transition: none;
+    }
+
+    .btn:hover,
+    .card:hover,
+    .field:hover {
+        transform: none;
+    }
+}
+
+/* The club applications privacy page. */
+.privacy-page {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+}
+
+.privacy-page h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+    margin-bottom: 0.75rem;
+}
+
+.privacy-page .lead {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
+.privacy-page section {
+    padding: 0;
+    margin: 0;
+}
+
+.privacy-page h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    margin: 2rem 0 0.5rem;
+}
+
+.privacy-page p {
+    color: var(--text-muted);
+    max-width: 70ch;
+    margin-bottom: 1rem;
+}
+
+/* The hidden attribute wins over any display set above. */
+[hidden] {
+    display: none !important;
+}

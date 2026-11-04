@@ -4,7 +4,10 @@ import { mount } from 'svelte';
 import './app.css';
 import App from './App.svelte';
 import ClubPage from './lib/ClubPage.svelte';
-import { clubRoute, isWishlistRoute } from './lib/route';
+import ApplicationsPage from './lib/ApplicationsPage.svelte';
+import { APPLICATIONS_ENABLED } from './lib/flags';
+import { clubRoute, isWishlistRoute, applicationsRoute } from './lib/route';
+import SettingsPage from './lib/SettingsPage.svelte';
 import WishlistPage from './lib/WishlistPage.svelte';
 
 // The DSN is a public key: it only lets a page send events to this project.
@@ -21,9 +24,19 @@ if (!target) {
 }
 
 const club = clubRoute(window.location.pathname, window.location.search);
+const applications = APPLICATIONS_ENABLED
+  ? applicationsRoute(window.location.pathname, window.location.search)
+  : null;
 
 export default club
   ? mount(ClubPage, { target, props: { route: club } })
-  : isWishlistRoute(window.location.pathname)
-    ? mount(WishlistPage, { target })
-    : mount(App, { target });
+  : applications?.page === 'settings'
+    ? mount(SettingsPage, {
+        target,
+        props: { clubId: applications.clubId, linked: applications.linked },
+      })
+    : applications
+      ? mount(ApplicationsPage, { target, props: { error: applications.error } })
+      : isWishlistRoute(window.location.pathname)
+        ? mount(WishlistPage, { target })
+        : mount(App, { target });

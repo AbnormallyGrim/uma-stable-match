@@ -21,16 +21,16 @@ fn at(seconds: u64) -> SystemTime {
 #[test]
 fn state_passes_with_its_nonce() {
     let config = config('a');
-    let (state, nonce) = begin(&config, Flow::Leader, "/club/1", None, at(1_000));
+    let (state, nonce) = begin(&config, Flow::SignIn, "/club/1", None, at(1_000));
     let checked = check_state(&config, &state, [nonce.as_str()].into_iter(), at(1_001)).unwrap();
-    assert_eq!(checked.f, Flow::Leader);
+    assert_eq!(checked.f, Flow::SignIn);
     assert_eq!(checked.r, "/club/1");
 }
 
 #[test]
 fn state_expires_after_ten_minutes() {
     let config = config('a');
-    let (state, nonce) = begin(&config, Flow::Leader, "/", None, at(1_000));
+    let (state, nonce) = begin(&config, Flow::SignIn, "/", None, at(1_000));
     let nonces = || [nonce.as_str()].into_iter();
     assert!(check_state(&config, &state, nonces(), at(1_599)).is_some());
     assert!(check_state(&config, &state, nonces(), at(1_600)).is_none());
@@ -39,8 +39,8 @@ fn state_expires_after_ten_minutes() {
 #[test]
 fn state_needs_the_matching_nonce() {
     let config = config('a');
-    let (state, _) = begin(&config, Flow::Leader, "/", None, at(1_000));
-    let (_, other_nonce) = begin(&config, Flow::Leader, "/", None, at(1_000));
+    let (state, _) = begin(&config, Flow::SignIn, "/", None, at(1_000));
+    let (_, other_nonce) = begin(&config, Flow::SignIn, "/", None, at(1_000));
     assert!(check_state(&config, &state, std::iter::empty(), at(1_001)).is_none());
     assert!(check_state(
         &config,
@@ -54,7 +54,7 @@ fn state_needs_the_matching_nonce() {
 #[test]
 fn state_is_rejected_when_tampered_or_signed_with_another_key() {
     let config = config('a');
-    let (state, nonce) = begin(&config, Flow::Leader, "/", None, at(1_000));
+    let (state, nonce) = begin(&config, Flow::SignIn, "/", None, at(1_000));
     let nonces = || [nonce.as_str()].into_iter();
     let (payload, tag) = state.split_once('.').unwrap();
     assert!(check_state(&config, &format!("{payload}x.{tag}"), nonces(), at(1_001)).is_none());
@@ -72,7 +72,7 @@ fn a_session_token_is_not_a_state() {
 
 #[test]
 fn flows_ask_for_their_scopes() {
-    assert_eq!(Flow::Leader.scopes(), "identify");
+    assert_eq!(Flow::SignIn.scopes(), "identify");
     assert_eq!(Flow::OptIn.scopes(), "bot identify");
     assert_eq!(Flow::Apply.scopes(), "identify guilds.join");
     assert_eq!(Flow::parse("opt_in"), Some(Flow::OptIn));

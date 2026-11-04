@@ -4,6 +4,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 
 import NavBar from './NavBar.svelte';
+import { PAGES } from './pages';
 
 const props = { onhelp: () => {}, onreleases: () => {}, unseen: false };
 
@@ -20,7 +21,7 @@ describe('NavBar', () => {
     render(NavBar, { ...props });
     const nav = screen.getByRole('navigation', { name: 'Main' });
     const pages = within(nav).getByRole('navigation', { name: 'Pages' });
-    expect(within(pages).getAllByRole('link')).toHaveLength(3);
+    expect(within(pages).getAllByRole('link')).toHaveLength(PAGES.length);
   });
 
   it('holds the theme switch', () => {

@@ -9,7 +9,8 @@ use serde_json::{json, Value};
 use tower::ServiceExt;
 use uma_stable_match_discord::{
     router, ApplicationId, BotToken, ClientSecret, Discord, DiscordConfig, PublicKey, PublicUrl,
-    SigningKey, CALLBACK_PATH, LEADERS_ME_PATH, LOGIN_PATH, OPT_IN_PATH, SIGN_OUT_PATH,
+    SigningKey, APPLICATIONS_ME_PATH, APPLICATIONS_PAGE, CALLBACK_PATH, LOGIN_PATH, OPT_IN_PATH,
+    SIGN_OUT_PATH,
 };
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -135,7 +136,7 @@ async fn login_redirects_to_discord_with_a_signed_state_and_a_nonce_cookie() {
 }
 
 #[tokio::test]
-async fn flows_other_than_the_leaders_arent_available_yet() {
+async fn flows_other_than_signing_in_arent_available_yet() {
     let server = MockServer::start().await;
     let app = app(&server);
     for flow in ["opt_in", "apply", "nope"] {
@@ -157,7 +158,7 @@ async fn signing_in_starts_a_leader_session_and_returns_to_the_page() {
     let cookies = set_cookies(&response);
     let session = cookies
         .iter()
-        .find(|c| c.starts_with("uma_leader_session="))
+        .find(|c| c.starts_with("uma_session="))
         .unwrap();
     for attribute in [
         "HttpOnly",
@@ -180,8 +181,8 @@ async fn signing_in_starts_a_leader_session_and_returns_to_the_page() {
 
     let me = get(
         &app,
-        LEADERS_ME_PATH,
-        Some(&cookie(&response, "uma_leader_session")),
+        APPLICATIONS_ME_PATH,
+        Some(&cookie(&response, "uma_session")),
     )
     .await;
     assert_eq!(me.status(), StatusCode::OK);
@@ -196,7 +197,7 @@ async fn the_session_cookie_holds_nothing_from_discord_but_the_signed_id() {
     let app = app(&server);
     let (state, nonce) = start(&app, "/").await;
     let response = get(&app, &callback_uri(&state, "made-up-code"), Some(&nonce)).await;
-    let session = cookie(&response, "uma_leader_session");
+    let session = cookie(&response, "uma_session");
     for secret in ["made-up-access-token", "made-up-name", "Made Up"] {
         assert!(!session.contains(secret));
     }
@@ -214,7 +215,7 @@ async fn a_callback_without_the_nonce_cookie_is_rejected() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     assert!(set_cookies(&response)
         .iter()
-        .all(|c| !c.starts_with("uma_leader_session=")));
+        .all(|c| !c.starts_with("uma_session=")));
     // Mixed up with another sign-in's nonce.
     let (_, other) = start(&app, "/").await;
     assert_ne!(nonce, other);
@@ -282,7 +283,7 @@ async fn a_code_discord_refuses_is_a_bad_gateway_with_no_session() {
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
     assert!(set_cookies(&response)
         .iter()
-        .all(|c| !c.starts_with("uma_leader_session=")));
+        .all(|c| !c.starts_with("uma_session=")));
 }
 
 #[tokio::test]
@@ -296,18 +297,14 @@ async fn next_outside_the_site_is_ignored() {
 }
 
 #[tokio::test]
-async fn leaders_me_needs_a_valid_session() {
+async fn the_session_endpoint_needs_a_valid_session() {
     let server = MockServer::start().await;
     let app = app(&server);
-    let response = get(&app, LEADERS_ME_PATH, None).await;
+    let response = get(&app, APPLICATIONS_ME_PATH, None).await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     assert_eq!(header_value(&response, CACHE_CONTROL), "no-store");
-    for forged in [
-        "uma_leader_session=abc.def",
-        "uma_leader_session=",
-        "other=1",
-    ] {
-        let response = get(&app, LEADERS_ME_PATH, Some(forged)).await;
+    for forged in ["uma_session=abc.def", "uma_session=", "other=1"] {
+        let response = get(&app, APPLICATIONS_ME_PATH, Some(forged)).await;
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{forged}");
     }
 }
@@ -319,8 +316,8 @@ async fn a_state_is_not_a_session() {
     let (state, _) = start(&app, "/").await;
     let response = get(
         &app,
-        LEADERS_ME_PATH,
-        Some(&format!("uma_leader_session={state}")),
+        APPLICATIONS_ME_PATH,
+        Some(&format!("uma_session={state}")),
     )
     .await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
@@ -337,7 +334,7 @@ async fn sign_out_clears_the_session() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
     let cleared = set_cookies(&response).remove(0);
-    assert!(cleared.starts_with("uma_leader_session=;"));
+    assert!(cleared.starts_with("uma_session=;"));
     assert!(cleared.contains("Max-Age=0"));
     // Signing out is a POST, so a link or image on another site can't trigger it.
     let response = get(&app, SIGN_OUT_PATH, None).await;
@@ -350,4 +347,43 @@ async fn opting_in_isnt_served_without_it_being_set_up() {
     let app = app(&server);
     let response = get(&app, &format!("{OPT_IN_PATH}?club=1"), None).await;
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_browser_is_sent_to_the_applications_page_when_sign_in_fails() {
+    let server = MockServer::start().await;
+    let app = app(&server);
+    let page_load = |uri: &str| {
+        Request::get(uri)
+            .header("accept", "text/html,application/xhtml+xml")
+            .body(Body::empty())
+            .unwrap()
+    };
+    let response = app
+        .clone()
+        .oneshot(page_load(&format!(
+            "{CALLBACK_PATH}?code=made-up-code&state=garbage"
+        )))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert_eq!(
+        header_value(&response, LOCATION),
+        format!("{APPLICATIONS_PAGE}?error=invalid_state")
+    );
+
+    // Cancelling on Discord's screen, with a valid state, says so.
+    let (state, nonce) = start(&app, "/").await;
+    let uri = format!("{CALLBACK_PATH}?error=access_denied&state={state}");
+    let mut request = page_load(&uri);
+    request.headers_mut().insert(COOKIE, nonce.parse().unwrap());
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(
+        header_value(&response, LOCATION),
+        format!("{APPLICATIONS_PAGE}?error=denied")
+    );
+    // The nonce is still used up.
+    assert!(set_cookies(&response)
+        .iter()
+        .any(|c| c.starts_with("uma_discord_nonce=;") && c.contains("Max-Age=0")));
 }

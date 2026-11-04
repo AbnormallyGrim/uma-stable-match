@@ -15,7 +15,7 @@ use crate::opt_in::{managed_club, store_unavailable};
 use crate::store::{ClubRecord, SettingsUpdate};
 
 /// Path of a club's settings, with `{club}` the club's ID. `GET` reads them and `PATCH` changes
-/// them. Both need a leader session with Manage Server on the club's server, checked with Discord
+/// them. Both need a session with Manage Server on the club's server, checked with Discord
 /// each time.
 pub const SETTINGS_PATH: &str = "/api/v1/discord/clubs/{club}/settings";
 

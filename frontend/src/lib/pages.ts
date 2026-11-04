@@ -1,11 +1,12 @@
 /** The pages the navbar links to, and which one is showing. */
 
+import { APPLICATIONS_ENABLED } from './flags';
 import type { MessageKey } from './i18n';
-import { isWishlistRoute, WISHLIST_PATH } from './route';
+import { APPLICATIONS_PATH, applicationsRoute, isWishlistRoute, WISHLIST_PATH } from './route';
 
 /** One page in the navbar. */
 export interface Page {
-  id: 'home' | 'finder' | 'wishlist';
+  id: 'home' | 'finder' | 'wishlist' | 'applications';
   href: string;
   label: MessageKey;
   /** The icon's drawing: SVG elements for a 16 by 16 grid, drawn as outlines. */
@@ -25,8 +26,8 @@ export function websiteUrl({ protocol, hostname, port }: Origin): string {
     : 'https://umastable.com';
 }
 
-/** The website's home page, the club finder and the wishlist page. */
-export const PAGES: Page[] = [
+/** Every page the navbar can link to. See `PAGES` for the ones shown. */
+const ALL_PAGES: Page[] = [
   {
     id: 'home',
     href: websiteUrl(window.location),
@@ -45,9 +46,26 @@ export const PAGES: Page[] = [
     label: 'wishlist.link',
     icon: '<rect x="2" y="2" width="12" height="12" rx="2" /><path d="m5.25 8.25 2 2 3.5-4.5" />',
   },
+  {
+    id: 'applications',
+    href: APPLICATIONS_PATH,
+    label: 'applications.link',
+    icon: '<circle cx="8" cy="5.25" r="2.5" /><path d="M3 13.5c.5-2.75 2.5-4 5-4s4.5 1.25 5 4" />',
+  },
 ];
+
+/** The pages in the navbar, leaving out the club applications page unless `applications` is on. */
+export function visiblePages(applications: boolean): Page[] {
+  return ALL_PAGES.filter((page) => page.id !== 'applications' || applications);
+}
+
+/** The website's home page, the club finder, the wishlist page and, when it's on, applications. */
+export const PAGES: Page[] = visiblePages(APPLICATIONS_ENABLED);
 
 /** The page `pathname` belongs to. The club page is part of the finder. */
 export function currentPage(pathname: string): Page['id'] {
+  if (applicationsRoute(pathname, '')) {
+    return 'applications';
+  }
   return isWishlistRoute(pathname) ? 'wishlist' : 'finder';
 }
