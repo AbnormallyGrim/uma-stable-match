@@ -63,7 +63,7 @@ impl KeySecret {
         (value.chars().count() >= MIN_SECRET_LEN).then(|| Self(value.to_owned()))
     }
 
-    /// The secret, for handing to another keyed hash. Never log it.
+    /// The secret, for handing to another keyed hash
     pub fn expose(&self) -> &str {
         &self.0
     }

@@ -53,3 +53,32 @@ fn permissions_combine_across_roles_and_junk_is_ignored() {
     assert!(has_manage(&guild, 10, 2, &member(&["20", "21", "22"])));
     assert!(!has_manage(&guild, 10, 2, &member(&["20", "21"])));
 }
+
+fn rights(manage: bool, held: &[u64]) -> Rights {
+    Rights {
+        manage,
+        held: held.to_vec(),
+        roles: Vec::new(),
+    }
+}
+
+#[test]
+fn managing_the_server_allows_everything() {
+    assert_eq!(rights(true, &[]).level(&[]), Some(Level::Manage));
+    assert_eq!(rights(true, &[5]).level(&[5, 6]), Some(Level::Manage));
+}
+
+#[test]
+fn a_leader_role_allows_viewing_only_that_clubs_applications() {
+    assert_eq!(rights(false, &[5]).level(&[5, 6]), Some(Level::View));
+    assert_eq!(rights(false, &[6]).level(&[5, 6]), Some(Level::View));
+    assert_eq!(rights(false, &[7]).level(&[5, 6]), None);
+    assert_eq!(rights(false, &[5]).level(&[]), None);
+    assert_eq!(rights(false, &[]).level(&[5]), None);
+}
+
+#[test]
+fn levels_have_names() {
+    assert_eq!(Level::View.as_str(), "view");
+    assert_eq!(Level::Manage.as_str(), "manage");
+}

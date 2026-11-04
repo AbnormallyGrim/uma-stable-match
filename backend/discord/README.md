@@ -182,6 +182,23 @@ A club whose server has removed the bot can't prove anyone's rights, so it can't
 
 `PATCH` takes a JSON object with any of `category` (an ID, or `null` to clear), `leader_roles` (a list of IDs, duplicates dropped, at most `MAX_LEADER_ROLES`, 25), `auto_join` and `open`. Fields left out stay as they are. The category must be one of the server's categories and the roles must be the server's roles; otherwise, an unknown field, a wrong type, or no field at all gets 400 and nothing changes. It answers with the new settings, as `GET` does. A 409 means the club moved to another server or was unlinked while the change was made.
 
+## Leader access
+
+What a person can do with a club depends on what they are in the club's server, checked with Discord on every call (the server's roles and the person's roles, with nothing kept), so losing a role ends access at once:
+
+| Access | Who | Can |
+|---|---|---|
+| `manage` | Owns the server, or has Administrator or Manage Server there | Everything for every club on the server: settings, unlinking, and seeing applications |
+| `view` | Holds one of the club's leader roles | See that club's applications. Nothing else, and not the clubs whose leader roles they don't hold |
+
+Settings and unlinking still need `manage`; `view` is for reading what the club has received.
+
+`GET /api/v1/discord/clubs/{club}` (`UNLINK_PATH`, the same path `DELETE` unlinks from) answers `{"club": "…", "guild_id": "…", "access": "manage"}` (or `"view"`) for the signed-in person, and sets a cookie that remembers the club's server. A person with neither gets 403, and the other statuses are those of [unlinking](#unlinking-a-club): 401, 400, 404 for a club that isn't linked, 502 and 503. A server the bot can't see proves no rights, so it's a 403 as well.
+
+`GET /api/v1/discord/clubs` (`CLUBS_PATH`) lists the clubs on the remembered server that the person can see: `{"guild_id": "…", "clubs": [{"id": "…", "access": "view"}]}`, lowest club ID first. With no remembered server, or none that is theirs, it's `{"guild_id": null, "clubs": []}`.
+
+**The remembered server.** It's a signed `HttpOnly`, `Secure`, `SameSite=Lax` cookie, `uma_guild`, holding the server's ID and the person's Discord ID, and lasting `MAX_HINT_AGE` (30 days), so it survives signing in again. It only says where to look: the list checks the person's rights with Discord again, and the cookie is no use to anyone else signed in on the same browser or without the signing key. Signing out clears it. A person who is a leader on two servers sees the one they last opened a club of.
+
 ## Linking a trainer
 
 A trainer ID is public and typed in by the player, so it proves nothing by itself. A signed-in person proves they own one by putting a key we give them in their in-game profile comment; once uma.moe shows the key there, the ID is linked to their Discord ID.

@@ -1,4 +1,4 @@
-//! Discord's trainer lookup against a mock server. All data is made up.
+//! Trainer lookup against a mock server. All data is made up.
 
 use std::time::Duration;
 

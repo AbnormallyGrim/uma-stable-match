@@ -2,6 +2,7 @@
 
 mod auth;
 mod bot;
+mod clubs;
 mod config;
 mod error;
 mod guild_access;
@@ -22,6 +23,7 @@ pub use auth::{
     MAX_STATE_AGE, SIGN_OUT_PATH,
 };
 pub use bot::Discord;
+pub use clubs::{CLUBS_PATH, MAX_HINT_AGE};
 pub use config::{
     ApplicationId, BotToken, ClientSecret, DiscordConfig, KeySecret, PublicKey, PublicUrl,
     RateLimitConfig, SigningKey, DEFAULT_API_BASE, DEFAULT_AUTHORIZE_URL,
