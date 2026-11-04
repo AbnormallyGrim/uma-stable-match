@@ -21,9 +21,14 @@ use crate::requests::{
 use crate::retry;
 use crate::types::{
     CircleListResponse, CircleResponse, GainsRankingsResponse, MonthlyRankingsResponse,
+    ProfileResponse,
 };
 
 const API_KEY_HEADER: &str = "X-API-Key";
+
+/// Smallest and largest trainer (account) IDs, which have 9 to 12 digits.
+const MIN_ACCOUNT_ID: u64 = 100_000_000;
+const MAX_ACCOUNT_ID: u64 = 999_999_999_999;
 
 /// uma.moe API client. Clones share one connection pool and rate limit.
 #[derive(Clone)]
@@ -137,7 +142,33 @@ impl Client {
         self.get("/api/v4/rankings/gains", request).await
     }
 
+    /// Fetches a trainer's profile (`GET /api/v4/user/profile/{account_id}`), including their
+    /// profile comment. A trainer uma.moe doesn't know is a 404 [`Error::Status`].
+    pub async fn profile(&self, account_id: u64) -> Result<ProfileResponse, Error> {
+        if !(MIN_ACCOUNT_ID..=MAX_ACCOUNT_ID).contains(&account_id) {
+            return Err(Error::InvalidRequest(format!(
+                "account ID must be 9 to 12 digits, got {account_id}"
+            )));
+        }
+        let query: [(&str, &str); 0] = [];
+        self.get_as(
+            "/api/v4/user/profile/{account_id}",
+            &format!("/api/v4/user/profile/{account_id}"),
+            &query,
+        )
+        .await
+    }
+
     async fn get<T, Q>(&self, path: &str, query: &Q) -> Result<T, Error>
+    where
+        T: DeserializeOwned,
+        Q: Serialize + ?Sized,
+    {
+        self.get_as(path, path, query).await
+    }
+
+    // `endpoint` names the call in traces, logs and metrics, so it must not hold an ID.
+    async fn get_as<T, Q>(&self, endpoint: &str, path: &str, query: &Q) -> Result<T, Error>
     where
         T: DeserializeOwned,
         Q: Serialize + ?Sized,
@@ -145,10 +176,10 @@ impl Client {
         let span = in_trace(|| {
             tracing::info_span!(
                 "umamoe",
-                otel.name = format!("GET {path}"),
+                otel.name = format!("GET {endpoint}"),
                 otel.kind = "client",
                 otel.status_code = Empty,
-                endpoint = path,
+                endpoint,
                 lane = lane_label(self.priority),
                 attempts = Empty,
                 http.response.status_code = Empty,
@@ -156,7 +187,7 @@ impl Client {
         });
         let mut attempts = 0;
         let result = self
-            .send(path, query, &mut attempts)
+            .send(endpoint, path, query, &mut attempts)
             .instrument(span.clone())
             .await;
         span.record("attempts", attempts);
@@ -164,7 +195,7 @@ impl Client {
             if error.status() != Some(StatusCode::NOT_FOUND) {
                 span.record("otel.status_code", "error");
             }
-            self.log_failure(path, query, attempts, error);
+            self.log_failure(endpoint, query, attempts, error);
         }
         result
     }
@@ -173,7 +204,7 @@ impl Client {
     // normal answers ("no such club or trainer"), so they aren't logged.
     fn log_failure<Q: Serialize + ?Sized>(
         &self,
-        path: &str,
+        endpoint: &str,
         query: &Q,
         attempts: u32,
         error: &Error,
@@ -188,7 +219,7 @@ impl Client {
             _ => None,
         };
         tracing::warn!(
-            endpoint = path,
+            endpoint,
             query = serde_urlencoded::to_string(query).ok(),
             lane = lane_label(self.priority),
             origin = error.origin(),
@@ -202,7 +233,13 @@ impl Client {
         );
     }
 
-    async fn send<T, Q>(&self, path: &str, query: &Q, attempts: &mut u32) -> Result<T, Error>
+    async fn send<T, Q>(
+        &self,
+        endpoint: &str,
+        path: &str,
+        query: &Q,
+        attempts: &mut u32,
+    ) -> Result<T, Error>
     where
         T: DeserializeOwned,
         Q: Serialize + ?Sized,
@@ -240,9 +277,9 @@ impl Client {
                 Ok(response) => response.status().as_u16().to_string(),
                 Err(e) => transport_label(e).to_owned(),
             };
-            metrics::histogram!("umamoe_request_duration_seconds", "endpoint" => path.to_owned(), "lane" => lane)
+            metrics::histogram!("umamoe_request_duration_seconds", "endpoint" => endpoint.to_owned(), "lane" => lane)
                 .record(started.elapsed().as_secs_f64());
-            metrics::counter!("umamoe_requests_total", "endpoint" => path.to_owned(), "lane" => lane, "status" => status)
+            metrics::counter!("umamoe_requests_total", "endpoint" => endpoint.to_owned(), "lane" => lane, "status" => status)
                 .increment(1);
 
             let (error, retry_after) = match result {
@@ -255,7 +292,7 @@ impl Client {
                     let retry_after = retry::retry_after(response.headers());
                     if status == StatusCode::TOO_MANY_REQUESTS {
                         tracing::warn!(
-                            endpoint = path,
+                            endpoint,
                             lane,
                             retry_after_secs = retry_after.map(|wait| wait.as_secs()),
                             "uma.moe returned 429 Too Many Requests"

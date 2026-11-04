@@ -101,6 +101,38 @@ pub struct CircleResponse {
     pub yesterday_fans_to_lower_tier: Option<i64>,
 }
 
+/// A trainer's profile as returned by the API: only the parts used here.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ProfileTrainer {
+    /// Trainer ID.
+    pub account_id: String,
+    /// Trainer name.
+    pub name: String,
+    /// The trainer's profile comment, set in game.
+    pub comment: Option<String>,
+}
+
+/// The club a profile belongs to.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ProfileCircle {
+    /// Club ID.
+    pub circle_id: u64,
+    /// Club name.
+    pub name: String,
+}
+
+/// Response from `GET /api/v4/user/profile/{account_id}`, without the parts not used here.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ProfileResponse {
+    /// The trainer.
+    pub trainer: ProfileTrainer,
+    /// The trainer's current club, if they have one.
+    pub circle: Option<ProfileCircle>,
+}
+
 /// Response from `GET /api/v4/circles/list`.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]

@@ -1,0 +1,14 @@
+{
+  "trainer": {
+    "account_id": "100000001",
+    "name": "Example Trainer",
+    "comment": "Hello! uma-7KQ4XM",
+    "follower_num": 12
+  },
+  "circle": {
+    "circle_id": 900001,
+    "name": "Example Club",
+    "member_count": 25
+  },
+  "veterans": []
+}

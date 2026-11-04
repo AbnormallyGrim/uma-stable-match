@@ -151,3 +151,12 @@ fn gains_finds_an_exact_viewer() {
     );
     assert!(response.viewer(100000002).is_none());
 }
+
+#[test]
+fn a_profile_without_a_comment_or_club_reads() {
+    let r: ProfileResponse =
+        serde_json::from_str(r#"{"trainer":{"account_id":"100000001","name":"A","comment":null}}"#)
+            .unwrap();
+    assert_eq!(r.trainer.comment, None);
+    assert_eq!(r.circle, None);
+}

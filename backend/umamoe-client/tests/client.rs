@@ -14,6 +14,7 @@ const KEY: &str = "test-key";
 const CIRCLE: &str = include_str!("fixtures/circle.json");
 const CIRCLE_LIST: &str = include_str!("fixtures/circle_list.json");
 const GAINS: &str = include_str!("fixtures/gains.json");
+const PROFILE: &str = include_str!("fixtures/profile.json");
 
 fn config(server: &MockServer) -> ClientConfig {
     ClientConfig {
@@ -683,4 +684,52 @@ async fn monthly_rankings_reject_an_invalid_month() {
         .await
         .unwrap_err();
     assert!(matches!(error, Error::InvalidRequest(_)));
+}
+
+#[tokio::test]
+async fn fetches_a_profile() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/v4/user/profile/100000001"))
+        .and(header("x-api-key", KEY))
+        .respond_with(json(PROFILE))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let response = client(&server).profile(100000001).await.unwrap();
+    assert_eq!(response.trainer.name, "Example Trainer");
+    assert_eq!(
+        response.trainer.comment.as_deref(),
+        Some("Hello! uma-7KQ4XM")
+    );
+    assert_eq!(response.circle.unwrap().circle_id, 900001);
+}
+
+#[tokio::test]
+async fn an_unknown_trainer_is_a_404() {
+    let server = MockServer::start().await;
+    Mock::given(path("/api/v4/user/profile/100000002"))
+        .respond_with(ResponseTemplate::new(404))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let error = client(&server).profile(100000002).await.unwrap_err();
+    assert_eq!(error.status(), Some(StatusCode::NOT_FOUND));
+}
+
+#[tokio::test]
+async fn rejects_a_bad_account_id_without_a_request() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(json(PROFILE))
+        .expect(0)
+        .mount(&server)
+        .await;
+
+    for id in [0, 99_999_999, 1_000_000_000_000] {
+        let error = client(&server).profile(id).await.unwrap_err();
+        assert!(matches!(error, Error::InvalidRequest(_)), "{id}");
+    }
 }
