@@ -43,6 +43,7 @@ if let Some(circle) = page.circles.first() {
 | `Client::list_circles` | `GET /api/v4/circles/list` | `CircleListResponse`: one page of clubs, without members or tier |
 | `Client::rankings_gains` | `GET /api/v4/rankings/gains` | `GainsRankingsResponse`: one page of trainers' fan gains over the last 3, 7 and 30 days |
 | `Client::rankings_monthly` | `GET /api/v4/rankings/monthly` | `MonthlyRankingsResponse`: one page of a month's fan rankings, with each trainer's club that month |
+| `Client::profile` | `GET /api/v4/user/profile/{account_id}` | `ProfileResponse`: a trainer's name, profile comment and current club |
 
 `CircleRequest` looks a club up by `circle_id` or by a member's `viewer_id`. A `viewer_id` lookup returns the trainer's oldest club in uma.moe's records once they've changed clubs, so it can miss their current club; `rankings_monthly` gives the club for a given month. Without `for_month`, the API returns the current game month, which starts on the 2nd (JST). A month outside 1 to 12 is rejected before any request is sent.
 
@@ -64,6 +65,8 @@ assert_eq!(me.gain_7d, Some(14_000_000));
 
 `RankingsMonthlyRequest` works the same way for one month: `for_viewer` searches for a trainer ID, `for_month` picks the month (the current one by default), and `MonthlyRankingsResponse::viewer` picks the exact trainer. Its `circle_id` is the club the trainer was in that month. A month outside 1 to 12 is rejected before any request is sent.
 
+`Client::profile` takes a trainer ID of 9 to 12 digits and rejects anything else before sending a request. A trainer uma.moe doesn't know is an `Error::Status` with a 404. The `ProfileResponse` type holds only the trainer's `account_id`, `name` and `comment` and the current `circle`; the rest of the profile is ignored. Metrics and traces label the call `/api/v4/user/profile/{account_id}`, never the ID.
+
 ## Response types
 
 | Type | Endpoint |
@@ -72,6 +75,7 @@ assert_eq!(me.gain_7d, Some(14_000_000));
 | `CircleListResponse` | `GET /api/v4/circles/list`: one page of clubs, without members or tier |
 | `GainsRankingsResponse` | `GET /api/v4/rankings/gains`: one page of `GainsRanking` rows |
 | `MonthlyRankingsResponse` | `GET /api/v4/rankings/monthly`: one page of `MonthlyRanking` rows |
+| `ProfileResponse` | `GET /api/v4/user/profile/{account_id}`: a trainer's name, comment and club |
 
 The types follow the uma.moe OpenAPI schema but are lenient. Missing fields take their default, `null` becomes `None`, and unknown fields are ignored. Timestamps are kept as ISO 8601 strings.
 
