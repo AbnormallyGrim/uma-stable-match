@@ -1,5 +1,5 @@
 use super::*;
-use uma_stable_match_umamoe_client::{Circle, CircleLookup};
+use uma_stable_match_umamoe_client::{Circle, CircleLookup, ProfileTrainer};
 
 struct Fixed;
 
@@ -49,6 +49,22 @@ impl ClubSource for Fixed {
     ) -> SourceFuture<'a, GainsRankingsResponse> {
         Box::pin(async { Ok(GainsRankingsResponse::default()) })
     }
+
+    fn profile(&self, account_id: u64) -> SourceFuture<'_, ProfileResponse> {
+        Box::pin(async move {
+            match account_id {
+                100000001 => Ok(ProfileResponse {
+                    trainer: ProfileTrainer {
+                        account_id: account_id.to_string(),
+                        name: "Example Trainer".into(),
+                        comment: Some("made-up comment".into()),
+                    },
+                    circle: None,
+                }),
+                _ => Err(SourceError::NotFound),
+            }
+        })
+    }
 }
 
 #[tokio::test]
@@ -59,6 +75,10 @@ async fn other_sources_plug_in() {
         .await
         .unwrap();
     assert_eq!(found.circle.circle_id, 42);
+
+    let profile = source.profile(100000001).await.unwrap();
+    assert_eq!(profile.trainer.comment.as_deref(), Some("made-up comment"));
+    assert!(source.profile(100000002).await.unwrap_err().is_not_found());
 
     let missing = source
         .club(&CircleRequest::by_circle_id(7), Priority::Background)

@@ -27,6 +27,7 @@ mod shared;
 mod source;
 mod telemetry;
 mod traces;
+mod trainers;
 mod website;
 
 pub use app::{app, app_with_features, app_with_routes, router, status_router, AppState};
@@ -66,4 +67,5 @@ pub use shared::{club_key, KeySecret, RedisUrl, SharedCache, SharedCacheError};
 pub use source::{ClubSource, Source, SourceError, SourceFuture, UmaMoeSource};
 pub use telemetry::{install_metrics, metrics_router, record_background};
 pub use traces::{TraceExport, TraceExportError};
+pub use trainers::trainer_lookup;
 pub use website::{content_security as website_content_security, Website};

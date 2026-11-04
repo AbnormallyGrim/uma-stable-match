@@ -79,7 +79,7 @@ The trainer IDs in `METRICS_EXCLUDED_TRAINER_IDS` are never logged or shown in e
 
 ## Data source
 
-The scanner, club details and trainer lookups read their data through a `ClubSource`, shared as a `Source`. `UmaMoeSource`, built from the uma.moe `Client`, is the one the server uses. A `Client` converts into a `Source` directly, so `scan`, `ClubDetails::new`, `PaceLookup::new` and `run_scheduler` accept either.
+The scanner, club details and trainer lookups read their data through a `ClubSource`, shared as a `Source`. `UmaMoeSource`, built from the uma.moe `Client`, is the one the server uses. Besides clubs and rankings it reads a trainer's profile (`ClubSource::profile`), which Discord's trainer linking uses for the profile comment. A `Client` converts into a `Source` directly, so `scan`, `ClubDetails::new`, `PaceLookup::new` and `run_scheduler` accept either.
 
 `run(config, source)` starts everything with a given source: metrics, Redis, the scheduler, the refresher, the background loader, the API and the frontend. It serves until Ctrl-C or SIGTERM and returns a `RunError` if something fails to start. `Config` holds the settings that don't depend on the source; the uma.moe ones, `UMAMOE_API_KEY` and `UMAMOE_BASE_URL`, are read separately into `UmaMoeConfig`. The binary in `main.rs` only sets up logging and traces, builds the uma.moe `Client` from `UmaMoeConfig`, and calls `run`, so another binary can run the same server with its own source.
 
@@ -706,9 +706,9 @@ Setting them before that version is live makes every search fail with `401`. To 
 
 ## Discord applications
 
-Club applications through Discord are being built in steps; so far the server answers Discord's interactions endpoint, offers Sign in with Discord, and lets a club opt in. With `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_SECRET`, `TOKEN_SIGNING_KEY` and `PUBLIC_URL` set, it serves `POST /discord/interactions` and the [sign-in routes](../discord/README.md#sign-in-with-discord) from the [`uma-stable-match-discord`](../discord/README.md) crate, behind the same security headers, time limit and panic handling as the API. Unset, the path isn't served and nothing else changes.
+Club applications through Discord are being built in steps; so far the server answers Discord's interactions endpoint, offers Sign in with Discord, lets a club opt in, and lets a player link a trainer ID to their Discord ID. With `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_SECRET`, `TOKEN_SIGNING_KEY` and `PUBLIC_URL` set, it serves `POST /discord/interactions` and the [sign-in routes](../discord/README.md#sign-in-with-discord) from the [`uma-stable-match-discord`](../discord/README.md) crate, behind the same security headers, time limit and panic handling as the API. Unset, the path isn't served and nothing else changes.
 
-Discord's data is kept in Redis, so these settings need `REDIS_URL`: which club is linked to which Discord server (`discord:club:{id}` and `discord:guild:{id}`), without a TTL so eviction never removes it. The server finds a club's description through its club details cache.
+Discord's data is kept in Redis, so these settings need `REDIS_URL`: which club is linked to which Discord server (`discord:club:{id}` and `discord:guild:{id}`), without a TTL so eviction never removes it. The server finds a club's description through its club details cache, and a trainer's profile comment through its source.
 
 To set it up:
 
@@ -725,7 +725,9 @@ The bot never needs privileged gateway intents. Sign-in is `GET /api/v1/auth/dis
 
 **Settings.** A signed-in person with Manage Server on a linked club's server reads and changes its settings with `GET` and `PATCH /api/v1/discord/clubs/<club ID>/settings`: the ticket category, leader roles, auto-join (on by default) and open or paused (open by default). Each call re-checks their rights with Discord, so losing Manage Server ends access at once. See [Club settings](../discord/README.md#club-settings).
 
-**Unlinking.** `DELETE /api/v1/discord/clubs/<club ID>` unlinks a club for a signed-in person with Manage Server on its server, and the bot leaves when no club is left there. See [Unlinking a club](../discord/README.md#unlinking-a-club). Calls to Discord are counted in `discord_requests_total`, by status, and sign-ins in `discord_sign_ins_total`; see the crate's [rate limits](../discord/README.md#rate-limits).
+**Unlinking.** `DELETE /api/v1/discord/clubs/<club ID>` unlinks a club for a signed-in person with Manage Server on its server, and the bot leaves when no club is left there. See [Unlinking a club](../discord/README.md#unlinking-a-club). **Linking a trainer.** A signed-in player proves they own a trainer ID by putting a key from `POST /api/v1/discord/trainers/<trainer ID>/verification` in their in-game profile comment, then checking with `POST …/link`. The server reads the comment fresh from uma.moe (`GET /api/v4/user/profile/<trainer ID>`, through the source) and links the ID to their Discord ID if the key is there. Redis keeps only a hash of the Discord ID, keyed with `REDIS_KEY_SECRET`, and the links stay until the player unlinks. The `fixture_server` example has no profiles, so every check there answers 404. See [Linking a trainer](../discord/README.md#linking-a-trainer) for the routes, limits and keys.
+
+Calls to Discord are counted in `discord_requests_total`, by status, and sign-ins in `discord_sign_ins_total`; see the crate's [rate limits](../discord/README.md#rate-limits).
 
 ## Logs
 
