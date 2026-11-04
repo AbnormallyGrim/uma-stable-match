@@ -21,6 +21,7 @@
   }
 
   let { error = null }: Props = $props();
+  void error;
 
   const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
   let readingReleases = $state(false);
@@ -77,7 +78,7 @@
 
   <section class="selector" aria-label={t('applications.role.heading')}>
     <div class="role-grid">
-      {#each roles as role}
+      {#each roles as role (role.key)}
         <button type="button" class="role-card" onclick={() => selectRole(role.key)}>
           <span class="role-icon" aria-hidden="true">{role.icon}</span>
           <div class="role-copy">
