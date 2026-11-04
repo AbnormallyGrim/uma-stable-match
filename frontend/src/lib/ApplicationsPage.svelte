@@ -9,13 +9,7 @@
   import { onMount } from 'svelte';
 
   import { ApiError } from './api';
-  import {
-    checkOptIn,
-    loginUrl,
-    parseClubInput,
-    signOut,
-    signedInUser,
-  } from './applications';
+  import { checkOptIn, loginUrl, parseClubInput, signOut, signedInUser } from './applications';
   import { applyFeatures } from './features';
   import { t, hasMessage } from './i18n';
   import { language } from './language.svelte';
@@ -99,7 +93,7 @@
     selectedClubId = null;
     selectedClubName = null;
     showConfirm = false;
-    statusMessage = keepStatus ? statusMessage : routeError ?? null;
+    statusMessage = keepStatus ? statusMessage : (routeError ?? null);
   }
 
   async function checkSession() {
@@ -153,7 +147,9 @@
     try {
       await checkOptIn(selectedClubId);
       const next = settingsPath(selectedClubId, true);
-      window.location.assign(`/api/v1/discord/opt-in?${new URLSearchParams({ club: selectedClubId, next })}`);
+      window.location.assign(
+        `/api/v1/discord/opt-in?${new URLSearchParams({ club: selectedClubId, next })}`,
+      );
     } catch (reason) {
       const status = reason instanceof ApiError ? reason.status : null;
       if (status === 401) {
@@ -245,7 +241,9 @@
         <p role="alert">{statusMessage}</p>
       {/if}
       <p>{t('applications.session.signedOut')}</p>
-      <a class="button primary" href={loginUrl(APPLICATIONS_PATH)}>{t('applications.session.signIn')}</a>
+      <a class="button primary" href={loginUrl(APPLICATIONS_PATH)}
+        >{t('applications.session.signIn')}</a
+      >
     </section>
   {:else}
     {#if !showConfirm}
@@ -268,7 +266,9 @@
     {:else}
       <section class="session-card confirm-card">
         <h2>{t('applications.confirm.heading')}</h2>
-        <p>{selectedClubName ?? t('applications.confirm.unknownClub', { id: selectedClubId ?? '' })}</p>
+        <p>
+          {selectedClubName ?? t('applications.confirm.unknownClub', { id: selectedClubId ?? '' })}
+        </p>
         <p>{t('applications.confirm.steps')}</p>
         {#if statusMessage}
           <p role="alert">{statusMessage}</p>
