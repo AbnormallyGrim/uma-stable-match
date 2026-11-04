@@ -18,7 +18,6 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::details::{ClubDetails, DetailConfig, SharedPool};
 use crate::discord_clubs::club_lookup;
-use crate::trainers::trainer_lookup;
 use crate::limits::RateLimits;
 use crate::pace::PaceLookup;
 use crate::refresher::RefreshConfig;
@@ -26,6 +25,7 @@ use crate::scheduler::{follow_scans, run_scheduler};
 use crate::shared::{SharedCache, SharedCacheError};
 use crate::source::Source;
 use crate::telemetry::{install_metrics, metrics_router};
+use crate::trainers::trainer_lookup;
 
 /// Why the server couldn't start or stopped with an error.
 #[derive(Debug, thiserror::Error)]

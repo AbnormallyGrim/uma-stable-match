@@ -2,6 +2,8 @@ use uma_stable_match_discord::{LookupError, TrainerLookup, TrainerSummary};
 
 use crate::source::Source;
 
+/// A trainer lookup for Discord that reads the trainer's profile from `source`, fresh each time.
+/// A trainer the source doesn't know is `None`; any other failure is an error.
 pub fn trainer_lookup(source: Source) -> TrainerLookup {
     TrainerLookup::new(move |trainer_id| {
         let source = source.clone();
