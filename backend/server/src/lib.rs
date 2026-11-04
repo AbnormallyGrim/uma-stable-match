@@ -9,7 +9,6 @@ mod club;
 mod config;
 mod details;
 mod discord_clubs;
-mod trainers;
 mod features;
 mod frontend;
 mod human;
@@ -42,7 +41,6 @@ pub use config::{
 };
 pub use details::{club_weight, BackgroundLoader, ClubDetails, DetailConfig, SharedPool};
 pub use discord_clubs::club_lookup;
-pub use trainers::trainer_lookup;
 pub use features::Features;
 pub use frontend::{CONTENT_SECURITY, CONTENT_SECURITY_WITH_ANALYTICS};
 pub use human::{HumanCheck, SigningKey, TurnstileSecret, TOKEN_COOKIE, TOKEN_LIFETIME};
