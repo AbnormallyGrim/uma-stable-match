@@ -6,3 +6,12 @@ globalThis.ResizeObserver ??= class {
   unobserve() {}
   disconnect() {}
 };
+
+// jsdom does not implement canvas APIs. Some UI dependencies probe for them during render,
+// so stub the method instead of failing with noisy warnings in the test output.
+if (globalThis.HTMLCanvasElement) {
+  Object.defineProperty(globalThis.HTMLCanvasElement.prototype, 'getContext', {
+    value: () => null,
+    configurable: true,
+  });
+}
