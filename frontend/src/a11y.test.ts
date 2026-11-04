@@ -252,7 +252,6 @@ describe('accessibility', () => {
     it('has no violations when signed out', async () => {
       answer({ 'GET /api/v1/applications/me': () => json({ error: 'no' }, 401) });
       const { container } = render(ApplicationsPage, { error: 'wrong_server' });
-      await screen.findByRole('link', { name: t('applications.session.signIn') });
       expect(await violations(container)).toEqual([]);
     });
 

@@ -24,6 +24,7 @@ Every change starts with an issue.
    ```
 
    For example: `12-balance-score-weighting`.
+
 3. **Make your changes**, with tests where it makes sense.
 4. **Open a pull request** into `main`. Fill in the template, and include `Closes #<issue-number>` so the issue closes when the PR is merged.
 5. **Pass the checks.** CI must be green before merging.
@@ -38,16 +39,16 @@ Use the format:
 <type>: <summary> (#<issue-number>)
 ```
 
-| Type | Use for |
-|---|---|
-| `feat` | New features |
-| `fix` | Bug fixes |
-| `docs` | Documentation only |
-| `test` | Adding or updating tests |
-| `refactor` | Code changes that don't change behaviour |
-| `build` | Build system, workspace or dependency changes |
-| `ci` | CI configuration |
-| `chore` | Other maintenance |
+| Type       | Use for                                       |
+| ---------- | --------------------------------------------- |
+| `feat`     | New features                                  |
+| `fix`      | Bug fixes                                     |
+| `docs`     | Documentation only                            |
+| `test`     | Adding or updating tests                      |
+| `refactor` | Code changes that don't change behaviour      |
+| `build`    | Build system, workspace or dependency changes |
+| `ci`       | CI configuration                              |
+| `chore`    | Other maintenance                             |
 
 Example: `feat: add balance weight option (#12)`
 
@@ -143,6 +144,7 @@ The project's page lives in `site/`: one `index.html` with its styles inline, `i
   ```
 
   For example, tests for `src/scoring.rs` live in `src/scoring/tests.rs` and can test private functions.
+
 - **Tests of the public API** go in the crate's `tests/` folder.
 - Use made-up data in tests, never real player or club data.
 

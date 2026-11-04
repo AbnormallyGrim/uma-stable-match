@@ -155,8 +155,25 @@
   {:else if load === 'signed-out'}
     <section class="card">
       <p>{t('settings.signIn')}</p>
-      <a class="button primary" href={loginUrl(settingsPath(clubId))}>
-        {t('applications.session.signIn')}
+      <a class="provider-btn discord" href={loginUrl(settingsPath(clubId))}>
+        <span class="provider-icon" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            stroke="none"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            width="20"
+            height="20"
+            aria-hidden="true"
+          >
+            <path
+              d="M20.32 4.37A19.8 19.8 0 0 0 15.43 2.85c-.21.38-.46.9-.63 1.3a18.27 18.27 0 0 0-5.49 0c-.17-.4-.42-.92-.64-1.3A19.74 19.74 0 0 0 3.78 4.38C.69 8.96-.15 13.31.27 17.61a19.94 19.94 0 0 0 6.04 3.05c.49-.66.92-1.36 1.28-2.08-.7-.26-1.37-.59-2-.96.17-.12.33-.25.49-.38a14.25 14.25 0 0 0 11.84 0c.16.13.32.26.49.38-.63.37-1.3.7-2 .96.36.72.79 1.42 1.28 2.08a19.9 19.9 0 0 0 6.04-3.05c.5-5-.84-9.31-3.41-13.24ZM8.02 14.96c-1.18 0-2.15-1.08-2.15-2.41s.95-2.41 2.15-2.41 2.17 1.09 2.15 2.41c0 1.33-.95 2.41-2.15 2.41Zm7.96 0c-1.18 0-2.15-1.08-2.15-2.41s.95-2.41 2.15-2.41 2.17 1.09 2.15 2.41c0 1.33-.95 2.41-2.15 2.41Z"
+            />
+          </svg>
+        </span>
+        <span>{t('applications.session.signIn')}</span>
       </a>
     </section>
   {:else if load === 'forbidden'}

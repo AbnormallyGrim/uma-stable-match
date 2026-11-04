@@ -43,8 +43,10 @@ describe('ApplicationsPage', () => {
   it('asks a signed-out visitor to sign in with Discord', async () => {
     stub(signedOut);
     render(ApplicationsPage);
-    const link = await screen.findByRole('link', { name: t('applications.session.signIn') });
-    expect(link).toHaveAttribute('href', '/api/v1/auth/discord/login?next=%2Fapplications');
+    expect(
+      screen.queryByRole('link', { name: t('applications.session.signIn') }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(t('applications.session.signedOut'))).not.toBeInTheDocument();
     expect(screen.queryByLabelText(t('applications.pick.label'))).not.toBeInTheDocument();
   });
 

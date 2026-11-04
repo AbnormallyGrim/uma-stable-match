@@ -37,13 +37,13 @@ if let Some(circle) = page.circles.first() {
 
 ## Endpoints
 
-| Method | Endpoint | Returns |
-|---|---|---|
-| `Client::circle` | `GET /api/v4/circles` | `CircleResponse`: a club, its members' daily fans and its tier |
-| `Client::list_circles` | `GET /api/v4/circles/list` | `CircleListResponse`: one page of clubs, without members or tier |
-| `Client::rankings_gains` | `GET /api/v4/rankings/gains` | `GainsRankingsResponse`: one page of trainers' fan gains over the last 3, 7 and 30 days |
-| `Client::rankings_monthly` | `GET /api/v4/rankings/monthly` | `MonthlyRankingsResponse`: one page of a month's fan rankings, with each trainer's club that month |
-| `Client::profile` | `GET /api/v4/user/profile/{account_id}` | `ProfileResponse`: a trainer's name, profile comment and current club |
+| Method                     | Endpoint                                | Returns                                                                                            |
+| -------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `Client::circle`           | `GET /api/v4/circles`                   | `CircleResponse`: a club, its members' daily fans and its tier                                     |
+| `Client::list_circles`     | `GET /api/v4/circles/list`              | `CircleListResponse`: one page of clubs, without members or tier                                   |
+| `Client::rankings_gains`   | `GET /api/v4/rankings/gains`            | `GainsRankingsResponse`: one page of trainers' fan gains over the last 3, 7 and 30 days            |
+| `Client::rankings_monthly` | `GET /api/v4/rankings/monthly`          | `MonthlyRankingsResponse`: one page of a month's fan rankings, with each trainer's club that month |
+| `Client::profile`          | `GET /api/v4/user/profile/{account_id}` | `ProfileResponse`: a trainer's name, profile comment and current club                              |
 
 `CircleRequest` looks a club up by `circle_id` or by a member's `viewer_id`. A `viewer_id` lookup returns the trainer's oldest club in uma.moe's records once they've changed clubs, so it can miss their current club; `rankings_monthly` gives the club for a given month. Without `for_month`, the API returns the current game month, which starts on the 2nd (JST). A month outside 1 to 12 is rejected before any request is sent.
 
@@ -69,23 +69,23 @@ assert_eq!(me.gain_7d, Some(14_000_000));
 
 ## Response types
 
-| Type | Endpoint |
-|---|---|
-| `CircleResponse` | `GET /api/v4/circles`: a club, its members' daily fans and its tier |
-| `CircleListResponse` | `GET /api/v4/circles/list`: one page of clubs, without members or tier |
-| `GainsRankingsResponse` | `GET /api/v4/rankings/gains`: one page of `GainsRanking` rows |
-| `MonthlyRankingsResponse` | `GET /api/v4/rankings/monthly`: one page of `MonthlyRanking` rows |
-| `ProfileResponse` | `GET /api/v4/user/profile/{account_id}`: a trainer's name, comment and club |
+| Type                      | Endpoint                                                                    |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `CircleResponse`          | `GET /api/v4/circles`: a club, its members' daily fans and its tier         |
+| `CircleListResponse`      | `GET /api/v4/circles/list`: one page of clubs, without members or tier      |
+| `GainsRankingsResponse`   | `GET /api/v4/rankings/gains`: one page of `GainsRanking` rows               |
+| `MonthlyRankingsResponse` | `GET /api/v4/rankings/monthly`: one page of `MonthlyRanking` rows           |
+| `ProfileResponse`         | `GET /api/v4/user/profile/{account_id}`: a trainer's name, comment and club |
 
 The types follow the uma.moe OpenAPI schema but are lenient. Missing fields take their default, `null` becomes `None`, and unknown fields are ignored. Timestamps are kept as ISO 8601 strings.
 
 ## Converting to scoring types
 
-| From | To | Notes |
-|---|---|---|
-| `CircleResponse` | `Club` | Includes members and tier (`club_rank`) |
-| `Circle` | `Club` | No members or tier, because the list endpoint doesn't return them |
-| `CircleMember` | `MemberSnapshot` | `daily_fans` is passed through unchanged |
+| From             | To               | Notes                                                             |
+| ---------------- | ---------------- | ----------------------------------------------------------------- |
+| `CircleResponse` | `Club`           | Includes members and tier (`club_rank`)                           |
+| `Circle`         | `Club`           | No members or tier, because the list endpoint doesn't return them |
+| `CircleMember`   | `MemberSnapshot` | `daily_fans` is passed through unchanged                          |
 
 A code that is out of range or unknown becomes `None`. This covers negative counts, join styles other than 1 to 3, and tiers above 255.
 
@@ -109,10 +109,10 @@ Requests are spaced at least `min_interval` apart (500 ms by default). Retries c
 
 Each client sends its requests in one of two lanes:
 
-| `Priority` | Use for |
-|---|---|
-| `Interactive` (default) | Requests someone is waiting for |
-| `Background` | Prefetching and other work that can wait |
+| `Priority`              | Use for                                  |
+| ----------------------- | ---------------------------------------- |
+| `Interactive` (default) | Requests someone is waiting for          |
+| `Background`            | Prefetching and other work that can wait |
 
 When a slot opens, the oldest waiting interactive request takes it. Background requests only get a slot when no interactive request is waiting. Within a lane, requests go out in the order they were made. A request that's cancelled while waiting gives up its place.
 
@@ -141,11 +141,11 @@ When uma.moe answers 429, the whole client slows down, not just the refused requ
 
 This is additive increase, multiplicative decrease (AIMD), the same scheme TCP uses for congestion: a one-off 429 dips the rate briefly, while repeated 429s settle it just below what the API accepts. The settings are in `ClientConfig::backoff`:
 
-| `BackoffConfig` | Default | Meaning |
-|---|---|---|
-| `max_interval` | 30 s | Slowest pace: one request this often |
-| `recovery_step` | 0.05 | Requests per second added after each quiet period |
-| `recovery_every` | 10 s | Length of a quiet period |
+| `BackoffConfig`  | Default | Meaning                                           |
+| ---------------- | ------- | ------------------------------------------------- |
+| `max_interval`   | 30 s    | Slowest pace: one request this often              |
+| `recovery_step`  | 0.05    | Requests per second added after each quiet period |
+| `recovery_every` | 10 s    | Length of a quiet period                          |
 
 With the defaults, recovering from a quarter of the normal rate takes about 5 minutes. With `min_interval` set to zero, only the `Retry-After` pause applies.
 
@@ -164,13 +164,13 @@ These are retried:
 
 Other errors are returned straight away. That includes other 4xx responses, invalid JSON and other transport errors. When retries run out, the last error is returned.
 
-| Setting | Default | Meaning |
-|---|---|---|
-| `max_retries` | 3 | Retries after the first attempt |
-| `base_delay` | 500 ms | First retry delay, doubled each time |
-| `max_delay` | 30 s | Longest backoff between attempts |
+| Setting       | Default | Meaning                              |
+| ------------- | ------- | ------------------------------------ |
+| `max_retries` | 3       | Retries after the first attempt      |
+| `base_delay`  | 500 ms  | First retry delay, doubled each time |
+| `max_delay`   | 30 s    | Longest backoff between attempts     |
 
-The wait before retry *n* (from 0) is:
+The wait before retry _n_ (from 0) is:
 
 ```text
 exp  = min(base_delay × 2ⁿ, max_delay)
@@ -181,14 +181,14 @@ When the response has a `Retry-After` header in seconds, that value is used inst
 
 ## Errors
 
-| Variant | When |
-|---|---|
-| `Config` | Invalid base URL or API key |
-| `InvalidRequest` | Invalid parameters, such as a month outside 1 to 12 |
-| `Status` | Non-success status, with the parsed `{error, status, details}` body when the API sent one |
-| `RateLimited` | uma.moe asked for a longer `Retry-After` pause than `with_max_pause` allows. `status()` returns 429 |
-| `Transport` | The request couldn't be sent or timed out, or the response couldn't be read |
-| `Decode` | The response body didn't match the expected shape |
+| Variant          | When                                                                                                |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| `Config`         | Invalid base URL or API key                                                                         |
+| `InvalidRequest` | Invalid parameters, such as a month outside 1 to 12                                                 |
+| `Status`         | Non-success status, with the parsed `{error, status, details}` body when the API sent one           |
+| `RateLimited`    | uma.moe asked for a longer `Retry-After` pause than `with_max_pause` allows. `status()` returns 429 |
+| `Transport`      | The request couldn't be sent or timed out, or the response couldn't be read                         |
+| `Decode`         | The response body didn't match the expected shape                                                   |
 
 `Error::origin` says where an error came from: `"umamoe"` for `Status`, `RateLimited` and `Decode`, `"network"` for `Transport`, and `"server"` for `Config` and `InvalidRequest`. Each failed call, after any retries, also logs one `uma.moe request failed` warning through [`tracing`](https://docs.rs/tracing) with the endpoint, lane, origin, status, uma.moe's error message, attempts and a stack trace (captured when `RUST_LIB_BACKTRACE=1`). 404s aren't logged.
 
@@ -196,12 +196,12 @@ When the response has a `Retry-After` header in seconds, that value is used inst
 
 Each call records metrics through the [`metrics`](https://docs.rs/metrics) facade. They cost nothing unless the application installs a recorder, such as the server's Prometheus exporter.
 
-| Metric | Type | Labels | Meaning |
-|---|---|---|---|
-| `umamoe_requests_total` | counter | `endpoint`, `lane`, `status` | Attempts, so each retry counts as another one. `status` is the HTTP status code, or `timeout`, `connect_error` or `transport_error` when no response came back |
-| `umamoe_request_duration_seconds` | histogram | `endpoint`, `lane` | Time from sending an attempt to its response or error |
-| `umamoe_queue_wait_seconds` | histogram | `lane` | Time an attempt waited for its slot under `min_interval` |
-| `umamoe_allowed_rate` | gauge | | Requests per second the client currently allows, lowered by [backing off](#backing-off). Absent when `min_interval` is zero |
+| Metric                            | Type      | Labels                       | Meaning                                                                                                                                                        |
+| --------------------------------- | --------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `umamoe_requests_total`           | counter   | `endpoint`, `lane`, `status` | Attempts, so each retry counts as another one. `status` is the HTTP status code, or `timeout`, `connect_error` or `transport_error` when no response came back |
+| `umamoe_request_duration_seconds` | histogram | `endpoint`, `lane`           | Time from sending an attempt to its response or error                                                                                                          |
+| `umamoe_queue_wait_seconds`       | histogram | `lane`                       | Time an attempt waited for its slot under `min_interval`                                                                                                       |
+| `umamoe_allowed_rate`             | gauge     |                              | Requests per second the client currently allows, lowered by [backing off](#backing-off). Absent when `min_interval` is zero                                    |
 
 `endpoint` is the API path, such as `/api/v4/circles`, never the full URL, so trainer IDs and other query values don't appear in labels. `lane` is `interactive` or `background`.
 

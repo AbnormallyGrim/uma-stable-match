@@ -40,16 +40,11 @@ export function optInUrl(clubId: string): string {
 }
 
 /**
- * The club ID in `input`, which is a club ID or an uma.moe club link, or `null`.
+ * Parses a club ID taken.
+ * Only raw numeric club IDs are accepted
  */
 export function parseClubInput(input: string): string | null {
   const text = input.trim();
-  const match = /^(?:https?:\/\/)?(?:www\.)?uma\.moe\/circles\/(\d{1,18})\/?(?:[?#].*)?$/i.exec(
-    text,
-  );
-  if (match) {
-    return match[1]!;
-  }
   return /^\d{1,18}$/.test(text) ? text : null;
 }
 

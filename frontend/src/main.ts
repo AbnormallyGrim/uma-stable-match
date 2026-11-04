@@ -6,11 +6,12 @@ import App from './App.svelte';
 import ClubPage from './lib/ClubPage.svelte';
 import ApplicationsPage from './lib/ApplicationsPage.svelte';
 import { APPLICATIONS_ENABLED } from './lib/flags';
-import { clubRoute, isWishlistRoute, applicationsRoute } from './lib/route';
+import LoginPage from './lib/LoginPage.svelte';
+import { applicationsRoute, clubRoute, isLoginRoute, isWishlistRoute } from './lib/route';
 import SettingsPage from './lib/SettingsPage.svelte';
 import WishlistPage from './lib/WishlistPage.svelte';
+import { signedInUser } from './lib/applications';
 
-// The DSN is a public key: it only lets a page send events to this project.
 Sentry.init({
   dsn: 'https://9e1efba7aae097a3e0c5df71f48e4aeb@o4512370149097472.ingest.us.sentry.io/4512370231279616',
   environment: import.meta.env.MODE,
@@ -23,22 +24,44 @@ if (!target) {
   throw new Error('missing #app element');
 }
 
-const club = clubRoute(window.location.pathname, window.location.search);
-const applications = APPLICATIONS_ENABLED
-  ? applicationsRoute(window.location.pathname, window.location.search)
-  : null;
+const isProtectedApplications =
+  APPLICATIONS_ENABLED &&
+  (window.location.pathname === '/applications' ||
+    window.location.pathname === '/applications/' ||
+    /^\/applications(?:\/|$)/.test(window.location.pathname));
 
-const isApplicationHome = applications?.page === 'home';
+let shouldRedirectToLogin = false;
+if (isProtectedApplications && !isLoginRoute(window.location.pathname)) {
+  const discordId = await signedInUser().catch(() => null);
+  if (discordId === null) {
+    const next = `${window.location.pathname}${window.location.search}`;
+    window.location.replace(`/login?next=${encodeURIComponent(next)}`);
+    shouldRedirectToLogin = true;
+  }
+}
 
-export default club
-  ? mount(ClubPage, { target, props: { route: club } })
-  : applications?.page === 'settings'
-    ? mount(SettingsPage, {
-        target,
-        props: { clubId: applications.clubId, linked: applications.linked },
-      })
-    : applications && isApplicationHome
-      ? mount(ApplicationsPage, { target, props: { error: applications.error } })
-      : isWishlistRoute(window.location.pathname)
-        ? mount(WishlistPage, { target })
-        : mount(App, { target });
+if (!shouldRedirectToLogin) {
+  const club = clubRoute(window.location.pathname, window.location.search);
+  const applications = APPLICATIONS_ENABLED
+    ? applicationsRoute(window.location.pathname, window.location.search)
+    : null;
+
+  const isApplicationHome = applications?.page === 'home';
+
+  if (club) {
+    mount(ClubPage, { target, props: { route: club } });
+  } else if (applications?.page === 'settings') {
+    mount(SettingsPage, {
+      target,
+      props: { clubId: applications.clubId, linked: applications.linked },
+    });
+  } else if (applications && isApplicationHome) {
+    mount(ApplicationsPage, { target, props: { error: applications.error } });
+  } else if (isWishlistRoute(window.location.pathname)) {
+    mount(WishlistPage, { target });
+  } else if (isLoginRoute(window.location.pathname)) {
+    mount(LoginPage, { target });
+  } else {
+    mount(App, { target });
+  }
+}
