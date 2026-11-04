@@ -357,6 +357,100 @@ export const en = {
   'wishlist.about':
     'These polls are hosted by <a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>, not by Uma Stable Match. Your vote is stored and handled by StrawPoll under <a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">its privacy policy</a>.',
 
+  'club.applies': 'Quick apply',
+  'club.appliesTitle': 'You can apply to this club right from Uma Stable Match',
+
+  'applications.link': 'Applications',
+  'applications.title': 'Lorem ipsum dolor sit amet',
+  'applications.heading': 'Consectetur adipiscing elit sed do eiusmod tempor incididunt',
+  'applications.intro':
+    'Ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt in culpa qui officia deserunt.',
+  'applications.requirements':
+    '<strong>Mollit anim id</strong><ul><li>Est laborum lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad.</li><li>Minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt in culpa qui officia deserunt mollit anim id est laborum lorem ipsum dolor sit amet consectetur adipiscing.</li></ul>',
+  'applications.privacy': ({ href }: { href: string }) =>
+    `Elit <a href="${href}">sed do eiusmod tempor incididunt</a>.`,
+  'applications.session.loading': 'Ut labore et dolore magna…',
+  'applications.session.signedOut':
+    'Aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut.',
+  'applications.session.signIn': 'Aliquip ex ea commodo',
+  'applications.session.signedIn': 'Consequat duis aute irure.',
+  'applications.session.signOut': 'Dolor in',
+  'applications.session.error':
+    'Reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint.',
+  'applications.pick.heading': 'Occaecat cupidatat non proident',
+  'applications.pick.label': 'Sunt in culpa qui officia',
+  'applications.pick.hint':
+    'Deserunt mollit anim id est laborum lorem ipsum dolor sit amet consectetur adipiscing elit sed do.',
+  'applications.pick.next': 'Eiusmod',
+  'applications.pick.invalid':
+    'Tempor incididunt ut labore et dolore magna aliqua ut enim ad minim.',
+  'applications.confirm.heading': 'Veniam quis nostrud exercitation?',
+  'applications.confirm.club': ({ name }: { name: string }) => name,
+  'applications.confirm.unknownClub': ({ id }: { id: string }) => `Ullamco ${id}`,
+  'applications.confirm.steps':
+    'Laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat cupidatat.',
+  'applications.confirm.add': 'Non proident sunt',
+  'applications.confirm.checking': 'In culpa qui…',
+  'applications.confirm.back': 'Officia deserunt mollit anim',
+  'applications.error.heading': 'Id est laborum',
+  'applications.error.signIn': 'Lorem ipsum dolor sit amet consectetur adipiscing.',
+  'applications.error.notFound':
+    'Elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis.',
+  'applications.error.noInvite':
+    'Nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat.',
+  'applications.error.unavailable':
+    'Nulla pariatur excepteur sint occaecat cupidatat non proident sunt in culpa qui.',
+  'applications.error.generic': 'Officia deserunt mollit anim id.',
+  'applications.error.invalid_state':
+    'Est laborum lorem ipsum dolor sit amet consectetur adipiscing.',
+  'applications.error.denied': 'Elit sed do eiusmod tempor incididunt ut.',
+  'applications.error.discord_error': 'Labore et dolore magna aliqua ut enim ad.',
+  'applications.error.wrong_server':
+    'Minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt.',
+  'applications.error.no_server':
+    'In culpa qui officia deserunt mollit anim id est laborum lorem ipsum dolor sit amet.',
+  'applications.error.forbidden':
+    'Consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad.',
+
+  'settings.title': 'Minim veniam quis nostrud exercitation ullamco',
+  'settings.heading': ({ name }: { name: string }) => `Laboris nisi ${name}`,
+  'settings.club': ({ id }: { id: string }) => `ut ${id}`,
+  'settings.loading': 'Aliquip ex…',
+  'settings.linked': 'Ea commodo consequat duis aute irure dolor in.',
+  'settings.back': 'Reprehenderit in voluptate velit',
+  'settings.signIn': 'Esse cillum dolore eu fugiat nulla pariatur excepteur sint.',
+  'settings.forbidden':
+    'Occaecat cupidatat non proident sunt in culpa qui officia deserunt mollit anim id est laborum lorem ipsum dolor.',
+  'settings.notLinked': 'Sit amet consectetur adipiscing elit sed do eiusmod.',
+  'settings.optIn': 'Tempor incididunt ut',
+  'settings.loadError': 'Labore et dolore magna aliqua ut enim ad minim veniam quis.',
+  'settings.open': 'Nostrud exercitation',
+  'settings.openHint':
+    'Ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor in reprehenderit in voluptate.',
+  'settings.autoJoin': 'Velit esse cillum dolore eu fugiat',
+  'settings.category': 'Nulla pariatur excepteur sint',
+  'settings.categoryHint': 'Occaecat cupidatat non proident sunt in culpa qui officia deserunt.',
+  'settings.categoryNone': 'Mollit anim',
+  'settings.leaderRoles': 'Id est laborum',
+  'settings.leaderRolesHint':
+    'Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt.',
+  'settings.noRoles':
+    'Ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation.',
+  'settings.problem': ({ problem }: { problem: string }) => `Ullamco laboris nisi: ${problem}`,
+  'settings.save': 'Ut',
+  'settings.saving': 'Aliquip…',
+  'settings.saved': 'Ex.',
+  'settings.saveError': 'Ea commodo consequat duis aute irure dolor.',
+  'settings.unlink': 'In reprehenderit',
+  'settings.unlinkHint':
+    'In voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt in culpa qui officia.',
+  'settings.unlinkConfirm':
+    'Deserunt mollit anim id est laborum lorem ipsum dolor sit amet consectetur.',
+  'settings.unlinkYes': 'Adipiscing',
+  'settings.unlinkError': 'Elit sed do eiusmod tempor incididunt ut.',
+  'settings.cancel': 'Labore',
+  'settings.unlinked': 'Et dolore magna aliqua.',
+
   'footer.tipsSummary': 'Tips for switching clubs',
   'footer.tip14':
     '<strong>14-day rule:</strong> you need at least 14 days in a club during a month to receive its monthly reward, so switch early in the month.',

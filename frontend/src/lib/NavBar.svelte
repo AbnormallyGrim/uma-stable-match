@@ -113,6 +113,24 @@
     padding: 10px var(--gutter);
   }
 
+  /* With room, the brand, pages and tools sit in three columns whose outer two are as wide as the
+     wider of them, so the pages stay put from one page to the next. The website's navbar does the
+     same. */
+  @media (width >= 960px) {
+    .inner {
+      display: grid;
+      grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
+    }
+
+    .brand {
+      justify-self: start;
+    }
+
+    .tools {
+      justify-self: end;
+    }
+  }
+
   .brand {
     display: flex;
     gap: 12px;

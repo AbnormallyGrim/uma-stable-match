@@ -4,4 +4,5 @@
         <loc>https://umastable.com/</loc>
         <lastmod>2026-10-22</lastmod>
     </url>
+    <!-- /privacy/ is listed once APPLICATIONS_ENABLED is on in site.js. -->
 </urlset>

@@ -28,6 +28,8 @@ export interface ClubInfo {
   comment: string | null;
   /** Whether the description mentions Discord. A best guess. */
   has_discord: boolean;
+  /** `'discord'` when players can apply to the club through Discord; left out otherwise. */
+  applications?: 'discord';
 }
 
 /** One recommended club. Lower `fit` and `score` are better. */

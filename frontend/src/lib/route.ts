@@ -1,4 +1,7 @@
-/** Which page an address shows: the search, a club page at `/club/{id}?trainer=…`, or the wishlist page. */
+/**
+ * Which page an address shows: the search, a club page at `/club/{id}?trainer=…`, the wishlist page,
+ * or the club applications pages.
+ */
 
 import { isTrainerId, normaliseTrainerId } from './search';
 
@@ -36,6 +39,34 @@ export const WISHLIST_PATH = '/wishlist';
 /** Whether `pathname` is the wishlist page. */
 export function isWishlistRoute(pathname: string): boolean {
   return pathname === WISHLIST_PATH || pathname === `${WISHLIST_PATH}/`;
+}
+
+/** The address of the club applications page, where a leader sets a club up. */
+export const APPLICATIONS_PATH = '/applications';
+
+/** A club applications page: the start, or one club's settings. */
+export type ApplicationsRoute =
+  { page: 'home'; error: string | null } | { page: 'settings'; clubId: string; linked: boolean };
+
+const SETTINGS_PATH = /^\/applications\/club\/(\d{1,18})\/?$/;
+
+/** The club applications page `pathname` and `search` point to, or `null` for any other page. */
+export function applicationsRoute(pathname: string, search: string): ApplicationsRoute | null {
+  const params = new URLSearchParams(search);
+  if (pathname === APPLICATIONS_PATH || pathname === `${APPLICATIONS_PATH}/`) {
+    const error = params.get('error');
+    // Only a short label is shown, never text from the address.
+    return { page: 'home', error: error !== null && /^[a-z_]{1,32}$/.test(error) ? error : null };
+  }
+  const match = SETTINGS_PATH.exec(pathname);
+  return match
+    ? { page: 'settings', clubId: match[1]!, linked: params.get('linked') === '1' }
+    : null;
+}
+
+/** The settings page of a club. */
+export function settingsPath(clubId: number | string, linked = false): string {
+  return `${APPLICATIONS_PATH}/club/${clubId}${linked ? '?linked=1' : ''}`;
 }
 
 const FROM_KEY = 'uma-stable-match:club-from';

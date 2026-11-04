@@ -8,9 +8,12 @@ import App from './App.svelte';
 import type { ClubDetails, Recommendations } from './lib/api';
 import ClubPage from './lib/ClubPage.svelte';
 import HowToUse from './lib/HowToUse.svelte';
+import { t } from './lib/i18n';
+import ApplicationsPage from './lib/ApplicationsPage.svelte';
 import ResultsTable from './lib/ResultsTable.svelte';
 import SearchForm from './lib/SearchForm.svelte';
 import SearchStatus from './lib/SearchStatus.svelte';
+import SettingsPage from './lib/SettingsPage.svelte';
 import { DEFAULT_SEARCH } from './lib/search';
 import { club, recommendations } from './lib/test-data';
 import ThemeToggle from './lib/ThemeToggle.svelte';
@@ -224,5 +227,62 @@ describe('accessibility', () => {
   it('has no violations in the theme switch', async () => {
     const { container } = render(ThemeToggle, { storage: localStorage });
     expect(await violations(container)).toEqual([]);
+  });
+
+  describe('the club applications pages', () => {
+    const answer = (routes: Record<string, () => Response>) =>
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((input: string, init?: RequestInit) => {
+          const route = routes[`${init?.method ?? 'GET'} ${input.split('?')[0]}`];
+          return Promise.resolve(route ? route() : json({ error: 'not found' }, 404));
+        }),
+      );
+    const settings = {
+      guild_id: '5000',
+      category: '10',
+      leader_roles: ['20'],
+      auto_join: true,
+      open: true,
+      problem: 'made-up problem',
+      categories: [{ id: '10', name: 'Applications' }],
+      roles: [{ id: '20', name: 'Officers' }],
+    };
+
+    it('has no violations when signed out', async () => {
+      answer({ 'GET /api/v1/applications/me': () => json({ error: 'no' }, 401) });
+      const { container } = render(ApplicationsPage, { error: 'wrong_server' });
+      await screen.findByRole('link', { name: t('applications.session.signIn') });
+      expect(await violations(container)).toEqual([]);
+    });
+
+    it('has no violations when picking and confirming a club', async () => {
+      answer({ 'GET /api/v1/applications/me': () => json({ discord_id: '42' }) });
+      const { container } = render(ApplicationsPage);
+      const field = await screen.findByLabelText(t('applications.pick.label'));
+      expect(await violations(container)).toEqual([]);
+      await fireEvent.input(field, { target: { value: 'nope' } });
+      await fireEvent.click(screen.getByRole('button', { name: t('applications.pick.next') }));
+      expect(await violations(container)).toEqual([]);
+      await fireEvent.input(field, { target: { value: '777' } });
+      await fireEvent.click(screen.getByRole('button', { name: t('applications.pick.next') }));
+      expect(await violations(container)).toEqual([]);
+    });
+
+    it('has no violations in the settings, and when unlinking', async () => {
+      answer({ 'GET /api/v1/discord/clubs/7/settings': () => json(settings) });
+      const { container } = render(SettingsPage, { clubId: '7', linked: true });
+      await screen.findByRole('button', { name: t('settings.save') });
+      expect(await violations(container)).toEqual([]);
+      await fireEvent.click(screen.getByRole('button', { name: t('settings.unlink') }));
+      expect(await violations(container)).toEqual([]);
+    });
+
+    it.each([401, 403, 404])('has no violations when the settings answer %s', async (status) => {
+      answer({ 'GET /api/v1/discord/clubs/7/settings': () => json({ error: 'no' }, status) });
+      const { container } = render(SettingsPage, { clubId: '7' });
+      await screen.findByText(/./, { selector: 'p.card, p[role="alert"], section p' });
+      expect(await violations(container)).toEqual([]);
+    });
   });
 });

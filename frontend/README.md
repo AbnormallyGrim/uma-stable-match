@@ -51,9 +51,12 @@ CI runs `check`, `lint`, `test` and `build` on Node 22 for every push to `main` 
 index.html                    Page shell
 public/theme-init.js          Applies the saved theme before the page renders
 public/favicon-32.png         Browser icon, with apple-touch-icon.png for home screens
-src/main.ts                   Mounts the search, or the club page for a /club/ address
+src/main.ts                   Mounts the search, the club page for a /club/ address, or a club applications page
 src/App.svelte                Root component: runs searches and keeps them in the URL
-src/lib/route.ts              Which page an address shows, and club and wishlist page addresses
+src/lib/route.ts              Which page an address shows, and club, wishlist and club applications page addresses
+src/lib/ApplicationsPage.svelte    The club applications page: what setting up needs, then sign in, pick the club, confirm
+src/lib/SettingsPage.svelte   A linked club's Discord settings, with unlinking
+src/lib/applications.ts            The applications API client: sign-in, opt-in check, settings, unlink
 src/lib/WishlistPage.svelte   The wishlist page: StrawPoll polls for ideas, in frames
 src/lib/polls.ts              The polls on the wishlist page
 src/lib/ClubPage.svelte       The club page: a club's details, its chart and member cards, with you added
@@ -366,6 +369,27 @@ The page calls `fetchClub()`, which wraps [`GET /api/v1/clubs/{id}`](../backend/
 - **Back to search:** following one of those buttons notes the search's address in this tab's session storage. The club page's **Back to search** then goes back in history to those results, with their scroll position. Without one, for example when the club page was opened from a shared link, it opens a new search. The server sends `Referrer-Policy: no-referrer`, so the referrer can't tell where the visitor came from.
 
 The navbar keeps the release notes but has no tour button here.
+
+### Quick apply badge
+
+`ClubTags.svelte` adds a **Quick apply** badge when a club's `applications` is `"discord"`: on result cards, table rows and the club page. It is separate from the **Discord** tag, which only says the description mentions Discord. The server sets `applications` for clubs that are opted in, open, joinable and without a setup problem, so the badge needs no logic here, and the field is left out when Discord isn't set up. The badge uses the Discord tag's colours, so the same [contrast](#accessibility) pair covers it.
+
+## Club applications pages
+
+**Feature flag.** `APPLICATIONS_ENABLED` in `src/lib/flags.ts` is `false`. While it is off, `main.ts` doesn't mount these pages, so `/applications` and `/applications/club/{id}` open the club finder like any unknown address, and `visiblePages()` leaves the **Applications** link out of the navbar. The components and their tests don't depend on the flag. The website has its own flag, `APPLICATIONS_ENABLED` in `site/site.js`, for its `/privacy/` page and the navbar link; see the notes at the top of that file for turning it on.
+
+**Placeholder copy.** All text on these pages is lorem ipsum for now: the `applications.*` messages (except `applications.link`, the navbar label) and the `settings.*` messages, in both languages, and the privacy page's text. Tests read the text through `t()`, so replacing it needs no test changes.
+
+`/applications` and `/applications/club/{id}` are where a club leader sets up applications through Discord. `main.ts` mounts `ApplicationsPage.svelte` or `SettingsPage.svelte`; `applicationsRoute()` reads the address and `settingsPath()` builds it. A **Club applications** link joins the navbar's pages. `applications.ts` wraps the [Discord endpoints](../backend/discord/README.md); they aren't behind the human check, and they use the session cookie, so requests are same-origin.
+
+**The page at `/applications`** says what taking applications through Discord does and what it needs, in the wording written for club leaders: a working invite in the club description while opting in, and Manage Server or Administrator in the server. It links to the website's [privacy section](../site/index.md). Then:
+
+1. **Sign in:** a signed-out visitor gets **Sign in with Discord**, which goes through `/api/v1/auth/discord/login` and comes back here. A signed-in one sees **Sign out**.
+2. **Pick the club:** a club ID, or an uma.moe club link (`parseClubInput()` reads both). Anything else is refused on the spot.
+3. **Confirm:** the club's name when it is loaded, what happens next, and **Add the bot to my server**. The button first calls the opt-in address without leaving the page (`checkOptIn()`, which only follows the redirect to Discord if the server would send one), so problems show here: no working invite or invites to two servers (422), an unknown club (404), a session that ended (401), or Discord unavailable. Only then does the browser go to Discord, with the server picker locked to the invite's server.
+4. **Result:** Discord sends the leader to the club's settings page with `?linked=1`. If something fails in the callback, the server sends the browser back to `/applications?error=<label>`, and the page shows what each label means (`wrong_server`, `no_server`, `denied`, `invalid_state`, `discord_error`, `unavailable`). An unknown label reads as a generic problem, and only a short lowercase label is accepted from the address.
+
+**The settings page** loads the settings with `GET /api/v1/discord/clubs/{id}/settings`. The server asks Discord on every request whether the person still manages the server, so the page shows what it's told: **sign in** for a 401, **you need Manage Server or Administrator** for a 403, and **the club doesn't take applications yet** with a link to set it up for a 404. The form has **Take applications** (off pauses them), **Add applicants to the server automatically**, a **Ticket category** menu and a **Leader roles** checklist, both from the server's own lists, and **Save settings**. A setup problem, if the server reports one, shows above the form. **Unlink this club** asks once before sending the `DELETE`.
 
 ### Pace chart
 

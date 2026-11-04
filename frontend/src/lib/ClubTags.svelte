@@ -1,6 +1,7 @@
 <!--
   @component
-  A club's rank and trend, open spots, join style, playstyle and Discord tag, on one wrapping line.
+  A club's rank and trend, open spots, join style, playstyle, Discord tag and, for clubs that take
+  applications here, a Quick apply badge, on one wrapping line.
 -->
 
 <script lang="ts">
@@ -35,6 +36,9 @@
   {#if spots}<span>{spots}</span>{/if}
   {#if joinStyle}<span class="tag join {club.join_style}">{joinStyle}</span>{/if}
   {#if playstyle}<span class="tag policy">{playstyle}</span>{/if}
+  {#if club.applications === 'discord'}
+    <span class="tag applies" title={t('club.appliesTitle')}>{t('club.applies')}</span>
+  {/if}
   {#if club.has_discord}
     <span class="tag discord" title={t('club.discordTitle')}>{t('club.discord')}</span>
   {/if}
@@ -90,8 +94,13 @@
     color: var(--policy);
   }
 
-  .discord {
+  .discord,
+  .applies {
     background: color-mix(in srgb, var(--discord) 14%, transparent);
     color: var(--discord);
+  }
+
+  .applies {
+    font-weight: 700;
   }
 </style>
