@@ -16,6 +16,12 @@
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
   import SiteFooter from './SiteFooter.svelte';
 
+  interface Props {
+    error?: string | null;
+  }
+
+  let { error = null }: Props = $props();
+
   const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
   let readingReleases = $state(false);
   let unseenRelease = $state(hasUnseenRelease(storage));

@@ -28,6 +28,8 @@ const applications = APPLICATIONS_ENABLED
   ? applicationsRoute(window.location.pathname, window.location.search)
   : null;
 
+const isApplicationHome = applications?.page === 'home';
+
 export default club
   ? mount(ClubPage, { target, props: { route: club } })
   : applications?.page === 'settings'
@@ -35,7 +37,7 @@ export default club
         target,
         props: { clubId: applications.clubId, linked: applications.linked },
       })
-    : applications
+    : applications && isApplicationHome
       ? mount(ApplicationsPage, { target, props: { error: applications.error } })
       : isWishlistRoute(window.location.pathname)
         ? mount(WishlistPage, { target })
