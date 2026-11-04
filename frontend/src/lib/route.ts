@@ -88,3 +88,11 @@ export function rememberedSearch(storage: Storage | undefined): string | null {
     return null;
   }
 }
+
+/** The address of the login page for Discord sign-in. */
+export const LOGIN_PATH = '/login';
+
+/** Whether `pathname` is the login page. */
+export function isLoginRoute(pathname: string): boolean {
+  return pathname === LOGIN_PATH || pathname === `${LOGIN_PATH}/`;
+}

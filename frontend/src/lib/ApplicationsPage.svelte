@@ -8,15 +8,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import { ApiError } from './api';
-  import { checkOptIn, loginUrl, parseClubInput, signOut, signedInUser } from './applications';
+  import { signOut, signedInUser } from './applications';
   import { applyFeatures } from './features';
   import { t, hasMessage } from './i18n';
   import { language } from './language.svelte';
   import NavBar from './NavBar.svelte';
   import ReleaseNotes from './ReleaseNotes.svelte';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
-  import { APPLICATIONS_PATH, settingsPath } from './route';
   import SiteFooter from './SiteFooter.svelte';
 
   interface Props {
@@ -29,11 +27,6 @@
   let readingReleases = $state(false);
   let unseenRelease = $state(hasUnseenRelease(storage));
   let session = $state<'loading' | 'signed-out' | 'signed-in' | 'error'>('loading');
-  let clubInput = $state('');
-  let invalidClub = $state(false);
-  let selectedClubId = $state<string | null>(null);
-  let selectedClubName = $state<string | null>(null);
-  let showConfirm = $state(false);
   let statusMessage = $state<string | null>(null);
   let busy = $state(false);
   const routeError = $derived(appErrorMessage(error));
@@ -87,22 +80,10 @@
     // Placeholder: future leader and trainer pages will live here.
   }
 
-  function resetPick(keepStatus = false) {
-    clubInput = '';
-    invalidClub = false;
-    selectedClubId = null;
-    selectedClubName = null;
-    showConfirm = false;
-    statusMessage = keepStatus ? statusMessage : (routeError ?? null);
-  }
-
   async function checkSession() {
     try {
       const discordId = await signedInUser();
       session = discordId === null ? 'signed-out' : 'signed-in';
-      if (discordId === null) {
-        resetPick();
-      }
     } catch (reason) {
       console.warn(reason);
       session = 'error';
@@ -110,77 +91,10 @@
     }
   }
 
-  async function pickClub() {
-    const parsed = parseClubInput(clubInput);
-    if (parsed === null) {
-      invalidClub = true;
-      statusMessage = t('applications.pick.invalid');
-      return;
-    }
-
-    invalidClub = false;
-    statusMessage = null;
-    busy = true;
-    try {
-      const response = await fetch(`/api/v1/clubs/${encodeURIComponent(parsed)}`);
-      if (response.ok) {
-        const body = (await response.json()) as { club?: { name?: string } };
-        selectedClubName = body.club?.name ?? null;
-      }
-    } catch {
-      // Ignore a missing club lookup when the user is already entering a valid ID.
-    } finally {
-      selectedClubId = parsed;
-      selectedClubName = selectedClubName ?? t('applications.confirm.unknownClub', { id: parsed });
-      showConfirm = true;
-      busy = false;
-    }
-  }
-
-  async function confirmClub() {
-    if (!selectedClubId) {
-      return;
-    }
-
-    busy = true;
-    statusMessage = null;
-    try {
-      await checkOptIn(selectedClubId);
-      const next = settingsPath(selectedClubId, true);
-      window.location.assign(
-        `/api/v1/discord/opt-in?${new URLSearchParams({ club: selectedClubId, next })}`,
-      );
-    } catch (reason) {
-      const status = reason instanceof ApiError ? reason.status : null;
-      if (status === 401) {
-        session = 'signed-out';
-        statusMessage = t('applications.error.signIn');
-        resetPick(true);
-        return;
-      }
-
-      statusMessage =
-        status === 404
-          ? t('applications.error.notFound')
-          : status === 422
-            ? t('applications.error.noInvite')
-            : status === 502
-              ? t('applications.error.unavailable')
-              : status === 500
-                ? t('applications.error.generic')
-                : status === 403
-                  ? t('applications.error.forbidden')
-                  : t('applications.error.generic');
-    } finally {
-      busy = false;
-    }
-  }
-
   async function signOutNow() {
     try {
       await signOut();
       session = 'signed-out';
-      resetPick();
       statusMessage = null;
     } catch {
       session = 'signed-out';
@@ -235,54 +149,7 @@
     <p class="card muted" role="status">{t('applications.session.loading')}</p>
   {:else if session === 'error'}
     <p class="status-alert" role="alert">{t('applications.session.error')}</p>
-  {:else if session === 'signed-out'}
-    <section class="session-card">
-      {#if statusMessage}
-        <p role="alert">{statusMessage}</p>
-      {/if}
-      <p>{t('applications.session.signedOut')}</p>
-      <a class="button primary" href={loginUrl(APPLICATIONS_PATH)}
-        >{t('applications.session.signIn')}</a
-      >
-    </section>
-  {:else}
-    {#if !showConfirm}
-      <section class="session-card pick-card">
-        <label for="club-input">{t('applications.pick.label')}</label>
-        <input
-          id="club-input"
-          bind:value={clubInput}
-          aria-invalid={invalidClub ? 'true' : 'false'}
-          type="text"
-          autocomplete="off"
-        />
-        {#if statusMessage}
-          <p role="alert">{statusMessage}</p>
-        {/if}
-        <button type="button" class="button primary" onclick={pickClub} disabled={busy}>
-          {t('applications.pick.next')}
-        </button>
-      </section>
-    {:else}
-      <section class="session-card confirm-card">
-        <h2>{t('applications.confirm.heading')}</h2>
-        <p>
-          {selectedClubName ?? t('applications.confirm.unknownClub', { id: selectedClubId ?? '' })}
-        </p>
-        <p>{t('applications.confirm.steps')}</p>
-        {#if statusMessage}
-          <p role="alert">{statusMessage}</p>
-        {/if}
-        <div class="actions">
-          <button type="button" class="button primary" onclick={confirmClub} disabled={busy}>
-            {busy ? t('applications.confirm.checking') : t('applications.confirm.add')}
-          </button>
-          <button type="button" onclick={() => resetPick()} disabled={busy}>
-            {t('applications.confirm.back')}
-          </button>
-        </div>
-      </section>
-    {/if}
+  {:else if session === 'signed-in'}
 
     <div class="session-actions">
       <button type="button" class="button secondary" onclick={signOutNow}>
@@ -398,27 +265,6 @@
     box-shadow: 0 2px 20px rgb(0 0 0 / 4%);
   }
 
-  .session-card label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-  }
-
-  .session-card input {
-    width: 100%;
-    box-sizing: border-box;
-    margin-bottom: 12px;
-    padding: 0.75rem 0.85rem;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface);
-    color: var(--text);
-  }
-
-  .session-card input[aria-invalid='true'] {
-    border-color: var(--danger, #d9485f);
-  }
-
   .session-card p {
     margin: 0 0 12px;
     color: var(--text-2);
@@ -440,12 +286,6 @@
     cursor: pointer;
   }
 
-  .button.primary {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--on-accent);
-  }
-
   .button:disabled {
     opacity: 0.6;
     cursor: wait;
@@ -457,12 +297,6 @@
     margin-top: 18px;
   }
 
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 12px;
-  }
 
   .status-alert {
     max-width: 560px;

@@ -31,27 +31,20 @@ const settings: Settings = {
 };
 
 describe('parseClubInput', () => {
-  it('reads a club ID or an uma.moe club link', () => {
-    for (const input of [
-      '123456789',
-      '  123456789 ',
-      'https://uma.moe/circles/123456789',
-      'http://www.uma.moe/circles/123456789/',
-      'uma.moe/circles/123456789?x=1',
-    ]) {
-      expect(parseClubInput(input), input).toBe('123456789');
-    }
+  it('reads a club ID from a direct frontend value', () => {
+    expect(parseClubInput('123456789')).toBe('123456789');
+    expect(parseClubInput('  123456789 ')).toBe('123456789');
   });
 
-  it('refuses anything else', () => {
+  it('refuses URLs and invalid values', () => {
     for (const input of [
       '',
       'abc',
       '12 34',
       '1'.repeat(19),
       'https://example.com/circles/123',
-      'https://uma.moe/circles/abc',
-      'https://uma.moe.example.com/circles/123',
+      'https://uma.moe/circles/123',
+      'uma.moe/circles/123',
     ]) {
       expect(parseClubInput(input), input).toBeNull();
     }
