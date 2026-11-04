@@ -21,11 +21,15 @@
   }
 
   let { error = null }: Props = $props();
-  void error;
 
   const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
   let readingReleases = $state(false);
   let unseenRelease = $state(hasUnseenRelease(storage));
+
+  // Keep the prop available for future route/error handling without causing a state-capture warning.
+  $effect(() => {
+    void error;
+  });
 
   type RoleKey = 'leader' | 'trainer';
 
