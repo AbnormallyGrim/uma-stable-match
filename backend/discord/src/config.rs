@@ -112,6 +112,31 @@ impl fmt::Debug for SigningKey {
     }
 }
 
+/// The secret that keys the hashes Redis holds in place of Discord IDs. `Debug` output hides it.
+#[derive(Clone, PartialEq, Eq)]
+pub struct KeySecret(String);
+
+impl KeySecret {
+    /// Shortest secret accepted.
+    pub const MIN_LEN: usize = 32;
+
+    /// The secret, or `None` if it's shorter than [`MIN_LEN`](Self::MIN_LEN) characters.
+    pub fn parse(value: &str) -> Option<Self> {
+        let value = value.trim();
+        (value.len() >= Self::MIN_LEN).then(|| Self(value.to_owned()))
+    }
+
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
+impl fmt::Debug for KeySecret {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("KeySecret(<redacted>)")
+    }
+}
+
 /// The site's public address, such as `https://example.com`: where Discord sends people back to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PublicUrl(String);

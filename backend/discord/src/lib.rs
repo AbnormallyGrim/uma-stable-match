@@ -14,6 +14,8 @@ mod rest;
 mod settings;
 mod store;
 mod token;
+mod trainer_store;
+mod trainers;
 
 pub use auth::{
     APPLICATIONS_ME_PATH, APPLICATIONS_PAGE, CALLBACK_PATH, LOGIN_PATH, MAX_SESSION_AGE,
@@ -21,8 +23,8 @@ pub use auth::{
 };
 pub use bot::Discord;
 pub use config::{
-    ApplicationId, BotToken, ClientSecret, DiscordConfig, PublicKey, PublicUrl, RateLimitConfig,
-    SigningKey, DEFAULT_API_BASE, DEFAULT_AUTHORIZE_URL,
+    ApplicationId, BotToken, ClientSecret, DiscordConfig, KeySecret, PublicKey, PublicUrl,
+    RateLimitConfig, SigningKey, DEFAULT_API_BASE, DEFAULT_AUTHORIZE_URL,
 };
 pub use error::Error;
 pub use interactions::{router, INTERACTIONS_PATH, MAX_TIMESTAMP_SKEW};
@@ -36,3 +38,10 @@ pub use reqwest::StatusCode;
 pub use rest::Rest;
 pub use settings::{MAX_LEADER_ROLES, SETTINGS_PATH};
 pub use store::{ClubRecord, ClubStore, Departure, SettingsUpdate, StoreError};
+pub use trainer_store::{
+    Action, LinkOutcome, Pending, TrainerStore, KEY_LIFETIME, MAX_LINKED_TRAINERS,
+};
+pub use trainers::{
+    TrainerLinks, TrainerLookup, TrainerSummary, LINK_PATH, TRAINERS_PATH, TRAINER_PATH,
+    VERIFICATION_PATH,
+};

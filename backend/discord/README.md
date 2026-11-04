@@ -181,3 +181,48 @@ A club whose server has removed the bot can't prove anyone's rights, so it can't
 | `roles` | The server's roles except `@everyone`, `{id, name}`, to choose the leader roles from |
 
 `PATCH` takes a JSON object with any of `category` (an ID, or `null` to clear), `leader_roles` (a list of IDs, duplicates dropped, at most `MAX_LEADER_ROLES`, 25), `auto_join` and `open`. Fields left out stay as they are. The category must be one of the server's categories and the roles must be the server's roles; otherwise, an unknown field, a wrong type, or no field at all gets 400 and nothing changes. It answers with the new settings, as `GET` does. A 409 means the club moved to another server or was unlinked while the change was made.
+
+## Linking a trainer
+
+A trainer ID is public and typed in by the player, so it proves nothing by itself. A signed-in person proves they own one by putting a key we give them in their in-game profile comment; once uma.moe shows the key there, the ID is linked to their Discord ID.
+
+| Route | Does |
+|---|---|
+| `GET /api/v1/discord/trainers` | `{"linked": ["…"], "max": 5}`: the trainer IDs the signed-in person owns (`TRAINERS_PATH`) |
+| `POST /api/v1/discord/trainers/{trainer}/verification` | Answers `{"key": "uma-7KQ4XM", "expires_in": 86400}`: the key to put in the profile comment (`VERIFICATION_PATH`) |
+| `POST /api/v1/discord/trainers/{trainer}/link` | Reads the trainer's profile and links the ID if the key is in the comment (`LINK_PATH`) |
+| `DELETE /api/v1/discord/trainers/{trainer}` | Unlinks the ID from the signed-in person (`TRAINER_PATH`) |
+
+All need a session, and `{trainer}` is 9 to 12 digits. The key and the list are never cached (`Cache-Control: no-store`).
+
+**Keys.** A key is `uma-` and six characters from letters and digits that can't be mistaken for each other (no `I`, `L`, `O`, `0` or `1`). It is made for one person and one trainer ID, is good for 24 hours (`KEY_LIFETIME`), and is used up when it links. Asking again while one is pending gives the same key. Someone else can't use a key they read in a profile: their own check looks for their own key. The profile can take a while to show a new comment, so the key lasts a day, and checking again is fine.
+
+**Checking.** The check looks for the key anywhere in the comment, ignoring case, in a profile fetched fresh from uma.moe (`TrainerLookup`, given by the server, so this crate doesn't know where profiles come from). It answers:
+
+| Status | When |
+|---|---|
+| 200 | Linked: `{"linked": true, "name": "…"}` |
+| 400 | `trainer` isn't a trainer ID |
+| 401 | Not signed in |
+| 403 | The person already has `MAX_LINKED_TRAINERS` (5) IDs linked; nothing changes, so no one loses their link to a refused claim |
+| 404 | uma.moe doesn't know the trainer |
+| 409 | No key is pending (ask for one first, or it expired); uma.moe isn't called |
+| 422 | The key isn't in the comment yet |
+| 429 | Too many tries; `Retry-After` says how many seconds to wait. At most 10 checks and 20 keys an hour per person, and a refused check never reaches uma.moe |
+| 502 | uma.moe couldn't be reached; try again |
+| 503 | The saved links couldn't be reached |
+
+Asking for a key for an ID the person already owns is a 409 as well.
+
+**Owners.** A trainer ID has one owner at a time. Proving it again replaces the old owner, since the comment shows who controls the account now. A person can own several IDs, up to the limit above.
+
+**What's kept.** Redis never holds a Discord ID, only a keyed hash of it (`KeySecret`, the server's `REDIS_KEY_SECRET`). The trainer ID's owner and the person's set of IDs have no TTL, so eviction can't remove them; they stay until the person unlinks. The pending key and the attempt counters expire.
+
+| Key | Holds |
+|---|---|
+| `discord:trainer:{trainer_id}` | The hash of the owner |
+| `discord:applicant:{hash}` | A set of the trainer IDs that person owns |
+| `discord:verify:{hash}:{trainer_id}` | The pending key, for 24 hours |
+| `discord:hits:{action}:{hash}` | Attempts this hour |
+
+Linking needs the app set up with `Discord::with_trainer_links(TrainerLinks::new(store, lookup))`; without it the routes aren't served. Results are counted in `discord_trainer_links_total`, labelled by `result` (`linked`, `mismatch`, `not_found`, `too_many`, `rate_limited`, `unavailable`).

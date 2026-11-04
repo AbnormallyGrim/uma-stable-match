@@ -6,6 +6,7 @@ use crate::config::DiscordConfig;
 use crate::error::Error;
 use crate::opt_in::OptIn;
 use crate::rest::Rest;
+use crate::trainers::TrainerLinks;
 
 /// The Discord application, shared by every route. Cheap to clone.
 #[derive(Debug, Clone)]
@@ -19,6 +20,7 @@ struct Inner {
     rest: Rest,
     http: reqwest::Client,
     opt_in: Option<OptIn>,
+    trainer_links: Option<TrainerLinks>,
 }
 
 impl Discord {
@@ -34,6 +36,7 @@ impl Discord {
                 rest,
                 http,
                 opt_in: None,
+                trainer_links: None,
             }),
         })
     }
@@ -62,11 +65,30 @@ impl Discord {
                 rest: inner.rest.clone(),
                 http: inner.http.clone(),
                 opt_in: Some(opt_in),
+                trainer_links: inner.trainer_links.clone(),
+            }),
+        }
+    }
+
+    /// The same application, also serving the trainer-link routes with `trainer_links`.
+    pub fn with_trainer_links(self, trainer_links: TrainerLinks) -> Self {
+        let inner = &self.inner;
+        Self {
+            inner: Arc::new(Inner {
+                config: inner.config.clone(),
+                rest: inner.rest.clone(),
+                http: inner.http.clone(),
+                opt_in: inner.opt_in.clone(),
+                trainer_links: Some(trainer_links),
             }),
         }
     }
 
     pub(crate) fn opt_in(&self) -> Option<&OptIn> {
         self.inner.opt_in.as_ref()
+    }
+
+    pub(crate) fn trainer_links(&self) -> Option<&TrainerLinks> {
+        self.inner.trainer_links.as_ref()
     }
 }
