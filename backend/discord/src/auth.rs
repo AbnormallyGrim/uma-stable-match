@@ -336,8 +336,13 @@ async fn session_info(State(discord): State<Discord>, headers: HeaderMap) -> Res
 }
 
 async fn sign_out(State(discord): State<Discord>) -> Response {
-    let cookie = set_cookie(discord.config(), SESSION_COOKIE, "", "/", Duration::ZERO);
-    (StatusCode::NO_CONTENT, [(SET_COOKIE, cookie)]).into_response()
+    let config = discord.config();
+    let session = set_cookie(config, SESSION_COOKIE, "", "/", Duration::ZERO);
+    let hint = crate::clubs::clear_hint(config);
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    response.headers_mut().append(SET_COOKIE, session);
+    response.headers_mut().append(SET_COOKIE, hint);
+    response
 }
 
 /// The `state` to send to Discord and the nonce to set as a cookie, for a sign-in starting `now`.
@@ -392,7 +397,7 @@ pub(crate) fn redirect_uri(config: &DiscordConfig) -> String {
     format!("{}{CALLBACK_PATH}", config.public_url.as_str())
 }
 
-fn set_cookie(
+pub(crate) fn set_cookie(
     config: &DiscordConfig,
     name: &str,
     value: &str,
@@ -412,7 +417,10 @@ fn set_cookie(
 }
 
 /// Every value of the cookie `name`, since a browser can send more than one.
-fn cookie_values<'a>(headers: &'a HeaderMap, name: &'a str) -> impl Iterator<Item = &'a str> {
+pub(crate) fn cookie_values<'a>(
+    headers: &'a HeaderMap,
+    name: &'a str,
+) -> impl Iterator<Item = &'a str> {
     headers
         .get_all(COOKIE)
         .iter()

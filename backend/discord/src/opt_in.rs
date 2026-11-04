@@ -15,7 +15,7 @@ use serde::Deserialize;
 
 use crate::auth::{begin, error, safe_next, send_to_discord, session_user, Failure, Flow, Target};
 use crate::bot::Discord;
-use crate::guild_access::{verify, Access};
+use crate::guild_access::{rights, Access, Rights};
 use crate::invites::servers_in_description;
 use crate::oauth::Authorized;
 use crate::store::{ClubRecord, ClubStore};
@@ -23,8 +23,8 @@ use crate::store::{ClubRecord, ClubStore};
 /// Path that starts opting a club in. Needs a session.
 pub const OPT_IN_PATH: &str = "/api/v1/discord/opt-in";
 
-/// Path that unlinks a club from its server, with `{club}` the club's ID. `DELETE`, and needs a
-/// session with Manage Server on the club's server.
+/// Path of a club, with `{club}` the club's ID. `DELETE` unlinks it from its server and needs a
+/// session with Manage Server on the club's server; `GET` says what access the session has.
 pub const UNLINK_PATH: &str = "/api/v1/discord/clubs/{club}";
 
 /// The permissions the bot asks for: View Channels, Manage Channels, Manage Roles, Send Messages,
@@ -100,8 +100,9 @@ pub(crate) fn router(discord: Discord) -> Router {
     }
     Router::new()
         .route(OPT_IN_PATH, get(start))
-        .route(UNLINK_PATH, delete(unlink))
+        .route(UNLINK_PATH, delete(unlink).get(crate::clubs::access))
         .with_state(discord.clone())
+        .merge(crate::clubs::router(discord.clone()))
         .merge(crate::settings::router(discord))
 }
 
@@ -211,6 +212,32 @@ pub(crate) async fn managed_club(
     headers: &HeaderMap,
     club: &str,
 ) -> Result<(u64, ClubRecord, Access), Box<Response>> {
+    let (_, club_id, record, rights) = member_club(discord, headers, club).await?;
+    if !rights.manage {
+        metrics::counter!("discord_club_access_total", "result" => "forbidden").increment(1);
+        return Err(Box::new(error(
+            StatusCode::FORBIDDEN,
+            "you need Manage Server on the club's Discord server for this",
+        )));
+    }
+    Ok((
+        club_id,
+        record,
+        Access {
+            roles: rights.roles,
+        },
+    ))
+}
+
+/// The signed-in user, the club with this ID, as `club`, and what the user can do in the club's
+/// server, checked with Discord each time. Someone who isn't a member, or a server the bot can't
+/// see, can't prove any rights. What the rights allow for this club is up to the caller. The `Err`
+/// is the response to send.
+pub(crate) async fn member_club(
+    discord: &Discord,
+    headers: &HeaderMap,
+    club: &str,
+) -> Result<(u64, u64, ClubRecord, Rights), Box<Response>> {
     let (Some(opt_in), config) = (discord.opt_in(), discord.config()) else {
         return Err(Box::new(error(StatusCode::NOT_FOUND, "not found")));
     };
@@ -236,8 +263,8 @@ pub(crate) async fn managed_club(
         }
         Err(err) => return Err(Box::new(store_unavailable(&err))),
     };
-    let access = match verify(discord.rest(), record.guild_id, user).await {
-        Ok(access) => access,
+    let rights = match rights(discord.rest(), record.guild_id, user).await {
+        Ok(rights) => rights,
         Err(err)
             if matches!(
                 err.status(),
@@ -254,14 +281,14 @@ pub(crate) async fn managed_club(
             )));
         }
     };
-    let Some(access) = access else {
+    let Some(rights) = rights else {
         metrics::counter!("discord_club_access_total", "result" => "forbidden").increment(1);
         return Err(Box::new(error(
             StatusCode::FORBIDDEN,
-            "you need Manage Server on the club's Discord server for this",
+            "you need Manage Server or a leader role on the club's Discord server for this",
         )));
     };
-    Ok((club_id, record, access))
+    Ok((user, club_id, record, rights))
 }
 
 pub(crate) fn store_unavailable(err: &dyn std::fmt::Display) -> Response {

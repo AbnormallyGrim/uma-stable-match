@@ -687,10 +687,10 @@ async fn unlinking_needs_a_session_a_club_id_and_a_linked_club() {
     assert_eq!(bad.status(), StatusCode::BAD_REQUEST);
     let unlinked = world.unlink(&session, world.club(2)).await;
     assert_eq!(unlinked.status(), StatusCode::NOT_FOUND);
-    // A link needs a DELETE; a GET from another site can't remove it.
+    // A link needs a DELETE; a GET only reads the person's access and can't remove it.
     let uri = UNLINK_PATH.replace("{club}", &world.club(1).to_string());
     let get = world.get(&uri, &session).await;
-    assert_eq!(get.status(), StatusCode::METHOD_NOT_ALLOWED);
+    assert_eq!(get.status(), StatusCode::OK);
     assert!(world.store.club(world.club(1)).await.unwrap().is_some());
     world.clean_up().await;
 }
