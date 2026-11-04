@@ -43,7 +43,9 @@ describe('ApplicationsPage', () => {
   it('asks a signed-out visitor to sign in with Discord', async () => {
     stub(signedOut);
     render(ApplicationsPage);
-    expect(screen.queryByRole('link', { name: t('applications.session.signIn') })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: t('applications.session.signIn') }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(t('applications.session.signedOut'))).not.toBeInTheDocument();
     expect(screen.queryByLabelText(t('applications.pick.label'))).not.toBeInTheDocument();
   });

@@ -72,13 +72,13 @@ site/              Project website, served by the server at umastable.com, with 
 docs/images/       README screenshots and the website's original artwork
 ```
 
-| Part | Package | Depends on | Details |
-|---|---|---|---|
-| Scoring | `uma-stable-match-scoring` (library, published separately) | `serde`, optional | [backend/scoring/README.md](backend/scoring/README.md) |
-| uma.moe client | `uma-stable-match-umamoe-client` (library) | scoring, `reqwest`, `tokio` | [backend/umamoe-client/README.md](backend/umamoe-client/README.md) |
-| Discord | `uma-stable-match-discord` (library) | `axum`, `reqwest`, `ed25519-dalek`, `hmac`, `redis` | [backend/discord/README.md](backend/discord/README.md) |
-| Server | `uma-stable-match-server` (binary and library) | scoring, client, Discord, `axum`, `moka`, `chrono` | [backend/server/README.md](backend/server/README.md) |
-| Web page | `frontend` | Svelte, Vite | [frontend/README.md](frontend/README.md) |
+| Part           | Package                                                    | Depends on                                          | Details                                                            |
+| -------------- | ---------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------ |
+| Scoring        | `uma-stable-match-scoring` (library, published separately) | `serde`, optional                                   | [backend/scoring/README.md](backend/scoring/README.md)             |
+| uma.moe client | `uma-stable-match-umamoe-client` (library)                 | scoring, `reqwest`, `tokio`                         | [backend/umamoe-client/README.md](backend/umamoe-client/README.md) |
+| Discord        | `uma-stable-match-discord` (library)                       | `axum`, `reqwest`, `ed25519-dalek`, `hmac`, `redis` | [backend/discord/README.md](backend/discord/README.md)             |
+| Server         | `uma-stable-match-server` (binary and library)             | scoring, client, Discord, `axum`, `moka`, `chrono`  | [backend/server/README.md](backend/server/README.md)               |
+| Web page       | `frontend`                                                 | Svelte, Vite                                        | [frontend/README.md](frontend/README.md)                           |
 
 The scoring crate has no network or storage code: club and member data go in, scores come out. That keeps it reusable, for example inside uma.moe's own backend, and it has its own version, minimum Rust version (1.71) and changelog.
 
@@ -112,14 +112,14 @@ The private `/status`, on the metrics address, reports the running scan's phase 
 
 The server keeps everything in memory. Without Redis, restarting it starts with an empty cache and a fresh scan. With Redis, a restarted server loads the current published scan, the refresh schedule and the cached clubs from Redis instead. The bundled Redis keeps its data on disk, so they also survive a Redis restart.
 
-| What | Key | Kept for | Where |
-|---|---|---|---|
-| Last scan result and error | – | Until the next scan | `cache.rs` |
-| Club pool | Club ID | Until the next scan | `pool.rs` |
-| Club details | Club ID and month | Until refreshed. With Redis, in memory until due for refresh, and in Redis a day longer | `details.rs`, `refresher.rs` |
-| Trainer paces | Trainer ID and month | `TRAINER_CACHE_MINUTES` (10) | `pace.rs` |
-| Last month's paces (priors) | Trainer or club ID, per month | One month in memory. With Redis, 14 days | `priors.rs` |
-| Rate limits | Visitor IP | Per-minute quotas | `limits.rs` |
+| What                        | Key                           | Kept for                                                                                | Where                        |
+| --------------------------- | ----------------------------- | --------------------------------------------------------------------------------------- | ---------------------------- |
+| Last scan result and error  | –                             | Until the next scan                                                                     | `cache.rs`                   |
+| Club pool                   | Club ID                       | Until the next scan                                                                     | `pool.rs`                    |
+| Club details                | Club ID and month             | Until refreshed. With Redis, in memory until due for refresh, and in Redis a day longer | `details.rs`, `refresher.rs` |
+| Trainer paces               | Trainer ID and month          | `TRAINER_CACHE_MINUTES` (10)                                                            | `pace.rs`                    |
+| Last month's paces (priors) | Trainer or club ID, per month | One month in memory. With Redis, 14 days                                                | `priors.rs`                  |
+| Rate limits                 | Visitor IP                    | Per-minute quotas                                                                       | `limits.rs`                  |
 
 Concurrent requests for the same club share one fetch, and failed fetches aren't cached.
 
