@@ -122,6 +122,7 @@ pub(crate) fn router(discord: Discord) -> Router {
         .route(APPLICATIONS_ME_PATH, get(session_info))
         .route(SIGN_OUT_PATH, post(sign_out))
         .with_state(discord.clone())
+        .merge(crate::trainers::router(discord.clone()))
         .merge(crate::opt_in::router(discord))
 }
 
