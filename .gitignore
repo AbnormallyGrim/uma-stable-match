@@ -86,3 +86,6 @@ club_candidates*.csv
 .idea/
 *.swp
 *~
+
+# Local scratch / transient workspace files
+.trail/

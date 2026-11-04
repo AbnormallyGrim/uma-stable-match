@@ -1,8 +1,10 @@
+const config = window.UMA_STABLE_MATCH_CONFIG ?? {};
+
 // Feature flag: whether the club applications page (/privacy/) and its link in the navbar are shown.
 // While it is off the link stays hidden and the page sends visitors to the home page. To turn it on,
 // set it to true, remove the noindex tag from privacy/index.html, and add /privacy/ back to
 // sitemap.xml and index.md.
-const APPLICATIONS_ENABLED = false;
+const APPLICATIONS_ENABLED = config.applicationsEnabled ?? false;
 
 if (APPLICATIONS_ENABLED) {
     for (const el of document.querySelectorAll('[data-applications]')) {
@@ -54,7 +56,7 @@ if (location.hostname === 'site.localhost') {
 // The language button. English is the page as written; Japanese swaps in the text below.
 (() => {
     // Feature flag: set to true to offer the Japanese translation, once the Japanese data is in.
-    const JAPANESE_ENABLED = false;
+    const JAPANESE_ENABLED = config.japaneseEnabled ?? false;
 
     const key = 'uma-stable-match:language';
     // Shared with app.umastable.com, whose local storage this page can't read.

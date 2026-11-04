@@ -337,96 +337,154 @@ export const ja: Catalog = {
   'club.applies': 'かんたん応募',
   'club.appliesTitle': 'Uma Stable Matchからこのサークルに直接応募できます',
 
-  'applications.link': 'サークルマスターの方へ',
-  'applications.title': 'lorem ipsum dolor sit amet',
-  'applications.heading': 'consectetur',
-  'applications.intro': 'adipiscing',
-  'applications.requirements': '<strong>elit</strong><ul><li>sed</li><li>do</li></ul>',
-  'applications.privacy': ({ href }: { href: string }) => `<a href="${href}">eiusmod</a>tempor`,
-  'applications.session.loading': 'incididunt…',
-  'applications.session.signedOut': 'Ut',
-  'applications.session.signIn': 'Labore',
-  'applications.session.signedIn': 'Et',
-  'applications.session.signOut': 'dolore',
-  'applications.session.error': 'magna',
-  'applications.pick.heading': 'aliqua',
-  'applications.pick.label': 'ut',
-  'applications.pick.hint': 'enim ad',
-  'applications.pick.next': 'minim',
-  'applications.pick.invalid': 'veniam',
-  'applications.confirm.heading': 'quis?',
-  'applications.confirm.club': ({ name }: { name: string }) => name,
-  'applications.confirm.unknownClub': ({ id }: { id: string }) => `nostrud ${id}`,
-  'applications.confirm.steps': 'exercitation',
-  'applications.confirm.add': 'Ullamco',
-  'applications.confirm.checking': 'laboris…',
-  'applications.confirm.back': 'nisi',
-  'applications.error.heading': 'ut',
-  'applications.error.signIn': 'Aliquip',
-  'applications.error.notFound': 'ex',
-  'applications.error.noInvite': 'ea',
-  'applications.error.unavailable': 'commodo',
-  'applications.error.generic': 'consequat',
-  'applications.error.invalid_state': 'duis',
-  'applications.error.denied': 'Aute',
-  'applications.error.discord_error': 'Irure',
-  'applications.error.wrong_server': 'dolor',
-  'applications.error.no_server': 'in',
-  'applications.error.forbidden': 'reprehenderit',
+  'applications.link': 'サークル申請',
+  'applications.title': 'サークル申請 · Uma Stable Match',
+  'applications.heading': 'どちらに当てはまりますか？',
+  'applications.intro':
+    'サークルマスターから応募者まで、次に進むべき一手がひと目で分かるように。サークル運営や応募状況を、一箇所でまとめて確認できます。',
+  'applications.requirements':
+    '<ul><li>サークルマスターはDiscord設定と運営状況をまとめて管理できます。</li><li>トレーナーは応募済みのサークルを一覧で確認し、進行状況を把握できます。</li></ul>',
+  'applications.privacy': ({ href }: { href: string }) =>
+    `Discordへのサインインはサークル申請の管理のためだけに使われます。<a href="${href}">プライバシー情報</a>をご確認ください。`,
 
-  'settings.title': 'in voluptate velit esse cillum',
-  'settings.heading': ({ name }: { name: string }) => `${name}dolore`,
-  'settings.club': ({ id }: { id: string }) => `eu ${id}`,
-  'settings.loading': 'fugiat…',
-  'settings.linked': 'nulla',
-  'settings.back': 'pariatur',
-  'settings.signIn': 'excepteur',
-  'settings.forbidden': 'sint',
-  'settings.notLinked': 'occaecat',
-  'settings.optIn': 'cupidatat',
-  'settings.loadError': 'non',
-  'settings.open': 'proident',
-  'settings.openHint': 'sunt',
-  'settings.autoJoin': 'in',
-  'settings.category': 'culpa',
-  'settings.categoryHint': 'qui',
-  'settings.categoryNone': 'officia',
-  'settings.leaderRoles': 'deserunt',
-  'settings.leaderRolesHint': 'mollit',
-  'settings.noRoles': 'anim',
-  'settings.problem': ({ problem }: { problem: string }) => `id: ${problem}`,
-  'settings.save': 'est',
-  'settings.saving': 'laborum…',
-  'settings.saved': 'lorem',
-  'settings.saveError': 'ipsum',
-  'settings.unlink': 'dolor',
-  'settings.unlinkHint': 'sit',
-  'settings.unlinkConfirm': 'amet',
-  'settings.unlinkYes': 'consectetur',
-  'settings.unlinkError': 'adipiscing',
-  'settings.cancel': 'elit',
-  'settings.unlinked': 'sed',
+  'applications.session.loading': 'Discordセッションを確認しています…',
+  'applications.session.signedOut':
+    '以下から役割を選んでください。Discordでサインインしてサークルを管理できます。',
+
+  'applications.session.signIn': 'Discordでサインイン',
+  'applications.session.signedIn': 'Discordセッションは有効です。',
+
+  'applications.session.signOut': 'サインアウト',
+  'applications.session.error':
+    'Discordセッションを確認できませんでした。しばらくしてからもう一度お試しください。',
+
+  'applications.pick.heading': '申請を有効にするサークルを選ぶ',
+  'applications.pick.label': 'サークルURLまたはID',
+  'applications.pick.hint': 'サークルのURLまたはIDを入力して、Discord設定を続けてください。',
+
+  'applications.pick.next': '次へ',
+  'applications.pick.invalid': '有効なサークルIDまたはサークルのURLを入力してください。',
+
+  'applications.confirm.heading': 'サークルを確認',
+  'applications.confirm.club': ({ name }: { name: string }) => name,
+  'applications.confirm.unknownClub': ({ id }: { id: string }) => `サークル ${id}`,
+  'applications.confirm.steps': 'このサークルをDiscordに接続し、応募フローを設定します。',
+
+  'applications.confirm.add': '続行',
+  'applications.confirm.checking': '確認中…',
+  'applications.confirm.back': '別のサークルを選ぶ',
+  'applications.error.heading': '確認が必要です',
+  'applications.error.signIn': '続けるにはDiscordでサインインしてください。',
+
+  'applications.error.notFound':
+    'そのサークルは見つかりませんでした。サークルIDやURLを確認してもう一度お試しください。',
+
+  'applications.error.noInvite':
+    'サークル紹介文に有効なDiscord招待リンクが設定されている必要があります。',
+
+  'applications.error.unavailable':
+    'Discordの設定は一時的に利用できません。しばらくしてからもう一度お試しください。',
+
+  'applications.error.generic': 'サークル申請の設定中に問題が発生しました。',
+
+  'applications.error.invalid_state':
+    'Discordから予期しない応答が返ってきました。もう一度お試しください。',
+
+  'applications.error.denied': 'Discordによりリクエストが拒否されました。もう一度お試しください。',
+
+  'applications.error.discord_error': 'Discordから予期しないエラーが返ってきました。',
+
+  'applications.error.wrong_server':
+    'サークルとDiscordサーバーが招待先と一致していません。招待先を確認してください。',
+
+  'applications.error.no_server':
+    'そのサークルのDiscordサーバーが見つかりませんでした。紹介文に有効な招待リンクを追加してからもう一度お試しください。',
+
+  'applications.error.forbidden': 'このサークルのDiscord設定を管理する権限がありません。',
+
+  'applications.role.heading': 'あなたはどちらですか？',
+  'applications.role.leader.title': 'サークルマスターです',
+  'applications.role.leader.description':
+    'ボットの状態を確認し、応募状況を見て、サークルのDiscord申請を管理します。',
+
+  'applications.role.trainer.title': 'トレーナーです',
+  'applications.role.trainer.description':
+    '応募したサークルを一覧で確認し、応募履歴をまとめて見られます。',
+
+  'settings.title': 'サークルDiscord設定',
+  'settings.heading': ({ name }: { name: string }) => `${name}の設定`,
+  'settings.club': ({ id }: { id: string }) => `サークル ${id}`,
+  'settings.loading': '設定を読み込み中…',
+  'settings.linked': 'このサークルはDiscordに接続済みです。',
+
+  'settings.back': '申請一覧へ戻る',
+  'settings.signIn': 'このサークルを管理するにはDiscordでサインインしてください。',
+
+  'settings.forbidden': 'このサークルのDiscord設定を編集する権限がありません。',
+
+  'settings.notLinked': 'このサークルはまだDiscordと接続されていません。',
+
+  'settings.optIn': '申請を設定する',
+  'settings.loadError': 'サークルのDiscord設定を読み込めませんでした。',
+
+  'settings.open': '応募を受け付ける',
+  'settings.openHint': 'オフにすると、一時的に新規応募を停止できます。',
+
+  'settings.autoJoin': '応募者をサーバーに自動で追加する',
+  'settings.category': 'チケットカテゴリ',
+  'settings.categoryHint': '新しい応募チケットを作成するカテゴリを選択してください。',
+
+  'settings.categoryNone': 'カテゴリが選択されていません',
+  'settings.leaderRoles': 'サークルマスター権限を持つロール',
+  'settings.leaderRolesHint': '応募者に返信できるロールを選択してください。',
+
+  'settings.noRoles': '現在、このサーバーにはロールがありません。',
+
+  'settings.problem': ({ problem }: { problem: string }) => `問題: ${problem}`,
+  'settings.save': '保存',
+  'settings.saving': '保存中…',
+  'settings.saved': '保存しました。',
+
+  'settings.saveError': '変更を保存できませんでした。',
+
+  'settings.unlink': 'サークルの接続を解除',
+  'settings.unlinkHint': 'このサークルのDiscord接続を解除します。',
+
+  'settings.unlinkConfirm': '本当にこのサークルのDiscord接続を解除しますか？',
+  'settings.unlinkYes': '接続を解除',
+  'settings.unlinkError': '今はこのサークルの接続を解除できませんでした。',
+
+  'settings.cancel': 'キャンセル',
+  'settings.unlinked': 'このサークルの接続は解除されました。',
 
   'footer.tipsSummary': 'サークル移籍のヒント',
   'footer.tip14':
     '<strong>14日ルール:</strong>月間報酬を受け取るには、その月にサークルへ14日以上所属している必要があります。移籍は月初に済ませましょう。',
+
   'footer.tip24':
     '<strong>24時間のクールダウン:</strong>サークルを抜けると、24時間は別のサークルに加入できません。サークルマスターに除名してもらうとこの制限を避けられるという報告があります。',
+
   'footer.tipLock':
     '<strong>月初のロック:</strong>毎月1日のUTC 10:00〜14:59(日本時間19:00〜23:59)は、サークルの脱退、加入申請、招待ができません。',
+
   'footer.tipActivity':
     '<strong>先に活動状況を確認:</strong>申請する前に、uma.moeでメンバーの活動状況を確認しましょう。',
+
   'footer.tipsNote':
     'これらのルールは変更されることがあります。違いがあれば、ゲーム内で確認してください。',
+
   'footer.links': 'プロジェクトのリンク',
   'footer.report': '問題を報告',
   'footer.kofi': 'にんじんをおごる',
   'footer.carats': '無料ジュエル',
   'footer.support': '任意の支援はホスティング費用に充てられます。すべての機能は無料のままです。',
+
   'footer.unofficial':
     'Uma Stable Matchは<strong>非公式の非営利ファンツール</strong>です。uma.moeおよび株式会社Cygamesとは提携しておらず、公認・後援も受けていません。',
+
   'footer.data':
     'サークルとトレーナーのデータは<a href="https://uma.moe" target="_blank" rel="noopener noreferrer">uma.moe</a>から取得しており、遅れや欠けがある場合があります。おすすめは判断の目安となる推定であり、特定のプレイヤーやサークルを評価するものではありません。',
+
   'footer.trademark':
     '<em>ウマ娘 プリティーダービー</em>の名称、キャラクター、アートワーク、商標は株式会社Cygamesに帰属します。サークルのティアアイコンは© Cygames, Inc.のもので、Cygamesの<a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener noreferrer">二次創作ガイドライン</a>に沿って非営利で使用しています。',
 };

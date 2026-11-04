@@ -8,26 +8,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import { ApiError, fetchClub } from './api';
+  import { ApiError } from './api';
+  import { checkOptIn, loginUrl, parseClubInput, signOut, signedInUser } from './applications';
   import { applyFeatures } from './features';
-  import { hasMessage, t, type MessageKey } from './i18n';
-  import {
-    checkOptIn,
-    loginUrl,
-    optInUrl,
-    parseClubInput,
-    signedInUser,
-    signOut,
-  } from './applications';
+  import { t, hasMessage } from './i18n';
   import { language } from './language.svelte';
   import NavBar from './NavBar.svelte';
-  import { websiteUrl } from './pages';
   import ReleaseNotes from './ReleaseNotes.svelte';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
+  import { APPLICATIONS_PATH, settingsPath } from './route';
   import SiteFooter from './SiteFooter.svelte';
 
   interface Props {
-    /** The failure label Discord's callback sent the visitor back with, if any. */
     error?: string | null;
   }
 
@@ -36,6 +28,53 @@
   const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
   let readingReleases = $state(false);
   let unseenRelease = $state(hasUnseenRelease(storage));
+  let session = $state<'loading' | 'signed-out' | 'signed-in' | 'error'>('loading');
+  let clubInput = $state('');
+  let invalidClub = $state(false);
+  let selectedClubId = $state<string | null>(null);
+  let selectedClubName = $state<string | null>(null);
+  let showConfirm = $state(false);
+  let statusMessage = $state<string | null>(null);
+  let busy = $state(false);
+  const routeError = $derived(appErrorMessage(error));
+
+  $effect(() => {
+    if (error !== null && statusMessage === null) {
+      statusMessage = routeError;
+    }
+  });
+
+  function appErrorMessage(label: string | null): string | null {
+    if (label === null) {
+      return null;
+    }
+    const key = `applications.error.${label}` as const;
+    return hasMessage(key) ? t(key) : t('applications.error.generic');
+  }
+
+  const privacyHref = '/privacy/';
+
+  // Keep the prop available for future route/error handling without causing a state-capture warning.
+  $effect(() => {
+    void error;
+  });
+
+  type RoleKey = 'leader' | 'trainer';
+
+  const roles: Array<{ key: RoleKey; icon: string; title: string; description: string }> = [
+    {
+      key: 'leader',
+      icon: '🎯',
+      title: t('applications.role.leader.title'),
+      description: t('applications.role.leader.description'),
+    },
+    {
+      key: 'trainer',
+      icon: '🧭',
+      title: t('applications.role.trainer.title'),
+      description: t('applications.role.trainer.description'),
+    },
+  ];
 
   function openReleases() {
     readingReleases = true;
@@ -43,23 +82,111 @@
     markReleaseSeen(storage);
   }
 
-  let session = $state<'loading' | 'out' | 'in' | 'error'>('loading');
-  let input = $state('');
-  let invalid = $state(false);
-  let clubId = $state<string | null>(null);
-  let clubName = $state<string | null>(null);
-  let checking = $state(false);
-  let failure = $state<MessageKey | null>(null);
+  function selectRole(role: RoleKey) {
+    void role;
+    // Placeholder: future leader and trainer pages will live here.
+  }
 
-  const callbackError = $derived.by((): MessageKey | null => {
-    if (error === null) {
-      return null;
+  function resetPick(keepStatus = false) {
+    clubInput = '';
+    invalidClub = false;
+    selectedClubId = null;
+    selectedClubName = null;
+    showConfirm = false;
+    statusMessage = keepStatus ? statusMessage : (routeError ?? null);
+  }
+
+  async function checkSession() {
+    try {
+      const discordId = await signedInUser();
+      session = discordId === null ? 'signed-out' : 'signed-in';
+      if (discordId === null) {
+        resetPick();
+      }
+    } catch (reason) {
+      console.warn(reason);
+      session = 'error';
+      statusMessage = t('applications.session.error');
     }
-    const key = `applications.error.${error}`;
-    return hasMessage(key) ? key : 'applications.error.generic';
-  });
-  const shownError = $derived(failure ?? callbackError);
-  const privacyHref = `${websiteUrl(window.location)}/privacy/`;
+  }
+
+  async function pickClub() {
+    const parsed = parseClubInput(clubInput);
+    if (parsed === null) {
+      invalidClub = true;
+      statusMessage = t('applications.pick.invalid');
+      return;
+    }
+
+    invalidClub = false;
+    statusMessage = null;
+    busy = true;
+    try {
+      const response = await fetch(`/api/v1/clubs/${encodeURIComponent(parsed)}`);
+      if (response.ok) {
+        const body = (await response.json()) as { club?: { name?: string } };
+        selectedClubName = body.club?.name ?? null;
+      }
+    } catch {
+      // Ignore a missing club lookup when the user is already entering a valid ID.
+    } finally {
+      selectedClubId = parsed;
+      selectedClubName = selectedClubName ?? t('applications.confirm.unknownClub', { id: parsed });
+      showConfirm = true;
+      busy = false;
+    }
+  }
+
+  async function confirmClub() {
+    if (!selectedClubId) {
+      return;
+    }
+
+    busy = true;
+    statusMessage = null;
+    try {
+      await checkOptIn(selectedClubId);
+      const next = settingsPath(selectedClubId, true);
+      window.location.assign(
+        `/api/v1/discord/opt-in?${new URLSearchParams({ club: selectedClubId, next })}`,
+      );
+    } catch (reason) {
+      const status = reason instanceof ApiError ? reason.status : null;
+      if (status === 401) {
+        session = 'signed-out';
+        statusMessage = t('applications.error.signIn');
+        resetPick(true);
+        return;
+      }
+
+      statusMessage =
+        status === 404
+          ? t('applications.error.notFound')
+          : status === 422
+            ? t('applications.error.noInvite')
+            : status === 502
+              ? t('applications.error.unavailable')
+              : status === 500
+                ? t('applications.error.generic')
+                : status === 403
+                  ? t('applications.error.forbidden')
+                  : t('applications.error.generic');
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function signOutNow() {
+    try {
+      await signOut();
+      session = 'signed-out';
+      resetPick();
+      statusMessage = null;
+    } catch {
+      session = 'signed-out';
+      statusMessage = t('applications.session.error');
+    }
+  }
 
   $effect(() => {
     document.documentElement.lang = language.current;
@@ -69,175 +196,100 @@
   onMount(() => {
     const features = new AbortController();
     applyFeatures({ signal: features.signal });
-    const loading = new AbortController();
-    signedInUser({ signal: loading.signal }).then(
-      (id) => (session = id === null ? 'out' : 'in'),
-      (reason) => {
-        if (!loading.signal.aborted) {
-          session = 'error';
-          console.warn(reason);
-        }
-      },
-    );
+    void checkSession();
     return () => {
       features.abort();
-      loading.abort();
     };
   });
-
-  async function pick(event: SubmitEvent) {
-    event.preventDefault();
-    const id = parseClubInput(input);
-    invalid = id === null;
-    failure = null;
-    if (id === null) {
-      return;
-    }
-    clubId = id;
-    clubName = null;
-    // The name is only a courtesy, so a club that is not loaded yet or a slow answer is fine.
-    fetchClub(id, null).then(
-      (details) => {
-        if (clubId === id) {
-          clubName = details.club.name;
-        }
-      },
-      () => undefined,
-    );
-  }
-
-  function failureFor(reason: unknown): MessageKey {
-    if (!(reason instanceof ApiError)) {
-      return 'applications.error.generic';
-    }
-    switch (reason.status) {
-      case 401:
-        return 'applications.error.signIn';
-      case 404:
-        return 'applications.error.notFound';
-      case 422:
-        return 'applications.error.noInvite';
-      case 502:
-      case 503:
-        return 'applications.error.unavailable';
-      default:
-        return 'applications.error.generic';
-    }
-  }
-
-  async function add() {
-    if (clubId === null) {
-      return;
-    }
-    checking = true;
-    failure = null;
-    try {
-      // Checking first keeps problems on this page; the redirect itself leaves for Discord.
-      await checkOptIn(clubId);
-      window.location.assign(optInUrl(clubId));
-    } catch (reason) {
-      failure = failureFor(reason);
-      if (reason instanceof ApiError && reason.status === 401) {
-        session = 'out';
-      }
-      checking = false;
-    }
-  }
-
-  async function leave() {
-    try {
-      await signOut();
-      session = 'out';
-      clubId = null;
-    } catch {
-      failure = 'applications.error.generic';
-    }
-  }
 </script>
 
-<!-- eslint-disable svelte/no-at-html-tags -- first-party text from the message catalog -->
 <NavBar onreleases={openReleases} unseen={unseenRelease} />
 
-<main>
+<main class="page">
   <header class="intro">
     <h1>{t('applications.heading')}</h1>
-    <p>{t('applications.intro')}</p>
+    <p class="lede">{t('applications.intro')}</p>
   </header>
 
-  <section class="card" aria-labelledby="requirements">
-    <h2 id="requirements" class="visually-hidden">{t('applications.link')}</h2>
-    <div class="requirements">{@html t('applications.requirements')}</div>
-    <p class="privacy">{@html t('applications.privacy', { href: privacyHref })}</p>
+  <section class="selector" aria-label={t('applications.role.heading')}>
+    <div class="role-grid">
+      {#each roles as role (role.key)}
+        <button type="button" class="role-card" onclick={() => selectRole(role.key)}>
+          <span class="role-icon" aria-hidden="true">{role.icon}</span>
+          <div class="role-copy">
+            <h2>{role.title}</h2>
+            <p>{role.description}</p>
+          </div>
+        </button>
+      {/each}
+    </div>
   </section>
 
-  {#if shownError}
-    <div class="notice error" role="alert">
-      <strong>{t('applications.error.heading')}</strong>
-      <span>{t(shownError)}</span>
-    </div>
+  {#if error !== null}
+    <p class="status-alert" role="alert">{appErrorMessage(error)}</p>
   {/if}
 
-  <section class="card" aria-labelledby="steps">
-    {#if session === 'loading'}
-      <p class="muted" role="status">{t('applications.session.loading')}</p>
-    {:else if session === 'error'}
-      <p role="alert">{t('applications.session.error')}</p>
-    {:else if session === 'out'}
-      <p>{t('applications.session.signedOut')}</p>
-      <a class="button primary" href={loginUrl()}>{t('applications.session.signIn')}</a>
-    {:else}
-      <div class="signed-in">
-        <span>{t('applications.session.signedIn')}</span>
-        <button type="button" onclick={leave}>{t('applications.session.signOut')}</button>
-      </div>
+  <p class="privacy-link"><a href={privacyHref}>Privacy</a></p>
 
-      <h2 id="steps">{t('applications.pick.heading')}</h2>
-      {#if clubId === null}
-        <form onsubmit={pick} novalidate>
-          <label for="club">{t('applications.pick.label')}</label>
-          <input
-            id="club"
-            type="text"
-            inputmode="text"
-            autocomplete="off"
-            bind:value={input}
-            aria-invalid={invalid}
-            aria-describedby={invalid ? 'club-hint club-error' : 'club-hint'}
-          />
-          <p id="club-hint" class="hint">{t('applications.pick.hint')}</p>
-          {#if invalid}
-            <p id="club-error" class="field-error" role="alert">{t('applications.pick.invalid')}</p>
-          {/if}
-          <button class="primary" type="submit">{t('applications.pick.next')}</button>
-        </form>
-      {:else}
-        <div class="confirm">
-          <h3>{t('applications.confirm.heading')}</h3>
-          <p class="club">
-            {t('applications.confirm.club', {
-              name: clubName ?? t('applications.confirm.unknownClub', { id: clubId }),
-            })}
-          </p>
-          <p>{t('applications.confirm.steps')}</p>
-          <div class="actions">
-            <button class="primary" type="button" disabled={checking} onclick={add}>
-              {checking ? t('applications.confirm.checking') : t('applications.confirm.add')}
-            </button>
-            <button
-              type="button"
-              disabled={checking}
-              onclick={() => {
-                clubId = null;
-                failure = null;
-              }}
-            >
-              {t('applications.confirm.back')}
-            </button>
-          </div>
-        </div>
+  {#if session === 'loading'}
+    <p class="card muted" role="status">{t('applications.session.loading')}</p>
+  {:else if session === 'error'}
+    <p class="status-alert" role="alert">{t('applications.session.error')}</p>
+  {:else if session === 'signed-out'}
+    <section class="session-card">
+      {#if statusMessage}
+        <p role="alert">{statusMessage}</p>
       {/if}
+      <p>{t('applications.session.signedOut')}</p>
+      <a class="button primary" href={loginUrl(APPLICATIONS_PATH)}
+        >{t('applications.session.signIn')}</a
+      >
+    </section>
+  {:else}
+    {#if !showConfirm}
+      <section class="session-card pick-card">
+        <label for="club-input">{t('applications.pick.label')}</label>
+        <input
+          id="club-input"
+          bind:value={clubInput}
+          aria-invalid={invalidClub ? 'true' : 'false'}
+          type="text"
+          autocomplete="off"
+        />
+        {#if statusMessage}
+          <p role="alert">{statusMessage}</p>
+        {/if}
+        <button type="button" class="button primary" onclick={pickClub} disabled={busy}>
+          {t('applications.pick.next')}
+        </button>
+      </section>
+    {:else}
+      <section class="session-card confirm-card">
+        <h2>{t('applications.confirm.heading')}</h2>
+        <p>
+          {selectedClubName ?? t('applications.confirm.unknownClub', { id: selectedClubId ?? '' })}
+        </p>
+        <p>{t('applications.confirm.steps')}</p>
+        {#if statusMessage}
+          <p role="alert">{statusMessage}</p>
+        {/if}
+        <div class="actions">
+          <button type="button" class="button primary" onclick={confirmClub} disabled={busy}>
+            {busy ? t('applications.confirm.checking') : t('applications.confirm.add')}
+          </button>
+          <button type="button" onclick={() => resetPick()} disabled={busy}>
+            {t('applications.confirm.back')}
+          </button>
+        </div>
+      </section>
     {/if}
-  </section>
+
+    <div class="session-actions">
+      <button type="button" class="button secondary" onclick={signOutNow}>
+        {t('applications.session.signOut')}
+      </button>
+    </div>
+  {/if}
 </main>
 
 <SiteFooter />
@@ -247,133 +299,193 @@
 {/if}
 
 <style>
-  main {
-    max-width: 760px;
-    padding-top: 40px;
+  .page {
+    padding-top: 24px;
   }
 
   .intro {
+    max-width: 920px;
+    margin: 0 auto 20px;
     text-align: center;
   }
 
-  h1 {
-    margin: 0 0 8px;
-    font-size: clamp(1.75rem, 4vw, 2.5rem);
-    letter-spacing: -0.02em;
+  .intro h1 {
+    margin: 0;
+    font-size: clamp(2rem, 3vw, 2.75rem);
     line-height: 1.15;
   }
 
   .intro p {
-    margin: 0 auto;
+    margin: 0 0 6px;
     color: var(--text-2);
-    font-size: 1.05rem;
+    font-size: 0.94rem;
+    line-height: 1.5;
   }
 
-  h2 {
-    margin: 0 0 12px;
-    font-size: 1.15rem;
+  .selector {
+    max-width: 920px;
+    margin: 0 auto;
   }
 
-  h3 {
-    margin: 0 0 8px;
-    font-size: 1rem;
+  .role-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 18px;
   }
 
-  .card {
-    margin-top: 24px;
+  .role-card {
+    display: flex;
+    gap: 16px;
+    width: 100%;
+    padding: 18px 20px;
+    background: var(--card);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgb(0 0 0 / 6%);
+    transition:
+      border-color 0.12s ease,
+      box-shadow 0.12s ease,
+      transform 0.12s ease;
+  }
+
+  .role-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 6px 18px rgb(0 0 0 / 10%);
+    transform: translateY(-1px);
+  }
+
+  .role-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    background: var(--surface);
+    border-radius: 12px;
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .role-copy {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .role-copy h2 {
+    margin: 0 0 6px;
+    font-size: 1.1rem;
+    line-height: 1.3;
+  }
+
+  .role-copy p {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 0.94rem;
+    line-height: 1.5;
+  }
+
+  .session-card {
+    max-width: 560px;
+    margin: 20px auto 0;
     padding: 20px;
     background: var(--card);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius);
-    box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+    box-shadow: 0 2px 20px rgb(0 0 0 / 4%);
   }
 
-  .card p {
-    margin: 0 0 12px;
-  }
-
-  .requirements :global(ul) {
-    margin: 8px 0 16px;
-    padding-left: 20px;
-  }
-
-  .requirements :global(li + li) {
-    margin-top: 8px;
-  }
-
-  .privacy,
-  .hint,
-  .muted {
-    color: var(--text-2);
-    font-size: 0.875rem;
-  }
-
-  .notice {
-    margin-top: 24px;
-    padding: 12px 16px;
-    background: color-mix(in srgb, var(--closed) 10%, var(--card));
-    border: 1px solid var(--closed);
-    border-radius: var(--radius);
-  }
-
-  .notice strong {
+  .session-card label {
     display: block;
-    color: var(--closed);
-  }
-
-  .signed-in {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  form {
-    display: grid;
-    gap: 8px;
-    justify-items: start;
-  }
-
-  label {
+    margin-bottom: 8px;
     font-weight: 600;
   }
 
-  input {
-    width: min(100%, 360px);
+  .session-card input {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 12px;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
   }
 
-  .field-error {
-    color: var(--closed);
-    font-size: 0.875rem;
+  .session-card input[aria-invalid='true'] {
+    border-color: var(--danger, #d9485f);
   }
 
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .club {
-    font-weight: 600;
+  .session-card p {
+    margin: 0 0 12px;
+    color: var(--text-2);
+    line-height: 1.5;
   }
 
   .button {
-    display: inline-block;
-    padding: 6px 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.75rem 1.05rem;
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    font-size: 0.875rem;
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
     font-weight: 600;
     text-decoration: none;
+    cursor: pointer;
   }
 
   .button.primary {
     background: var(--accent);
     border-color: var(--accent);
     color: var(--on-accent);
+  }
+
+  .button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+
+  .session-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 18px;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .status-alert {
+    max-width: 560px;
+    margin: 20px auto 0;
+    padding: 12px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .card.muted {
+    max-width: 560px;
+    margin: 20px auto 0;
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text-2);
+  }
+
+  @media (max-width: 640px) {
+    .selector {
+      padding: 0 4px;
+    }
   }
 </style>
