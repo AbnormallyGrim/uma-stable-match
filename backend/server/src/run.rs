@@ -18,6 +18,7 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::details::{ClubDetails, DetailConfig, SharedPool};
 use crate::discord_clubs::club_lookup;
+use crate::trainers::trainer_lookup;
 use crate::limits::RateLimits;
 use crate::pace::PaceLookup;
 use crate::refresher::RefreshConfig;
