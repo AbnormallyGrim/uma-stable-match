@@ -31,21 +31,6 @@ describe('SiteFooter', () => {
     }
   });
 
-  it('links to the wishlist page, except on the wishlist page', () => {
-    const { unmount } = render(SiteFooter);
-    expect(screen.getByRole('link', { name: 'Wishlist' })).toHaveAttribute('href', '/wishlist');
-    expect(screen.getByText('Tips for switching clubs')).toBeInTheDocument();
-    unmount();
-    window.history.pushState({}, '', '/wishlist');
-    try {
-      render(SiteFooter);
-      expect(screen.queryByRole('link', { name: 'Wishlist' })).not.toBeInTheDocument();
-      expect(screen.queryByText('Tips for switching clubs')).not.toBeInTheDocument();
-    } finally {
-      window.history.pushState({}, '', '/');
-    }
-  });
-
   it('opens the issue tracker and Ko-fi in a new tab from buttons', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     render(SiteFooter);
@@ -96,10 +81,9 @@ describe('SiteFooter', () => {
     );
   });
 
-  it('has the tips for switching clubs', () => {
+  it('leaves the wishlist link and the switching tips to the pages that have them', () => {
     render(SiteFooter);
-    const details = screen.getByText('Tips for switching clubs').closest('details')!;
-    expect(within(details).getAllByRole('listitem')).toHaveLength(4);
-    expect(details).toHaveTextContent('14-day rule');
+    expect(screen.queryByRole('link', { name: 'Wishlist' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Tips for switching clubs')).not.toBeInTheDocument();
   });
 });

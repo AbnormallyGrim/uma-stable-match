@@ -60,40 +60,6 @@
     font-size: 0.8125rem;
   }
 
-  .tips {
-    width: 100%;
-    max-width: 760px;
-    justify-self: center;
-    padding: 12px 18px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-  }
-
-  .tips[open] {
-    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  }
-
-  summary {
-    color: var(--text);
-    font-size: 0.9375rem;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  ul {
-    margin: 10px 0 0;
-    padding-left: 20px;
-  }
-
-  li + li {
-    margin-top: 4px;
-  }
-
-  .tips p {
-    margin: 10px 0 0;
-  }
-
   .meta {
     display: grid;
     gap: 18px;
@@ -128,21 +94,6 @@
     color: var(--text);
     font-weight: 600;
     text-decoration: none;
-  }
-
-  nav a.link {
-    padding: 6px 14px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text);
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  nav a.link:hover {
-    border-color: var(--accent);
-    color: var(--accent);
   }
 
   nav button:hover {

@@ -10,7 +10,7 @@ import { currentPage, visiblePages, websiteUrl } from './pages';
 afterEach(() => window.history.pushState({}, '', '/'));
 
 describe('NavLinks', () => {
-  it('links to the home page, the club finder and the wishlist page', () => {
+  it('links to the home page, the club finder, the wishlist page and, when it is on, applications', () => {
     render(NavLinks);
     const nav = screen.getByRole('navigation', { name: 'Pages' });
     expect(
@@ -21,11 +21,11 @@ describe('NavLinks', () => {
       ['Home', `http://site.localhost:${window.location.port}`],
       ['Club finder', '/'],
       ['Wishlist', '/wishlist'],
+      ...(APPLICATIONS_ENABLED ? [['Applications', '/applications']] : []),
     ]);
   });
 
-  it('keeps the applications page out of the navbar while its flag is off', () => {
-    expect(APPLICATIONS_ENABLED).toBe(false);
+  it('keeps the applications page out of the navbar unless its flag is on', () => {
     expect(visiblePages(false).map((page) => page.id)).toEqual(['home', 'finder', 'wishlist']);
     expect(visiblePages(true).map((page) => page.id)).toEqual([
       'home',
