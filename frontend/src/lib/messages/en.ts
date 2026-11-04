@@ -367,7 +367,7 @@ export const en = {
   'applications.requirements':
     '<ul><li>Leaders can manage the bot and their club settings when the Discord setup is live.</li><li>Trainers can track their applications and keep an eye on the clubs they want to join.</li></ul>',
   'applications.privacy': ({ href }: { href: string }) =>
-    'Your Discord sign-in is only used for club application management. See our <a href="${href}">privacy information</a>.',
+    `Your Discord sign-in is only used for club application management. See our <a href="${href}">privacy information</a>.`,
   'applications.session.loading': 'Checking your Discord session…',
   'applications.session.signedOut':
     'Choose your role below to continue, or sign in with Discord to manage a club.',
@@ -399,16 +399,14 @@ export const en = {
   'applications.error.unavailable':
     'The Discord setup is temporarily unavailable. Please try again in a moment.',
   'applications.error.generic': 'Something went wrong while setting up applications.',
-  'applications.error.invalid_state':
-    'Discord sent us an unexpected response. Please try again.',
+  'applications.error.invalid_state': 'Discord sent us an unexpected response. Please try again.',
   'applications.error.denied': 'Discord denied the request. Please try again.',
   'applications.error.discord_error': 'Discord returned an unexpected error.',
   'applications.error.wrong_server':
     'The club and server do not match the invite we found. Please check the invite and try again.',
   'applications.error.no_server':
     'We could not find a Discord server for that club. Add a valid invite to the club description and try again.',
-  'applications.error.forbidden':
-    'You do not have permission to manage that club’s Discord setup.',
+  'applications.error.forbidden': 'You do not have permission to manage that club’s Discord setup.',
 
   'applications.role.heading': 'Who are you?',
   'applications.role.leader.title': 'I’m a club leader',
@@ -425,8 +423,7 @@ export const en = {
   'settings.linked': 'Your club is linked to Discord.',
   'settings.back': 'Back to applications',
   'settings.signIn': 'Please sign in with Discord to manage this club.',
-  'settings.forbidden':
-    'You do not have permission to edit this club’s Discord settings.',
+  'settings.forbidden': 'You do not have permission to edit this club’s Discord settings.',
   'settings.notLinked': 'This club is not linked to Discord yet.',
   'settings.optIn': 'Set up applications',
   'settings.loadError': 'We could not load the club’s Discord settings.',

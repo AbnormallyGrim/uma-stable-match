@@ -54,7 +54,8 @@
     markReleaseSeen(storage);
   }
 
-  function selectRole(_role: RoleKey) {
+  function selectRole(role: RoleKey) {
+    void role;
     // Placeholder: future leader and trainer pages will live here.
   }
 
