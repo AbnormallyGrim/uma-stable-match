@@ -62,6 +62,9 @@ impl KeySecret {
     pub fn parse(value: &str) -> Option<Self> {
         (value.chars().count() >= MIN_SECRET_LEN).then(|| Self(value.to_owned()))
     }
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
 }
 
 impl fmt::Debug for KeySecret {

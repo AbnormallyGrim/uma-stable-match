@@ -8,7 +8,9 @@ use metrics_exporter_prometheus::BuildError;
 use redis::aio::ConnectionManager;
 use tokio::net::TcpListener;
 use tokio::sync::watch;
-use uma_stable_match_discord::{ClubStore, Discord, OptIn};
+use uma_stable_match_discord::{
+    ClubStore, Discord, KeySecret as DiscordKeySecret, OptIn, TrainerLinks, TrainerStore,
+};
 
 use crate::app::{app_with_routes, AppState};
 use crate::applications::Applications;
@@ -16,6 +18,7 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::details::{ClubDetails, DetailConfig, SharedPool};
 use crate::discord_clubs::club_lookup;
+use crate::trainers::trainer_lookup;
 use crate::limits::RateLimits;
 use crate::pace::PaceLookup;
 use crate::refresher::RefreshConfig;
@@ -64,6 +67,7 @@ pub enum RunError {
 /// SIGTERM. Logging and trace export are the caller's to set up and shut down.
 pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunError> {
     let source = source.into();
+    let profile_source = source.clone();
     let metrics = match config.metrics_addr {
         None => None,
         Some(addr) => {
@@ -194,11 +198,21 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
             .await
             .map_err(|_| RunError::DiscordStore("timed out".into()))?
             .map_err(|e| RunError::DiscordStore(format!("{:?}", e.kind())))?;
+            let secret = config
+                .redis_key_secret
+                .as_ref()
+                .and_then(|secret| DiscordKeySecret::parse(secret.expose()))
+                .expect("Discord settings need REDIS_KEY_SECRET");
+            let trainers = TrainerLinks::new(
+                TrainerStore::new(conn.clone(), secret),
+                trainer_lookup(profile_source),
+            );
             let store = ClubStore::new(conn);
             let discord = Discord::new(discord.clone())
                 .map_err(RunError::Discord)?
-                .with_opt_in(OptIn::new(store.clone(), club_lookup(club_details)));
-            tracing::info!("serving Discord interactions, club opt-in and settings");
+                .with_opt_in(OptIn::new(store.clone(), club_lookup(club_details)))
+                .with_trainer_links(trainers);
+            tracing::info!("serving Discord interactions, club opt-in, settings and trainer links");
             (
                 uma_stable_match_discord::router(discord),
                 Some(Applications::new(store)),

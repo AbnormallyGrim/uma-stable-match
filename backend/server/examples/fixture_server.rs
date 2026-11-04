@@ -9,7 +9,7 @@ use uma_stable_match_server::{
 use uma_stable_match_umamoe_client::{
     Circle, CircleListResponse, CircleLookup, CircleMember, CircleRequest, CircleResponse,
     GainsRankingsResponse, ListCirclesRequest, MonthlyRanking, MonthlyRankingsResponse, Priority,
-    RankingsGainsRequest, RankingsMonthlyRequest,
+    ProfileResponse, RankingsGainsRequest, RankingsMonthlyRequest,
 };
 
 /// Number of fixture clubs.
@@ -141,6 +141,10 @@ impl ClubSource for Fixtures {
         &'a self,
         _: &'a RankingsGainsRequest,
     ) -> SourceFuture<'a, GainsRankingsResponse> {
+        Box::pin(async { Err(SourceError::NotFound) })
+    }
+
+    fn profile(&self, _: u64) -> SourceFuture<'_, ProfileResponse> {
         Box::pin(async { Err(SourceError::NotFound) })
     }
 }

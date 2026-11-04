@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use uma_stable_match_umamoe_client::{
     CircleListResponse, CircleRequest, CircleResponse, Client, Error, GainsRankingsResponse,
-    ListCirclesRequest, MonthlyRankingsResponse, Priority, RankingsGainsRequest,
+    ListCirclesRequest, MonthlyRankingsResponse, Priority, ProfileResponse, RankingsGainsRequest,
     RankingsMonthlyRequest, StatusCode,
 };
 
@@ -49,6 +49,10 @@ pub trait ClubSource: Send + Sync + 'static {
         &'a self,
         request: &'a RankingsGainsRequest,
     ) -> SourceFuture<'a, GainsRankingsResponse>;
+
+    /// A trainer's profile, including their profile comment. A trainer the source doesn't know
+    /// is [`SourceError::NotFound`].
+    fn profile(&self, account_id: u64) -> SourceFuture<'_, ProfileResponse>;
 }
 
 /// Why a [`ClubSource`] call failed.
@@ -217,6 +221,10 @@ impl ClubSource for UmaMoeSource {
         request: &'a RankingsGainsRequest,
     ) -> SourceFuture<'a, GainsRankingsResponse> {
         Box::pin(async move { Ok(self.visitor.rankings_gains(request).await?) })
+    }
+
+    fn profile(&self, account_id: u64) -> SourceFuture<'_, ProfileResponse> {
+        Box::pin(async move { Ok(self.visitor.profile(account_id).await?) })
     }
 }
 
