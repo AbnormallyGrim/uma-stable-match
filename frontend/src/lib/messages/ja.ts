@@ -334,6 +334,8 @@ export const ja: Catalog = {
   'wishlist.about':
     'これらの投票は<a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>が運営しており、Uma Stable Matchではありません。あなたの投票はStrawPollが<a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">プライバシーポリシー</a>に基づいて保存・管理します。',
 
+  'club.quickApply': 'かんたん応募',
+  'club.quickApplyOff': 'このサークルはかんたん応募に対応していません',
   'club.applies': 'かんたん応募',
   'club.appliesTitle': 'Uma Stable Matchからこのサークルに直接応募できます',
 

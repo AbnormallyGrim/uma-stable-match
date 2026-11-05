@@ -1,13 +1,16 @@
 <!--
   @component
-  One recommended club: tier, link to uma.moe, rank trend, tags, how you'd compare with a button to
-  the club page, and balance details when balance scoring is on. The top three get medal colours.
+  One recommended club: tier, link to uma.moe, rank trend, tags, buttons to the club page and, when
+  applications are on, to quick apply, and stats on how you'd compare and, when balance scoring is on, on balance. The top
+  three get medal colours.
 -->
 
 <script lang="ts">
   import type { Club } from './api';
   import ClubTags from './ClubTags.svelte';
+  import DiscordIcon from './DiscordIcon.svelte';
   import MembersLink from './MembersLink.svelte';
+  import { flags } from './flags.svelte';
   import { formatPercent, formatPerDay, formatPlace } from './format';
   import { t } from './i18n';
   import TierBadge from './TierBadge.svelte';
@@ -22,6 +25,7 @@
   let { club, position, trainerId = null }: Props = $props();
 
   const medal = $derived(position <= 3 ? `p${position}` : '');
+  const offId = $derived(`quick-apply-off-${club.circle_id}`);
 </script>
 
 <article class="card {medal}" aria-labelledby="club-{club.circle_id}">
@@ -41,7 +45,46 @@
   </div>
 
   <div class="side">
-    <dl class="nums">
+    <MembersLink circleId={club.circle_id} name={club.name} {trainerId} />
+    {#if !flags.applications}
+      <!-- Quick apply is off. -->
+    {:else if club.applications === 'discord'}
+      <button type="button" class="quick-apply">
+        <span class="icon"><DiscordIcon /></span>{t('club.quickApply')}
+      </button>
+    {:else}
+      <span class="quick-apply-wrap" data-tip={t('club.quickApplyOff')}>
+        <button type="button" class="quick-apply" aria-disabled="true" aria-describedby={offId}>
+          <span class="icon"><DiscordIcon /></span>{t('club.quickApply')}
+        </button>
+        <span id={offId} class="visually-hidden">{t('club.quickApplyOff')}</span>
+      </span>
+    {/if}
+  </div>
+
+  <div class="details">
+    {#if club.comment}
+      <p class="comment">{club.comment}</p>
+    {/if}
+
+    <dl class="stats">
+      {#if club.balance}
+        <div class="bar-row">
+          <dt>{t('club.balance')}</dt>
+          <dd>
+            <span class="bar" aria-hidden="true"><i style:width="{club.balance.score}%"></i></span>
+            {club.balance.score}/100
+          </dd>
+        </div>
+        <div>
+          <dt>{t('club.passengers')}</dt>
+          <dd>{formatPlace(club.balance.passengers, club.balance.counted)}</dd>
+        </div>
+        <div>
+          <dt>{t('club.top3Share')}</dt>
+          <dd>{formatPercent(club.balance.top3_share)}</dd>
+        </div>
+      {/if}
       <div>
         <dt>{t('club.youdBe')}</dt>
         <dd>{formatPlace(club.your_place, club.club_size)}</dd>
@@ -51,37 +94,7 @@
         <dd>{formatPerDay(club.median_per_day)}</dd>
       </div>
     </dl>
-    <MembersLink circleId={club.circle_id} name={club.name} {trainerId} />
   </div>
-
-  {#if club.comment || club.balance}
-    <div class="details">
-      {#if club.comment}
-        <p class="comment">{club.comment}</p>
-      {/if}
-
-      {#if club.balance}
-        <dl class="balance">
-          <div class="bar-row">
-            <dt>{t('club.balance')}</dt>
-            <dd>
-              <span class="bar" aria-hidden="true"><i style:width="{club.balance.score}%"></i></span
-              >
-              {club.balance.score}/100
-            </dd>
-          </div>
-          <div>
-            <dt>{t('club.passengers')}</dt>
-            <dd>{formatPlace(club.balance.passengers, club.balance.counted)}</dd>
-          </div>
-          <div>
-            <dt>{t('club.top3Share')}</dt>
-            <dd>{formatPercent(club.balance.top3_share)}</dd>
-          </div>
-        </dl>
-      {/if}
-    </div>
-  {/if}
 </article>
 
 <style>
@@ -159,9 +172,8 @@
     text-decoration: underline;
   }
 
-  /* The numbers and the club page button. The divider on its left spans 85% of the card's content
-     height. Fixed column widths, wide enough for `30 of 30` and `<0.01M/day`, keep it in line from
-     card to card. */
+  /* The club page and quick apply buttons. The divider on its left spans 85% of the card's content
+     height. */
   .side {
     position: relative;
     grid-area: nums;
@@ -170,14 +182,6 @@
     gap: 8px;
     justify-content: center;
     padding-left: 16px;
-  }
-
-  .nums {
-    display: grid;
-    grid-template-columns: 4.5rem 6rem;
-    gap: 16px;
-    margin: 0;
-    text-align: right;
   }
 
   .side::before {
@@ -189,21 +193,84 @@
     content: '';
   }
 
-  .nums dt,
-  .balance dt {
+  /* A tooltip with a short, set delay: the browser's own `title` one can't be configured. The same
+     text is the button's description for screen readers. */
+  .quick-apply-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .quick-apply-wrap::after {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 6px);
+    z-index: 10;
+    width: max-content;
+    max-width: 240px;
+    padding: 4px 8px;
+    background: var(--text);
+    border-radius: var(--radius-sm);
+    color: var(--card);
+    font-size: 0.75rem;
+    opacity: 0;
+    pointer-events: none;
+    content: attr(data-tip);
+    transition: opacity 0.1s ease;
+  }
+
+  .quick-apply-wrap:hover::after,
+  .quick-apply-wrap:focus-within::after {
+    opacity: 1;
+    transition-delay: 0.5s;
+  }
+
+  .quick-apply {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    background: #5865f2;
+    border: 1px solid #5865f2;
+    border-radius: var(--radius-sm);
+    color: #ffffff;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .quick-apply:hover {
+    background: #4752c4;
+    border-color: #4752c4;
+  }
+
+  .quick-apply:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .quick-apply[aria-disabled='true'] {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+
+  .icon,
+  .icon :global(svg) {
+    display: block;
+    width: 16px;
+    height: 16px;
+  }
+
+  .stats dt {
     color: var(--muted);
     font-size: 0.6875rem;
   }
 
-  .nums dd {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  /* The description and balance details share a row on wide screens, and stack on narrow ones. */
+  /* The description and stats share a row on wide screens, and stack on narrow ones. */
   .details {
     grid-area: details;
     display: flex;
@@ -222,7 +289,7 @@
     overflow-wrap: anywhere;
   }
 
-  .balance {
+  .stats {
     display: flex;
     flex: none;
     flex-wrap: wrap;
@@ -231,13 +298,13 @@
     font-size: 0.8125rem;
   }
 
-  .balance div {
+  .stats div {
     display: flex;
     gap: 6px;
     align-items: baseline;
   }
 
-  .balance dd {
+  .stats dd {
     display: flex;
     gap: 6px;
     align-items: center;
@@ -267,7 +334,7 @@
       margin-left: 0;
     }
 
-    .comment + .balance {
+    .comment + .stats {
       margin-top: 8px;
     }
 
@@ -282,17 +349,10 @@
     }
 
     .side {
-      align-items: start;
+      align-items: stretch;
       margin-top: 8px;
       padding: 8px 0 0;
       border-top: 1px solid var(--border);
-    }
-
-    .nums {
-      grid-template-columns: none;
-      grid-auto-flow: column;
-      justify-content: start;
-      text-align: left;
     }
 
     .side::before {

@@ -356,6 +356,8 @@ export const en = {
   'wishlist.aboutLabel': 'About these polls',
   'wishlist.about':
     'These polls are hosted by <a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>, not by Uma Stable Match. Your vote is stored and handled by StrawPoll under <a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">its privacy policy</a>.',
+  'club.quickApply': 'Quick Apply',
+  'club.quickApplyOff': "This club doesn't have quick applications enabled",
   'club.applies': 'Quick apply',
   'club.appliesTitle': 'You can apply to this club right from Uma Stable Match',
 
