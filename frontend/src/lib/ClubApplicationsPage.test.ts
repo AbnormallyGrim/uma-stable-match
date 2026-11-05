@@ -122,9 +122,6 @@ describe('ClubApplicationsPage', () => {
         await screen.findByText(t('leader.state.open'), { selector: '.status' }),
       ).toBeInTheDocument();
       expect(screen.getByText(t('leader.linked'))).toBeInTheDocument();
-      expect(
-        screen.getByText(t('leader.status.category', { name: 'Applications' })),
-      ).toBeInTheDocument();
       expect(screen.getByText(t('leader.table.empty'))).toBeInTheDocument();
     });
 
@@ -167,7 +164,6 @@ describe('ClubApplicationsPage', () => {
       expect(JSON.parse(String(patch?.[1]?.body))).toEqual({
         open: true,
         auto_join: false,
-        category: '10',
       });
     });
 

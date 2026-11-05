@@ -22,7 +22,6 @@
 
   let open = $state(true);
   let autoJoin = $state(true);
-  let category = $state('');
   let saving = $state(false);
   let saved = $state(false);
   let saveFailed = $state(false);
@@ -33,12 +32,7 @@
   $effect(() => {
     open = settings.open;
     autoJoin = settings.auto_join;
-    category = settings.category ?? '';
   });
-
-  const categoryName = $derived(
-    settings.categories.find((option) => option.id === settings.category)?.name ?? null,
-  );
 
   async function save(event: SubmitEvent) {
     event.preventDefault();
@@ -46,13 +40,7 @@
     saved = false;
     saveFailed = false;
     try {
-      onsaved(
-        await saveSettings(clubId, {
-          open,
-          auto_join: autoJoin,
-          category: category === '' ? null : category,
-        }),
-      );
+      onsaved(await saveSettings(clubId, { open, auto_join: autoJoin }));
       saved = true;
     } catch {
       saveFailed = true;
@@ -85,17 +73,6 @@
         })}
       </li>
     {/if}
-    {#if categoryName}
-      <li class="ok">
-        <span class="icon" aria-hidden="true">✓</span>{t('leader.status.category', {
-          name: categoryName,
-        })}
-      </li>
-    {:else}
-      <li class="warn">
-        <span class="icon" aria-hidden="true">!</span>{t('leader.status.noCategory')}
-      </li>
-    {/if}
     {#if settings.open}
       <li class="ok"><span class="icon" aria-hidden="true">✓</span>{t('leader.status.open')}</li>
     {:else}
@@ -122,16 +99,6 @@
       >
     </span>
     <input type="checkbox" role="switch" bind:checked={autoJoin} />
-  </label>
-  <label class="field">
-    <strong>{t('leader.settings.category')}</strong>
-    <small>{t('leader.settings.categoryHint')}</small>
-    <select bind:value={category}>
-      <option value="">{t('leader.settings.categoryNone')}</option>
-      {#each settings.categories as option (option.id)}
-        <option value={option.id}>{option.name}</option>
-      {/each}
-    </select>
   </label>
   <div class="actions">
     <button class="primary" type="submit" disabled={saving}>
@@ -265,21 +232,6 @@
   input[role='switch']:checked::after {
     left: 20px;
     background: #ffffff;
-  }
-
-  .field {
-    display: grid;
-    gap: 4px;
-    margin-top: 12px;
-  }
-
-  select {
-    padding: 7px 10px;
-    background: var(--card);
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-sm);
-    color: var(--text);
-    font: inherit;
   }
 
   .actions {
