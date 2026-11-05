@@ -427,8 +427,9 @@ export const en = {
   'trainer.table.club': 'Club',
   'trainer.table.trainerId': 'Trainer ID',
   'trainer.table.expires': 'Expires',
-  'trainer.table.ticket': 'Open ticket',
-  'trainer.table.ticketFor': ({ name }: { name: string }) => `Open your ticket for ${name}`,
+  'trainer.table.ticket': 'Open in Discord',
+  'trainer.table.ticketFor': ({ name }: { name: string }) =>
+    `Open ${name}’s application in Discord`,
   'trainer.table.noTicket': 'Ticket closed',
 
   'leader.title': 'Club applications · Uma Stable Match',

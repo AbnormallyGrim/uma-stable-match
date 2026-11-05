@@ -418,8 +418,8 @@ export const ja: Catalog = {
   'trainer.table.club': 'サークル',
   'trainer.table.trainerId': 'トレーナーID',
   'trainer.table.expires': '期限',
-  'trainer.table.ticket': 'チケットを開く',
-  'trainer.table.ticketFor': ({ name }: { name: string }) => `${name}のチケットを開く`,
+  'trainer.table.ticket': 'Discordで開く',
+  'trainer.table.ticketFor': ({ name }: { name: string }) => `${name}の申請をDiscordで開く`,
   'trainer.table.noTicket': 'チケット終了',
 
   'leader.title': 'サークル申請 · Uma Stable Match',

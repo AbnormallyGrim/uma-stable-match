@@ -11,6 +11,7 @@
     type ApplicationStatus,
     type TrainerApplication,
   } from './applications';
+  import DiscordIcon from './DiscordIcon.svelte';
   import { formatDate } from './format';
   import { t } from './i18n';
   import { clubPath } from './route';
@@ -95,13 +96,14 @@
             <td class="act">
               {#if application.ticketUrl !== null}
                 <a
-                  class="ticket"
+                  class="provider-btn discord ticket"
                   href={application.ticketUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={t('trainer.table.ticketFor', { name: application.clubName })}
-                  >{t('trainer.table.ticket')}</a
                 >
+                  <span class="provider-icon"><DiscordIcon /></span>{t('trainer.table.ticket')}
+                </a>
               {:else}
                 <span class="muted">{t('trainer.table.noTicket')}</span>
               {/if}
@@ -221,14 +223,10 @@
   }
 
   .ticket {
-    display: inline-block;
-    padding: 4px 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    color: var(--text);
+    min-height: 0;
+    padding: 6px 12px;
     font-size: 0.85rem;
-    font-weight: 600;
-    text-decoration: none;
+    white-space: nowrap;
   }
 
   /* Each row becomes a card, with the column names beside the values. */
@@ -285,7 +283,6 @@
 
     .ticket {
       width: 100%;
-      text-align: center;
     }
   }
 </style>
