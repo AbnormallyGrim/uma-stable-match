@@ -341,16 +341,18 @@ export const ja: Catalog = {
   'applications.title': 'サークル申請 · Uma Stable Match',
   'applications.heading': 'どちらに当てはまりますか？',
   'applications.intro':
-    'クラブマスターと応募者が、次の一手を見失わないように。サークル申請の管理や進行状況を一か所で確認できます。',
+    'サークルマスターから応募者まで、次に進むべき一手がひと目で分かるように。サークル運営や応募状況を、一箇所でまとめて確認できます。',
   'applications.requirements':
-    '<ul><li>サークルマスターはDiscordの設定とボットの状態を管理できます。</li><li>トレーナーは応募したサークルや進行状況を一覧で確認できます。</li></ul>',
+    '<ul><li>サークルマスターはDiscord設定と運営状況をまとめて管理できます。</li><li>トレーナーは応募済みのサークルを一覧で確認し、進行状況を把握できます。</li></ul>',
   'applications.privacy': ({ href }: { href: string }) =>
     `Discordへのサインインは、サークル申請の管理のためだけに使われます。<a href="${href}">プライバシー情報</a>をご確認ください。`,
   'applications.session.loading': 'Discordセッションを確認しています…',
   'applications.session.signedOut':
     '以下から役割を選んでください。Discordでサインインしてサークルを管理できます。',
+
   'applications.session.signIn': 'Discordでサインイン',
   'applications.session.signedIn': 'Discordセッションは有効です。',
+
   'applications.session.signOut': 'サインアウト',
   'applications.session.error':
     'Discordセッションを確認できませんでした。しばらくしてからもう一度お試しください。',
@@ -358,6 +360,7 @@ export const ja: Catalog = {
   'applications.role.leader.title': 'サークルマスターです',
   'applications.role.leader.description':
     'ボットの状態を確認し、応募状況を見て、サークルのDiscord申請を管理します。',
+
   'applications.role.trainer.title': 'トレーナーです',
   'applications.role.trainer.description':
     '応募したサークルを一覧で確認し、応募履歴をまとめて見られます。',
