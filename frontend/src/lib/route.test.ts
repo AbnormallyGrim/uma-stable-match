@@ -8,6 +8,7 @@ import {
   isWishlistRoute,
   APPLICATIONS_PATH,
   applicationsRoute,
+  TRAINER_APPLICATIONS_PATH,
   rememberedSearch,
   rememberSearch,
   clubApplicationsPath,
@@ -29,8 +30,22 @@ describe('clubRoute', () => {
     expect(clubRoute('/club/7', '?trainer=me')).toEqual({ circleId: '7', trainerId: null });
   });
 
+  it("reads a trainer's own applications page", () => {
+    expect(applicationsRoute('/applications/mine', '')).toEqual({ page: 'trainer' });
+    expect(applicationsRoute('/applications/mine/', '')).toEqual({ page: 'trainer' });
+    expect(TRAINER_APPLICATIONS_PATH).toBe('/applications/mine');
+  });
+
   it('leaves other pages alone', () => {
-    for (const path of ['/', '/club', '/club/', '/club/abc', '/club/7/members', '/clubs/7']) {
+    for (const path of [
+      '/applications/mine/7',
+      '/',
+      '/club',
+      '/club/',
+      '/club/abc',
+      '/club/7/members',
+      '/clubs/7',
+    ]) {
       expect(clubRoute(path, ''), path).toBeNull();
     }
   });

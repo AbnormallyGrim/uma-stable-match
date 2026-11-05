@@ -18,6 +18,8 @@ import ClubApplicationsPage from './lib/ClubApplicationsPage.svelte';
 import { DEFAULT_SEARCH } from './lib/search';
 import { club, recommendations } from './lib/test-data';
 import ThemeToggle from './lib/ThemeToggle.svelte';
+import TrainerApplicationsPage from './lib/TrainerApplicationsPage.svelte';
+import TrainerApplicationsTable from './lib/TrainerApplicationsTable.svelte';
 import { TOUR_KEY } from './lib/tour';
 
 // axe's colour-contrast rule needs real rendering, so contrast.test.ts covers it instead.
@@ -285,6 +287,27 @@ describe('accessibility', () => {
       answer({ 'GET /api/v1/discord/clubs/7/settings': () => json({ error: 'no' }, status) });
       const { container } = render(ClubApplicationsPage, { clubId: '7' });
       await screen.findByText(/./, { selector: 'p.card, p[role="alert"], section p' });
+      expect(await violations(container)).toEqual([]);
+    });
+
+    it("has no violations on a trainer's applications page and table", async () => {
+      const page = render(TrainerApplicationsPage);
+      expect(await violations(page.container)).toEqual([]);
+      page.unmount();
+      const { container } = render(TrainerApplicationsTable, {
+        applications: [
+          {
+            id: 'a1',
+            clubId: '100000001',
+            clubName: 'Example Club',
+            trainerId: '100000000011',
+            status: 'pending',
+            submittedAt: '2026-11-01T10:00:00Z',
+            ticketUrl: 'https://discord.com/channels/1/2',
+          },
+        ],
+        now: new Date('2026-11-05T00:00:00Z'),
+      });
       expect(await violations(container)).toEqual([]);
     });
 

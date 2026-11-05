@@ -44,9 +44,14 @@ export function isWishlistRoute(pathname: string): boolean {
 /** The address of the club applications page, where a leader sets a club up. */
 export const APPLICATIONS_PATH = '/applications';
 
-/** A club applications page: the start, or one club's page for its leaders. */
+/** The address of the page where a trainer follows the applications they've sent. */
+export const TRAINER_APPLICATIONS_PATH = `${APPLICATIONS_PATH}/mine`;
+
+/** A club applications page: the start, one club's page for its leaders, or a trainer's own. */
 export type ApplicationsRoute =
-  { page: 'home'; error: string | null } | { page: 'club'; clubId: string; linked: boolean };
+  | { page: 'home'; error: string | null }
+  | { page: 'club'; clubId: string; linked: boolean }
+  | { page: 'trainer' };
 
 const CLUB_APPLICATIONS = /^\/applications\/club\/(\d{1,18})\/?$/;
 
@@ -57,6 +62,9 @@ export function applicationsRoute(pathname: string, search: string): Application
     const error = params.get('error');
     // Keeps the error when it is a short label, as the page shows it.
     return { page: 'home', error: error !== null && /^[a-z_]{1,32}$/.test(error) ? error : null };
+  }
+  if (pathname === TRAINER_APPLICATIONS_PATH || pathname === `${TRAINER_APPLICATIONS_PATH}/`) {
+    return { page: 'trainer' };
   }
   const match = CLUB_APPLICATIONS.exec(pathname);
   return match ? { page: 'club', clubId: match[1]!, linked: params.get('linked') === '1' } : null;
