@@ -10,6 +10,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::auth::error;
 use crate::bot::Discord;
+use crate::error::Error;
 use crate::leaders::managed_club;
 use crate::opt_in::store_unavailable;
 use crate::store::{ClubRecord, SettingsUpdate};
@@ -20,6 +21,10 @@ pub const SETTINGS_PATH: &str = "/api/v1/discord/clubs/{club}/settings";
 
 /// Discord's channel type for a category.
 const CATEGORY: u8 = 4;
+
+/// Discord's error codes for a server the bot can't see: Missing Access and Unknown Guild. Both
+/// are what's left after the bot is kicked.
+const BOT_GONE: [u32; 2] = [50001, 10004];
 
 pub(crate) fn router(discord: Discord) -> Router {
     Router::new()
@@ -79,7 +84,8 @@ async fn read(
         Err(response) => return *response,
     };
     match categories(&discord, record.guild_id).await {
-        Ok(categories) => Json(view(&record, categories)).into_response(),
+        Ok(Some(categories)) => Json(view(&record, categories)).into_response(),
+        Ok(None) => forget_server(&discord, record.guild_id).await,
         Err(response) => *response,
     }
 }
@@ -98,7 +104,8 @@ async fn change(
         return error(StatusCode::BAD_REQUEST, "invalid settings");
     };
     let categories = match categories(&discord, record.guild_id).await {
-        Ok(categories) => categories,
+        Ok(Some(categories)) => categories,
+        Ok(None) => return forget_server(&discord, record.guild_id).await,
         Err(response) => return *response,
     };
     let update = match checked(&patch, &categories) {
@@ -153,19 +160,45 @@ fn checked(patch: &Patch, categories: &[Named]) -> Result<SettingsUpdate, &'stat
     Ok(update)
 }
 
-/// The server's categories, by name.
-async fn categories(discord: &Discord, guild_id: u64) -> Result<Vec<Named>, Box<Response>> {
-    let channels: Vec<Channel> = discord
+/// Unlinks every club on a server the bot was kicked from, so its leaders can add the bot again.
+/// Answers as for a club that isn't linked.
+async fn forget_server(discord: &Discord, guild_id: u64) -> Response {
+    let Some(opt_in) = discord.opt_in() else {
+        return error(StatusCode::NOT_FOUND, "not found");
+    };
+    let store = opt_in.store();
+    let clubs = match store.clubs_on(guild_id).await {
+        Ok(clubs) => clubs,
+        Err(err) => return store_unavailable(&err),
+    };
+    for club in clubs {
+        if let Err(err) = store.unlink(club).await {
+            return store_unavailable(&err);
+        }
+        metrics::counter!("discord_unlinks_total", "result" => "bot_removed").increment(1);
+    }
+    error(StatusCode::NOT_FOUND, "that club isn't linked to a server")
+}
+
+/// The server's categories, by name; `None` if the bot is no longer in the server.
+async fn categories(discord: &Discord, guild_id: u64) -> Result<Option<Vec<Named>>, Box<Response>> {
+    let channels: Vec<Channel> = match discord
         .rest()
         .get(&format!("/guilds/{guild_id}/channels"))
         .await
-        .map_err(|err| {
+    {
+        Ok(channels) => channels,
+        Err(Error::Api {
+            code: Some(code), ..
+        }) if BOT_GONE.contains(&code) => return Ok(None),
+        Err(err) => {
             tracing::warn!(error = %err, "could not list a Discord server's categories");
-            Box::new(error(
+            return Err(Box::new(error(
                 StatusCode::BAD_GATEWAY,
                 "couldn't read the server's categories; try again",
-            ))
-        })?;
+            )));
+        }
+    };
     let mut categories: Vec<Named> = channels
         .into_iter()
         .filter(|channel| channel.kind == CATEGORY)
@@ -175,7 +208,7 @@ async fn categories(discord: &Discord, guild_id: u64) -> Result<Vec<Named>, Box<
         })
         .collect();
     categories.sort_by_key(|category| category.name.to_lowercase());
-    Ok(categories)
+    Ok(Some(categories))
 }
 
 fn view(record: &ClubRecord, categories: Vec<Named>) -> Settings {

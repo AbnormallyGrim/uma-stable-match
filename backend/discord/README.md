@@ -85,7 +85,7 @@ Discord sends a signed PING, and a badly signed request, when the URL is saved i
 
 **Session.** A signed cookie holds the Discord ID and a 12-hour expiry (`MAX_SESSION_AGE`), also `HttpOnly`, `Secure` and `SameSite=Lax`. Nothing is stored server-side, so signing out removes the cookie but can't revoke a copy of it before it expires. The signed values carry a purpose, so a `state` can't be used as a session, and neither can the human check's tokens that share the key. `Secure` is left off only when `PUBLIC_URL` is `http://`, for local development.
 
-**What's kept.** The access token is used for one `GET /users/@me` inside the callback request and then dropped; only the ID is kept, inside the session cookie. The name `GET /api/v1/applications/me` gives is looked up as the bot (`GET /users/{id}`) and held in memory for 10 minutes (`NAME_TTL`), never in the cookie or Redis; deleting the account drops it. Nothing from Discord is logged: a failed sign-in logs Discord's error message, not the user. Results are counted in `discord_sign_ins_total`, labelled by `result` (`success`, `invalid_state`, `denied`, `discord_error`, or for opting a club in `no_server`, `wrong_server`, `not_manager`, `not_leader` and `unavailable`).
+**What's kept.** The access token is used for one `GET /users/@me` inside the callback request and then dropped; only the ID is kept, inside the session cookie. The name `GET /api/v1/applications/me` gives is looked up as the bot (`GET /users/{id}`) and held in memory for 10 minutes (`NAME_TTL`), never in the cookie or Redis; deleting the account drops it. Nothing from Discord is logged: a failed sign-in logs Discord's error message, not the user. Results are counted in `discord_sign_ins_total`, labelled by `result` (`success`, `invalid_state`, `denied`, `discord_error`, or for opting a club in `no_server`, `wrong_server`, `not_manager`, `not_leader`, `missing_permissions` and `unavailable`).
 
 ## Finding a club's server
 
@@ -147,6 +147,7 @@ The callback never reads the redirect's own `guild_id` or `permissions` paramete
 
 - **Same server as the invite's, the same person who started it, who manages it and still leads the club:** the club is linked (`ClubStore::link`) and the visitor goes to `next`. If the club was linked to another server, it moves; when no club is left on the old one, the bot leaves it. Managing the server is checked with `GET /guilds/{id}` (the owner and the roles' permissions) and `GET /guilds/{id}/members/{user}` (the person's roles), combining `@everyone`'s permissions and the person's roles.
 - **Another server, or a person who doesn't manage it or no longer leads the club:** nothing is linked (403) and the bot leaves that server, unless a club is linked to it.
+- **The bot without every permission in `BOT_PERMISSIONS`:** Discord's page lets the person untick permissions, so the bot's own roles are checked (`GET /guilds/{id}` and `GET /guilds/{id}/members/{application id}`, combining `@everyone` and the bot's roles; Administrator covers everything, channel overrides aren't looked at). If any is missing, nothing is linked (400, `missing_permissions`) and the bot leaves, unless a club is linked to it. The person starts again and leaves them ticked.
 - **No server** (the bot wasn't added) **or a different person:** nothing is linked (400).
 
 Opting in needs the app set up with `Discord::with_opt_in(OptIn::new(store, clubs))` and `Discord::with_trainer_links`. `ClubLookup` is how clubs are found, since this crate doesn't know where they come from; it answers `Ok(None)` for a club that doesn't exist, and the server reads the club fresh from uma.moe each time. Without both, the routes aren't served.
@@ -194,6 +195,8 @@ It is a `DELETE`, which a browser doesn't send across sites with the session coo
 | `categories` | The server's categories, `{id, name}`, to choose the ticket category from |
 
 `PATCH` takes a JSON object with any of `category` (an ID, or `null` to clear), `auto_join` and `open`. Fields left out stay as they are. The category must be one of the server's categories; otherwise, an unknown field, a wrong type, or no field at all gets 400 and nothing changes. It answers with the new settings, as `GET` does. A 409 means the club moved to another server or was unlinked while the change was made.
+
+**Bot kicked from the server.** Discord then answers the channel list with 403 `Missing Access` (50001) or 404 `Unknown Guild` (10004). Both `GET` and `PATCH` take that as the bot being gone: every club linked to that server is unlinked (the bot is gone for all of them) and the call answers 404, as for a club that isn't linked, so the leader can opt in again. Each is counted in `discord_unlinks_total` with `result="bot_removed"`. Any other Discord failure is 502 and changes nothing.
 
 ## Linking a trainer
 

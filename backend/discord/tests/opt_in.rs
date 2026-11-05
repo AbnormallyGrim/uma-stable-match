@@ -37,6 +37,8 @@ struct World {
     /// Each club's leader, by trainer ID.
     leaders: Arc<Mutex<HashMap<u64, u64>>>,
     club_lookups: Arc<AtomicUsize>,
+    /// What the bot's role on server A grants, for the mock to answer with.
+    bot_role: Arc<AtomicU64>,
     base: u64,
 }
 
@@ -144,6 +146,7 @@ impl World {
             trainers,
             leaders,
             club_lookups,
+            bot_role: Arc::new(AtomicU64::new(BOT_PERMISSIONS)),
             base,
         };
         world.mock_discord().await;
@@ -259,25 +262,36 @@ impl World {
             .await;
 
         // Server A: someone else owns it; one role has Manage Server, and `@everyone` (the role
-        // with the server's ID) has nothing. The leader has that role, the other user doesn't.
+        // with the server's ID) has nothing. The leader has that role, the other user doesn't. The
+        // bot, whose ID is the application's, has a role granting `bot_role`.
         let a = self.server_a();
         let manager_role = a + 1000;
+        let bot_role = a + 1002;
+        let granted = self.bot_role.clone();
         Mock::given(method("GET"))
             .and(path(format!("/guilds/{a}")))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "owner_id": "999",
-                "roles": [
-                    { "id": a.to_string(), "name": "@everyone", "permissions": "0" },
-                    { "id": manager_role.to_string(), "name": "Managers", "permissions": "32" },
-                    { "id": (a + 1001).to_string(), "name": "officers", "permissions": "0" },
-                ],
-            })))
+            .respond_with(move |_: &wiremock::Request| {
+                ResponseTemplate::new(200).set_body_json(json!({
+                    "owner_id": "999",
+                    "roles": [
+                        { "id": a.to_string(), "name": "@everyone", "permissions": "0" },
+                        { "id": manager_role.to_string(), "name": "Managers", "permissions": "32" },
+                        { "id": (a + 1001).to_string(), "name": "officers", "permissions": "0" },
+                        {
+                            "id": bot_role.to_string(),
+                            "name": "Bot",
+                            "permissions": granted.load(Ordering::Relaxed).to_string(),
+                        },
+                    ],
+                }))
+            })
             .mount(&self.mock)
             .await;
         for (user, roles) in [
             (self.leader(), vec![manager_role.to_string()]),
             (self.other_user(), vec![]),
             (self.stranger(), vec![]),
+            (1000, vec![bot_role.to_string()]),
         ] {
             Mock::given(method("GET"))
                 .and(path(format!("/guilds/{a}/members/{user}")))
@@ -292,6 +306,15 @@ impl World {
                 { "id": (a + 2001).to_string(), "name": "general", "type": 0 },
                 { "id": (a + 2002).to_string(), "name": "archive", "type": 4 },
             ])))
+            .mount(&self.mock)
+            .await;
+        // The bot was kicked from the old server.
+        Mock::given(method("GET"))
+            .and(path(format!("/guilds/{}/channels", self.old_server())))
+            .respond_with(
+                ResponseTemplate::new(403)
+                    .set_body_json(json!({ "message": "Missing Access", "code": 50001 })),
+            )
             .mount(&self.mock)
             .await;
         // Server B is down.
@@ -684,6 +707,43 @@ async fn a_leader_without_manage_server_cant_add_the_bot() {
 }
 
 #[tokio::test]
+async fn the_bot_added_without_every_permission_links_nothing_and_leaves() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    // The leader unticked Manage Channels on Discord's page.
+    world
+        .bot_role
+        .store(BOT_PERMISSIONS & !(1 << 4), Ordering::Relaxed);
+    let session = world.sign_in().await;
+    let started = world.start(&session, world.club(1)).await;
+    let response = world.finish(&started, "install-a", "").await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(world.store.club(world.club(1)).await.unwrap(), None);
+    assert_eq!(
+        world.left().await,
+        [format!("/users/@me/guilds/{}", world.server_a())]
+    );
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn administrator_covers_every_permission_the_bot_needs() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    world.bot_role.store(1 << 3, Ordering::Relaxed);
+    let session = world.sign_in().await;
+    let started = world.start(&session, world.club(1)).await;
+    let response = world.finish(&started, "install-a", "").await;
+
+    assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
+    assert!(world.store.club(world.club(1)).await.unwrap().is_some());
+    world.clean_up().await;
+}
+
+#[tokio::test]
 async fn a_leader_who_steps_down_before_finishing_links_nothing() {
     let Some(world) = World::new().await else {
         return;
@@ -912,6 +972,45 @@ async fn the_leader_reads_the_clubs_settings_with_the_servers_categories() {
             ],
         })
     );
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn a_kicked_bot_unlinks_the_servers_clubs_so_the_bot_can_be_added_again() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    for n in [2, 3] {
+        world
+            .store
+            .link(world.club(n), world.old_server())
+            .await
+            .unwrap();
+    }
+    let session = world.sign_in().await;
+    let response = world.settings(&session, world.club(2)).await;
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    // Every club on the server went, as the bot is gone for all of them.
+    assert!(world
+        .store
+        .clubs_on(world.old_server())
+        .await
+        .unwrap()
+        .is_empty());
+    assert_eq!(world.store.club(world.club(2)).await.unwrap(), None);
+    assert_eq!(world.store.club(world.club(3)).await.unwrap(), None);
+    // Changing settings of a kicked bot's club does the same.
+    world
+        .store
+        .link(world.club(2), world.old_server())
+        .await
+        .unwrap();
+    let response = world
+        .change(&session, world.club(2), json!({ "open": false }))
+        .await;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(world.store.club(world.club(2)).await.unwrap(), None);
     world.clean_up().await;
 }
 
