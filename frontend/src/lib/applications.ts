@@ -79,6 +79,30 @@ export function activeApplications<T extends { submittedAt: string }>(
   return applications.filter((application) => expiresAt(application.submittedAt) > now);
 }
 
+/** The address that starts applying to club `clubId`, where Quick Apply goes. */
+export function applyUrl(clubId: number | string): string {
+  return `/api/v1/discord/apply?${new URLSearchParams({ club: String(clubId) })}`;
+}
+
+/** The applications the signed-in leader's club has had, newest first. */
+export async function fetchClubApplications(
+  clubId: string,
+  options: RequestOptions = {},
+): Promise<Application[]> {
+  return send<Application[]>(
+    `/api/v1/discord/clubs/${encodeURIComponent(clubId)}/applications`,
+    {},
+    options,
+  );
+}
+
+/** The applications the signed-in person sent, newest first. */
+export async function fetchMyApplications(
+  options: RequestOptions = {},
+): Promise<TrainerApplication[]> {
+  return send<TrainerApplication[]>('/api/v1/discord/applications', {}, options);
+}
+
 /** What to change. Fields left out stay as they are; `category: null` clears the category. */
 export interface SettingsChange {
   category?: string | null;

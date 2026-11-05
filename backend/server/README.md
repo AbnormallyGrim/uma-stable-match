@@ -53,6 +53,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `DISCORD_PUBLIC_KEY` | none | Required with `DISCORD_APP_ID`: the application's public key, 64 hex characters, which checks that interactions come from Discord |
 | `DISCORD_BOT_TOKEN` | none | Required with `DISCORD_APP_ID`: the bot's token |
 | `DISCORD_CLIENT_SECRET` | none | Required with `DISCORD_APP_ID`: the application's OAuth2 client secret |
+| `DISCORD_DEV_GUILD` | none | For trying applications on your own machine: a Discord server ID that takes every club's applications, so every ticket goes there. Needs Discord set up and a `PUBLIC_URL` on `http://localhost` or `http://127.0.0.1`; anything else is refused at startup |
 | `PUBLIC_URL` | none | Required with `DISCORD_APP_ID`: the site's address, such as `https://example.com`, with no path. Discord's sign-in redirects back to it, and cookies are `Secure` when it's `https` |
 | `METRICS_ADDR` | none | IP address and port to serve Prometheus metrics and the full [status](#status) on, such as `127.0.0.1:9464`. Unset, no metrics are recorded. See [Metrics](#metrics) |
 | `METRICS_EXCLUDED_TRAINER_IDS` | none | Comma-separated trainer IDs whose searches are left out of search metrics and the search total. See [Excluded trainers](#excluded-trainers) |
@@ -72,6 +73,7 @@ Blank values count as unset. These stop the server at startup, with an error mes
 - `SERVE_ONLY` without `REDIS_URL`
 - only some of `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and `TOKEN_SIGNING_KEY`, or a `TOKEN_SIGNING_KEY` under 32 characters
 - only some of `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_SECRET`, a `DISCORD_APP_ID` that isn't a positive whole number, a `DISCORD_PUBLIC_KEY` that isn't a valid key, or Discord without `REDIS_URL`, `TOKEN_SIGNING_KEY` (at least 32 characters) or a valid `PUBLIC_URL`
+- a `DISCORD_DEV_GUILD` that isn't a positive whole number, or one set without Discord or with a `PUBLIC_URL` that isn't local
 - a `METRICS_ADDR` that isn't an IP address and port, or that can't be listened on
 - a `METRICS_EXCLUDED_TRAINER_IDS` that isn't a comma-separated list of trainer IDs
 - an `OTEL_EXPORTER_OTLP_ENDPOINT` that isn't a valid URL
@@ -707,7 +709,7 @@ Setting them before that version is live makes every search fail with `401`. To 
 
 ## Discord applications
 
-Club applications through Discord are being built in steps; so far the server answers Discord's interactions endpoint, offers Sign in with Discord, lets a club opt in, and lets a player link a trainer ID to their Discord ID. With `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_SECRET`, `TOKEN_SIGNING_KEY` and `PUBLIC_URL` set, it serves `POST /discord/interactions` and the [sign-in routes](../discord/README.md#sign-in-with-discord) from the [`uma-stable-match-discord`](../discord/README.md) crate, behind the same security headers, time limit and panic handling as the API. Unset, the path isn't served and nothing else changes.
+Club applications go through Discord: the server answers Discord's interactions endpoint, offers Sign in with Discord, lets a club opt in, lets a player link a trainer ID to their Discord ID, and lets a linked player apply to a club that opted in. With `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_SECRET`, `TOKEN_SIGNING_KEY` and `PUBLIC_URL` set, it serves `POST /discord/interactions` and the [sign-in routes](../discord/README.md#sign-in-with-discord) from the [`uma-stable-match-discord`](../discord/README.md) crate, behind the same security headers, time limit and panic handling as the API. Unset, the path isn't served and nothing else changes.
 
 Discord's data is kept in Redis, so these settings need `REDIS_URL`: which club is linked to which Discord server (`discord:club:{id}` and `discord:guild:{id}`), without a TTL so eviction never removes it. The server finds a club's description through its club details cache, and a trainer's profile comment through its source.
 
@@ -727,6 +729,10 @@ The bot never needs privileged gateway intents; the server holds one gateway con
 **Leader access.** Only a club's leader in the game reads and changes its settings (`GET` and `PATCH /api/v1/discord/clubs/<club ID>/settings`: the ticket category, auto-join, on by default, and open or paused, open by default) or unlinks it (`DELETE /api/v1/discord/clubs/<club ID>`, after which the bot leaves when no club is left on the server). Each call reads the club fresh from uma.moe and checks its leader is the person's linked trainer, so handing the club over moves access at once. `GET /api/v1/discord/my-club` gives the person's linked trainer, its club and whether it leads it. See [Leader access](../discord/README.md#leader-access) and [Club settings](../discord/README.md#club-settings).
 
 **Linking a trainer.** A signed-in player proves they own a trainer ID by putting a key from `POST /api/v1/discord/trainers/<trainer ID>/verification` in their in-game profile comment, then checking with `POST …/link`. The server reads the comment fresh from uma.moe (`GET /api/v4/user/profile/<trainer ID>`, through the source) and links the ID to their Discord ID if the key is there. Redis keeps only a hash of the Discord ID, keyed with `REDIS_KEY_SECRET`, and the links stay until the player unlinks. A player links one trainer ID at a time. The `fixture_server` example has no profiles, so every check there answers 404. See [Linking a trainer](../discord/README.md#linking-a-trainer) for the routes, limits and keys.
+
+**Applying.** A club that opted in gets a Quick Apply button, which goes to `GET /api/v1/discord/apply?club=<club ID>`. The player signs in with Discord, allows it to add them to the club's server, and the server then opens a private ticket channel there for the player and the club's leader, with their trainer's profile link, pace and fans this month, and Accept and Decline buttons. Pace and fans come from the same lookups as the search (through the source). A player has one pending application per club and can send five a day. Applications are kept in Redis until a calendar month after they're sent. `GET /api/v1/discord/applications` and `GET /api/v1/discord/clubs/<club ID>/applications` list them for the player and the club's leader. See [Applying to a club](../discord/README.md#applying-to-a-club).
+
+**Trying it locally.** With Discord set up and `PUBLIC_URL=http://localhost:<port>`, set `DISCORD_DEV_GUILD` to the ID of a server the bot is in. Every club then shows Quick Apply, and every ticket opens in that server, in no category and with no leader added, so whoever has Manage Server there answers it. The server refuses to start with it on any other `PUBLIC_URL`.
 
 Calls to Discord are counted in `discord_requests_total`, by status, and sign-ins in `discord_sign_ins_total`; see the crate's [rate limits](../discord/README.md#rate-limits).
 

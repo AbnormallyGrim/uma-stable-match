@@ -20,7 +20,7 @@ use crate::guild_access::{manages, missing_for_bot};
 use crate::invites::servers_in_description;
 use crate::leaders::{leadership, led_club, managed_club, Leadership, Unchecked};
 use crate::oauth::Authorized;
-use crate::store::ClubStore;
+use crate::store::{ClubStore, SettingsUpdate};
 
 /// Path that starts opting a club in. Needs a session whose linked trainer leads the club.
 pub const OPT_IN_PATH: &str = "/api/v1/discord/opt-in";
@@ -330,6 +330,23 @@ pub(crate) async fn install(
     if let Some(left) = moved.filter(|left| left.remaining == 0) {
         leave(discord, left.guild_id).await;
     }
+    // Tickets go to the leader who set the club up.
+    let leader = SettingsUpdate {
+        leader: Some(target.user),
+        ..SettingsUpdate::default()
+    };
+    opt_in
+        .store
+        .update(target.club, target.guild, &leader)
+        .await
+        .map_err(|err| {
+            tracing::warn!(error = %err, "could not note a club's leader");
+            Failure::new(
+                "unavailable",
+                StatusCode::SERVICE_UNAVAILABLE,
+                "couldn't save the link; try again",
+            )
+        })?;
     Ok(())
 }
 

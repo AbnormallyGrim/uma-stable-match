@@ -1,7 +1,7 @@
 //! Which club is linked to which Discord server, kept in Redis.
 //!
-//! - `discord:club:{club_id}`: a hash with the club's `server`, `category`, `auto_join`, `open`
-//!   and `problem`. Clubs linked before leader roles were dropped may still hold `leader_roles`,
+//! - `discord:club:{club_id}`: a hash with the club's `server`, `category`, `auto_join`, `open`,
+//!   `leader` (the Discord ID of the leader who last set it up) and `problem`. Clubs linked before leader roles were dropped may still hold `leader_roles`,
 //!   which nothing reads.
 //! - `discord:guild:{guild_id}`: a set of the club IDs linked to that server.
 //!
@@ -91,6 +91,8 @@ pub struct ClubRecord {
     pub open: bool,
     /// The problem with the club's setup, if there is one.
     pub problem: Option<String>,
+    /// The Discord ID of the leader who last set the club up, who is added to its tickets.
+    pub leader: Option<u64>,
 }
 
 /// Changes to a club's settings. A field left `None` stays as it is.
@@ -102,6 +104,8 @@ pub struct SettingsUpdate {
     pub auto_join: Option<bool>,
     /// Whether the club takes applications.
     pub open: Option<bool>,
+    /// The Discord ID of the leader setting the club up.
+    pub leader: Option<u64>,
 }
 
 impl SettingsUpdate {
@@ -120,6 +124,9 @@ impl SettingsUpdate {
         }
         if let Some(on) = self.open {
             pairs.push(("open", flag(on)));
+        }
+        if let Some(leader) = self.leader {
+            pairs.push(("leader", leader.to_string()));
         }
         pairs
     }
@@ -146,6 +153,7 @@ impl From<redis::RedisError> for StoreError {
 #[derive(Clone)]
 pub struct ClubStore {
     conn: ConnectionManager,
+    dev_guild: Option<u64>,
 }
 
 impl std::fmt::Debug for ClubStore {
@@ -157,7 +165,17 @@ impl std::fmt::Debug for ClubStore {
 impl ClubStore {
     /// A store using this connection.
     pub fn new(conn: ConnectionManager) -> Self {
-        Self { conn }
+        Self {
+            conn,
+            dev_guild: None,
+        }
+    }
+
+    /// The same store, answering as if every club took applications in this server. For trying
+    /// applications on one's own machine.
+    pub fn with_dev_guild(mut self, guild_id: u64) -> Self {
+        self.dev_guild = Some(guild_id);
+        self
     }
 
     /// Links a club to a server. A club is linked to one server at a time, so linking it to
@@ -207,6 +225,9 @@ impl ClubStore {
 
     /// For each club, whether it is linked, takes applications and has no setup problem.
     pub async fn takes_applications(&self, club_ids: &[u64]) -> Result<Vec<bool>, StoreError> {
+        if self.dev_guild.is_some() {
+            return Ok(vec![true; club_ids.len()]);
+        }
         if club_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -234,6 +255,16 @@ impl ClubStore {
 
     /// What's kept about a club, or `None` if it isn't linked.
     pub async fn club(&self, club_id: u64) -> Result<Option<ClubRecord>, StoreError> {
+        if let Some(guild_id) = self.dev_guild {
+            return Ok(Some(ClubRecord {
+                guild_id,
+                category: None,
+                auto_join: true,
+                open: true,
+                problem: None,
+                leader: None,
+            }));
+        }
         let fields: HashMap<String, String> = self
             .run(
                 redis::cmd("HGETALL")
@@ -291,6 +322,7 @@ fn parse_record(fields: &HashMap<String, String>) -> Option<ClubRecord> {
         auto_join: fields.get("auto_join").is_some_and(|v| v == "1"),
         open: fields.get("open").is_some_and(|v| v == "1"),
         problem: fields.get("problem").filter(|v| !v.is_empty()).cloned(),
+        leader: fields.get("leader").and_then(|id| id.parse().ok()),
     })
 }
 

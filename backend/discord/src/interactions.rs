@@ -27,7 +27,11 @@ const UNSUPPORTED: &str = "This action isn't available yet.";
 
 const PING: u8 = 1;
 const PONG: u8 = 1;
+const COMPONENT: u8 = 3;
 const CHANNEL_MESSAGE: u8 = 4;
+/// Discord's Manage Server and Administrator permission bits.
+const MANAGE_GUILD: u64 = 1 << 5;
+const ADMINISTRATOR: u64 = 1 << 3;
 const EPHEMERAL: u32 = 1 << 6;
 
 /// Serves `POST /discord/interactions` and the sign-in routes.
@@ -42,6 +46,25 @@ pub fn router(discord: Discord) -> Router {
 struct Interaction {
     #[serde(rename = "type")]
     kind: u8,
+    data: Option<Data>,
+    member: Option<Member>,
+}
+
+#[derive(Deserialize)]
+struct Data {
+    custom_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct Member {
+    user: Option<User>,
+    /// The member's permissions in the channel, as a number in a string.
+    permissions: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct User {
+    id: String,
 }
 
 async fn interactions(State(discord): State<Discord>, headers: HeaderMap, body: Bytes) -> Response {
@@ -67,6 +90,23 @@ async fn interactions(State(discord): State<Discord>, headers: HeaderMap, body: 
     };
     match interaction.kind {
         PING => Json(json!({ "type": PONG })).into_response(),
+        COMPONENT => {
+            let custom_id = interaction
+                .data
+                .and_then(|data| data.custom_id)
+                .unwrap_or_default();
+            let member = interaction.member;
+            let clicker = member
+                .as_ref()
+                .and_then(|member| member.user.as_ref())
+                .and_then(|user| user.id.parse().ok());
+            let permissions: u64 = member
+                .and_then(|member| member.permissions)
+                .and_then(|bits| bits.parse().ok())
+                .unwrap_or(0);
+            let manages = permissions & (MANAGE_GUILD | ADMINISTRATOR) != 0;
+            Json(crate::apply::answer(&discord, &custom_id, clicker, manages).await).into_response()
+        }
         _ => Json(json!({
             "type": CHANNEL_MESSAGE,
             "data": { "content": UNSUPPORTED, "flags": EPHEMERAL },

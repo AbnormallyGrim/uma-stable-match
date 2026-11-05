@@ -8,7 +8,7 @@ use axum::routing::get;
 use axum::{Json, Router};
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::auth::error;
+use crate::auth::{error, session_user};
 use crate::bot::Discord;
 use crate::error::Error;
 use crate::leaders::managed_club;
@@ -108,10 +108,12 @@ async fn change(
         Ok(None) => return forget_server(&discord, record.guild_id).await,
         Err(response) => return *response,
     };
-    let update = match checked(&patch, &categories) {
+    let mut update = match checked(&patch, &categories) {
         Ok(update) => update,
         Err(message) => return error(StatusCode::BAD_REQUEST, message),
     };
+    // The leader who changes the settings is the one tickets go to.
+    update.leader = session_user(discord.config(), &headers);
     let Some(opt_in) = discord.opt_in() else {
         return error(StatusCode::NOT_FOUND, "not found");
     };
@@ -153,6 +155,7 @@ fn checked(patch: &Patch, categories: &[Named]) -> Result<SettingsUpdate, &'stat
         category,
         auto_join: patch.auto_join,
         open: patch.open,
+        leader: None,
     };
     if update == SettingsUpdate::default() {
         return Err("no settings to change");

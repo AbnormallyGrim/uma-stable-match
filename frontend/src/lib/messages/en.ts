@@ -395,6 +395,17 @@ export const en = {
   'applications.error.denied': 'Discord sign-in was denied. Please try again.',
   'applications.error.invalid_state': 'The Discord sign-in is no longer valid. Please try again.',
   'applications.error.discord_error': 'Discord returned an unexpected error. Please try again.',
+  'applications.error.not_open': "This club doesn't take applications through Discord right now.",
+  'applications.error.no_trainer':
+    'Link your trainer ID in Settings before you apply, so the club can see who you are.',
+  'applications.error.bad_club': 'That club link is not valid.',
+  'applications.error.already_applied':
+    'You already have an application to this club waiting for an answer.',
+  'applications.error.too_many_applications':
+    "You've sent the most applications you can in a day. Try again tomorrow.",
+  'applications.error.join_failed': "Discord wouldn't add you to the club's server.",
+  'applications.error.ticket_failed':
+    "We couldn't open your ticket on the club's server. Please try again.",
   'applications.error.unavailable':
     'The club applications setup is temporarily unavailable. Please try again later.',
 

@@ -9,10 +9,12 @@ use redis::aio::ConnectionManager;
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 use uma_stable_match_discord::{
-    ClubStore, Discord, KeySecret as DiscordKeySecret, OptIn, TrainerLinks, TrainerStore,
+    ApplicationStore, Applying, ClubStore, Discord, KeySecret as DiscordKeySecret, OptIn,
+    TrainerLinks, TrainerStore,
 };
 
 use crate::app::{app_with_routes, AppState};
+use crate::applicants::applicant_lookup;
 use crate::applications::Applications;
 use crate::cache::Cache;
 use crate::config::Config;
@@ -69,6 +71,7 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
     let source = source.into();
     let profile_source = source.clone();
     let club_source = source.clone();
+    let applicant_source = source.clone();
     let metrics = match config.metrics_addr {
         None => None,
         Some(addr) => {
@@ -166,6 +169,7 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
             site.dir.display()
         );
     }
+    let applicant_paces = paces.clone();
     let state = AppState {
         cache,
         paces: paces.with_details(details.clone()),
@@ -204,20 +208,36 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
                 .and_then(|secret| DiscordKeySecret::parse(secret.expose()))
                 .expect("Discord settings need REDIS_KEY_SECRET");
             let trainers = TrainerLinks::new(
-                TrainerStore::new(conn.clone(), secret),
+                TrainerStore::new(conn.clone(), secret.clone()),
                 trainer_lookup(profile_source),
             );
             // Checks for profile keys keep going in the background, and pick up after a restart.
             tokio::spawn(trainers.clone().run_checks());
-            let store = ClubStore::new(conn);
+            let store = match config.discord_dev_guild {
+                Some(guild) => {
+                    tracing::warn!(
+                        guild,
+                        "DISCORD_DEV_GUILD is set: every club takes applications in that server"
+                    );
+                    ClubStore::new(conn.clone()).with_dev_guild(guild)
+                }
+                None => ClubStore::new(conn.clone()),
+            };
+            let applying = Applying::new(
+                ApplicationStore::new(conn, secret),
+                applicant_lookup(applicant_source, applicant_paces),
+            );
             let discord = Discord::new(discord.clone())
                 .map_err(RunError::Discord)?
                 .with_opt_in(OptIn::new(store.clone(), club_lookup(club_source)))
-                .with_trainer_links(trainers);
+                .with_trainer_links(trainers)
+                .with_applications(applying);
             // Keeps the bot showing as online.
             let gateway = discord.clone();
             tokio::spawn(async move { gateway.run_gateway().await });
-            tracing::info!("serving Discord interactions, club opt-in, settings and trainer links");
+            tracing::info!(
+                "serving Discord interactions, club opt-in, settings, trainer links and applications"
+            );
             (
                 uma_stable_match_discord::router(discord),
                 Some(Applications::new(store)),

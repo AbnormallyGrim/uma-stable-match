@@ -23,6 +23,9 @@ struct Guild {
 pub(crate) struct Authorized {
     pub(crate) user_id: u64,
     pub(crate) guild_id: Option<u64>,
+    /// The user's access token, for the one call the flow makes as them: adding them to a server.
+    /// Never stored or logged.
+    pub(crate) access_token: String,
 }
 
 #[derive(Deserialize)]
@@ -66,6 +69,7 @@ pub(crate) async fn authorize(
             .map_err(|_| Error::Decode(serde::de::Error::custom("an ID isn't a whole number")))
     };
     Ok(Authorized {
+        access_token: token.access_token.clone(),
         user_id: id(&user.id)?,
         guild_id: token
             .guild

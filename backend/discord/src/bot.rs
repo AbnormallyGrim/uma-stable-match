@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use crate::apply::Applying;
 use crate::config::DiscordConfig;
 use crate::error::Error;
 use crate::names::Names;
@@ -22,6 +23,7 @@ struct Inner {
     http: reqwest::Client,
     opt_in: Option<OptIn>,
     trainer_links: Option<TrainerLinks>,
+    applying: Option<Applying>,
     names: Arc<Names>,
 }
 
@@ -39,6 +41,7 @@ impl Discord {
                 http,
                 opt_in: None,
                 trainer_links: None,
+                applying: None,
                 names: Arc::default(),
             }),
         })
@@ -69,6 +72,7 @@ impl Discord {
                 http: inner.http.clone(),
                 opt_in: Some(opt_in),
                 trainer_links: inner.trainer_links.clone(),
+                applying: inner.applying.clone(),
                 names: inner.names.clone(),
             }),
         }
@@ -84,9 +88,30 @@ impl Discord {
                 http: inner.http.clone(),
                 opt_in: inner.opt_in.clone(),
                 trainer_links: Some(trainer_links),
+                applying: inner.applying.clone(),
                 names: inner.names.clone(),
             }),
         }
+    }
+
+    /// The same application, also taking applications to clubs with `applying`.
+    pub fn with_applications(self, applying: Applying) -> Self {
+        let inner = &self.inner;
+        Self {
+            inner: Arc::new(Inner {
+                config: inner.config.clone(),
+                rest: inner.rest.clone(),
+                http: inner.http.clone(),
+                opt_in: inner.opt_in.clone(),
+                trainer_links: inner.trainer_links.clone(),
+                applying: Some(applying),
+                names: inner.names.clone(),
+            }),
+        }
+    }
+
+    pub(crate) fn applying(&self) -> Option<&Applying> {
+        self.inner.applying.as_ref()
     }
 
     pub(crate) fn opt_in(&self) -> Option<&OptIn> {

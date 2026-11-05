@@ -4,11 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   activeApplications,
+  applyUrl,
   checkTrainerLink,
   deleteAccount,
   discardVerificationKey,
   expiresAt,
+  fetchClubApplications,
   fetchLinkedTrainers,
+  fetchMyApplications,
   fetchMyClub,
   fetchSettings,
   hasInvite,
@@ -213,5 +216,28 @@ describe('application expiry', () => {
         now,
       ),
     ).toEqual([sent('2026-11-01T00:00:00Z')]);
+  });
+});
+
+describe('applications', () => {
+  it('addresses applying to a club', () => {
+    expect(applyUrl(7)).toBe('/api/v1/discord/apply?club=7');
+    expect(applyUrl('12')).toBe('/api/v1/discord/apply?club=12');
+  });
+
+  it("reads the signed-in person's applications", async () => {
+    const list = [{ id: 'a', clubId: '7', clubName: 'Example Club', status: 'pending' }];
+    const fetch = vi.fn(() => Promise.resolve(json(list)));
+    await expect(fetchMyApplications({ fetch })).resolves.toEqual(list);
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/discord/applications',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    );
+  });
+
+  it("reads a club's applications", async () => {
+    const fetch = vi.fn(() => Promise.resolve(json([])));
+    await expect(fetchClubApplications('7', { fetch })).resolves.toEqual([]);
+    expect(fetch).toHaveBeenCalledWith('/api/v1/discord/clubs/7/applications', expect.anything());
   });
 });

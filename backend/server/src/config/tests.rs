@@ -678,6 +678,68 @@ fn reads_discord_settings_without_showing_secrets() {
     assert!(config.human.is_none());
 }
 
+fn dev_guild_vars(public_url: &'static str) -> Vec<(&'static str, &'static str)> {
+    let mut vars: Vec<_> = discord_vars()
+        .into_iter()
+        .filter(|(name, _)| *name != "PUBLIC_URL")
+        .collect();
+    vars.push(("PUBLIC_URL", public_url));
+    vars.push(("DISCORD_DEV_GUILD", "2000"));
+    vars
+}
+
+#[test]
+fn the_dev_server_is_off_unless_set() {
+    let config = Config::from_lookup(lookup(&discord_vars())).unwrap();
+    assert_eq!(config.discord_dev_guild, None);
+}
+
+#[test]
+fn reads_the_dev_server_on_a_local_address() {
+    for url in [
+        "http://localhost",
+        "http://localhost:5173",
+        "http://127.0.0.1:8080",
+    ] {
+        let config = Config::from_lookup(lookup(&dev_guild_vars(url))).unwrap();
+        assert_eq!(config.discord_dev_guild, Some(2000), "{url}");
+    }
+}
+
+#[test]
+fn refuses_the_dev_server_on_a_real_site() {
+    for url in [
+        "https://example.test",
+        "http://localhost.example.test",
+        "http://127.0.0.1.example.test",
+    ] {
+        assert_eq!(
+            Config::from_lookup(lookup(&dev_guild_vars(url))).unwrap_err(),
+            ConfigError::DiscordDevGuildNeedsLocal,
+            "{url}"
+        );
+    }
+    // Nor without Discord.
+    assert_eq!(
+        Config::from_lookup(lookup(&[("DISCORD_DEV_GUILD", "2000")])).unwrap_err(),
+        ConfigError::DiscordDevGuildNeedsLocal
+    );
+}
+
+#[test]
+fn rejects_a_dev_server_that_isnt_an_id() {
+    let mut vars = dev_guild_vars("http://localhost");
+    vars.retain(|(name, _)| *name != "DISCORD_DEV_GUILD");
+    for value in ["abc", "0", "-1"] {
+        let mut vars = vars.clone();
+        vars.push(("DISCORD_DEV_GUILD", value));
+        assert_eq!(
+            Config::from_lookup(lookup(&vars)).unwrap_err(),
+            ConfigError::InvalidDiscordDevGuild(value.into())
+        );
+    }
+}
+
 #[test]
 fn rejects_partial_discord_settings() {
     for missing in [

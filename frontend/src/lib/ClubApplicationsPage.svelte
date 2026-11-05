@@ -14,6 +14,7 @@
     fetchSettings,
     loginUrl,
     saveSettings,
+    fetchClubApplications,
     type Application,
     type Settings,
   } from './applications';
@@ -62,8 +63,7 @@
   let settings = $state<Settings | null>(null);
   let resumeFailed = $state(false);
 
-  // No endpoint lists applications yet, so the table shows its empty state.
-  const applications: Application[] = [];
+  let applications = $state<Application[]>([]);
 
   type Status = 'off' | 'open' | 'paused' | 'problem';
   const status = $derived<Status>(
@@ -103,6 +103,8 @@
       }
       settings = await fetchSettings(clubId, { signal });
       load = 'ready';
+      // The page works without the list, which shows its empty state.
+      applications = await fetchClubApplications(clubId, { signal }).catch(() => []);
     } catch (reason) {
       if (!signal.aborted) {
         load = failed(reason);
