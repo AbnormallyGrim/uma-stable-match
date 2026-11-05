@@ -258,7 +258,7 @@
     {
       "id": 205,
       "type": "timeseries",
-      "title": "Searches per hour",
+      "title": "Searches per 5 minutes",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -276,7 +276,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (status) (rate(http_requests_total{route=\"/api/v1/recommendations\"}[$__rate_interval]) * 300)",
+          "expr": "sum by (status) (increase(http_requests_total{route=\"/api/v1/recommendations\"}[5m]))",
           "legendFormat": "{{status}}",
           "interval": "5m",
           "range": true
