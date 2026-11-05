@@ -6,8 +6,6 @@ primary_region = "iad"
 
 [build]
   dockerfile = "Dockerfile"
-  [build.args]
-    VITE_APPLICATIONS_ENABLED = "false"
 
 # The API key is never set here: it's a Fly secret (`fly secrets`).
 # So are the human check's keys, TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY and TOKEN_SIGNING_KEY.
@@ -18,6 +16,8 @@ primary_region = "iad"
 [env]
   SENTRY_DSN = "https://652bee55f5c797d9e5c2dfc65e4d9cc7@o4512370149097472.ingest.us.sentry.io/4512370231017472"
   SENTRY_ENVIRONMENT = "production"
+  # The club applications pages in the app, and the privacy page on the website.
+  ENABLE_APPLICATIONS = "true"
   # JSON lines for a log search service. Keep RUST_LOG at info so logs hold no trainer IDs.
   LOG_FORMAT = "json"
   RUST_LOG = "info"

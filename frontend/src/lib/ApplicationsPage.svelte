@@ -1,22 +1,20 @@
 <!--
   @component
-  The page applications dashboard: what taking applications here does, what it needs, and the steps to
-  set it up: sign in with Discord, pick the club, confirm, and add the bot. Discord sends
-  the leader back to the club's settings page, or here with `?error=` when it did not work.
+  The page for the applications dashboard: what it does, how it works, and the sign-in flow for
+  club leaders and trainers.
 -->
 
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import { ApiError, fetchClub } from './api';
-  import { checkOptIn, loginUrl, parseClubInput, signOut, signedInUser } from './applications';
+  import { loginUrl, signOut, signedInUser } from './applications';
   import { applyFeatures } from './features';
   import { t, hasMessage } from './i18n';
   import { language } from './language.svelte';
   import NavBar from './NavBar.svelte';
   import ReleaseNotes from './ReleaseNotes.svelte';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
-  import { APPLICATIONS_PATH, settingsPath } from './route';
+  import { APPLICATIONS_PATH, clubApplicationsPath } from './route';
   import SiteFooter from './SiteFooter.svelte';
 
   interface Props {
@@ -31,11 +29,6 @@
   let unseenRelease = $state(hasUnseenRelease(storage));
   let session = $state<'loading' | 'signed-out' | 'signed-in' | 'error'>('loading');
   let statusMessage = $state<string | null>(null);
-  let inputValue = $state('');
-  let clubId = $state<string | null>(null);
-  let clubName = $state<string | null>(null);
-  let checkingClub = $state(false);
-  let confirmingClub = $state(false);
   let showSignInLink = $state(false);
 
   type RoleKey = 'leader' | 'trainer';
@@ -62,24 +55,9 @@
   }
 
   function selectRole(role: RoleKey) {
-    void role;
-  }
-
-  function parsePickedClub(value: string): string | null {
-    const trimmed = value.trim();
-    const direct = parseClubInput(trimmed);
-    if (direct !== null) {
-      return direct;
+    if (role === 'leader') {
+      window.location.assign(clubApplicationsPath(7));
     }
-    const match = trimmed.match(/(?:\/|\?|&)(?:circles|club)\/(\d{1,18})(?:[/?#]|$)/);
-    if (match) {
-      return match[1]!;
-    }
-    const query = trimmed.match(/[?&]club=(\d{1,18})(?:&|$)/);
-    if (query) {
-      return query[1]!;
-    }
-    return null;
   }
 
   function appErrorMessage(label: string | null): string | null {
@@ -88,12 +66,6 @@
     }
     const key = `applications.error.${label}` as const;
     return hasMessage(key) ? t(key) : t('applications.error.generic');
-  }
-
-  function startPick() {
-    statusMessage = null;
-    clubId = null;
-    clubName = null;
   }
 
   async function checkSession() {
@@ -117,75 +89,10 @@
       session = 'signed-out';
       showSignInLink = true;
       statusMessage = null;
-      inputValue = '';
-      clubId = null;
-      clubName = null;
     } catch {
       session = 'signed-out';
       showSignInLink = true;
       statusMessage = t('applications.session.error');
-    }
-  }
-
-  async function submitClubPick(event: SubmitEvent) {
-    event.preventDefault();
-    const candidate = parsePickedClub(inputValue);
-    if (candidate === null) {
-      statusMessage = t('applications.pick.invalid');
-      clubId = null;
-      clubName = null;
-      return;
-    }
-
-    checkingClub = true;
-    statusMessage = null;
-    clubId = candidate;
-    clubName = null;
-    try {
-      const details = await fetchClub(candidate, null);
-      clubName = details.club.name;
-    } catch {
-      // Keeps the ID. The opt-in request validates the club, and the confirmation step shows its
-      // errors.
-    } finally {
-      checkingClub = false;
-    }
-  }
-
-  async function confirmClub() {
-    if (clubId === null) {
-      return;
-    }
-
-    confirmingClub = true;
-    statusMessage = null;
-    try {
-      await checkOptIn(clubId);
-      window.location.assign(
-        `/api/v1/discord/opt-in?club=${encodeURIComponent(clubId)}&next=${encodeURIComponent(settingsPath(clubId, true))}`,
-      );
-    } catch (reason) {
-      if (reason instanceof ApiError) {
-        if (reason.status === 401) {
-          session = 'signed-out';
-          showSignInLink = true;
-          statusMessage = t('applications.error.signIn');
-        } else if (reason.status === 404) {
-          statusMessage = t('applications.error.notFound');
-        } else if (reason.status === 422) {
-          statusMessage = t('applications.error.noInvite');
-        } else if (reason.status === 502) {
-          statusMessage = t('applications.error.unavailable');
-        } else if (reason.status === 500) {
-          statusMessage = t('applications.error.generic');
-        } else {
-          statusMessage = t('applications.error.generic');
-        }
-      } else {
-        statusMessage = t('applications.error.generic');
-      }
-    } finally {
-      confirmingClub = false;
     }
   }
 
@@ -268,50 +175,6 @@
   {:else if session === 'signed-in'}
     {#if statusMessage !== null}
       <p class="status-alert" role="alert">{statusMessage}</p>
-    {/if}
-
-    <section class="card pick-card">
-      <h2>{t('applications.pick.heading')}</h2>
-      <form onsubmit={submitClubPick}>
-        <div class="field">
-          <label for="applications-club-input">{t('applications.pick.label')}</label>
-          <input
-            id="applications-club-input"
-            type="text"
-            value={inputValue}
-            aria-invalid={statusMessage === t('applications.pick.invalid') ? 'true' : undefined}
-            oninput={(event) => {
-              inputValue = event.currentTarget.value;
-              if (statusMessage === t('applications.pick.invalid')) {
-                statusMessage = null;
-              }
-            }}
-            placeholder="777"
-          />
-          <p class="hint">{t('applications.pick.hint')}</p>
-        </div>
-        <div class="actions">
-          <button type="submit" disabled={checkingClub}>
-            {checkingClub ? t('applications.confirm.checking') : t('applications.pick.next')}
-          </button>
-        </div>
-      </form>
-    </section>
-
-    {#if clubId !== null}
-      <section class="card confirm-card" aria-live="polite">
-        <h2>{t('applications.confirm.heading')}</h2>
-        <p>{t('applications.confirm.steps')}</p>
-        <p class="club-name">{clubName ?? t('applications.confirm.unknownClub', { id: clubId })}</p>
-        <div class="actions split">
-          <button type="button" disabled={confirmingClub} onclick={confirmClub}>
-            {confirmingClub ? t('applications.confirm.checking') : t('applications.confirm.add')}
-          </button>
-          <button type="button" class="secondary" onclick={startPick}>
-            {t('applications.confirm.back')}
-          </button>
-        </div>
-      </section>
     {/if}
 
     <div class="session-actions">

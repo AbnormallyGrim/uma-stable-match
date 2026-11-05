@@ -38,6 +38,7 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer lookups each visitor can make per minute that need a call to uma.moe |
 | `TRUST_FORWARDED_FOR` | `false` | `true` to identify visitors by `X-Forwarded-For`. Only turn this on behind a reverse proxy that sets the header |
 | `ENABLE_JAPANESE` | `false` | `true` to offer the Japanese translation and its language button in the web app. Reported on `GET /api/v1/features` |
+| `ENABLE_APPLICATIONS` | `false` | `true` to show the club applications pages in the web app and the privacy page on the website. Reported on `GET /api/v1/features` |
 | `WEB_ANALYTICS_TOKEN` | none | A [Cloudflare Web Analytics](https://developers.cloudflare.com/web-analytics/) site token, letters and digits only. Set, the web app loads Cloudflare's beacon and the `Content-Security-Policy` allows it. Reported on `GET /api/v1/features`. Unset, analytics are off |
 | `FRONTEND_DIR` | none | Built frontend to serve, such as `frontend/dist`. Unset, the server serves only the API |
 | `SITE_HOST` | none | Host name to serve a static website on, such as `example.com`. Set it with `SITE_DIR`. See [Serving the website](#serving-the-website) |
@@ -406,7 +407,7 @@ Then open <http://site.localhost:8080> for the website and <http://localhost:808
 
 | Request | Response |
 |---|---|
-| For `SITE_HOST` | A file from `SITE_DIR`, or `404`. No API and no page fallback |
+| For `SITE_HOST` | A file from `SITE_DIR`, or `404`. No API except `GET /api/v1/features`, and no page fallback |
 | For `www.` plus `SITE_HOST` | `308` to `https://` plus `SITE_HOST`, keeping the path and query |
 | For any other host, or without one | The API and frontend, as above |
 
@@ -430,7 +431,7 @@ All endpoints are under `/api/v1`.
 | Method | Path | Response |
 |---|---|---|
 | `GET` | `/api/v1/health` | `200 {"status":"ok"}` |
-| `GET` | `/api/v1/features` | `200 {"japanese":false,"web_analytics":null}`: the features that are switched on, and the Web Analytics token if set |
+| `GET` | `/api/v1/features` | `200 {"japanese":false,"applications":false,"web_analytics":null}`: the features that are switched on, and the Web Analytics token if set |
 | `GET` | `/api/v1/recommendations` | Ranked clubs for a trainer or a pace, below |
 | `GET` | `/api/v1/clubs/{id}` | A loaded club's members, and where a trainer would sit among them; see [Club page](#club-page) |
 

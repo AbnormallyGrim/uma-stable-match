@@ -124,6 +124,8 @@ export interface PreviousMonth {
 /** Features the server has switched on. */
 export interface Features {
   japanese: boolean;
+  /** Whether the club applications pages are shown. */
+  applications: boolean;
   /** Cloudflare Web Analytics token, or `null` when analytics are off. */
   webAnalytics: string | null;
 }
@@ -274,9 +276,10 @@ export async function fetchFeatures(options: RequestOptions = {}): Promise<Featu
   const body = await getJson<unknown>('/api/v1/features', options, null);
   const fields = (body !== null && typeof body === 'object' ? body : {}) as Record<string, unknown>;
   const japanese = fields.japanese === true;
+  const applications = fields.applications === true;
   const token = fields.web_analytics;
   const webAnalytics = typeof token === 'string' && token !== '' ? token : null;
-  return { japanese, webAnalytics };
+  return { japanese, applications, webAnalytics };
 }
 
 async function getJson<T>(path: string, options: RequestOptions, token: string | null): Promise<T> {

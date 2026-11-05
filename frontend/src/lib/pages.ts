@@ -1,8 +1,14 @@
 /** The pages the navbar links to, and which one is showing. */
 
-import { APPLICATIONS_ENABLED } from './flags';
+import { flags } from './flags.svelte';
 import type { MessageKey } from './i18n';
-import { APPLICATIONS_PATH, applicationsRoute, isWishlistRoute, WISHLIST_PATH } from './route';
+import {
+  APPLICATIONS_PATH,
+  applicationsRoute,
+  isLoginRoute,
+  isWishlistRoute,
+  WISHLIST_PATH,
+} from './route';
 
 /** One page in the navbar. */
 export interface Page {
@@ -26,7 +32,7 @@ export function websiteUrl({ protocol, hostname, port }: Origin): string {
     : 'https://umastable.com';
 }
 
-/** Every page the navbar can link to. See `PAGES` for the ones shown. */
+/** Every page the navbar can link to. See `pages()` for the ones shown. */
 const ALL_PAGES: Page[] = [
   {
     id: 'home',
@@ -60,11 +66,13 @@ export function visiblePages(applications: boolean): Page[] {
 }
 
 /** The website's home page, the club finder, the wishlist page and, when it's on, applications. */
-export const PAGES: Page[] = visiblePages(APPLICATIONS_ENABLED);
+export function pages(): Page[] {
+  return visiblePages(flags.applications);
+}
 
-/** The page `pathname` belongs to. The club page is part of the finder. */
+/** The page `pathname` belongs to. The club page is part of the finder, sign-in of applications. */
 export function currentPage(pathname: string): Page['id'] {
-  if (applicationsRoute(pathname, '')) {
+  if (applicationsRoute(pathname, '') || isLoginRoute(pathname)) {
     return 'applications';
   }
   return isWishlistRoute(pathname) ? 'wishlist' : 'finder';

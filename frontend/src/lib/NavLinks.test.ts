@@ -1,16 +1,20 @@
 // NavLinks component tests.
 
 import { render, screen, within } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import NavLinks from './NavLinks.svelte';
-import { APPLICATIONS_ENABLED } from './flags';
+import { flags } from './flags.svelte';
 import { currentPage, visiblePages, websiteUrl } from './pages';
 
-afterEach(() => window.history.pushState({}, '', '/'));
+afterEach(() => {
+  window.history.pushState({}, '', '/');
+  flags.applications = false;
+});
 
 describe('NavLinks', () => {
-  it('links to the home page, the club finder, the wishlist page and, when it is on, applications', () => {
+  it('links to the home page, the club finder and the wishlist page', () => {
     render(NavLinks);
     const nav = screen.getByRole('navigation', { name: 'Pages' });
     expect(
@@ -21,8 +25,19 @@ describe('NavLinks', () => {
       ['Home', `http://site.localhost:${window.location.port}`],
       ['Club finder', '/'],
       ['Wishlist', '/wishlist'],
-      ...(APPLICATIONS_ENABLED ? [['Applications', '/applications']] : []),
     ]);
+  });
+
+  it('adds the applications link once the server has it on', async () => {
+    render(NavLinks);
+    const nav = screen.getByRole('navigation', { name: 'Pages' });
+    expect(within(nav).queryByRole('link', { name: 'Applications' })).toBeNull();
+    flags.applications = true;
+    await tick();
+    expect(within(nav).getByRole('link', { name: 'Applications' })).toHaveAttribute(
+      'href',
+      '/applications',
+    );
   });
 
   it('keeps the applications page out of the navbar unless its flag is on', () => {
@@ -62,6 +77,7 @@ describe('currentPage', () => {
     expect(currentPage('/wishlist')).toBe('wishlist');
     expect(currentPage('/applications')).toBe('applications');
     expect(currentPage('/applications/club/7')).toBe('applications');
+    expect(currentPage('/login')).toBe('applications');
   });
 });
 

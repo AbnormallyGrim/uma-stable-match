@@ -1,18 +1,19 @@
-const config = window.UMA_STABLE_MATCH_CONFIG ?? {};
-
-// Feature flag: whether the club applications privacy page (/privacy/) and its navbar link are
-// shown. While it is off, the page sends visitors to the home page. To turn it on,
-// set it to true, remove the noindex tag from privacy/index.html, and add /privacy/ back to
-// sitemap.xml and index.md.
-const APPLICATIONS_ENABLED = config.applicationsEnabled ?? false;
-
-if (APPLICATIONS_ENABLED) {
-    for (const el of document.querySelectorAll('[data-applications]')) {
-        el.hidden = false;
-    }
-} else if (location.pathname.startsWith('/privacy')) {
-    location.replace('/');
-}
+// Whether the club applications privacy page (/privacy/) and its navbar link are shown, from the
+// server's ENABLE_APPLICATIONS. While it is off, or the server can't be asked, the page sends
+// visitors to the home page. When turning it on, also remove the noindex tag from
+// privacy/index.html, and add /privacy/ back to sitemap.xml and index.md.
+fetch('/api/v1/features')
+    .then((response) => (response.ok ? response.json() : {}))
+    .catch(() => ({}))
+    .then((features) => {
+        if (features.applications === true) {
+            for (const el of document.querySelectorAll('[data-applications]')) {
+                el.hidden = false;
+            }
+        } else if (location.pathname.startsWith('/privacy')) {
+            location.replace('/');
+        }
+    });
 
 // The theme switch: shows the saved choice, applies a new one and remembers it, like the web app.
 (() => {

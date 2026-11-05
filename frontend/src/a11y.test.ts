@@ -13,7 +13,8 @@ import ApplicationsPage from './lib/ApplicationsPage.svelte';
 import ResultsTable from './lib/ResultsTable.svelte';
 import SearchForm from './lib/SearchForm.svelte';
 import SearchStatus from './lib/SearchStatus.svelte';
-import SettingsPage from './lib/SettingsPage.svelte';
+import ApplicationsTable from './lib/ApplicationsTable.svelte';
+import ClubApplicationsPage from './lib/ClubApplicationsPage.svelte';
 import { DEFAULT_SEARCH } from './lib/search';
 import { club, recommendations } from './lib/test-data';
 import ThemeToggle from './lib/ThemeToggle.svelte';
@@ -255,33 +256,60 @@ describe('accessibility', () => {
       expect(await violations(container)).toEqual([]);
     });
 
-    it('has no violations when picking and confirming a club', async () => {
+    it('has no violations when signed in and the sign-out button shows', async () => {
       answer({ 'GET /api/v1/applications/me': () => json({ discord_id: '42' }) });
       const { container } = render(ApplicationsPage);
-      const field = await screen.findByLabelText(t('applications.pick.label'));
-      expect(await violations(container)).toEqual([]);
-      await fireEvent.input(field, { target: { value: 'nope' } });
-      await fireEvent.click(screen.getByRole('button', { name: t('applications.pick.next') }));
-      expect(await violations(container)).toEqual([]);
-      await fireEvent.input(field, { target: { value: '777' } });
-      await fireEvent.click(screen.getByRole('button', { name: t('applications.pick.next') }));
+      expect(
+        await screen.findByRole('button', { name: t('applications.session.signOut') }),
+      ).toBeInTheDocument();
       expect(await violations(container)).toEqual([]);
     });
 
-    it('has no violations in the settings, and when unlinking', async () => {
+    it('has no violations on a linked club, and when removing the bot', async () => {
       answer({ 'GET /api/v1/discord/clubs/7/settings': () => json(settings) });
-      const { container } = render(SettingsPage, { clubId: '7', linked: true });
-      await screen.findByRole('button', { name: t('settings.save') });
+      const { container } = render(ClubApplicationsPage, { clubId: '7', linked: true });
+      await screen.findByRole('button', { name: t('leader.settings.save') });
       expect(await violations(container)).toEqual([]);
-      await fireEvent.click(screen.getByRole('button', { name: t('settings.unlink') }));
+      await fireEvent.click(screen.getByRole('button', { name: t('leader.remove.button') }));
       expect(await violations(container)).toEqual([]);
     });
 
-    it.each([401, 403, 404])('has no violations when the settings answer %s', async (status) => {
+    it('has no violations while the bot is not set up', async () => {
+      answer({ 'GET /api/v1/discord/opt-in': () => json({ error: 'no invite' }, 422) });
+      const { container } = render(ClubApplicationsPage, { clubId: '7' });
+      await screen.findByRole('button', { name: t('leader.steps.checkAgain') });
+      expect(await violations(container)).toEqual([]);
+    });
+
+    it.each([401, 403, 500])('has no violations when the settings answer %s', async (status) => {
       answer({ 'GET /api/v1/discord/clubs/7/settings': () => json({ error: 'no' }, status) });
-      const { container } = render(SettingsPage, { clubId: '7' });
+      const { container } = render(ClubApplicationsPage, { clubId: '7' });
       await screen.findByText(/./, { selector: 'p.card, p[role="alert"], section p' });
       expect(await violations(container)).toEqual([]);
+    });
+
+    it('has no violations in the applications table and an open application', async () => {
+      const application = {
+        id: 'a1',
+        trainerName: 'Trainer Alpha',
+        trainerId: '100000000011',
+        discordName: 'alpha_applicant',
+        pace: 1_420_000,
+        fansThisMonth: 18_300_000,
+        currentClub: null,
+        status: 'pending' as const,
+        submittedAt: '2026-11-01T10:00:00Z',
+        ticketUrl: 'https://discord.com/channels/1/2',
+      };
+      const { container } = render(ApplicationsTable, {
+        applications: [application],
+        clubName: 'Example Club',
+      });
+      expect(await violations(container)).toEqual([]);
+      await fireEvent.click(
+        screen.getByRole('button', { name: t('leader.table.viewFor', { name: 'Trainer Alpha' }) }),
+      );
+      expect(await violations(document.body)).toEqual([]);
     });
   });
 });

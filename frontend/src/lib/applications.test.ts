@@ -2,13 +2,11 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { ApiError } from './api';
 import {
-  checkOptIn,
   fetchSettings,
+  hasInvite,
   loginUrl,
   optInUrl,
-  parseClubInput,
   saveSettings,
   signedInUser,
   signOut,
@@ -30,27 +28,6 @@ const settings: Settings = {
   roles: [{ id: '20', name: 'Officers' }],
 };
 
-describe('parseClubInput', () => {
-  it('reads a club ID from a direct frontend value', () => {
-    expect(parseClubInput('123456789')).toBe('123456789');
-    expect(parseClubInput('  123456789 ')).toBe('123456789');
-  });
-
-  it('refuses URLs and invalid values', () => {
-    for (const input of [
-      '',
-      'abc',
-      '12 34',
-      '1'.repeat(19),
-      'https://example.com/circles/123',
-      'https://uma.moe/circles/123',
-      'uma.moe/circles/123',
-    ]) {
-      expect(parseClubInput(input), input).toBeNull();
-    }
-  });
-});
-
 describe('addresses', () => {
   it('sends the visitor back to where they were', () => {
     expect(loginUrl()).toBe('/api/v1/auth/discord/login?next=%2Fapplications');
@@ -58,11 +35,26 @@ describe('addresses', () => {
       '/api/v1/auth/discord/login?next=%2Fapplications%2Fclub%2F7',
     );
   });
+});
 
-  it("opts a club in and ends on the club's settings", () => {
+describe('adding the bot', () => {
+  it('starts the opt-in and comes back to the club page', () => {
     expect(optInUrl('7')).toBe(
       '/api/v1/discord/opt-in?club=7&next=%2Fapplications%2Fclub%2F7%3Flinked%3D1',
     );
+  });
+
+  it('reads a redirect as an invite and a 422 as none, without following it', async () => {
+    const redirect = vi.fn<typeof fetch>(async () => new Response(null, { status: 307 }));
+    await expect(hasInvite('7', { fetch: redirect })).resolves.toBe(true);
+    expect(redirect.mock.calls[0]?.[1]).toMatchObject({ redirect: 'manual' });
+    const none = vi.fn<typeof fetch>(async () => json({ error: 'no invite' }, 422));
+    await expect(hasInvite('7', { fetch: none })).resolves.toBe(false);
+  });
+
+  it('fails on other answers, such as being signed out', async () => {
+    const signedOut = vi.fn<typeof fetch>(async () => json({ error: 'sign in' }, 401));
+    await expect(hasInvite('7', { fetch: signedOut })).rejects.toMatchObject({ status: 401 });
   });
 });
 
@@ -79,26 +71,6 @@ describe('signedInUser', () => {
     await expect(signedInUser({ fetch: down })).rejects.toMatchObject({ status: 503 });
     const offline = vi.fn(() => Promise.reject(new TypeError('offline')));
     await expect(signedInUser({ fetch: offline })).rejects.toMatchObject({ kind: 'network' });
-  });
-});
-
-describe('checkOptIn', () => {
-  it('passes when the server redirects to Discord', async () => {
-    const redirect = vi.fn(() =>
-      Promise.resolve({ type: 'opaqueredirect', status: 0 } as Response),
-    );
-    await expect(checkOptIn('7', { fetch: redirect })).resolves.toBeUndefined();
-    expect(redirect).toHaveBeenCalledWith(
-      optInUrl('7'),
-      expect.objectContaining({ redirect: 'manual' }),
-    );
-  });
-
-  it("fails with the server's status when it can't start", async () => {
-    const refused = vi.fn(() => Promise.resolve(json({ error: 'no invite' }, 422)));
-    const error = await checkOptIn('7', { fetch: refused }).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(ApiError);
-    expect(error).toMatchObject({ status: 422, message: 'no invite' });
   });
 });
 

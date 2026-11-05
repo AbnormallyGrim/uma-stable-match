@@ -248,17 +248,19 @@ describe('fetchFeatures', () => {
     vi.fn<typeof fetch>(async () => new Response(JSON.stringify(body), { status }));
 
   it('reads the switched-on features', async () => {
-    const fetch = reply({ japanese: true, web_analytics: 'madeuptoken123' });
+    const fetch = reply({ japanese: true, applications: true, web_analytics: 'madeuptoken123' });
     await expect(fetchFeatures({ fetch })).resolves.toEqual({
       japanese: true,
+      applications: true,
       webAnalytics: 'madeuptoken123',
     });
     expect(fetch.mock.calls[0]?.[0]).toBe('/api/v1/features');
   });
 
   it('counts anything that is not exactly true as off', async () => {
-    const off = { japanese: false, webAnalytics: null };
+    const off = { japanese: false, applications: false, webAnalytics: null };
     await expect(fetchFeatures({ fetch: reply({ japanese: 'yes' }) })).resolves.toEqual(off);
+    await expect(fetchFeatures({ fetch: reply({ applications: 'true' }) })).resolves.toEqual(off);
     await expect(fetchFeatures({ fetch: reply({ web_analytics: 1 }) })).resolves.toEqual(off);
     await expect(fetchFeatures({ fetch: reply({ web_analytics: '' }) })).resolves.toEqual(off);
     await expect(fetchFeatures({ fetch: reply({}) })).resolves.toEqual(off);

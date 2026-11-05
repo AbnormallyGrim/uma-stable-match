@@ -54,9 +54,12 @@ public/favicon-32.png         Browser icon, with apple-touch-icon.png for home s
 src/main.ts                   Mounts the search, the club page for a /club/ address, or a club applications page
 src/App.svelte                Root component: runs searches and keeps them in the URL
 src/lib/route.ts              Which page an address shows, and club, wishlist and club applications page addresses
-src/lib/ApplicationsPage.svelte    The club applications page: what setting up needs, then sign in, pick the club, confirm
-src/lib/SettingsPage.svelte   A linked club's Discord settings, with unlinking
-src/lib/applications.ts            The applications API client: sign-in, opt-in check, settings, unlink
+src/lib/ApplicationsPage.svelte    The club applications page for Discord session sign-in and role selection
+src/lib/ClubApplicationsPage.svelte A club's page for its leaders: adding the bot, then its status and applications
+src/lib/BotSetup.svelte       The steps to add the bot, ticked as they're done
+src/lib/BotPanel.svelte       The bot's status, the club's settings and removing the bot
+src/lib/ApplicationsTable.svelte   A club's applications, filtered by status, with ApplicationDetails.svelte for one
+src/lib/applications.ts            The applications API client: sign-in, the invite check, settings and unlink
 src/lib/WishlistPage.svelte   The wishlist page: StrawPoll polls for ideas, in frames
 src/lib/polls.ts              The polls on the wishlist page
 src/lib/ClubPage.svelte       The club page: a club's details, its chart and member cards, with you added
@@ -87,7 +90,8 @@ src/lib/language.svelte.ts    The language shown right now, shared by every comp
 src/lib/SiteFooter.svelte     Tips, the logo, a link to report a problem, and the disclaimer
 src/lib/BrandLogo.svelte      The logo, in the version for the current theme
 src/lib/api.ts                Typed API client
-src/lib/features.ts           Switches on Japanese and analytics from the server's features, on every page
+src/lib/features.ts           Switches on Japanese, applications and analytics from the server's features, on every page
+src/lib/flags.svelte.ts       Feature flags from the server, shared by every component
 src/lib/human.ts              The human check: Turnstile challenge and API token
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
@@ -376,20 +380,22 @@ The navbar keeps the release notes but has no tour button here.
 
 ## Club applications pages
 
-**Feature flag.** `APPLICATIONS_ENABLED` in `src/lib/flags.ts` is `false`. While it is off, `main.ts` doesn't mount these pages, so `/applications` and `/applications/club/{id}` open the club finder like any unknown address, and `visiblePages()` leaves the **Applications** link out of the navbar. The components and their tests don't depend on the flag. The website has its own flag, `APPLICATIONS_ENABLED` in `site/site.js`, for its `/privacy/` page and the navbar link; see the notes at the top of that file for turning it on.
+**Feature flag.** The server's `ENABLE_APPLICATIONS` setting, off by default, switches on these pages and the website's `/privacy/` page. It is read at run time from `GET /api/v1/features`, so changing it needs no rebuild. On an `/applications` address, `main.ts` asks for it before mounting; while it is off, or the request fails, these pages aren't mounted, so `/applications` and `/applications/club/{id}` open the club finder like any unknown address. Elsewhere, `applyFeatures()` sets `flags.applications` and `pages()` adds the **Applications** link to the navbar once it's on. The components and their tests don't depend on the flag. The website's `site.js` reads the same endpoint for its privacy page and navbar link; see the notes at the top of that file for what else to change when turning it on.
 
 **Placeholder copy.** All text on these pages is lorem ipsum for now: the `applications.*` messages (except `applications.link`, the navbar label) and the `settings.*` messages, in both languages, and the privacy page's text. Tests read the text through `t()`, so replacing it needs no test changes.
 
-`/applications` and `/applications/club/{id}` are where a club leader sets up applications through Discord. `main.ts` mounts `ApplicationsPage.svelte` or `SettingsPage.svelte`; `applicationsRoute()` reads the address and `settingsPath()` builds it. A **Club applications** link joins the navbar's pages. `applications.ts` wraps the [Discord endpoints](../backend/discord/README.md); they aren't behind the human check, and they use the session cookie, so requests are same-origin.
+`/applications` and `/applications/club/{id}` are where a club leader sets up applications through Discord. `main.ts` mounts `ApplicationsPage.svelte` or `ClubApplicationsPage.svelte`; `applicationsRoute()` reads the address and `clubApplicationsPath()` builds it. A **Club applications** link joins the navbar's pages. `applications.ts` wraps the [Discord endpoints](../backend/discord/README.md); they aren't behind the human check, and they use the session cookie, so requests are same-origin.
 
 **The page at `/applications`** says what taking applications through Discord does and what it needs, in the wording written for club leaders: a working invite in the club description while opting in, and Manage Server or Administrator in the server. It links to the website's [privacy section](../site/index.md). Then:
 
 1. **Sign in:** a signed-out visitor gets **Sign in with Discord**, which goes through `/api/v1/auth/discord/login` and comes back here. A signed-in one sees **Sign out**.
-2. **Pick the club:** a club ID, or an uma.moe club link (`parseClubInput()` reads both). Anything else is refused on the spot.
-3. **Confirm:** the club's name when it is loaded, what happens next, and **Add the bot to my server**. The button first calls the opt-in address without leaving the page (`checkOptIn()`, which only follows the redirect to Discord if the server would send one), so problems show here: no working invite or invites to two servers (422), an unknown club (404), a session that ended (401), or Discord unavailable. Only then does the browser go to Discord, with the server picker locked to the invite's server.
-4. **Result:** Discord sends the leader to the club's settings page with `?linked=1`. If something fails in the callback, the server sends the browser back to `/applications?error=<label>`, and the page shows what each label means (`wrong_server`, `no_server`, `denied`, `invalid_state`, `discord_error`, `unavailable`). An unknown label reads as a generic problem, and only a short lowercase label is accepted from the address.
+2. **Result:** Discord sends the leader to the club's applications page with `?linked=1`. If something fails in the callback, the server sends the browser back to `/applications?error=<label>`, and the page shows what each label means (`wrong_server`, `no_server`, `denied`, `invalid_state`, `discord_error`, `unavailable`). An unknown label reads as a generic problem, and only a short lowercase label is accepted from the address.
 
-**The settings page** loads the settings with `GET /api/v1/discord/clubs/{id}/settings`. The server asks Discord on every request whether the person still manages the server, so the page shows what it's told: **sign in** for a 401, **you need Manage Server or Administrator** for a 403, and **the club doesn't take applications yet** with a link to set it up for a 404. The form has **Take applications** (off pauses them), **Add applicants to the server automatically**, a **Ticket category** menu and a **Leader roles** checklist, both from the server's own lists, and **Save settings**. A setup problem, if the server reports one, shows above the form. **Unlink this club** asks once before sending the `DELETE`.
+**The club's applications page** (`/applications/club/{id}`) is for the people who can manage the club's Discord server; there are no leader roles. It loads `GET /api/v1/discord/clubs/{id}/settings`, which the server checks with Discord on every request, and shows what it's told: **sign in** for a 401 and **you need Manage Server or Administrator** for a 403. The heading is the club's name with a status chip: **Not set up**, **Taking applications**, **Paused** or **Needs attention** (the server reported a setup problem).
+
+- **Before the bot is added** (a 404), `BotSetup.svelte` explains how applications work and lists three steps with round checkboxes. Only the first can be checked from here: `hasInvite()` calls the opt-in address without following its redirect, so a redirect means the club description has a working invite to one server and a 422 means it doesn't. Until one is found, **Add the bot to my server** stays disabled and **Check again** repeats the check. If the check fails for another reason the button works anyway, since the opt-in checks the invite itself. The other two steps, having Manage Server or Administrator and adding the bot, are done once Discord sends the leader back.
+- **Once it's added**, `BotPanel.svelte` sits beside the applications: the bot's status as a checklist, the settings (**Take applications**, **Add applicants to the server**, **Ticket category**) and **Remove the bot**, which asks once before sending the `DELETE` and then shows the setup steps again. When applications are paused, a notice above the table has a **Resume** button.
+- **Applications.** `ApplicationsTable.svelte` lists them newest first with status filters, as cards on narrow screens, and **View** opens `ApplicationDetails.svelte`, laid out like the message the bot posted, with a link to the ticket channel. No endpoint lists a club's applications yet, so the page passes an empty list and the table shows its empty state.
 
 ### Pace chart
 
