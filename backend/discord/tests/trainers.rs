@@ -94,10 +94,12 @@ impl World {
                         Some(Profile::NoComment) => Ok(Some(TrainerSummary {
                             name: "Example Trainer".into(),
                             comment: None,
+                            club: None,
                         })),
                         Some(Profile::Comment(comment)) => Ok(Some(TrainerSummary {
                             name: "Example Trainer".into(),
                             comment: Some(comment.to_owned()),
+                            club: None,
                         })),
                     }
                 }
@@ -305,8 +307,9 @@ async fn deleting_the_account_removes_its_links_and_keys_and_no_one_elses() {
     };
     let (first, second) = (world.sign_in(1).await, world.sign_in(2).await);
     let (mine, pending, theirs) = (world.trainer(1), world.trainer(2), world.trainer(3));
-    assert_eq!(world.prove(&first, mine).await, StatusCode::OK);
+    // The key comes first: with a trainer linked, no new key is given.
     let key = world.key(&first, pending).await;
+    assert_eq!(world.prove(&first, mine).await, StatusCode::OK);
     assert_eq!(world.prove(&second, theirs).await, StatusCode::OK);
 
     let response = world.send("DELETE", ACCOUNT_PATH, &first).await;
@@ -320,7 +323,8 @@ async fn deleting_the_account_removes_its_links_and_keys_and_no_one_elses() {
     );
     // The trainer is free: the old key is gone, and a new one is made.
     assert_ne!(world.key(&first, pending).await, key);
-    assert_eq!(world.prove(&second, mine).await, StatusCode::OK);
+    let third = world.sign_in(3).await;
+    assert_eq!(world.prove(&third, mine).await, StatusCode::OK);
     world.clean_up().await;
 }
 
@@ -621,19 +625,25 @@ async fn proving_it_again_moves_a_trainer_to_the_new_owner() {
 }
 
 #[tokio::test]
-async fn a_user_can_link_only_so_many_trainers() {
+async fn a_user_can_link_only_one_trainer() {
     let Some(world) = World::new().await else {
         return;
     };
+    assert_eq!(MAX_LINKED_TRAINERS, 1);
     let alice = world.sign_in(1).await;
-    for n in 1..=MAX_LINKED_TRAINERS as u64 {
-        assert_eq!(world.prove(&alice, world.trainer(n)).await, StatusCode::OK);
-    }
+    assert_eq!(world.prove(&alice, world.trainer(1)).await, StatusCode::OK);
+    // No key for a second one until the first is unlinked.
+    let refused = world.start(&alice, world.trainer(9)).await;
+    assert_eq!(refused.status(), StatusCode::FORBIDDEN);
     assert_eq!(
-        world.prove(&alice, world.trainer(9)).await,
-        StatusCode::FORBIDDEN
+        world.linked(&alice).await,
+        vec![world.trainer(1).to_string()]
     );
-    assert_eq!(world.linked(&alice).await.len(), MAX_LINKED_TRAINERS);
+    assert_eq!(
+        world.unlink(&alice, world.trainer(1)).await.status(),
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(world.prove(&alice, world.trainer(9)).await, StatusCode::OK);
     world.clean_up().await;
 }
 
@@ -645,11 +655,15 @@ async fn a_refused_link_doesnt_take_the_trainer_from_its_owner() {
     let (alice, bob) = (world.sign_in(1).await, world.sign_in(2).await);
     let owned = world.trainer(1);
     assert_eq!(world.prove(&alice, owned).await, StatusCode::OK);
-    for n in 2..2 + MAX_LINKED_TRAINERS as u64 {
-        assert_eq!(world.prove(&bob, world.trainer(n)).await, StatusCode::OK);
-    }
+    // Bob asks for a key for Alice's trainer, then links another before checking it.
+    let key = world.key(&bob, owned).await;
+    assert_eq!(world.prove(&bob, world.trainer(2)).await, StatusCode::OK);
+    world.set(owned, Profile::Comment(Box::leak(key.into_boxed_str())));
     // Bob has no room left, and the refusal leaves Alice's link alone.
-    assert_eq!(world.prove(&bob, owned).await, StatusCode::FORBIDDEN);
+    assert_eq!(
+        world.check(&bob, owned).await.status(),
+        StatusCode::FORBIDDEN
+    );
     assert_eq!(world.linked(&alice).await, vec![owned.to_string()]);
     world.clean_up().await;
 }

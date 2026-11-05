@@ -12,6 +12,7 @@ pub fn trainer_lookup(source: Source) -> TrainerLookup {
                 Ok(profile) => Ok(Some(TrainerSummary {
                     name: profile.trainer.name,
                     comment: profile.trainer.comment,
+                    club: profile.circle.map(|circle| circle.circle_id),
                 })),
                 Err(error) if error.is_not_found() => Ok(None),
                 Err(error) => {

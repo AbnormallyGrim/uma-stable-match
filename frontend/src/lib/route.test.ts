@@ -134,11 +134,21 @@ describe('applicationsRoute', () => {
     });
   });
 
+  it("reads the leader's page without a club", () => {
+    expect(applicationsRoute('/applications/club', '')).toEqual({
+      page: 'club',
+      clubId: null,
+      linked: false,
+    });
+    expect(applicationsRoute('/applications/club/', '')).toMatchObject({ clubId: null });
+    expect(applicationsRoute('/applications/club/abc', '')).toBeNull();
+  });
+
   it('leaves other pages alone', () => {
     for (const path of [
       '/',
-      '/applications/club',
       '/applications/club/abc',
+      '/applications/club/7/members',
       '/applications/other',
       '/leader',
     ]) {

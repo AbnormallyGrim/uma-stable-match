@@ -4,7 +4,8 @@
 //! `REDIS_TEST_URL=redis://127.0.0.1:6379 cargo test`; CI sets it.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use axum::body::Body;
 use axum::http::header::{COOKIE, LOCATION, SET_COOKIE};
@@ -16,20 +17,26 @@ use serde_json::json;
 use tower::ServiceExt;
 use uma_stable_match_discord::{
     router, ApplicationId, BotToken, ClientSecret, ClubLookup, ClubStore, ClubSummary, Discord,
-    DiscordConfig, LookupError, OptIn, PublicKey, PublicUrl, SigningKey, BOT_PERMISSIONS,
-    CALLBACK_PATH, LOGIN_PATH, OPT_IN_PATH, SETTINGS_PATH, UNLINK_PATH,
+    DiscordConfig, KeySecret, LookupError, OptIn, PublicKey, PublicUrl, SigningKey, TrainerLinks,
+    TrainerLookup, TrainerStore, TrainerSummary, BOT_PERMISSIONS, CALLBACK_PATH, LOGIN_PATH,
+    MY_CLUB_PATH, OPT_IN_PATH, SETTINGS_PATH, UNLINK_PATH,
 };
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-const LEADER: u64 = 7001;
-const OTHER_USER: u64 = 7002;
-
-/// A mock Discord, an app using it and a Redis store, with IDs no other test uses.
+/// A mock Discord, an app using it, a fake uma.moe and Redis stores, with IDs no other test uses.
+///
+/// Three people sign in. The leader manages server A and has linked the trainer that leads clubs
+/// 1 to 8. The other user is a member of server A without Manage Server, and has linked the
+/// trainer that leads club 9. The stranger is a member of server A with no trainer linked.
 struct World {
     mock: MockServer,
     app: Router,
     store: ClubStore,
+    trainers: TrainerStore,
+    /// Each club's leader, by trainer ID.
+    leaders: Arc<Mutex<HashMap<u64, u64>>>,
+    club_lookups: Arc<AtomicUsize>,
     base: u64,
 }
 
@@ -50,7 +57,12 @@ impl World {
         let conn = ConnectionManager::new(redis::Client::open(url).unwrap())
             .await
             .expect("REDIS_TEST_URL is reachable");
-        let store = ClubStore::new(conn);
+        let store = ClubStore::new(conn.clone());
+        let trainers = TrainerStore::new(
+            conn,
+            KeySecret::parse("made-up-key-secret-of-32-chars!!").unwrap(),
+        )
+        .with_check_queue(&format!("test:checks:{base}"));
         let mock = MockServer::start().await;
         let mut config = DiscordConfig::new(
             ApplicationId::parse("1000").unwrap(),
@@ -65,7 +77,7 @@ impl World {
         config.api_base = mock.uri();
 
         // Clubs: base+11..13 point to server A, 14 has an expired invite, 15 has none, 16 points
-        // to A and B, 17 can't be looked up, 18 points to B.
+        // to A and B, 17 can't be looked up, 18 points to B, 19 points to A.
         let descriptions: HashMap<u64, Option<String>> = HashMap::from([
             (base + 11, Some("discord.gg/aaa111".into())),
             (base + 12, Some("Discord: discord.gg/aaa111".into())),
@@ -77,28 +89,99 @@ impl World {
                 Some("discord.gg/aaa111 discord.gg/bbb222".into()),
             ),
             (base + 18, Some("discord.gg/bbb222".into())),
+            (base + 19, Some("discord.gg/aaa111".into())),
         ]);
         let unavailable = base + 17;
-        let lookup = ClubLookup::new(move |id| {
-            let found = descriptions.get(&id).cloned();
-            async move {
-                if id == unavailable {
-                    return Err(LookupError);
+        let leaders: Arc<Mutex<HashMap<u64, u64>>> = Arc::new(Mutex::new(
+            (11..=18)
+                .map(|n| (base + n, base + 50))
+                .chain([(base + 19, base + 51)])
+                .collect(),
+        ));
+        let club_lookups = Arc::new(AtomicUsize::new(0));
+        let lookup = {
+            let (leaders, club_lookups) = (leaders.clone(), club_lookups.clone());
+            ClubLookup::new(move |id| {
+                club_lookups.fetch_add(1, Ordering::Relaxed);
+                let found = descriptions.get(&id).cloned();
+                let leader = leaders.lock().unwrap().get(&id).copied();
+                async move {
+                    if id == unavailable {
+                        return Err(LookupError);
+                    }
+                    Ok(found.map(|description| ClubSummary {
+                        name: "Example Club".into(),
+                        description,
+                        leader,
+                    }))
                 }
-                Ok(found.map(|description| ClubSummary { description }))
+            })
+        };
+        // Trainers base+50 and base+52 are in club 1, base+51 in club 9.
+        let profiles: HashMap<u64, u64> = HashMap::from([
+            (base + 50, base + 11),
+            (base + 51, base + 19),
+            (base + 52, base + 11),
+        ]);
+        let profile = TrainerLookup::new(move |id| {
+            let club = profiles.get(&id).copied();
+            async move {
+                Ok(club.map(|club| TrainerSummary {
+                    name: "Example Trainer".into(),
+                    comment: None,
+                    club: Some(club),
+                }))
             }
         });
         let discord = Discord::new(config)
             .unwrap()
-            .with_opt_in(OptIn::new(store.clone(), lookup));
+            .with_opt_in(OptIn::new(store.clone(), lookup))
+            .with_trainer_links(TrainerLinks::new(trainers.clone(), profile));
         let world = Self {
             mock,
             app: router(discord),
             store,
+            trainers,
+            leaders,
+            club_lookups,
             base,
         };
         world.mock_discord().await;
+        for (user, trainer) in [
+            (world.leader(), world.leader_trainer()),
+            (world.other_user(), world.other_trainer()),
+        ] {
+            world
+                .trainers
+                .link(user, trainer, "Example Trainer")
+                .await
+                .unwrap();
+        }
         Some(world)
+    }
+
+    fn leader(&self) -> u64 {
+        self.base + 61
+    }
+    fn other_user(&self) -> u64 {
+        self.base + 62
+    }
+    fn stranger(&self) -> u64 {
+        self.base + 63
+    }
+    fn leader_trainer(&self) -> u64 {
+        self.base + 50
+    }
+    fn other_trainer(&self) -> u64 {
+        self.base + 51
+    }
+    fn stranger_trainer(&self) -> u64 {
+        self.base + 52
+    }
+
+    /// Makes `trainer` the leader of club `n`.
+    fn set_leader(&self, n: u64, trainer: u64) {
+        self.leaders.lock().unwrap().insert(self.club(n), trainer);
     }
 
     fn server_a(&self) -> u64 {
@@ -125,10 +208,12 @@ impl World {
         for (code, body) in [
             token("leader-code", "leader-token", None),
             token("other-code", "other-token", None),
+            token("stranger-code", "stranger-token", None),
             token("install-a", "leader-token", Some(self.server_a())),
             token("install-b", "leader-token", Some(self.server_b())),
             token("install-nothing", "leader-token", None),
             token("install-other-user", "other-token", Some(self.server_a())),
+            token("install-stranger", "stranger-token", Some(self.server_a())),
         ] {
             Mock::given(method("POST"))
                 .and(path("/oauth2/token"))
@@ -137,7 +222,11 @@ impl World {
                 .mount(&self.mock)
                 .await;
         }
-        for (access, id) in [("leader-token", LEADER), ("other-token", OTHER_USER)] {
+        for (access, id) in [
+            ("leader-token", self.leader()),
+            ("other-token", self.other_user()),
+            ("stranger-token", self.stranger()),
+        ] {
             Mock::given(method("GET"))
                 .and(path("/users/@me"))
                 .and(header("authorization", format!("Bearer {access}")))
@@ -186,8 +275,9 @@ impl World {
             .mount(&self.mock)
             .await;
         for (user, roles) in [
-            (LEADER, vec![manager_role.to_string()]),
-            (OTHER_USER, vec![]),
+            (self.leader(), vec![manager_role.to_string()]),
+            (self.other_user(), vec![]),
+            (self.stranger(), vec![]),
         ] {
             Mock::given(method("GET"))
                 .and(path(format!("/guilds/{a}/members/{user}")))
@@ -233,7 +323,7 @@ impl World {
             .unwrap()
     }
 
-    /// A session cookie, from signing in as `LEADER`.
+    /// A session cookie, from signing in as the leader.
     async fn sign_in(&self) -> String {
         self.sign_in_with("leader-code").await
     }
@@ -294,11 +384,18 @@ impl World {
             .collect()
     }
 
+    async fn my_club(&self, session: &str) -> Response<Body> {
+        self.get(MY_CLUB_PATH, session).await
+    }
+
     async fn clean_up(&self) {
-        for n in 1..=8 {
+        for n in 1..=9 {
             self.store.unlink(self.club(n)).await.unwrap();
         }
         self.store.unlink(self.base + 20).await.unwrap();
+        for user in [self.leader(), self.other_user(), self.stranger()] {
+            self.trainers.forget(user).await.unwrap();
+        }
     }
 }
 
@@ -369,6 +466,27 @@ async fn starting_needs_a_session_a_real_club_and_one_working_invite() {
         status(world.start(&session, world.club(7)).await),
         StatusCode::BAD_GATEWAY
     );
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn only_the_clubs_leader_can_start() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    // No trainer linked.
+    let stranger = world.sign_in_with("stranger-code").await;
+    let response = world.start(&stranger, world.club(1)).await;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    // A linked trainer that doesn't lead the club.
+    let other = world.sign_in_with("other-code").await;
+    let response = world.start(&other, world.club(1)).await;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    // The leader is checked before the invite, so a non-leader learns nothing about it.
+    let response = world.start(&other, world.club(5)).await;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let response = world.start(&other, world.club(9)).await;
+    assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
     world.clean_up().await;
 }
 
@@ -547,6 +665,44 @@ async fn moving_a_club_keeps_the_old_server_when_a_sibling_uses_it() {
 }
 
 #[tokio::test]
+async fn a_leader_without_manage_server_cant_add_the_bot() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    // The other user leads club 9, whose invite points to server A, but can't manage A.
+    let session = world.sign_in_with("other-code").await;
+    let started = world.start(&session, world.club(9)).await;
+    let response = world.finish(&started, "install-other-user", "").await;
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(world.store.club(world.club(9)).await.unwrap(), None);
+    assert_eq!(
+        world.left().await,
+        [format!("/users/@me/guilds/{}", world.server_a())]
+    );
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn a_leader_who_steps_down_before_finishing_links_nothing() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    let session = world.sign_in().await;
+    let started = world.start(&session, world.club(1)).await;
+    world.set_leader(1, world.other_trainer());
+    let response = world.finish(&started, "install-a", "").await;
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(world.store.club(world.club(1)).await.unwrap(), None);
+    assert_eq!(
+        world.left().await,
+        [format!("/users/@me/guilds/{}", world.server_a())]
+    );
+    world.clean_up().await;
+}
+
+#[tokio::test]
 async fn another_person_cant_finish_someone_elses_opt_in() {
     let Some(world) = World::new().await else {
         return;
@@ -649,7 +805,7 @@ async fn unlinking_one_club_keeps_the_bot_while_a_sibling_uses_the_server() {
 }
 
 #[tokio::test]
-async fn someone_without_manage_server_cant_unlink() {
+async fn only_the_clubs_leader_can_unlink() {
     let Some(world) = World::new().await else {
         return;
     };
@@ -658,10 +814,11 @@ async fn someone_without_manage_server_cant_unlink() {
         .link(world.club(1), world.server_a())
         .await
         .unwrap();
-    let session = world.sign_in_with("other-code").await;
-    let response = world.unlink(&session, world.club(1)).await;
-
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    for code in ["other-code", "stranger-code"] {
+        let session = world.sign_in_with(code).await;
+        let response = world.unlink(&session, world.club(1)).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{code}");
+    }
     assert!(world.store.club(world.club(1)).await.unwrap().is_some());
     assert!(world.left().await.is_empty());
     world.clean_up().await;
@@ -687,16 +844,16 @@ async fn unlinking_needs_a_session_a_club_id_and_a_linked_club() {
     assert_eq!(bad.status(), StatusCode::BAD_REQUEST);
     let unlinked = world.unlink(&session, world.club(2)).await;
     assert_eq!(unlinked.status(), StatusCode::NOT_FOUND);
-    // A link needs a DELETE; a GET only reads the person's access and can't remove it.
+    // A link needs a DELETE.
     let uri = UNLINK_PATH.replace("{club}", &world.club(1).to_string());
     let get = world.get(&uri, &session).await;
-    assert_eq!(get.status(), StatusCode::OK);
+    assert_eq!(get.status(), StatusCode::METHOD_NOT_ALLOWED);
     assert!(world.store.club(world.club(1)).await.unwrap().is_some());
     world.clean_up().await;
 }
 
 #[tokio::test]
-async fn a_server_the_bot_cant_see_or_a_discord_outage_leaves_the_link() {
+async fn a_leader_unlinks_from_a_server_the_bot_left_but_not_during_an_outage() {
     let Some(world) = World::new().await else {
         return;
     };
@@ -706,19 +863,19 @@ async fn a_server_the_bot_cant_see_or_a_discord_outage_leaves_the_link() {
         .link(world.club(1), world.old_server())
         .await
         .unwrap();
+    // Club 7 can't be looked up, so its leader can't be checked.
     world
         .store
-        .link(world.club(2), world.server_b())
+        .link(world.club(7), world.server_a())
         .await
         .unwrap();
     let session = world.sign_in().await;
 
-    let unseen = world.unlink(&session, world.club(1)).await;
-    assert_eq!(unseen.status(), StatusCode::FORBIDDEN);
-    let outage = world.unlink(&session, world.club(2)).await;
+    let gone = world.unlink(&session, world.club(1)).await;
+    assert_eq!(gone.status(), StatusCode::NO_CONTENT);
+    let outage = world.unlink(&session, world.club(7)).await;
     assert_eq!(outage.status(), StatusCode::BAD_GATEWAY);
-    assert!(world.store.club(world.club(1)).await.unwrap().is_some());
-    assert!(world.store.club(world.club(2)).await.unwrap().is_some());
+    assert!(world.store.club(world.club(7)).await.unwrap().is_some());
     world.clean_up().await;
 }
 
@@ -727,7 +884,7 @@ async fn json_body(response: Response<Body>) -> serde_json::Value {
 }
 
 #[tokio::test]
-async fn a_server_manager_reads_the_clubs_settings_with_the_servers_lists() {
+async fn the_leader_reads_the_clubs_settings_with_the_servers_categories() {
     let Some(world) = World::new().await else {
         return;
     };
@@ -746,7 +903,6 @@ async fn a_server_manager_reads_the_clubs_settings_with_the_servers_lists() {
         json!({
             "guild_id": a.to_string(),
             "category": null,
-            "leader_roles": [],
             "auto_join": true,
             "open": true,
             "problem": null,
@@ -754,17 +910,13 @@ async fn a_server_manager_reads_the_clubs_settings_with_the_servers_lists() {
                 { "id": (a + 2000).to_string(), "name": "Applications" },
                 { "id": (a + 2002).to_string(), "name": "archive" },
             ],
-            "roles": [
-                { "id": (a + 1000).to_string(), "name": "Managers" },
-                { "id": (a + 1001).to_string(), "name": "officers" },
-            ],
         })
     );
     world.clean_up().await;
 }
 
 #[tokio::test]
-async fn only_someone_with_manage_server_reads_or_changes_settings() {
+async fn only_the_clubs_leader_reads_or_changes_settings() {
     let Some(world) = World::new().await else {
         return;
     };
@@ -781,24 +933,35 @@ async fn only_someone_with_manage_server_reads_or_changes_settings() {
     let anonymous = world.change("", world.club(1), patch.clone()).await;
     assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
 
-    // Signed in, but without Manage Server there.
-    let session = world.sign_in_with("other-code").await;
-    let read = world.settings(&session, world.club(1)).await;
-    assert_eq!(read.status(), StatusCode::FORBIDDEN);
-    let change = world.change(&session, world.club(1), patch).await;
-    assert_eq!(change.status(), StatusCode::FORBIDDEN);
+    // Signed in, but not the club's leader.
+    for code in ["other-code", "stranger-code"] {
+        let session = world.sign_in_with(code).await;
+        let read = world.settings(&session, world.club(1)).await;
+        assert_eq!(read.status(), StatusCode::FORBIDDEN, "{code}");
+        let change = world.change(&session, world.club(1), patch.clone()).await;
+        assert_eq!(change.status(), StatusCode::FORBIDDEN, "{code}");
+    }
     let record = world.store.club(world.club(1)).await.unwrap().unwrap();
     assert!(record.open && record.category.is_none());
 
-    // And a club that isn't linked has nothing to read.
+    // Managing the server isn't enough: the leader manages server A but doesn't lead club 9.
+    world
+        .store
+        .link(world.club(9), world.server_a())
+        .await
+        .unwrap();
     let session = world.sign_in().await;
+    let read = world.settings(&session, world.club(9)).await;
+    assert_eq!(read.status(), StatusCode::FORBIDDEN);
+
+    // And a club that isn't linked has nothing to read.
     let missing = world.settings(&session, world.club(2)).await;
     assert_eq!(missing.status(), StatusCode::NOT_FOUND);
     world.clean_up().await;
 }
 
 #[tokio::test]
-async fn every_read_and_change_asks_discord_again() {
+async fn every_read_and_change_checks_the_leader_again() {
     let Some(world) = World::new().await else {
         return;
     };
@@ -808,22 +971,18 @@ async fn every_read_and_change_asks_discord_again() {
         .await
         .unwrap();
     let session = world.sign_in().await;
+    let before = world.club_lookups.load(Ordering::Relaxed);
     world.settings(&session, world.club(1)).await;
     world.settings(&session, world.club(1)).await;
     world
         .change(&session, world.club(1), json!({ "auto_join": false }))
         .await;
+    assert_eq!(world.club_lookups.load(Ordering::Relaxed) - before, 3);
 
-    let member = format!("/guilds/{}/members/{LEADER}", world.server_a());
-    let checks = world
-        .mock
-        .received_requests()
-        .await
-        .unwrap()
-        .iter()
-        .filter(|request| request.url.path() == member)
-        .count();
-    assert_eq!(checks, 3);
+    // A leader who stepped down loses access at once.
+    world.set_leader(1, world.other_trainer());
+    let read = world.settings(&session, world.club(1)).await;
+    assert_eq!(read.status(), StatusCode::FORBIDDEN);
     world.clean_up().await;
 }
 
@@ -845,7 +1004,6 @@ async fn changing_settings_saves_them_and_answers_with_the_result() {
             world.club(1),
             json!({
                 "category": (a + 2000).to_string(),
-                "leader_roles": [(a + 1001).to_string(), (a + 1001).to_string()],
                 "auto_join": false,
                 "open": false,
             }),
@@ -855,32 +1013,25 @@ async fn changing_settings_saves_them_and_answers_with_the_result() {
     assert_eq!(response.status(), StatusCode::OK);
     let body = json_body(response).await;
     assert_eq!(body["category"], (a + 2000).to_string());
-    assert_eq!(body["leader_roles"], json!([(a + 1001).to_string()]));
     assert_eq!(body["auto_join"], false);
     assert_eq!(body["open"], false);
     let record = world.store.club(world.club(1)).await.unwrap().unwrap();
     assert_eq!(record.category, Some(a + 2000));
-    assert_eq!(record.leader_roles, [a + 1001]);
     assert!(!record.auto_join && !record.open);
 
     // `null` clears the category; fields left out stay.
     let response = world
-        .change(
-            &session,
-            world.club(1),
-            json!({ "category": null, "leader_roles": [] }),
-        )
+        .change(&session, world.club(1), json!({ "category": null }))
         .await;
     assert_eq!(response.status(), StatusCode::OK);
     let record = world.store.club(world.club(1)).await.unwrap().unwrap();
     assert_eq!(record.category, None);
-    assert!(record.leader_roles.is_empty());
     assert!(!record.open);
     world.clean_up().await;
 }
 
 #[tokio::test]
-async fn settings_must_name_the_servers_own_categories_and_roles() {
+async fn settings_must_name_the_servers_own_categories() {
     let Some(world) = World::new().await else {
         return;
     };
@@ -898,8 +1049,7 @@ async fn settings_must_name_the_servers_own_categories_and_roles() {
         ),
         ("another server's category", json!({ "category": "42" })),
         ("junk", json!({ "category": "abc" })),
-        ("@everyone", json!({ "leader_roles": [a.to_string()] })),
-        ("an unknown role", json!({ "leader_roles": ["42"] })),
+        ("leader roles", json!({ "leader_roles": [] })),
         ("nothing", json!({})),
         ("an unknown field", json!({ "problem": "none" })),
         ("a wrong type", json!({ "open": "yes" })),
@@ -918,5 +1068,49 @@ async fn settings_must_name_the_servers_own_categories_and_roles() {
     assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
     let record = world.store.club(world.club(1)).await.unwrap().unwrap();
     assert!(record.open && record.auto_join && record.category.is_none());
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn my_club_says_which_club_the_linked_trainer_is_in_and_whether_it_leads_it() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    assert_eq!(world.my_club("").await.status(), StatusCode::UNAUTHORIZED);
+
+    let stranger = world.sign_in_with("stranger-code").await;
+    let response = world.my_club(&stranger).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        json_body(response).await,
+        json!({ "trainer": null, "club": null })
+    );
+
+    let leader = world.sign_in().await;
+    assert_eq!(
+        json_body(world.my_club(&leader).await).await,
+        json!({
+            "trainer": world.leader_trainer().to_string(),
+            "club": { "id": world.club(1).to_string(), "name": "Example Club", "leader": true },
+        })
+    );
+
+    // A member of club 1 who doesn't lead it.
+    world
+        .trainers
+        .link(
+            world.stranger(),
+            world.stranger_trainer(),
+            "Example Trainer",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        json_body(world.my_club(&stranger).await).await,
+        json!({
+            "trainer": world.stranger_trainer().to_string(),
+            "club": { "id": world.club(1).to_string(), "name": "Example Club", "leader": false },
+        })
+    );
     world.clean_up().await;
 }

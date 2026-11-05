@@ -46,7 +46,7 @@ interface Pending {
 
 /** The list endpoint's answer. */
 const list = (linked: { id: string; name: string | null }[] = [], pending: Pending[] = []) =>
-  json({ linked, max: 5, pending });
+  json({ linked, max: 1, pending });
 
 const pendingKey = (check: Pending['check'] = null): Pending => ({
   trainer: '100000000002',
@@ -56,13 +56,14 @@ const pendingKey = (check: Pending['check'] = null): Pending => ({
 });
 
 describe('SettingsPage', () => {
-  it('lists the linked trainers', async () => {
+  it('lists the linked trainer, and offers no second link', async () => {
     answer({ [TRAINERS]: () => list([{ id: '100000000001', name: 'Example Trainer' }]) });
     render(SettingsPage);
     expect(await screen.findByText('100000000001')).toBeInTheDocument();
     expect(screen.getByText('Example Trainer')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Unlink trainer 100000000001' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Link Account' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Link Account' })).toBeNull();
+    expect(screen.getByText(/Unlink it to link a different one/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign Out' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete Account' })).toBeInTheDocument();
   });
@@ -197,6 +198,7 @@ describe('SettingsPage', () => {
       await screen.findByRole('button', { name: 'Unlink trainer 100000000001' }),
     );
     expect(await screen.findByText('No trainers linked yet.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Link Account' })).toBeInTheDocument();
   });
 
   it('hides linking when the server does not offer it', async () => {

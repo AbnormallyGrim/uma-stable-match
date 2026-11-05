@@ -1,18 +1,19 @@
 <!--
   @component
-  The page where a club's leaders take applications through Discord. Until the bot is in the
-  club's server it shows how to add it; then the bot's status and settings beside the applications
-  the club has had.
+  The page where a club's leader takes applications through Discord. It finds the club from the
+  leader's linked trainer. Until the bot is in the club's server it shows how to add it; then the
+  bot's status and settings beside the applications the club has had.
 -->
 
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import { ApiError, fetchClub } from './api';
+  import { ApiError } from './api';
   import {
+    fetchMyClub,
+    fetchSettings,
     loginUrl,
     saveSettings,
-    fetchSettings,
     type Application,
     type Settings,
   } from './applications';
@@ -26,16 +27,17 @@
   import NavBar from './NavBar.svelte';
   import ReleaseNotes from './ReleaseNotes.svelte';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
-  import { clubApplicationsPath } from './route';
+  import { CLUB_APPLICATIONS_PATH, clubApplicationsPath } from './route';
   import SiteFooter from './SiteFooter.svelte';
 
   interface Props {
-    clubId: string;
+    /** The club the address names, if any; the leader's own club replaces it. */
+    clubId?: string | null;
     /** Whether the leader just added the bot. */
     linked?: boolean;
   }
 
-  let { clubId, linked = false }: Props = $props();
+  let { clubId: named = null, linked = false }: Props = $props();
 
   const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
   let readingReleases = $state(false);
@@ -47,10 +49,16 @@
     markReleaseSeen(storage);
   }
 
-  /** `setup`: the bot isn't in the club's server yet. */
+  /** `setup`: the bot isn't in the club's server yet, or the leader can't add it yet. */
   type Load = 'loading' | 'setup' | 'ready' | 'signed-out' | 'forbidden' | 'error';
   let load = $state<Load>('loading');
+  /** The club the signed-in leader leads, once known. */
+  let clubId = $state<string | null>(null);
   let clubName = $state<string | null>(null);
+  /** The signed-in person's linked trainer, if any. */
+  let trainer = $state<string | null>(null);
+  /** Whether that trainer leads a club. */
+  let leads = $state(false);
   let settings = $state<Settings | null>(null);
   let resumeFailed = $state(false);
 
@@ -67,34 +75,46 @@
     document.title = t('leader.title');
   });
 
+  function failed(reason: unknown): Load {
+    const code = reason instanceof ApiError ? reason.status : null;
+    return code === 404
+      ? 'setup'
+      : code === 401
+        ? 'signed-out'
+        : code === 403
+          ? 'forbidden'
+          : 'error';
+  }
+
+  async function open(signal: AbortSignal) {
+    try {
+      const mine = await fetchMyClub({ signal });
+      trainer = mine.trainer;
+      leads = mine.club?.leader === true;
+      if (!leads || mine.club === null) {
+        load = 'setup';
+        return;
+      }
+      clubId = mine.club.id;
+      clubName = mine.club.name;
+      if (named !== clubId) {
+        // The address follows the club the leader leads.
+        history.replaceState(history.state, '', clubApplicationsPath(clubId, linked));
+      }
+      settings = await fetchSettings(clubId, { signal });
+      load = 'ready';
+    } catch (reason) {
+      if (!signal.aborted) {
+        load = failed(reason);
+      }
+    }
+  }
+
   onMount(() => {
     const features = new AbortController();
     applyFeatures({ signal: features.signal });
     const loading = new AbortController();
-    fetchClub(clubId, null, { signal: loading.signal }).then(
-      (details) => (clubName = details.club.name),
-      () => undefined,
-    );
-    fetchSettings(clubId, { signal: loading.signal }).then(
-      (found) => {
-        settings = found;
-        load = 'ready';
-      },
-      (reason) => {
-        if (loading.signal.aborted) {
-          return;
-        }
-        const code = reason instanceof ApiError ? reason.status : null;
-        load =
-          code === 404
-            ? 'setup'
-            : code === 401
-              ? 'signed-out'
-              : code === 403
-                ? 'forbidden'
-                : 'error';
-      },
-    );
+    void open(loading.signal);
     return () => {
       features.abort();
       loading.abort();
@@ -103,6 +123,9 @@
 
   async function resume() {
     resumeFailed = false;
+    if (clubId === null) {
+      return;
+    }
     try {
       settings = await saveSettings(clubId, { open: true });
     } catch {
@@ -135,7 +158,10 @@
   {:else if load === 'signed-out'}
     <section class="card">
       <p>{t('leader.signIn')}</p>
-      <a class="provider-btn discord" href={loginUrl(clubApplicationsPath(clubId))}>
+      <a
+        class="provider-btn discord"
+        href={loginUrl(clubId === null ? CLUB_APPLICATIONS_PATH : clubApplicationsPath(clubId))}
+      >
         <span class="provider-icon"><DiscordIcon /></span>{t('applications.session.signIn')}
       </a>
     </section>
@@ -145,9 +171,9 @@
     <p class="card" role="alert">{t('leader.loadError')}</p>
   {:else if load === 'setup'}
     <div class="stack">
-      <BotSetup {clubId} {clubName} />
+      <BotSetup {clubId} {clubName} {trainer} {leads} />
     </div>
-  {:else if settings !== null}
+  {:else if settings !== null && clubId !== null}
     <div class="split">
       <aside class="stack">
         <BotPanel {clubId} {settings} onsaved={(next) => (settings = next)} onremoved={removed} />

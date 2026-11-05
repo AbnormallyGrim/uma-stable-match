@@ -40,7 +40,7 @@ const LIMIT: Duration = Duration::from_secs(5);
 pub const KEY_LIFETIME: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// Most trainer IDs one Discord user can have linked.
-pub const MAX_LINKED_TRAINERS: usize = 5;
+pub const MAX_LINKED_TRAINERS: usize = 1;
 
 /// How long a finished check's outcome is kept, for a page opened later to show.
 const OUTCOME_LIFETIME: u64 = 15 * 60;

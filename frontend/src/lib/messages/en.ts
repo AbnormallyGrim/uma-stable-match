@@ -386,6 +386,9 @@ export const en = {
 
   'applications.error.generic': 'Something went wrong while setting up the club applications flow.',
   'applications.error.wrong_server': 'This Discord server is not set up for this club.',
+  'applications.error.not_manager':
+    'You need Manage Server or Administrator in the club’s Discord server to add the bot.',
+  'applications.error.not_leader': 'Only the club’s leader can add the bot.',
   'applications.error.no_server': 'This club does not have an active Discord server linked yet.',
   'applications.error.denied': 'Discord sign-in was denied. Please try again.',
   'applications.error.invalid_state': 'The Discord sign-in is no longer valid. Please try again.',
@@ -437,8 +440,7 @@ export const en = {
   'leader.heading': 'Your club',
   'leader.loading': 'Loading…',
   'leader.signIn': 'Your sign-in has ended. Sign in with Discord to manage this club.',
-  'leader.forbidden':
-    'You need Manage Server or Administrator in this club’s Discord server to manage it.',
+  'leader.forbidden': 'Only the club’s leader can manage it. Check the trainer linked in Settings.',
   'leader.loadError': 'We couldn’t load this club. Try again in a moment.',
   'leader.linked': 'The bot was added to your server.',
   'leader.state.off': 'Not set up',
@@ -465,9 +467,16 @@ export const en = {
   'leader.steps.heading': 'Set it up',
   'leader.steps.done': 'Done',
   'leader.steps.todo': 'To do',
+  'leader.steps.account': 'Link your Umamusume account',
+  'leader.steps.accountHow':
+    'Link your trainer ID in Settings. That’s how we know which club you lead: only its leader can add the bot.',
+  'leader.steps.accountDone': ({ id }: { id: string }) => `Linked trainer ${id}.`,
+  'leader.steps.notLeader':
+    'This trainer isn’t the leader of a club. Only a club’s leader can add the bot.',
+  'leader.steps.openSettings': 'Open Settings',
   'leader.steps.invite': 'Put an invite to your Discord server in your club description',
   'leader.steps.inviteHow':
-    'In game, edit your club’s description and paste an invite link, such as discord.gg/yourcode. Any invite to the server works, and it can expire once you’re set up. We read descriptions once a day, so a new invite can take up to a day to show here.',
+    'This is how we know the server belongs to your club. In game, edit your club’s description and paste an invite link, such as discord.gg/yourcode. Any invite to the server works, and it can expire once you’re set up. uma.moe can take a while to show a new description.',
   'leader.steps.inviteFound': 'Found an invite to your server in your club description.',
   'leader.steps.inviteMissing':
     'We didn’t find a working invite to one server in your club description yet.',
@@ -578,11 +587,14 @@ export const en = {
   'settings.link.notFound': 'We couldn’t find that trainer on uma.moe.',
   'settings.link.already': 'That trainer is already linked to you.',
   'settings.link.tooMany': ({ n }: { n: number }) =>
-    `You can link up to ${n} trainers. Unlink one first.`,
+    n === 1
+      ? 'You can link one trainer at a time. Unlink it first.'
+      : `You can link up to ${n} trainers. Unlink one first.`,
+  'settings.link.full': 'You’ve linked a trainer. Unlink it to link a different one.',
   'settings.link.tooManyTries': 'Too many tries. Wait a while and try again.',
   'settings.link.expired': 'That key has expired. Start again for a new one.',
   'settings.link.error': 'Something went wrong. Try again in a moment.',
-  'settings.link.linkedHeading': 'Linked trainers',
+  'settings.link.linkedHeading': 'Linked trainer',
   'settings.link.none': 'No trainers linked yet.',
   'settings.link.unlink': 'Unlink',
   'settings.link.unlinkFor': ({ id }: { id: string }) => `Unlink trainer ${id}`,

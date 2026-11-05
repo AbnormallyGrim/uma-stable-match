@@ -60,6 +60,8 @@ pub struct TrainerSummary {
     pub name: String,
     /// The profile comment, if they have one.
     pub comment: Option<String>,
+    /// The ID of the club they're in, if any.
+    pub club: Option<u64>,
 }
 
 type Lookup = dyn Fn(u64) -> Pin<Box<dyn Future<Output = Result<Option<TrainerSummary>, LookupError>> + Send>>
@@ -108,6 +110,11 @@ impl TrainerLinks {
     /// Where links are kept.
     pub fn store(&self) -> &TrainerStore {
         &self.store
+    }
+
+    /// Where profiles come from.
+    pub(crate) fn trainers(&self) -> &TrainerLookup {
+        &self.trainers
     }
 
     /// Runs the background checks, looking for due ones every few seconds. Spawn it once per
@@ -243,6 +250,12 @@ async fn start(
     match links.store.linked(user).await {
         Ok(linked) if linked.contains(&trainer) => {
             return error(StatusCode::CONFLICT, "that trainer is already linked")
+        }
+        Ok(linked) if linked.len() >= MAX_LINKED_TRAINERS => {
+            return error(
+                StatusCode::FORBIDDEN,
+                "unlink your trainer before linking another",
+            )
         }
         Ok(_) => {}
         Err(err) => return store_unavailable(&err),

@@ -267,7 +267,6 @@ async fn deleting_the_account_needs_a_session_and_signs_out() {
     assert!(cleared
         .iter()
         .any(|c| c.starts_with("uma_session=;") && c.contains("Max-Age=0")));
-    assert!(cleared.iter().any(|c| c.starts_with("uma_guild=;")));
     // A DELETE, so a link or form on another site can't trigger it.
     for method in ["GET", "POST"] {
         let response = send(&app, method, ACCOUNT_PATH, Some(&session)).await;

@@ -7,15 +7,6 @@ fn categories() -> Vec<Named> {
     }]
 }
 
-fn roles(count: u64) -> Vec<NamedRole> {
-    (1..=count)
-        .map(|id| NamedRole {
-            id,
-            name: format!("role {id}"),
-        })
-        .collect()
-}
-
 fn patch(json: &str) -> Patch {
     serde_json::from_str(json).unwrap()
 }
@@ -37,17 +28,11 @@ fn unknown_fields_are_rejected() {
 
 #[test]
 fn builds_an_update_from_valid_settings() {
-    let update = checked(
-        &patch(r#"{"category":"10","leader_roles":["2","1","2"],"open":false}"#),
-        &categories(),
-        &roles(3),
-    )
-    .unwrap();
+    let update = checked(&patch(r#"{"category":"10","open":false}"#), &categories()).unwrap();
     assert_eq!(
         update,
         SettingsUpdate {
             category: Some(Some(10)),
-            leader_roles: Some(vec![2, 1]),
             auto_join: None,
             open: Some(false),
         }
@@ -55,29 +40,14 @@ fn builds_an_update_from_valid_settings() {
 }
 
 #[test]
-fn refuses_other_categories_roles_and_empty_changes() {
-    let check = |json| checked(&patch(json), &categories(), &roles(3));
+fn refuses_other_categories_and_empty_changes() {
+    let check = |json| checked(&patch(json), &categories());
     assert!(check(r#"{"category":"11"}"#).is_err());
     assert!(check(r#"{"category":"x"}"#).is_err());
-    assert!(check(r#"{"leader_roles":["4"]}"#).is_err());
-    assert!(check(r#"{"leader_roles":["x"]}"#).is_err());
     assert!(check("{}").is_err());
 }
 
 #[test]
-fn limits_the_number_of_leader_roles() {
-    let ids = |n: u64| {
-        let ids: Vec<String> = (1..=n).map(|id| format!("\"{id}\"")).collect();
-        format!("{{\"leader_roles\":[{}]}}", ids.join(","))
-    };
-    let all = roles(MAX_LEADER_ROLES as u64 + 1);
-    assert!(checked(&patch(&ids(MAX_LEADER_ROLES as u64)), &categories(), &all).is_ok());
-    assert_eq!(
-        checked(
-            &patch(&ids(MAX_LEADER_ROLES as u64 + 1)),
-            &categories(),
-            &all
-        ),
-        Err("too many leader roles")
-    );
+fn leader_roles_are_no_longer_a_setting() {
+    assert!(serde_json::from_str::<Patch>(r#"{"leader_roles":["1"]}"#).is_err());
 }

@@ -12,7 +12,7 @@ fn reads_a_full_record() {
     let record = parse_record(&fields(&[
         ("server", "10"),
         ("category", "20"),
-        ("leader_roles", "30,31,x"),
+        ("leader_roles", "30,31"),
         ("auto_join", "1"),
         ("open", "1"),
         ("problem", "missing permission"),
@@ -23,7 +23,6 @@ fn reads_a_full_record() {
         ClubRecord {
             guild_id: 10,
             category: Some(20),
-            leader_roles: vec![30, 31],
             auto_join: true,
             open: true,
             problem: Some("missing permission".into()),
@@ -40,7 +39,6 @@ fn a_record_needs_a_server_and_defaults_the_rest() {
         ClubRecord {
             guild_id: 10,
             category: None,
-            leader_roles: vec![],
             auto_join: false,
             open: false,
             problem: None,

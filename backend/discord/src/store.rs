@@ -1,7 +1,8 @@
 //! Which club is linked to which Discord server, kept in Redis.
 //!
-//! - `discord:club:{club_id}`: a hash with the club's `server`, `category`, `leader_roles`,
-//!   `auto_join`, `open` and `problem`.
+//! - `discord:club:{club_id}`: a hash with the club's `server`, `category`, `auto_join`, `open`
+//!   and `problem`. Clubs linked before leader roles were dropped may still hold `leader_roles`,
+//!   which nothing reads.
 //! - `discord:guild:{guild_id}`: a set of the club IDs linked to that server.
 //!
 //! Neither key has a TTL, which keeps them out of `volatile-lru` eviction.
@@ -84,8 +85,6 @@ pub struct ClubRecord {
     pub guild_id: u64,
     /// The category for the club's channels, if set.
     pub category: Option<u64>,
-    /// Roles whose members count as the club's leaders.
-    pub leader_roles: Vec<u64>,
     /// Whether applicants are added to the server automatically.
     pub auto_join: bool,
     /// Whether the club takes applications.
@@ -99,8 +98,6 @@ pub struct ClubRecord {
 pub struct SettingsUpdate {
     /// The category for the club's channels; `Some(None)` clears it.
     pub category: Option<Option<u64>>,
-    /// Roles whose members count as the club's leaders; empty clears them.
-    pub leader_roles: Option<Vec<u64>>,
     /// Whether applicants are added to the server automatically.
     pub auto_join: Option<bool>,
     /// Whether the club takes applications.
@@ -117,10 +114,6 @@ impl SettingsUpdate {
                 "category",
                 category.map(|id| id.to_string()).unwrap_or_default(),
             ));
-        }
-        if let Some(roles) = &self.leader_roles {
-            let roles: Vec<String> = roles.iter().map(u64::to_string).collect();
-            pairs.push(("leader_roles", roles.join(",")));
         }
         if let Some(on) = self.auto_join {
             pairs.push(("auto_join", flag(on)));
@@ -295,10 +288,6 @@ fn parse_record(fields: &HashMap<String, String>) -> Option<ClubRecord> {
     Some(ClubRecord {
         guild_id,
         category: fields.get("category").and_then(|id| id.parse().ok()),
-        leader_roles: fields
-            .get("leader_roles")
-            .map(|roles| roles.split(',').filter_map(|id| id.parse().ok()).collect())
-            .unwrap_or_default(),
         auto_join: fields.get("auto_join").is_some_and(|v| v == "1"),
         open: fields.get("open").is_some_and(|v| v == "1"),
         problem: fields.get("problem").filter(|v| !v.is_empty()).cloned(),

@@ -85,7 +85,7 @@ Discord sends a signed PING, and a badly signed request, when the URL is saved i
 
 **Session.** A signed cookie holds the Discord ID and a 12-hour expiry (`MAX_SESSION_AGE`), also `HttpOnly`, `Secure` and `SameSite=Lax`. Nothing is stored server-side, so signing out removes the cookie but can't revoke a copy of it before it expires. The signed values carry a purpose, so a `state` can't be used as a session, and neither can the human check's tokens that share the key. `Secure` is left off only when `PUBLIC_URL` is `http://`, for local development.
 
-**What's kept.** The access token is used for one `GET /users/@me` inside the callback request and then dropped; only the ID is kept, inside the session cookie. The name `GET /api/v1/applications/me` gives is looked up as the bot (`GET /users/{id}`) and held in memory for 10 minutes (`NAME_TTL`), never in the cookie or Redis; deleting the account drops it. Nothing from Discord is logged: a failed sign-in logs Discord's error message, not the user. Results are counted in `discord_sign_ins_total`, labelled by `result` (`success`, `invalid_state`, `denied`, `discord_error`, or for opting a club in `no_server`, `wrong_server` and `unavailable`).
+**What's kept.** The access token is used for one `GET /users/@me` inside the callback request and then dropped; only the ID is kept, inside the session cookie. The name `GET /api/v1/applications/me` gives is looked up as the bot (`GET /users/{id}`) and held in memory for 10 minutes (`NAME_TTL`), never in the cookie or Redis; deleting the account drops it. Nothing from Discord is logged: a failed sign-in logs Discord's error message, not the user. Results are counted in `discord_sign_ins_total`, labelled by `result` (`success`, `invalid_state`, `denied`, `discord_error`, or for opting a club in `no_server`, `wrong_server`, `not_manager`, `not_leader` and `unavailable`).
 
 ## Finding a club's server
 
@@ -104,14 +104,14 @@ These are only guesses. A code is an invite once Discord resolves it: `resolve_i
 
 | Key | Holds |
 |---|---|
-| `discord:club:{club_id}` | A hash: `server`, `category`, `leader_roles` (comma-separated), `auto_join` and `open` (`1` or absent), and `problem` |
+| `discord:club:{club_id}` | A hash: `server`, `category`, `auto_join` and `open` (`1` or absent), and `problem`. Clubs linked before leader roles were dropped may still hold `leader_roles`, which nothing reads |
 | `discord:guild:{guild_id}` | A set of the IDs of the clubs linked to that server |
 
 Many clubs can share a server, and a club is linked to one server at a time:
 
-- `link(club_id, server_id)` links a club. Linking it to another server moves it: it leaves the old server's set and loses its `category`, `leader_roles` and `problem`, which name things on the old one, and keeps its `auto_join` and `open` choices. It returns the `Departure` (server and clubs still linked there) if the club moved.
+- `link(club_id, server_id)` links a club. Linking it to another server moves it: it leaves the old server's set and loses its `category` and `problem`, which name things on the old one, and keeps its `auto_join` and `open` choices. It returns the `Departure` (server and clubs still linked there) if the club moved.
 - A new link starts open and with auto-join on (`open` and `auto_join` are set only if the club has none, so a moved club keeps its choices).
-- `update(club_id, server_id, &SettingsUpdate)` changes the category, leader roles, auto-join or open fields, and only while the club is still linked to `server_id`, so a club that moved meanwhile isn't changed. It returns whether it did.
+- `update(club_id, server_id, &SettingsUpdate)` changes the category, auto-join or open fields, and only while the club is still linked to `server_id`, so a club that moved meanwhile isn't changed. It returns whether it did.
 - `takes_applications(club_ids)` says for each club whether it is linked, open and has no setup problem, in one round trip. The server adds the club's own join style and spots to decide the `applications` badge.
 - `unlink(club_id)` deletes the club's hash and takes it out of its server's set, returning the `Departure` if it was linked. A `remaining` of 0 means no club needs the bot on that server any more.
 - `club(club_id)` reads the `ClubRecord`, and `clubs_on(server_id)` lists a server's clubs, lowest ID first.
@@ -120,85 +120,80 @@ Each of `link` and `unlink` is one Lua script, so a crash can't leave a club in 
 
 ## Opting a club in
 
-A leader opts a club in by showing they control the Discord server the club points to. Two things are checked, and Discord vouches for both:
+Only a club's leader can add the bot. Four things are checked:
 
-- **The club points to the server:** its description has a working invite to it (see [Finding a club's server](#finding-a-clubs-server)).
-- **The person controls the server:** they add the bot to that same server, which Discord only allows with Manage Server or Administrator.
+- **The person leads the club:** the trainer ID they [linked](#linking-a-trainer) is the club's leader in the game. See [Leader access](#leader-access).
+- **The club points to the server:** its description has a working invite to exactly one server (see [Finding a club's server](#finding-a-clubs-server)). Only `discord.gg/`, `discord.com/invite/` and `discordapp.com/invite/` links and bare codes after the word "discord" count, and each code is checked with Discord, so a link to any other site, an expired invite or one that leads to no server never counts.
+- **The person manages the server:** Discord only lets someone with Manage Server or Administrator add a bot, and the bot checks it again before linking.
+- **The bot went to that server:** Discord's token response names the server it was added to.
 
-`GET /api/v1/discord/opt-in?club=ID&next=/path` starts it. It needs a session (sign in first), so a visitor can't make the server call Discord for nothing. It answers:
+Many clubs can share a server; each club's leader adds it for their own club.
+
+`GET /api/v1/discord/opt-in?club=ID&next=/path` starts it. It needs a session (sign in first), so a visitor can't make the server call Discord for nothing. The leader is checked before the invite, so someone else learns nothing about it. It answers:
 
 | Status | When |
 |---|---|
 | 401 | Not signed in |
 | 400 | `club` isn't a club ID |
+| 403 | No trainer linked, or the linked trainer doesn't lead the club |
 | 404 | No such club |
 | 422 | The description has no working invite, or invites to more than one server |
 | 502 | The club or Discord couldn't be reached; try again |
 | 307 | To Discord's add-bot screen (`scope=bot identify`) with `guild_id` set and the server picker locked |
 
-The club, the expected server and the signed-in user go inside the signed `state`, so editing the callback's query string can't change them. `permissions` is `BOT_PERMISSIONS`: View Channels, Manage Channels, Manage Roles, Send Messages, Embed Links, Read Message History and Create Instant Invite. No `guilds` scope is asked for: adding the bot already proves the person's rights, and their server list isn't needed.
+The club, the expected server and the signed-in user go inside the signed `state`, so editing the callback's query string can't change them. `permissions` is `BOT_PERMISSIONS`: View Channels, Manage Channels, Manage Roles, Send Messages, Embed Links, Read Message History and Create Instant Invite. No `guilds` scope is asked for: the person's server list isn't needed.
 
 The callback never reads the redirect's own `guild_id` or `permissions` parameters. It exchanges the code, and Discord's token response says which server the bot was actually added to:
 
-- **Same server as the invite's, and the same person who started it:** the club is linked (`ClubStore::link`) and the visitor goes to `next`. If the club was linked to another server, it moves; when no club is left on the old one, the bot leaves it.
-- **Another server:** nothing is linked (403) and the bot leaves that server, unless a club is linked to it.
+- **Same server as the invite's, the same person who started it, who manages it and still leads the club:** the club is linked (`ClubStore::link`) and the visitor goes to `next`. If the club was linked to another server, it moves; when no club is left on the old one, the bot leaves it. Managing the server is checked with `GET /guilds/{id}` (the owner and the roles' permissions) and `GET /guilds/{id}/members/{user}` (the person's roles), combining `@everyone`'s permissions and the person's roles.
+- **Another server, or a person who doesn't manage it or no longer leads the club:** nothing is linked (403) and the bot leaves that server, unless a club is linked to it.
 - **No server** (the bot wasn't added) **or a different person:** nothing is linked (400).
 
-Opting in needs the app set up with `Discord::with_opt_in(OptIn::new(store, clubs))`. `ClubLookup` is how clubs are found, since this crate doesn't know where they come from; it answers `Ok(None)` for a club that doesn't exist. Without it, the route isn't served.
+Opting in needs the app set up with `Discord::with_opt_in(OptIn::new(store, clubs))` and `Discord::with_trainer_links`. `ClubLookup` is how clubs are found, since this crate doesn't know where they come from; it answers `Ok(None)` for a club that doesn't exist, and the server reads the club fresh from uma.moe each time. Without both, the routes aren't served.
 
-## Unlinking a club
+## Leader access
 
-`DELETE /api/v1/discord/clubs/{club}` (`UNLINK_PATH`) takes a club off its server, deleting everything kept about it. It needs a session, and the person must have the rights that let them add the bot: they own the server or have Administrator or Manage Server there. The bot checks this itself with two calls, `GET /guilds/{id}` (the owner and the roles' permissions) and `GET /guilds/{id}/members/{user}` (the person's roles), and combines the permissions of `@everyone` and the person's roles.
+Everything about a linked club, from its settings to unlinking it, is for its leader alone. On every call, the club is read fresh (`ClubLookup`) and its leader's trainer ID must be one the signed-in person has linked, so a leader who hands the club over loses access at once and the new leader gains it. Managing the club's Discord server isn't enough, and isn't needed after the bot is in.
 
 | Status | When |
 |---|---|
-| 204 | The club is unlinked |
 | 401 | Not signed in |
 | 400 | `club` isn't a club ID |
-| 404 | The club isn't linked to a server |
-| 403 | The person isn't a member with those rights, or the bot can't see the server any more, so nothing proves their rights |
-| 502 | Discord couldn't be reached to check; try again |
+| 403 | No trainer linked, or the linked trainer doesn't lead the club |
+| 404 | No such club, or it isn't linked to a server |
+| 502 | The club couldn't be looked up; try again |
 | 503 | The saved links couldn't be reached |
 
-It is a `DELETE`, which a browser doesn't send across sites with the session cookie. When the last club on a server is unlinked the bot leaves it; while another club is linked there the bot stays.
+`GET /api/v1/discord/my-club` (`MY_CLUB_PATH`) says where the signed-in person stands, so the page can find their club without being told it:
 
-A club whose server has removed the bot can't prove anyone's rights, so it can't be unlinked this way. Opting the club in again, to the same or another server, replaces the link.
+```json
+{ "trainer": "100000001", "club": { "id": "900001", "name": "Example Club", "leader": true } }
+```
+
+`trainer` is their linked trainer (`null` with none), and `club` the club it's in, from its profile (`null` with none), with whether it leads it. It's never cached. Someone who linked several trainers before only one was allowed gets the first that leads a club. It needs a session (401), and a 502 means uma.moe couldn't be reached.
+
+## Unlinking a club
+
+`DELETE /api/v1/discord/clubs/{club}` (`UNLINK_PATH`) takes a club off its server, deleting everything kept about it. It needs the club's leader (see [Leader access](#leader-access)), and answers 204 once it's unlinked. Discord isn't asked, so a club whose server removed the bot can still be unlinked.
+
+It is a `DELETE`, which a browser doesn't send across sites with the session cookie. When the last club on a server is unlinked the bot leaves it; while another club is linked there the bot stays. Opting the club in again, to the same or another server, replaces the link.
 
 ## Club settings
 
-`GET` and `PATCH /api/v1/discord/clubs/{club}/settings` (`SETTINGS_PATH`) read and change a club's settings. Both need a session and the same rights as [unlinking](#unlinking-a-club): the person owns the server or has Administrator or Manage Server there, checked with Discord on every call (the server's roles and the person's roles, with no copy kept), so losing the rights ends access at once. Someone without them gets 403 and can neither read nor change anything.
+`GET` and `PATCH /api/v1/discord/clubs/{club}/settings` (`SETTINGS_PATH`) read and change a club's settings. Both need the club's leader (see [Leader access](#leader-access)).
 
-`GET` answers with the settings and the lists to choose from. IDs are strings, as Discord's are larger than JSON numbers can hold safely:
+`GET` answers with the settings and the categories to choose from. IDs are strings, as Discord's are larger than JSON numbers can hold safely:
 
 | Field | Meaning |
 |---|---|
 | `guild_id` | The linked server |
 | `category` | The category for the club's ticket channels, or `null` |
-| `leader_roles` | Roles whose members count as the club's leaders |
 | `auto_join` | Whether applicants are added to the server automatically |
 | `open` | Whether the club takes applications (`false` is paused) |
 | `problem` | The club's setup problem, if any; it can't be changed here |
 | `categories` | The server's categories, `{id, name}`, to choose the ticket category from |
-| `roles` | The server's roles except `@everyone`, `{id, name}`, to choose the leader roles from |
 
-`PATCH` takes a JSON object with any of `category` (an ID, or `null` to clear), `leader_roles` (a list of IDs, duplicates dropped, at most `MAX_LEADER_ROLES`, 25), `auto_join` and `open`. Fields left out stay as they are. The category must be one of the server's categories and the roles must be the server's roles; otherwise, an unknown field, a wrong type, or no field at all gets 400 and nothing changes. It answers with the new settings, as `GET` does. A 409 means the club moved to another server or was unlinked while the change was made.
-
-## Leader access
-
-What a person can do with a club depends on what they are in the club's server, checked with Discord on every call (the server's roles and the person's roles, with nothing kept), so losing a role ends access at once:
-
-| Access | Who | Can |
-|---|---|---|
-| `manage` | Owns the server, or has Administrator or Manage Server there | Everything for every club on the server: settings, unlinking, and seeing applications |
-| `view` | Holds one of the club's leader roles | See that club's applications. Nothing else, and not the clubs whose leader roles they don't hold |
-
-Settings and unlinking still need `manage`; `view` is for reading what the club has received.
-
-`GET /api/v1/discord/clubs/{club}` (`UNLINK_PATH`, the same path `DELETE` unlinks from) answers `{"club": "…", "guild_id": "…", "access": "manage"}` (or `"view"`) for the signed-in person, and sets a cookie that remembers the club's server. A person with neither gets 403, and the other statuses are those of [unlinking](#unlinking-a-club): 401, 400, 404 for a club that isn't linked, 502 and 503. A server the bot can't see proves no rights, so it's a 403 as well.
-
-`GET /api/v1/discord/clubs` (`CLUBS_PATH`) lists the clubs on the remembered server that the person can see: `{"guild_id": "…", "clubs": [{"id": "…", "access": "view"}]}`, lowest club ID first. With no remembered server, or none that is theirs, it's `{"guild_id": null, "clubs": []}`.
-
-**The remembered server.** It's a signed `HttpOnly`, `Secure`, `SameSite=Lax` cookie, `uma_guild`, holding the server's ID and the person's Discord ID, and lasting `MAX_HINT_AGE` (30 days), so it survives signing in again. It only says where to look: the list checks the person's rights with Discord again, and the cookie is no use to anyone else signed in on the same browser or without the signing key. Signing out clears it. A person who is a leader on two servers sees the one they last opened a club of.
+`PATCH` takes a JSON object with any of `category` (an ID, or `null` to clear), `auto_join` and `open`. Fields left out stay as they are. The category must be one of the server's categories; otherwise, an unknown field, a wrong type, or no field at all gets 400 and nothing changes. It answers with the new settings, as `GET` does. A 409 means the club moved to another server or was unlinked while the change was made.
 
 ## Linking a trainer
 
@@ -221,7 +216,7 @@ The list answers:
 ```json
 {
   "linked": [{ "id": "100000000001", "name": "Example Trainer" }],
-  "max": 5,
+  "max": 1,
   "pending": [
     {
       "trainer": "100000000002",
@@ -243,17 +238,17 @@ The list answers:
 | 202 | Not found yet, or uma.moe couldn't be reached: `{"checking": true, "seconds_left": 300}`. The server keeps looking (see below). Asking again while it runs gives the same answer without looking again |
 | 400 | `trainer` isn't a trainer ID |
 | 401 | Not signed in |
-| 403 | The person already has `MAX_LINKED_TRAINERS` (5) IDs linked; nothing changes, so no one loses their link to a refused claim |
+| 403 | The person already has `MAX_LINKED_TRAINERS` (1) ID linked; nothing changes, so no one loses their link to a refused claim |
 | 404 | uma.moe doesn't know the trainer |
 | 409 | No key is pending (ask for one first, or it expired); uma.moe isn't called |
 | 429 | Too many tries; `Retry-After` says how many seconds to wait. At most 10 checks and 20 keys an hour per person, and a refused check never reaches uma.moe. A check with its retries counts once |
 | 503 | The saved links couldn't be reached |
 
-Asking for a key for an ID the person already owns is a 409 as well.
+Asking for a key for an ID the person already owns is a 409 as well, and asking for one while they have a trainer linked is a 403: they unlink it first.
 
 **Background checks.** When the first look misses, the check keeps going on the server: it looks again every minute (`CHECK_EVERY`) until 5 minutes (`CHECK_FOR`) have passed, six looks in all. Its state is in Redis, so closing or reloading the page doesn't stop it, and the list shows it to a page opened later. `TrainerLinks::run_checks` runs them: the server spawns it once, and every 5 seconds it claims the checks that are due from a sorted set scored by when to look next. Claiming moves a check a minute on first, so several servers sharing Redis never look at once, and checks left by a restart are picked up when the server starts again. A check ends when it links, when the key is forgotten or expires, when uma.moe doesn't know the trainer, when the person has no room, or after the last look.
 
-**Owners.** A trainer ID has one owner at a time. Proving it again replaces the old owner, since the comment shows who controls the account now. A person can own several IDs, up to the limit above.
+**Owners.** A trainer ID has one owner at a time. Proving it again replaces the old owner, since the comment shows who controls the account now. A person can own one ID at a time, which is how a club's leader is found.
 
 **What's kept.** Redis never holds a Discord ID, only a keyed hash of it (`KeySecret`, the server's `REDIS_KEY_SECRET`). The trainer ID's owner and the person's set of IDs have no TTL, so eviction can't remove them; they stay until the person unlinks or deletes their account, and so do the trainers' names, kept when they link. The pending key, the check and the attempt counters expire.
 
