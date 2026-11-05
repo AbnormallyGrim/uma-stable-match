@@ -16,7 +16,7 @@ use serde::Deserialize;
 
 use crate::auth::{begin, error, safe_next, send_to_discord, Failure, Flow, Target};
 use crate::bot::Discord;
-use crate::guild_access::manages;
+use crate::guild_access::{manages, missing_for_bot};
 use crate::invites::servers_in_description;
 use crate::leaders::{leadership, led_club, managed_club, Leadership, Unchecked};
 use crate::oauth::Authorized;
@@ -216,7 +216,7 @@ pub(crate) fn store_unavailable(err: &dyn std::fmt::Display) -> Response {
 
 /// Finishes an opt-in from the callback. Links the club only when the same person who started it
 /// approved, the server in Discord's token response is the one the club's invite points to, they
-/// manage that server and they still lead the club.
+/// manage that server, they still lead the club and the bot kept every permission it asked for.
 pub(crate) async fn install(
     discord: &Discord,
     target: Target,
@@ -285,6 +285,32 @@ pub(crate) async fn install(
                 "unavailable",
                 StatusCode::SERVICE_UNAVAILABLE,
                 "couldn't check the club's leader; try again",
+            ));
+        }
+    }
+    match missing_for_bot(
+        discord.rest(),
+        target.guild,
+        discord.config().app_id.get(),
+        BOT_PERMISSIONS,
+    )
+    .await
+    {
+        Ok(0) => {}
+        Ok(_) => {
+            leave_unless_linked(discord, target.guild).await;
+            return Err(Failure::new(
+                "missing_permissions",
+                StatusCode::BAD_REQUEST,
+                "the bot was added without every permission it needs; start again and leave them all ticked",
+            ));
+        }
+        Err(err) => {
+            tracing::warn!(error = %err, "could not check the bot's permissions on a Discord server");
+            return Err(Failure::new(
+                "unavailable",
+                StatusCode::BAD_GATEWAY,
+                "couldn't check the bot's permissions on the server; try again",
             ));
         }
     }

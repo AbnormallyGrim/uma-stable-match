@@ -52,3 +52,18 @@ fn permissions_combine_across_roles_and_junk_is_ignored() {
     assert!(has_manage(&guild, 10, 2, &member(&["20", "21", "22"])));
     assert!(!has_manage(&guild, 10, 2, &member(&["20", "21"])));
 }
+
+#[test]
+fn the_bot_is_missing_what_its_roles_dont_grant() {
+    let guild = guild(&[("10", "1024"), ("20", "16"), ("30", "2048")]);
+    // View Channels from `@everyone`, Manage Channels from its role; Send Messages isn't its.
+    let wanted = 1024 | 16 | 2048;
+    assert_eq!(missing(&guild, 10, &member(&["20"]), wanted), 2048);
+    assert_eq!(missing(&guild, 10, &member(&["20", "30"]), wanted), 0);
+}
+
+#[test]
+fn administrator_leaves_the_bot_missing_nothing() {
+    let guild = guild(&[("10", "0"), ("20", "8")]);
+    assert_eq!(missing(&guild, 10, &member(&["20"]), 1024 | 16), 0);
+}
