@@ -13,8 +13,8 @@ primary_region = "iad"
 # So are the human check's keys, TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY and TOKEN_SIGNING_KEY.
 # Traces are on when the OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_EXPORTER_OTLP_HEADERS secrets are set.
 # HOST, PORT and FRONTEND_DIR come from the Dockerfile.
-# Errors, logs and traces go to Sentry. The DSN only lets a sender report events, so it isn't a
-# secret. The deploy workflow sets SENTRY_RELEASE to the commit.
+# Errors, logs and traces go to Sentry. The DSN is public: it lets a sender report events. The
+# deploy workflow sets SENTRY_RELEASE to the commit.
 [env]
   SENTRY_DSN = "https://652bee55f5c797d9e5c2dfc65e4d9cc7@o4512370149097472.ingest.us.sentry.io/4512370231017472"
   SENTRY_ENVIRONMENT = "production"

@@ -23,8 +23,8 @@ impl Applications {
 }
 
 /// Sets `applications` to `"discord"` on the clubs that take applications through Discord: linked,
-/// open, joinable (not closed or full) and with no setup problem. Without Discord, or if the links
-/// can't be read, none are marked, as a missing badge is better than a wrong one.
+/// open, joinable and with no setup problem. Marks none when Discord is off or the links can't be
+/// read.
 pub(crate) async fn mark(
     applications: &Option<Extension<Applications>>,
     clubs: impl IntoIterator<Item = &mut ClubInfo>,

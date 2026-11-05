@@ -1,7 +1,7 @@
 const config = window.UMA_STABLE_MATCH_CONFIG ?? {};
 
-// Feature flag: whether the club applications page (/privacy/) and its link in the navbar are shown.
-// While it is off the link stays hidden and the page sends visitors to the home page. To turn it on,
+// Feature flag: whether the club applications privacy page (/privacy/) and its navbar link are
+// shown. While it is off, the page sends visitors to the home page. To turn it on,
 // set it to true, remove the noindex tag from privacy/index.html, and add /privacy/ back to
 // sitemap.xml and index.md.
 const APPLICATIONS_ENABLED = config.applicationsEnabled ?? false;
@@ -59,7 +59,7 @@ if (location.hostname === 'site.localhost') {
     const JAPANESE_ENABLED = config.japaneseEnabled ?? false;
 
     const key = 'uma-stable-match:language';
-    // Shared with app.umastable.com, whose local storage this page can't read.
+    // A cookie, so app.umastable.com shares the choice.
     const cookie = 'uma-stable-match-language';
     const ja = {
         'meta.title': 'Uma Stable Match: ウマ娘 サークル検索・サークルマッチ',

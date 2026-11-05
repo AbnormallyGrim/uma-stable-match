@@ -4,15 +4,15 @@
 use std::time::{Duration, SystemTime};
 
 use axum::extract::{Path, State};
-use axum::http::header::{CACHE_CONTROL, SET_COOKIE};
+use axum::http::header::SET_COOKIE;
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
-use axum::response::{IntoResponse, Response};
+use axum::response::Response;
 use axum::routing::get;
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::auth::{cookie_values, error, session_user, set_cookie};
+use crate::auth::{cookie_values, error, private, session_user, set_cookie};
 use crate::bot::Discord;
 use crate::config::DiscordConfig;
 use crate::guild_access::rights;
@@ -29,11 +29,11 @@ pub const MAX_HINT_AGE: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 const HINT_PURPOSE: &str = "guild";
 const HINT_COOKIE: &str = "uma_guild";
 
-/// The server a person last had access to a club on. It only says where to look: every list
-/// checks the person's rights with Discord again.
+/// The server a person last had access to a club on. It says where to look; every list checks
+/// the person's rights with Discord.
 #[derive(Serialize, Deserialize)]
 struct Hint {
-    /// The person it was made for, so it can't be used by someone else on the same browser.
+    /// The person it was made for. Only that person's session can use it.
     u: u64,
     /// The server.
     g: u64,
@@ -116,7 +116,7 @@ async fn list(State(discord): State<Discord>, headers: HeaderMap) -> Response {
     for id in ids {
         match opt_in.store().club(id).await {
             Ok(Some(record)) => {
-                // A club that moved while this ran isn't on this server any more.
+                // Skips a club that moved to another server while this ran.
                 if record.guild_id != guild_id {
                     continue;
                 }
@@ -131,15 +131,6 @@ async fn list(State(discord): State<Discord>, headers: HeaderMap) -> Response {
     private(Json(
         json!({ "guild_id": guild_id.to_string(), "clubs": clubs }),
     ))
-}
-
-/// A response that must never be cached, as it holds a person's access.
-fn private(body: impl IntoResponse) -> Response {
-    let mut response = body.into_response();
-    response
-        .headers_mut()
-        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    response
 }
 
 /// The cookie that remembers `guild_id` as `user`'s server.

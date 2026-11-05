@@ -6,14 +6,14 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use axum::extract::{Path, State};
-use axum::http::header::{CACHE_CONTROL, RETRY_AFTER};
+use axum::http::header::RETRY_AFTER;
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use serde_json::json;
 
-use crate::auth::{error, session_user};
+use crate::auth::{error, private, session_user};
 use crate::bot::Discord;
 use crate::opt_in::{store_unavailable, LookupError};
 use crate::trainer_store::{Action, LinkOutcome, TrainerStore, MAX_LINKED_TRAINERS};
@@ -279,15 +279,6 @@ async fn limited(links: &TrainerLinks, user: u64, action: Action) -> Option<Resp
 
 fn count(result: &'static str) {
     metrics::counter!("discord_trainer_links_total", "result" => result).increment(1);
-}
-
-/// A response that must never be cached, as it holds a key or a user's links.
-fn private(body: impl IntoResponse) -> Response {
-    let mut response = body.into_response();
-    response
-        .headers_mut()
-        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    response
 }
 
 /// The trainer ID in `text`: 9 to 12 digits.

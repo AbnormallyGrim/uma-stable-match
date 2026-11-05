@@ -1,5 +1,4 @@
-//! Signed, expiring values for the sign-in `state` and the session. Nothing is stored
-//! server-side: the signature is the proof.
+//! Signed, expiring values for the sign-in `state` and the session, verified by their signature.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -25,7 +24,7 @@ pub(crate) fn seconds(time: SystemTime) -> u64 {
 }
 
 /// `value` as `<payload>.<signature>`, valid until `expires` (Unix seconds). `purpose` is signed
-/// too, so a value made for one use is rejected for another, and for the human check's tokens.
+/// too, which ties each value to one use, apart from the human check's tokens.
 pub(crate) fn seal<T: Serialize>(
     key: &SigningKey,
     purpose: &str,

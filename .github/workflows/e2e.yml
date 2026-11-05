@@ -1,7 +1,7 @@
 name: End-to-end test
 
-# Runs the end-to-end test after CI passes for a push to main. Merges don't deploy; the Deploy
-# workflow is run by hand.
+# Runs the end-to-end test after CI passes for a push to main. Deploys run by hand from the Deploy
+# workflow.
 on:
   workflow_run:
     workflows: [CI]
@@ -14,8 +14,8 @@ permissions: {}
 jobs:
   e2e:
     name: End-to-end test
-    # Only CI runs for pushes to this repository's main. Without the last two checks, a pull request
-    # from a fork's own main branch would match too.
+    # Matches CI runs for pushes to this repository's main. The event and repository checks exclude
+    # pull requests from a fork's main branch.
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
@@ -67,7 +67,7 @@ jobs:
           retention-days: 14
 
   # Comments on the merged pull request, and opens the e2e-failure issue or comments on the open
-  # one, so repeated failures don't pile up issues.
+  # one, so repeated failures share one issue.
   report:
     name: Report end-to-end failure
     needs: e2e

@@ -167,7 +167,7 @@ impl Client {
         self.get_as(path, path, query).await
     }
 
-    // `endpoint` names the call in traces, logs and metrics, so it must not hold an ID.
+    // `endpoint` names the call in traces, logs and metrics: a fixed route name with no IDs.
     async fn get_as<T, Q>(&self, endpoint: &str, path: &str, query: &Q) -> Result<T, Error>
     where
         T: DeserializeOwned,
