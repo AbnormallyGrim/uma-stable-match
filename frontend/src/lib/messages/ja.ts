@@ -133,7 +133,7 @@ export const ja: Catalog = {
   'form.trainerIdError': 'トレーナーIDを入力してください(9〜12桁の数字)。',
   'form.paceError': '1日のファン獲得数を百万単位で入力してください(例: 7.6)。',
 
-  'status.loading': '�������������������ークルを検索中…',
+  'status.loading': 'サークルを検索中…',
   'status.waitingTitle': 'サークルのデータを読み込み中です',
   'status.waitingBody': ({ wait }) =>
     `サーバーが初回のサークル取得を行っています(1分ほどかかります)。${wait}後に再試行します。`,
@@ -152,7 +152,7 @@ export const ja: Catalog = {
   'error.network.detail': '接続を確認して、もう一度お試しください。',
   'error.timeout.title': 'サーバーの応答に時間がかかっています',
   'error.invalidResponse.detail':
-    'サーバーから予期し���い���答���あ���ま���た���し���ら���し���からもう一度お試しください。',
+    'サーバーから予期しない応答がありました。しばらくしてからもう一度お試しください。',
   'error.humanCheck.title': '人間であることを確認できませんでした',
   'error.badSearch.title': '検索できませんでした',
   'error.trainerNotFound.title': 'トレーナーが見つかりません',
@@ -167,8 +167,7 @@ export const ja: Catalog = {
 
   'hint.discord': '「Discordあり」をオフにする。',
   'hint.playstyle': 'サークル方針を「指定なし」に戻す。',
-  'hint.closed':
-    '加���方法で���募集停���」を選���と、現���募集し���いない���ークルも表示されます。',
+  'hint.closed': '加入方法で「募集停止」を選ぶと、現在募集していないサークルも表示されます。',
   'hint.balance': 'バランスの強さを下げるか、バランス評価をオフにする。',
   'notice.filtered':
     '加入方法やサークル方針で絞り込んでいるため、いつもより獲得ファン数のペースが離れたサークルが上位に出ることがあります。',
@@ -183,8 +182,8 @@ export const ja: Catalog = {
   'results.topPicks': 'おすすめ',
   'results.allFull':
     '条件に合うサークルはすべて満員です。下の表には表示されていますが、加入できる枠はありません。',
-  'results.none': '条件に合うサークルが見つかりま���んでし���。',
-  'results.tryThese': '次���試してみて���ださい:',
+  'results.none': '条件に合うサークルが見つかりませんでした。',
+  'results.tryThese': '次を試してみてください:',
   'results.fullIncluded':
     '満員(30人中30人)のサークルは、加入できる枠がないため、おすすめには含まれず表のみに表示されます。',
   'results.fullExcluded':
@@ -197,9 +196,9 @@ export const ja: Catalog = {
     'サークルのティアは合計ファン数で決まり、上位メンバーの獲得数に大きく左右されます。このツールはサークルの典型的なメンバーを基準にするため、あなたが真ん中あたりに入れるサークルが選ばれます。上位ティアのサークルの典型的なメンバーよりあなたのペースがかなり低い場合は、1〜2ティア下のサークルが最適になることがあります。',
   'results.topN': ({ n }) => `上位${n}件`,
 
-  'summary.pace': 'あなた���ペース',
-  'summary.analysed': '調べたサークル���',
-  'summary.comfortable': 'ちょう���よいサークル',
+  'summary.pace': 'あなたのペース',
+  'summary.analysed': '調べたサークル数',
+  'summary.comfortable': 'ちょうどよいサークル',
   'summary.comfortableTitle': 'メンバーの上位25%〜60%あたりに入れるサークル',
   'summary.typical': '典型的な順位',
   'summary.typicalTitle': 'これらのサークルでのあなたの順位の中央値',
@@ -227,7 +226,7 @@ export const ja: Catalog = {
 
   'yourClub.heading': 'あなたのサークル',
   'yourClub.best': 'あなたのサークルは、どの検索結果よりもあなたに合っています。',
-  'yourClub.rank': ({ rank }) => `あ���たのサークルは検索結果${rank}位に入ります。`,
+  'yourClub.rank': ({ rank }) => `あなたのサークルは検索結果の${rank}位に入ります。`,
   'yourClub.below': ({ n }) => `あなたのサークルは上位${n}件より下になります。`,
   'yourClub.typical': ({ own, pace }) =>
     `典型的なメンバーの獲得数は${own}で、あなたのペースは${pace}です。`,
@@ -264,7 +263,7 @@ export const ja: Catalog = {
   'chart.labelDaily':
     '今月の各メンバーの1日のファン獲得数を、サークルの中央値とあなたの線と合わせて示す折れ線グラフです。矢印キーで日ごとの値を確認できます。',
   'chart.labelMonth':
-    '今月の各メンバーのファ���獲得数の累���を、サークルの中央値とあなたの線と合わせて示す折れ線グラフです。矢印キーで日ごとの値を確認できます。',
+    '今月の各メンバーのファン獲得数の累計を、サークルの中央値とあなたの線と合わせて示す折れ線グラフです。矢印キーで日ごとの値を確認できます。',
   'chart.members': 'メンバー',
   'chart.median': 'サークルの中央値',
   'chart.you': 'あなた',
@@ -285,7 +284,7 @@ export const ja: Catalog = {
     '「トレーナーID」を選ぶとペースを自動で調べます。「1日の獲得ファン数」を選ぶと自分で入力できます。',
   'tour.field.title': '情報を入力',
   'tour.field.body':
-    'トレーナーIDは、ゲーム内の「メニュー → プロフィール → トレーナーカー��」に表示される9〜12桁の数字です。ペースで検索する場合は、1日のファン獲得数を百万単位で入力してください(例: 7.6)。',
+    'トレーナーIDは、ゲーム内の「メニュー → プロフィール → トレーナーカード」に表示される9〜12桁の数字です。ペースで検索する場合は、1日のファン獲得数を百万単位で入力してください(例: 7.6)。',
   'tour.balance.title': 'バランス評価',
   'tour.balance.body':
     'オンにすると、一部のメンバーだけが支えているサークルの順位が下がります。スライダーで強さを調整できます。',
@@ -297,7 +296,7 @@ export const ja: Catalog = {
     '検索を実行します。検索条件はページのアドレスに保存されるので、ブックマークや共有ができます。',
   'tour.results.title': '結果の見方',
   'tour.results.body':
-    '概要、おすすめをカードで、上位の結果を検索・並べ替えできる表で表示します。トレーナーIDで検索すると、今のサークルとの比較も表示されます。サークル名を選ぶとuma.moeのページが開き、サークルマスターに連絡���きます。',
+    '概要、おすすめをカードで、上位の結果を検索・並べ替えできる表で表示します。トレーナーIDで検索すると、今のサークルとの比較も表示されます。サークル名を選ぶとuma.moeのページが開き、サークルマスターに連絡できます。',
   'tour.howTo.title': '使い方',
   'tour.howTo.body': 'トレーナーIDやペースの調べ方など、手順はここでいつでも確認できます。',
   'tour.theme.title': 'ライト / ダーク',
@@ -311,11 +310,11 @@ export const ja: Catalog = {
   'howTo.step2':
     '<strong>IDで検索する。</strong><strong>トレーナーID</strong>に入力して<strong>サークルを探す</strong>を押します。<strong>この端末にトレーナーIDを記憶する</strong>にチェックすると、次回から自動で入力されます。',
   'howTo.step3': ({ rankings }) =>
-    `<strong>ペースで検索する。</strong><strong>1日の獲得ファン数</strong>に切り替えて、1日に獲得するファン数を百万単位で入力します(<strong>7.6</strong>なら1日760万)。調べ���には、<a href="${rankings}" target="_blank" rel="noopener">uma.moeのラン���ング</a>でトレーナー名またはIDを検索し、1日平均のファン獲得数を確認してください。`,
+    `<strong>ペースで検索する。</strong><strong>1日の獲得ファン数</strong>に切り替えて、1日に獲得するファン数を百万単位で入力します(<strong>7.6</strong>なら1日760万)。調べるには、<a href="${rankings}" target="_blank" rel="noopener">uma.moeのランキング</a>でトレーナー名またはIDを検索し、1日平均のファン獲得数を確認してください。`,
   'howTo.step4':
-    '<strong>必要に応じて調整する。</strong><strong>バランス評価</strong>は、一部のメンバーだけが支えているサークルの順位を下げます。<strong>満員のサークルも含める</strong>は、空きのないサークルを比���用に表へ追加します。<strong>加入方法</strong>(現在募集していないサークルなら<strong>募集停止</strong>など)や<strong>サークル方針</strong>を1つ選ぶと、そのサークルだけが表示されます。もう一度押すか<strong>指定なし</strong>を選ぶと元に戻ります���どちらも候補が少なくなるため、ペースの離れたサークルが上位に出ることがあります。<strong>Discordあり</strong>は、紹介文にDiscordの記載があるサークルに絞ります(あくまで目安です)。',
+    '<strong>必要に応じて調整する。</strong><strong>バランス評価</strong>は、一部のメンバーだけが支えているサークルの順位を下げます。<strong>満員のサークルも含める</strong>は、空きのないサークルを比較用に表へ追加します。<strong>加入方法</strong>(現在募集していないサークルなら<strong>募集停止</strong>など)や<strong>サークル方針</strong>を1つ選ぶと、そのサークルだけが表示されます。もう一度押すか<strong>指定なし</strong>を選ぶと元に戻ります。どちらも候補が少なくなるため、ペースの離れたサークルが上位に出ることがあります。<strong>Discordあり</strong>は、紹介文にDiscordの記載があるサークルに絞ります(あくまで目安です)。',
   'howTo.step5':
-    '<strong>サークルを選ぶ。</strong>まずは<strong>おすすめ</strong>から見てみましょう。メンバーの真ん中あたりに入れるサークルが上位に出ます。<strong>上位の結果</strong>では検索や並べ替えができます。サークル名を選ぶとuma.moeのページが開き、サ���クルマスターに連絡できます。',
+    '<strong>サークルを選ぶ。</strong>まずは<strong>おすすめ</strong>から見てみましょう。メンバーの真ん中あたりに入れるサークルが上位に出ます。<strong>上位の結果</strong>では検索や並べ替えができます。サークル名を選ぶとuma.moeのページが開き、サークルマスターに連絡できます。',
   'howTo.note':
     'ゲームのグローバル版(英語版)に対応しています。トレーナーIDが見つからない場合は、1日の獲得ファン数で検索してください。満員のサークルとあなた自身のサークルは結果に含まれません。自分のサークルとの比較は、トレーナーIDで検索すると表示されます。',
 
@@ -333,7 +332,7 @@ export const ja: Catalog = {
   'wishlist.poll.jpTrainers': '日本版のトレーナーとサークルの投票',
   'wishlist.aboutLabel': '投票について',
   'wishlist.about':
-    'これらの投票は<a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>が運営しており、Uma Stable Matchでは����ま��ん。あなたの投票はStrawPollが<a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">プライバシーポリシー</a>に基づいて保存・管理します。',
+    'これらの投票は<a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>が運営しており、Uma Stable Matchではありません。あなたの投票はStrawPollが<a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">プライバシーポリシー</a>に基づいて保存・管理します。',
 
   'club.applies': 'かんたん応募',
   'club.appliesTitle': 'Uma Stable Matchからこのサークルに直接応募できます',
@@ -347,7 +346,7 @@ export const ja: Catalog = {
     '<ul><li>サークルマスターはDiscordの設定とボットの状態を管理できます。</li><li>トレーナーは応募したサークルや進行状況を一覧で確認できます。</li></ul>',
   'applications.privacy': ({ href }: { href: string }) =>
     `Discordへのサインインは、サークル申請の管理のためだけに使われます。<a href="${href}">プライバシー情報</a>をご確認ください。`,
-  'applications.session.loading': 'Discordセッ�����ンを確認しています…',
+  'applications.session.loading': 'Discordセッションを確認しています…',
   'applications.session.signedOut':
     '以下から役割を選んでください。Discordでサインインしてサークルを管理できます。',
   'applications.session.signIn': 'Discordでサインイン',
@@ -369,7 +368,7 @@ export const ja: Catalog = {
   'applications.error.invalid_state':
     'Discordサインインの状態が無効になりました。もう一度お試しください。',
   'applications.error.discord_error':
-    'Discordが予期しないエラーを返しました。もう一度���しください。',
+    'Discordから予期しないエラーが返ってきました。もう一度お試しください。',
   'applications.error.unavailable':
     'サークル申請の設定は一時的に利用できません。しばらくしてからもう一度お試しください。',
 
@@ -378,7 +377,7 @@ export const ja: Catalog = {
     '<strong>14日ルール:</strong>月間報酬を受け取るには、その月にサークルへ14日以上所属している必要があります。移籍は月初に済ませましょう。',
 
   'footer.tip24':
-    '<strong>24時間のクールダウン:</strong>サークルを抜けると、24時間は別のサークルに加入できません。サークルマス���ーに除名してもらうとこの制限を避けられるという報告があります���',
+    '<strong>24時間のクールダウン:</strong>サークルを抜けると、24時間は別のサークルに加入できません。代わりにサークルマスターに除名してもらうことで、この制限を避ける人もいます。',
 
   'footer.tipLock':
     '<strong>月初のロック:</strong>毎月1日のUTC 10:00〜14:59(日本時間19:00〜23:59)は、サークルの脱退、加入申請、招待ができません。',
@@ -399,7 +398,7 @@ export const ja: Catalog = {
     'Uma Stable Matchは<strong>非公式の非営利ファンツール</strong>です。uma.moeおよび株式会社Cygamesとは提携しておらず、公認・後援も受けていません。',
 
   'footer.data':
-    'サークルとトレー��ーのデータは<a href="https://uma.moe" target="_blank" rel="noopener noreferrer">uma.moe</a>から取得しており、遅れや欠��がある場合があります。おすすめは判断の目安となる推定であり、特定の��レイヤーやサークルを評価するものではありません。',
+    'サークルとトレーナーのデータは<a href="https://uma.moe" target="_blank" rel="noopener noreferrer">uma.moe</a>から取得しており、遅れや欠けがある場合があります。おすすめは判断の目安となる推定であり、特定のプレイヤーやサークルを評価するものではありません。',
 
   'footer.trademark':
     '<em>ウマ娘 プリティーダービー</em>の名称、キャラクター、アートワーク、商標は株式会社Cygamesに帰属します。サークルのティアアイコンは© Cygames, Inc.のもので、Cygamesの<a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener noreferrer">二次創作ガイドライン</a>に沿って非営利で使用しています。',

@@ -1,6 +1,6 @@
 // ApplicationsPage component tests with a stubbed fetch. All data is made up.
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import ApplicationsPage from './ApplicationsPage.svelte';
