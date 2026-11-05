@@ -356,6 +356,8 @@ export const en = {
   'wishlist.aboutLabel': 'About these polls',
   'wishlist.about':
     'These polls are hosted by <a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>, not by Uma Stable Match. Your vote is stored and handled by StrawPoll under <a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">its privacy policy</a>.',
+  'club.quickApply': 'Quick Apply',
+  'club.quickApplyOff': "This club doesn't have quick applications enabled",
   'club.applies': 'Quick apply',
   'club.appliesTitle': 'You can apply to this club right from Uma Stable Match',
 
@@ -493,8 +495,6 @@ export const en = {
   'leader.status.inServer': 'The bot is in your server',
   'leader.status.problem': ({ problem }: { problem: string }) =>
     `Something needs fixing: ${problem}`,
-  'leader.status.category': ({ name }: { name: string }) => `Tickets go in ${name}`,
-  'leader.status.noCategory': 'No ticket category picked yet',
   'leader.status.open': 'Taking applications',
   'leader.status.paused': 'Applications are paused',
   'leader.settings.heading': 'Settings',
@@ -502,9 +502,6 @@ export const en = {
   'leader.settings.openHint': 'Off hides the Apply button for your club.',
   'leader.settings.autoJoin': 'Add applicants to the server',
   'leader.settings.autoJoinHint': 'Applicants join your server when they apply.',
-  'leader.settings.category': 'Ticket category',
-  'leader.settings.categoryHint': 'Where the bot makes a channel for each application.',
-  'leader.settings.categoryNone': 'Not set',
   'leader.settings.save': 'Save',
   'leader.settings.saving': 'Saving…',
   'leader.settings.saved': 'Saved.',

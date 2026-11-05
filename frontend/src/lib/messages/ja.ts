@@ -334,6 +334,8 @@ export const ja: Catalog = {
   'wishlist.about':
     'これらの投票は<a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>が運営しており、Uma Stable Matchではありません。あなたの投票はStrawPollが<a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">プライバシーポリシー</a>に基づいて保存・管理します。',
 
+  'club.quickApply': 'かんたん応募',
+  'club.quickApplyOff': 'このサークルはかんたん応募に対応していません',
   'club.applies': 'かんたん応募',
   'club.appliesTitle': 'Uma Stable Matchからこのサークルに直接応募できます',
 
@@ -484,8 +486,6 @@ export const ja: Catalog = {
   'leader.status.heading': 'Botの状態',
   'leader.status.inServer': 'Botはサーバーにいます',
   'leader.status.problem': ({ problem }: { problem: string }) => `修正が必要です: ${problem}`,
-  'leader.status.category': ({ name }: { name: string }) => `チケットは「${name}」に作成されます`,
-  'leader.status.noCategory': 'チケットカテゴリがまだ選ばれていません',
   'leader.status.open': '申請受付中',
   'leader.status.paused': '申請は一時停止中です',
   'leader.settings.heading': '設定',
@@ -493,9 +493,6 @@ export const ja: Catalog = {
   'leader.settings.openHint': 'オフにすると、このサークルの申請ボタンが非表示になります。',
   'leader.settings.autoJoin': '申請者をサーバーに追加する',
   'leader.settings.autoJoinHint': '申請者は申請時にサーバーへ参加します。',
-  'leader.settings.category': 'チケットカテゴリ',
-  'leader.settings.categoryHint': 'Botが申請ごとにチャンネルを作る場所です。',
-  'leader.settings.categoryNone': '未設定',
   'leader.settings.save': '保存',
   'leader.settings.saving': '保存中…',
   'leader.settings.saved': '保存しました。',
