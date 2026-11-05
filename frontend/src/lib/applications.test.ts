@@ -3,14 +3,20 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  checkTrainerLink,
+  deleteAccount,
+  discardVerificationKey,
+  fetchLinkedTrainers,
   fetchSettings,
   hasInvite,
   loginUrl,
   optInUrl,
   saveSettings,
   signedInUser,
+  requestVerificationKey,
   signOut,
   unlinkClub,
+  unlinkTrainer,
   type Settings,
 } from './applications';
 
@@ -59,9 +65,11 @@ describe('adding the bot', () => {
 });
 
 describe('signedInUser', () => {
-  it('gives the Discord ID, or null when signed out', async () => {
-    const ok = vi.fn(() => Promise.resolve(json({ discord_id: '42' })));
-    expect(await signedInUser({ fetch: ok })).toBe('42');
+  it('gives the Discord ID and name, or null when signed out', async () => {
+    const ok = vi.fn(() => Promise.resolve(json({ discord_id: '42', name: 'Made Up' })));
+    expect(await signedInUser({ fetch: ok })).toEqual({ discordId: '42', name: 'Made Up' });
+    const unnamed = vi.fn(() => Promise.resolve(json({ discord_id: '42', name: null })));
+    expect(await signedInUser({ fetch: unnamed })).toEqual({ discordId: '42', name: null });
     const out = vi.fn(() => Promise.resolve(json({ error: 'not signed in' }, 401)));
     expect(await signedInUser({ fetch: out })).toBeNull();
   });
@@ -111,5 +119,68 @@ describe('unlinkClub and signOut', () => {
       ['/api/v1/discord/clubs/7', 'DELETE'],
       ['/api/v1/auth/sign-out', 'POST'],
     ]);
+  });
+});
+
+describe('account', () => {
+  it('deletes the account with a DELETE', async () => {
+    const remove = vi.fn<typeof fetch>(() => Promise.resolve(new Response(null, { status: 204 })));
+    await deleteAccount({ fetch: remove });
+    expect(remove).toHaveBeenCalledWith(
+      '/api/v1/auth/account',
+      expect.objectContaining({ method: 'DELETE', credentials: 'same-origin' }),
+    );
+  });
+});
+
+describe('trainer links', () => {
+  it('lists, starts, checks and unlinks with the trainer ID in the path', async () => {
+    const calls: string[] = [];
+    const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+      calls.push(`${init?.method ?? 'GET'} ${String(input)}`);
+      if (String(input).endsWith('/verification')) {
+        return Promise.resolve(json({ key: 'uma-ABCDEFGH', expires_in: 86400 }));
+      }
+      if (String(input).endsWith('/link')) {
+        return Promise.resolve(json({ linked: true, name: 'Example Trainer' }));
+      }
+      if (init?.method === 'DELETE') {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      return Promise.resolve(json(list));
+    });
+    const list = {
+      linked: [{ id: '100000000001', name: 'Example Trainer' }],
+      max: 5,
+      pending: [],
+    };
+    expect(await fetchLinkedTrainers({ fetch })).toEqual(list);
+    expect(await requestVerificationKey('100000000002', { fetch })).toEqual({
+      key: 'uma-ABCDEFGH',
+      expires_in: 86400,
+    });
+    expect(await checkTrainerLink('100000000002', { fetch })).toEqual({
+      linked: true,
+      name: 'Example Trainer',
+    });
+    await discardVerificationKey('100000000002', { fetch });
+    await unlinkTrainer('100000000002', { fetch });
+    expect(calls).toEqual([
+      'GET /api/v1/discord/trainers',
+      'POST /api/v1/discord/trainers/100000000002/verification',
+      'POST /api/v1/discord/trainers/100000000002/link',
+      'DELETE /api/v1/discord/trainers/100000000002/verification',
+      'DELETE /api/v1/discord/trainers/100000000002',
+    ]);
+  });
+
+  it('gives a running check when the key is not in the comment yet', async () => {
+    const later = vi.fn<typeof fetch>(() =>
+      Promise.resolve(json({ checking: true, seconds_left: 300 }, 202)),
+    );
+    expect(await checkTrainerLink('100000000002', { fetch: later })).toEqual({
+      checking: true,
+      seconds_left: 300,
+    });
   });
 });

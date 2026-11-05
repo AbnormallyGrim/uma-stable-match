@@ -523,6 +523,66 @@ export const en = {
   'leader.details.submitted': ({ date }: { date: string }) => `Submitted ${date}`,
   'leader.details.openTicket': 'Open ticket in Discord',
   'leader.details.ticketGone': 'The ticket channel has been closed.',
+
+  'account.label': 'Account',
+  'account.signIn': 'Sign in',
+  'account.unnamed': 'Discord account',
+  'account.signedInAs': ({ name }: { name: string }) => `Signed in as ${name}`,
+  'account.settings': 'Settings',
+  'account.signOut': 'Sign Out',
+  'account.signOutError': 'We couldn’t sign you out. Try again in a moment.',
+
+  'settings.title': 'Settings · Uma Stable Match',
+  'settings.heading': 'Settings',
+  'settings.lede': 'Manage your Uma Stable Match account.',
+  'settings.link.heading': 'Link your umamusume account',
+  'settings.link.intro':
+    'Prove a trainer ID is yours by adding a short key to its profile comment in the game.',
+  'settings.link.label': 'Trainer ID',
+  'settings.link.hint': '9 to 12 digits, shown on your trainer profile.',
+  'settings.link.invalid': 'Enter a trainer ID of 9 to 12 digits.',
+  'settings.link.submit': 'Link Account',
+  'settings.link.keyHeading': ({ id }: { id: string }) =>
+    `Add this key to the profile comment of trainer ${id}`,
+  'settings.link.keySteps':
+    'In the game, open your trainer profile, edit your comment and add the key anywhere in it. Then select Check. uma.moe can take a while to show a new comment, and the key works for 24 hours.',
+  'settings.link.copy': 'Copy key',
+  'settings.link.copied': 'Copied',
+  'settings.link.check': 'Check',
+  'settings.link.checking': 'Checking…',
+  'settings.link.cancel': 'Cancel',
+  'settings.link.verifying': 'Verifying',
+  'settings.link.verifyingHint':
+    'We look for the key on uma.moe now and then every minute for 5 minutes. You can leave this page; it keeps going.',
+  'settings.link.missing':
+    'We couldn’t find the key in the comment after 5 minutes. Check it shows on uma.moe, then select Check again.',
+  'settings.link.linked': ({ name }: { name: string }) =>
+    `Linked ${name}. You can take the key out of your comment now.`,
+  'settings.link.notFound': 'We couldn’t find that trainer on uma.moe.',
+  'settings.link.already': 'That trainer is already linked to you.',
+  'settings.link.tooMany': ({ n }: { n: number }) =>
+    `You can link up to ${n} trainers. Unlink one first.`,
+  'settings.link.tooManyTries': 'Too many tries. Wait a while and try again.',
+  'settings.link.expired': 'That key has expired. Start again for a new one.',
+  'settings.link.error': 'Something went wrong. Try again in a moment.',
+  'settings.link.linkedHeading': 'Linked trainers',
+  'settings.link.none': 'No trainers linked yet.',
+  'settings.link.unlink': 'Unlink',
+  'settings.link.unlinkFor': ({ id }: { id: string }) => `Unlink trainer ${id}`,
+  'settings.link.loadError': 'We couldn’t load your linked trainers.',
+  'settings.link.unavailable': 'Linking trainers isn’t available right now.',
+  'settings.session.heading': 'Sign out',
+  'settings.session.text': 'Ends your session on this device.',
+  'settings.signOut': 'Sign Out',
+  'settings.delete.heading': 'Delete account',
+  'settings.delete.text':
+    'Removes your linked trainers and any keys waiting to be checked, then signs you out. Clubs you added the bot to keep it.',
+  'settings.delete.button': 'Delete Account',
+  'settings.delete.confirm':
+    'Delete your account? Your linked trainers are removed and you’re signed out. This can’t be undone.',
+  'settings.delete.yes': 'Delete',
+  'settings.delete.cancel': 'Cancel',
+  'settings.delete.error': 'We couldn’t delete your account right now. Try again in a moment.',
 };
 
 /** The messages every language provides. */

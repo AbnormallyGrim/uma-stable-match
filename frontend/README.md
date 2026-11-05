@@ -51,15 +51,18 @@ CI runs `check`, `lint`, `test` and `build` on Node 22 for every push to `main` 
 index.html                    Page shell
 public/theme-init.js          Applies the saved theme before the page renders
 public/favicon-32.png         Browser icon, with apple-touch-icon.png for home screens
-src/main.ts                   Mounts the search, the club page for a /club/ address, or a club applications page
+src/main.ts                   Mounts the search, the club page for a /club/ address, a club applications page or the settings page
 src/App.svelte                Root component: runs searches and keeps them in the URL
-src/lib/route.ts              Which page an address shows, and club, wishlist and club applications page addresses
+src/lib/route.ts              Which page an address shows, and club, wishlist, club applications and settings page addresses
 src/lib/ApplicationsPage.svelte    The club applications page for Discord session sign-in and role selection
 src/lib/ClubApplicationsPage.svelte A club's page for its leaders: adding the bot, then its status and applications
 src/lib/BotSetup.svelte       The steps to add the bot, ticked as they're done
 src/lib/BotPanel.svelte       The bot's status, the club's settings and removing the bot
 src/lib/ApplicationsTable.svelte   A club's applications, filtered by status, with ApplicationDetails.svelte for one
-src/lib/applications.ts            The applications API client: sign-in, the invite check, settings and unlink
+src/lib/applications.ts            The applications API client: sign-in, the invite check, settings, unlink, trainer links and deleting the account
+src/lib/SettingsPage.svelte   The settings page: link a trainer ID, sign out, delete the account
+src/lib/AccountMenu.svelte    The navbar's account menu for a person signed in with Discord
+src/lib/account.svelte.ts     Who is signed in, shared by every component
 src/lib/WishlistPage.svelte   The wishlist page: StrawPoll polls for ideas, in frames
 src/lib/polls.ts              The polls on the wishlist page
 src/lib/ClubPage.svelte       The club page: a club's details, its chart and member cards, with you added
@@ -72,7 +75,7 @@ src/lib/HowToUse.svelte       Step-by-step instructions under the search form
 src/lib/SearchStatus.svelte   Loading, waiting and error messages
 src/lib/RunnerProgress.svelte The running figure that moves along a track while a search or club loads
 src/lib/progress.ts           The progress curve: how far along the track the runner is
-src/lib/NavBar.svelte         Top bar: the brand, linking to the website, the pages pill, the release notes and tour buttons, and the theme switch
+src/lib/NavBar.svelte         Top bar: the brand, linking to the website, the pages pill, the release notes and tour buttons, the theme switch and the account menu
 src/lib/NavLinks.svelte       The pages as a pill of icon links in the navbar, icons only on narrow screens
 src/lib/pages.ts              The pages the navbar links to, and which one is showing
 src/lib/ReleaseNotes.svelte   The release notes modal: a timeline of builds, newest first
@@ -120,7 +123,23 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 
 ## Navbar
 
-`NavBar.svelte` is a bar across the top of the page, matching the website's at [umastable.com](https://umastable.com): the logo and "Uma Stable Match" on the left, linking back to the website (`site.localhost` on the same port when the app runs on `localhost` or a name under it, as when the [server serves both](../backend/server/README.md#serving-the-website)), and on the right a round **?** button that starts the [product tour](#product-tour) (left out on the club page), then the theme switch. It stays at the top while scrolling, with a translucent, blurred background. The page's own heading, "Uma Stable Match club finder", is hidden visually and read by screen readers. On narrow screens a long title is cut short with an ellipsis rather than pushing the switch off the screen.
+`NavBar.svelte` is a bar across the top of the page, matching the website's at [umastable.com](https://umastable.com): the logo and "Uma Stable Match" on the left, linking back to the website (`site.localhost` on the same port when the app runs on `localhost` or a name under it, as when the [server serves both](../backend/server/README.md#serving-the-website)), and on the right a round **?** button that starts the [product tour](#product-tour) (left out on the club page), then the theme switch and, for a person signed in with Discord, the [account menu](#account-menu) at the far right. It stays at the top while scrolling, with a translucent, blurred background. The page's own heading, "Uma Stable Match club finder", is hidden visually and read by screen readers. On narrow screens a long title is cut short with an ellipsis rather than pushing the switch off the screen.
+
+### Account menu
+
+`main.ts` asks `GET /api/v1/applications/me` who is signed in once per page (`loadAccount()` in `account.svelte.ts`), waiting for the answer only on pages that need a session. Once someone is, `AccountMenu.svelte` shows last in the navbar: a pill with their Discord name (or "Discord account" when the server couldn't look it up), cut short with an ellipsis when long. It opens a menu with **Signed in as …**, **Settings** and **Sign Out**, following the ARIA menu button pattern: arrow keys, Home and End move between the items, and Escape, Tab or a click elsewhere closes it. Signing out from a page that needs a session goes to the club finder; elsewhere the menu gives way to the sign-in button.
+
+Signed out, the same place holds a round silhouette button, **Sign in**, linking to `/login?next=<this page>`. It waits for the server's answer (`account.known`), so a signed-in person never sees it flash first, and it's left out while applications are off and on the login page itself.
+
+The menu or the sign-in button makes the tools wider, so while either shows (`showsAccount()`) the page names in the pill show from 1440px rather than 900px, and the three-column layout starts at 1100px rather than 960px. Below that the navbar wraps, as it does on phones.
+
+## Settings page
+
+`/settings` (`SettingsPage.svelte`) is for a person signed in with Discord; `main.ts` sends anyone else to `/login?next=/settings`. It isn't one of the navbar's pages, so none is marked current there; the [account menu](#account-menu) links to it. It has three cards:
+
+1. **Link your umamusume account.** The person types a trainer ID (9 to 12 digits; spaces and dashes are dropped) and presses **Link Account**. The server gives a key such as `uma-7KQ4XMPR`, shown with **Copy key** and how to add it to the trainer's profile comment in the game. **Check** asks the server to look for it. Found at once, the trainer joins the list below. Otherwise the server keeps looking every minute for 5 minutes, and the button turns grey with a spinner and reads **Verifying** until it ends. The page only asks the server how it's going (every 5 seconds, from `GET /api/v1/discord/trainers`), so it never calls uma.moe itself. Reloading or coming back later picks up the newest pending key and any running check. **Cancel** forgets the key on the server, which stops its check. Linked trainers show their name (when kept) and ID, each with **Unlink**. The page shows the server's other answers as messages: not found after 5 minutes, already linked, unknown trainer, too many trainers, too many tries, and an expired key, which starts over. See [trainer links](../backend/discord/README.md#club-links) for the endpoints. If the server doesn't offer trainer links, the card says so instead.
+2. **Sign Out** ends the session and goes to the club finder.
+3. **Delete Account** asks once, then deletes the person's trainer links and pending keys and signs them out (`DELETE /api/v1/auth/account`). Clubs they added the bot to keep it.
 
 ## Product tour
 
@@ -382,7 +401,7 @@ The navbar keeps the release notes but has no tour button here.
 
 **Feature flag.** The server's `ENABLE_APPLICATIONS` setting, off by default, switches on these pages and the website's `/privacy/` page. It is read at run time from `GET /api/v1/features`, so changing it needs no rebuild. On an `/applications` address, `main.ts` asks for it before mounting; while it is off, or the request fails, these pages aren't mounted, so `/applications` and `/applications/club/{id}` open the club finder like any unknown address. Elsewhere, `applyFeatures()` sets `flags.applications` and `pages()` adds the **Applications** link to the navbar once it's on. The components and their tests don't depend on the flag. The website's `site.js` reads the same endpoint for its privacy page and navbar link; see the notes at the top of that file for what else to change when turning it on.
 
-**Placeholder copy.** All text on these pages is lorem ipsum for now: the `applications.*` messages (except `applications.link`, the navbar label) and the `settings.*` messages, in both languages, and the privacy page's text. Tests read the text through `t()`, so replacing it needs no test changes.
+**Placeholder copy.** All text on these pages is lorem ipsum for now: the `applications.*` messages (except `applications.link`, the navbar label), in both languages, and the privacy page's text. Tests read the text through `t()`, so replacing it needs no test changes.
 
 `/applications` and `/applications/club/{id}` are where a club leader sets up applications through Discord. `main.ts` mounts `ApplicationsPage.svelte` or `ClubApplicationsPage.svelte`; `applicationsRoute()` reads the address and `clubApplicationsPath()` builds it. A **Club applications** link joins the navbar's pages. `applications.ts` wraps the [Discord endpoints](../backend/discord/README.md); they aren't behind the human check, and they use the session cookie, so requests are same-origin.
 

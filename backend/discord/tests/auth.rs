@@ -9,8 +9,8 @@ use serde_json::{json, Value};
 use tower::ServiceExt;
 use uma_stable_match_discord::{
     router, ApplicationId, BotToken, ClientSecret, Discord, DiscordConfig, PublicKey, PublicUrl,
-    SigningKey, APPLICATIONS_ME_PATH, APPLICATIONS_PAGE, CALLBACK_PATH, LOGIN_PATH, OPT_IN_PATH,
-    SIGN_OUT_PATH,
+    SigningKey, ACCOUNT_PATH, APPLICATIONS_ME_PATH, APPLICATIONS_PAGE, CALLBACK_PATH, LOGIN_PATH,
+    OPT_IN_PATH, SIGN_OUT_PATH,
 };
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -187,7 +187,96 @@ async fn signing_in_starts_a_leader_session_and_returns_to_the_page() {
     .await;
     assert_eq!(me.status(), StatusCode::OK);
     assert_eq!(header_value(&me, CACHE_CONTROL), "no-store");
-    assert_eq!(json_body(me).await, json!({ "discord_id": USER_ID }));
+    assert_eq!(
+        json_body(me).await,
+        json!({ "discord_id": USER_ID, "name": null })
+    );
+}
+
+/// A session cookie for `USER_ID`, from signing in.
+async fn signed_in(app: &Router) -> String {
+    let (state, nonce) = start(app, "/").await;
+    let response = get(app, &callback_uri(&state, "made-up-code"), Some(&nonce)).await;
+    cookie(&response, "uma_session")
+}
+
+async fn send(app: &Router, method: &str, uri: &str, cookie: Option<&str>) -> Response<Body> {
+    let mut request = Request::builder().method(method).uri(uri);
+    if let Some(cookie) = cookie {
+        request = request.header(COOKIE, cookie);
+    }
+    app.clone()
+        .oneshot(request.body(Body::empty()).unwrap())
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn the_session_endpoint_gives_the_display_name_looked_up_once_as_the_bot() {
+    let server = MockServer::start().await;
+    mock_discord(&server).await;
+    Mock::given(method("GET"))
+        .and(path(format!("/users/{USER_ID}")))
+        .and(header("authorization", "Bot made-up-bot-token"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            json!({ "id": USER_ID, "username": "made-up-name", "global_name": "Made Up" }),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let app = app(&server);
+    let session = signed_in(&app).await;
+    for _ in 0..2 {
+        let me = get(&app, APPLICATIONS_ME_PATH, Some(&session)).await;
+        assert_eq!(
+            json_body(me).await,
+            json!({ "discord_id": USER_ID, "name": "Made Up" })
+        );
+    }
+}
+
+#[tokio::test]
+async fn without_a_display_name_the_username_is_given() {
+    let server = MockServer::start().await;
+    mock_discord(&server).await;
+    Mock::given(method("GET"))
+        .and(path(format!("/users/{USER_ID}")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            json!({ "id": USER_ID, "username": "made-up-name", "global_name": null }),
+        ))
+        .mount(&server)
+        .await;
+    let app = app(&server);
+    let session = signed_in(&app).await;
+    let me = get(&app, APPLICATIONS_ME_PATH, Some(&session)).await;
+    assert_eq!(json_body(me).await["name"], "made-up-name");
+}
+
+#[tokio::test]
+async fn deleting_the_account_needs_a_session_and_signs_out() {
+    let server = MockServer::start().await;
+    mock_discord(&server).await;
+    let app = app(&server);
+    let response = send(&app, "DELETE", ACCOUNT_PATH, None).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+    let session = signed_in(&app).await;
+    let response = send(&app, "DELETE", ACCOUNT_PATH, Some(&session)).await;
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    let cleared = set_cookies(&response);
+    assert!(cleared
+        .iter()
+        .any(|c| c.starts_with("uma_session=;") && c.contains("Max-Age=0")));
+    assert!(cleared.iter().any(|c| c.starts_with("uma_guild=;")));
+    // A DELETE, so a link or form on another site can't trigger it.
+    for method in ["GET", "POST"] {
+        let response = send(&app, method, ACCOUNT_PATH, Some(&session)).await;
+        assert_eq!(
+            response.status(),
+            StatusCode::METHOD_NOT_ALLOWED,
+            "{method}"
+        );
+    }
 }
 
 #[tokio::test]

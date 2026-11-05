@@ -6,7 +6,7 @@ use axum::extract::{Query, State};
 use axum::http::header::{ACCEPT, CACHE_CONTROL, COOKIE, SET_COOKIE};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Redirect, Response};
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -27,6 +27,9 @@ pub const APPLICATIONS_ME_PATH: &str = "/api/v1/applications/me";
 
 /// Path that ends the session.
 pub const SIGN_OUT_PATH: &str = "/api/v1/auth/sign-out";
+
+/// Path that deletes what's kept about the signed-in person and ends the session.
+pub const ACCOUNT_PATH: &str = "/api/v1/auth/account";
 
 /// How long a sign-in link is good for, from the redirect to Discord until the callback.
 pub const MAX_STATE_AGE: Duration = Duration::from_secs(10 * 60);
@@ -120,6 +123,7 @@ pub(crate) fn router(discord: Discord) -> Router {
         .route(CALLBACK_PATH, get(callback))
         .route(APPLICATIONS_ME_PATH, get(session_info))
         .route(SIGN_OUT_PATH, post(sign_out))
+        .route(ACCOUNT_PATH, delete(delete_account))
         .with_state(discord.clone())
         .merge(crate::trainers::router(discord.clone()))
         .merge(crate::opt_in::router(discord))
@@ -303,6 +307,8 @@ async fn finish(
 #[derive(Serialize)]
 struct Me {
     discord_id: String,
+    /// `None` when Discord couldn't be asked.
+    name: Option<String>,
 }
 
 /// The Discord ID in the request's session, if it has a valid one.
@@ -320,17 +326,37 @@ pub(crate) fn session_user(config: &DiscordConfig, headers: &HeaderMap) -> Optio
 }
 
 async fn session_info(State(discord): State<Discord>, headers: HeaderMap) -> Response {
-    let id = session_user(discord.config(), &headers);
-    private(match id {
-        Some(id) => Json(Me {
-            discord_id: id.to_string(),
-        })
-        .into_response(),
-        None => error(StatusCode::UNAUTHORIZED, "not signed in"),
-    })
+    let Some(id) = session_user(discord.config(), &headers) else {
+        return private(error(StatusCode::UNAUTHORIZED, "not signed in"));
+    };
+    let name = discord.names().get(discord.rest(), id).await;
+    private(Json(Me {
+        discord_id: id.to_string(),
+        name,
+    }))
 }
 
 async fn sign_out(State(discord): State<Discord>) -> Response {
+    signed_out(&discord)
+}
+
+/// Deletes the person's trainer links and pending keys, then signs them out.
+async fn delete_account(State(discord): State<Discord>, headers: HeaderMap) -> Response {
+    let Some(user) = session_user(discord.config(), &headers) else {
+        return error(StatusCode::UNAUTHORIZED, "sign in with Discord first");
+    };
+    if let Some(links) = discord.trainer_links() {
+        if let Err(err) = links.store().forget(user).await {
+            return crate::opt_in::store_unavailable(&err);
+        }
+    }
+    discord.names().forget(user);
+    metrics::counter!("discord_account_deletions_total").increment(1);
+    signed_out(&discord)
+}
+
+/// A 204 that clears the session and the remembered server.
+fn signed_out(discord: &Discord) -> Response {
     let config = discord.config();
     let session = set_cookie(config, SESSION_COOKIE, "", "/", Duration::ZERO);
     let hint = crate::clubs::clear_hint(config);

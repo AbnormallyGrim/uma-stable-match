@@ -18,8 +18,8 @@ use tower::ServiceExt;
 use uma_stable_match_discord::{
     router, ApplicationId, BotToken, ClientSecret, Discord, DiscordConfig, KeySecret, LookupError,
     PublicKey, PublicUrl, SigningKey, TrainerLinks, TrainerLookup, TrainerStore, TrainerSummary,
-    CALLBACK_PATH, LINK_PATH, LOGIN_PATH, MAX_LINKED_TRAINERS, TRAINERS_PATH, TRAINER_PATH,
-    VERIFICATION_PATH,
+    ACCOUNT_PATH, CALLBACK_PATH, CHECK_FOR, LINK_PATH, LOGIN_PATH, MAX_LINKED_TRAINERS,
+    TRAINERS_PATH, TRAINER_PATH, VERIFICATION_PATH,
 };
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -37,6 +37,7 @@ enum Profile {
 struct World {
     app: Router,
     store: TrainerStore,
+    links: TrainerLinks,
     profiles: Arc<Mutex<HashMap<u64, Profile>>>,
     lookups: Arc<AtomicUsize>,
     base: u64,
@@ -60,10 +61,12 @@ impl World {
         let conn = ConnectionManager::new(redis::Client::open(url).unwrap())
             .await
             .expect("REDIS_TEST_URL is reachable");
+        // Each world has its own queue of running checks, so tests don't take each other's.
         let store = TrainerStore::new(
             conn,
             KeySecret::parse("made-up-key-secret-of-32-chars!!").unwrap(),
-        );
+        )
+        .with_check_queue(&format!("test:checks:{base}"));
         let mock = MockServer::start().await;
         let mut config = DiscordConfig::new(
             ApplicationId::parse("1000").unwrap(),
@@ -100,12 +103,14 @@ impl World {
                 }
             })
         };
+        let links = TrainerLinks::new(store.clone(), lookup);
         let discord = Discord::new(config)
             .unwrap()
-            .with_trainer_links(TrainerLinks::new(store.clone(), lookup));
+            .with_trainer_links(links.clone());
         let world = Self {
             app: router(discord),
             store,
+            links,
             profiles,
             lookups,
             base,
@@ -225,8 +230,18 @@ impl World {
             .as_array()
             .unwrap()
             .iter()
-            .map(|id| id.as_str().unwrap().to_owned())
+            .map(|t| t["id"].as_str().unwrap().to_owned())
             .collect()
+    }
+
+    /// The first pending key in the list, as the page would see it.
+    async fn first_pending(&self, session: &str) -> serde_json::Value {
+        json_body(self.list(session).await).await["pending"][0].clone()
+    }
+
+    async fn discard(&self, session: &str, trainer: u64) -> Response<Body> {
+        self.send("DELETE", &Self::uri(VERIFICATION_PATH, trainer), session)
+            .await
     }
 
     async fn clean_up(&self) {
@@ -236,9 +251,20 @@ impl World {
                     .unlink(self.user(n), self.trainer(t))
                     .await
                     .unwrap();
+                self.store
+                    .discard(self.user(n), self.trainer(t))
+                    .await
+                    .unwrap();
             }
         }
     }
+}
+
+fn seconds_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }
 
 /// `name=value` of the cookie set under `name`.
@@ -273,6 +299,32 @@ async fn every_route_needs_a_session() {
 }
 
 #[tokio::test]
+async fn deleting_the_account_removes_its_links_and_keys_and_no_one_elses() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    let (first, second) = (world.sign_in(1).await, world.sign_in(2).await);
+    let (mine, pending, theirs) = (world.trainer(1), world.trainer(2), world.trainer(3));
+    assert_eq!(world.prove(&first, mine).await, StatusCode::OK);
+    let key = world.key(&first, pending).await;
+    assert_eq!(world.prove(&second, theirs).await, StatusCode::OK);
+
+    let response = world.send("DELETE", ACCOUNT_PATH, &first).await;
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    assert!(world.linked(&first).await.is_empty());
+    assert_eq!(world.linked(&second).await, [theirs.to_string()]);
+    assert_eq!(
+        world.store.pending(world.user(1), pending).await.unwrap(),
+        None
+    );
+    // The trainer is free: the old key is gone, and a new one is made.
+    assert_ne!(world.key(&first, pending).await, key);
+    assert_eq!(world.prove(&second, mine).await, StatusCode::OK);
+    world.clean_up().await;
+}
+
+#[tokio::test]
 async fn a_trainer_id_must_be_nine_to_twelve_digits() {
     let Some(world) = World::new().await else {
         return;
@@ -303,7 +355,7 @@ async fn asking_for_a_key_gives_the_same_private_key_until_it_is_used() {
     assert_eq!(first.headers()[CACHE_CONTROL], "no-store");
     let first = json_body(first).await;
     let key = first["key"].as_str().unwrap();
-    assert!(key.starts_with("uma-") && key.len() == 10, "{key}");
+    assert!(key.starts_with("uma-") && key.len() == 12, "{key}");
     let left = first["expires_in"].as_u64().unwrap();
     assert!((86_000..=86_400).contains(&left), "{left}");
 
@@ -311,6 +363,44 @@ async fn asking_for_a_key_gives_the_same_private_key_until_it_is_used() {
     assert_eq!(again["key"], first["key"]);
     let other = json_body(world.start(&session, world.trainer(2)).await).await;
     assert_ne!(other["key"], first["key"]);
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn a_key_pending_for_one_person_is_never_given_to_another() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    let key = format!("uma-T{}", world.base);
+    let (first, second) = (world.user(1), world.user(2));
+    let (t1, t2, t3) = (world.trainer(1), world.trainer(2), world.trainer(3));
+    let started = world.store.start(first, t1, &key).await.unwrap().unwrap();
+    assert_eq!(started.key, key);
+    assert_eq!(world.store.start(second, t2, &key).await.unwrap(), None);
+    // Same person, other trainer: still taken.
+    assert_eq!(world.store.start(first, t3, &key).await.unwrap(), None);
+    // Asking again for the same trainer gives the pending key, whatever key is offered.
+    let again = world
+        .store
+        .start(first, t1, "uma-OTHER")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(again.key, key);
+
+    // Linking uses the key up, so it's free again.
+    world
+        .store
+        .link(first, t1, "Example Trainer")
+        .await
+        .unwrap();
+    let reused = world.store.start(second, t2, &key).await.unwrap().unwrap();
+    assert_eq!(reused.key, key);
+
+    // Deleting the account frees its pending keys too.
+    world.store.forget(second).await.unwrap();
+    assert!(world.store.start(first, t3, &key).await.unwrap().is_some());
+    world.store.forget(first).await.unwrap();
     world.clean_up().await;
 }
 
@@ -337,20 +427,50 @@ async fn the_key_in_the_comment_links_the_trainer() {
     let t = world.trainer(1);
     let key = world.key(&session, t).await;
 
-    // Not there yet: no comment, then someone else's words.
-    world.set(t, Profile::NoComment);
-    assert_eq!(
-        world.check(&session, t).await.status(),
-        StatusCode::UNPROCESSABLE_ENTITY
-    );
+    // Not there yet: the first look misses, so the check keeps going in the background.
     world.set(t, Profile::Comment("Looking for a club!"));
+    let response = world.check(&session, t).await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    let body = json_body(response).await;
+    assert_eq!(body["checking"], true);
+    assert_eq!(body["seconds_left"], CHECK_FOR.as_secs());
+    assert!(world.linked(&session).await.is_empty());
+    // Pressing Check again joins the running check: no new look at uma.moe.
+    let looked = world.lookups.load(Ordering::Relaxed);
     assert_eq!(
         world.check(&session, t).await.status(),
-        StatusCode::UNPROCESSABLE_ENTITY
+        StatusCode::ACCEPTED
     );
-    assert!(world.linked(&session).await.is_empty());
+    assert_eq!(world.lookups.load(Ordering::Relaxed), looked);
+    // The list shows it, so a page opened again picks it up.
+    let pending = world.first_pending(&session).await;
+    assert_eq!(pending["trainer"], t.to_string());
+    assert_eq!(pending["key"], key);
+    assert_eq!(pending["check"]["state"], "checking");
 
-    // Now it is, with other text around it and in any case.
+    // Nothing is due before a minute has passed.
+    let now = seconds_now();
+    assert_eq!(world.links.check_due(now + 30).await.unwrap(), 0);
+    // A minute on, the key is there, with other text around it and in any case.
+    let comment: &'static str = Box::leak(format!("hi {} :)", key.to_uppercase()).into_boxed_str());
+    world.set(t, Profile::Comment(comment));
+    assert_eq!(world.links.check_due(now + 61).await.unwrap(), 1);
+    assert_eq!(world.linked(&session).await, vec![t.to_string()]);
+    let body = json_body(world.list(&session).await).await;
+    assert_eq!(body["linked"][0]["name"], "Example Trainer");
+    assert_eq!(body["pending"], json!([]));
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn the_key_found_on_the_first_look_links_at_once() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    let session = world.sign_in(1).await;
+    let t = world.trainer(1);
+    let key = world.key(&session, t).await;
+    // With other text around it and in any case.
     let comment: &'static str = Box::leak(format!("hi {} :)", key.to_uppercase()).into_boxed_str());
     world.set(t, Profile::Comment(comment));
     let response = world.check(&session, t).await;
@@ -359,6 +479,11 @@ async fn the_key_in_the_comment_links_the_trainer() {
     let body = json_body(response).await;
     assert_eq!(body, json!({ "linked": true, "name": "Example Trainer" }));
     assert_eq!(world.linked(&session).await, vec![t.to_string()]);
+    let body = json_body(world.list(&session).await).await;
+    assert_eq!(
+        body["linked"],
+        json!([{ "id": t.to_string(), "name": "Example Trainer" }])
+    );
 
     // The key is used up, and the trainer can't be linked twice.
     assert_eq!(
@@ -367,6 +492,63 @@ async fn the_key_in_the_comment_links_the_trainer() {
     );
     assert_eq!(
         world.start(&session, t).await.status(),
+        StatusCode::CONFLICT
+    );
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn a_check_gives_up_after_five_minutes_of_looking_every_minute() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    let session = world.sign_in(1).await;
+    let t = world.trainer(1);
+    world.key(&session, t).await;
+    world.set(t, Profile::NoComment);
+    let now = seconds_now();
+    assert_eq!(
+        world.check(&session, t).await.status(),
+        StatusCode::ACCEPTED
+    );
+    // A look a minute (and a bit) apart, until five minutes have passed.
+    for minute in 1..=5 {
+        assert_eq!(world.links.check_due(now + 65 * minute).await.unwrap(), 1);
+    }
+    assert_eq!(world.lookups.load(Ordering::Relaxed), 6);
+    assert_eq!(world.links.check_due(now + 65 * 6).await.unwrap(), 0);
+    let pending = world.first_pending(&session).await;
+    assert_eq!(pending["check"]["state"], "missing");
+    // The key still works: a new check starts.
+    assert_eq!(
+        world.check(&session, t).await.status(),
+        StatusCode::ACCEPTED
+    );
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn forgetting_a_key_stops_its_check() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    let session = world.sign_in(1).await;
+    let t = world.trainer(1);
+    world.key(&session, t).await;
+    world.set(t, Profile::NoComment);
+    let now = seconds_now();
+    assert_eq!(
+        world.check(&session, t).await.status(),
+        StatusCode::ACCEPTED
+    );
+    assert_eq!(
+        world.discard(&session, t).await.status(),
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(world.first_pending(&session).await, serde_json::Value::Null);
+    assert_eq!(world.links.check_due(now + 65).await.unwrap(), 0);
+    assert_eq!(
+        world.check(&session, t).await.status(),
         StatusCode::CONFLICT
     );
     world.clean_up().await;
@@ -386,9 +568,10 @@ async fn an_unknown_trainer_and_an_outage_link_nothing() {
         world.check(&session, unknown).await.status(),
         StatusCode::NOT_FOUND
     );
+    // An outage is tried again in the background.
     assert_eq!(
         world.check(&session, down).await.status(),
-        StatusCode::BAD_GATEWAY
+        StatusCode::ACCEPTED
     );
     assert!(world.linked(&session).await.is_empty());
     world.clean_up().await;
@@ -408,10 +591,7 @@ async fn someone_elses_key_is_no_use() {
     // The profile shows only Alice's key, so Bob can't claim the trainer with it.
     let comment: &'static str = Box::leak(alices.into_boxed_str());
     world.set(t, Profile::Comment(comment));
-    assert_eq!(
-        world.check(&bob, t).await.status(),
-        StatusCode::UNPROCESSABLE_ENTITY
-    );
+    assert_eq!(world.check(&bob, t).await.status(), StatusCode::ACCEPTED);
     assert!(world.linked(&bob).await.is_empty());
     assert_eq!(world.check(&alice, t).await.status(), StatusCode::OK);
     world.clean_up().await;
@@ -506,14 +686,17 @@ async fn too_many_checks_in_an_hour_are_refused_with_a_wait() {
     };
     let session = world.sign_in(1).await;
     let t = world.trainer(1);
-    world.key(&session, t).await;
     world.set(t, Profile::NoComment);
+    // Each check runs for five minutes, so start over with a new key between them.
     for _ in 0..10 {
+        world.key(&session, t).await;
         assert_eq!(
             world.check(&session, t).await.status(),
-            StatusCode::UNPROCESSABLE_ENTITY
+            StatusCode::ACCEPTED
         );
+        world.discard(&session, t).await;
     }
+    world.key(&session, t).await;
     let calls = world.lookups.load(Ordering::Relaxed);
     let refused = world.check(&session, t).await;
     assert_eq!(refused.status(), StatusCode::TOO_MANY_REQUESTS);
@@ -529,10 +712,7 @@ async fn too_many_checks_in_an_hour_are_refused_with_a_wait() {
     // Another user is unaffected.
     let other = world.sign_in(2).await;
     world.key(&other, t).await;
-    assert_eq!(
-        world.check(&other, t).await.status(),
-        StatusCode::UNPROCESSABLE_ENTITY
-    );
+    assert_eq!(world.check(&other, t).await.status(), StatusCode::ACCEPTED);
     world.clean_up().await;
 }
 

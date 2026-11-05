@@ -75,8 +75,9 @@ Discord sends a signed PING, and a badly signed request, when the URL is saved i
 |---|---|
 | `GET /api/v1/auth/discord/login?flow=sign_in&next=/path` | Redirects to Discord's authorize page. `next` is where the visitor lands afterwards: a path on this site, else `/` |
 | `GET /api/v1/auth/discord/callback` | Where Discord sends the visitor back. Checks the `state`, trades the code for the visitor's Discord ID, starts the session and redirects to `next`. When it fails, a browser (a request that accepts `text/html`) is redirected to `/applications?error=<result>` (`APPLICATIONS_PAGE`) instead of seeing JSON |
-| `GET /api/v1/applications/me` | `{"discord_id": "…"}` for a signed-in leader, else 401. Never cached |
+| `GET /api/v1/applications/me` | `{"discord_id": "…", "name": "…"}` for a signed-in person, else 401. `name` is their Discord display name, or their username without one, and `null` if Discord couldn't be asked. Never cached |
 | `POST /api/v1/auth/sign-out` | Clears the session cookie (204). A POST, so another site can't trigger it with a link |
+| `DELETE /api/v1/auth/account` | Deletes the person's [trainer links](#club-links), pending keys and attempt counts, then signs them out like `sign-out` (204). Clubs they opted in stay linked. 401 without a session, 503 if the saved links can't be reached (nothing is deleted and the session stays). A DELETE, so another site can't trigger it with a link or form (`ACCOUNT_PATH`) |
 
 **Flows.** The scopes depend on what the sign-in is for: `sign_in` asks for `identify`, `opt_in` for `bot identify` and `apply` for `identify guilds.join`. Only `sign_in` is open so far; the others answer 404 until the features that use them land.
 
@@ -84,7 +85,7 @@ Discord sends a signed PING, and a badly signed request, when the URL is saved i
 
 **Session.** A signed cookie holds the Discord ID and a 12-hour expiry (`MAX_SESSION_AGE`), also `HttpOnly`, `Secure` and `SameSite=Lax`. Nothing is stored server-side, so signing out removes the cookie but can't revoke a copy of it before it expires. The signed values carry a purpose, so a `state` can't be used as a session, and neither can the human check's tokens that share the key. `Secure` is left off only when `PUBLIC_URL` is `http://`, for local development.
 
-**What's kept.** The access token is used for one `GET /users/@me` inside the callback request and then dropped; only the ID is kept, inside the session cookie. Nothing from Discord is logged: a failed sign-in logs Discord's error message, not the user. Results are counted in `discord_sign_ins_total`, labelled by `result` (`success`, `invalid_state`, `denied`, `discord_error`, or for opting a club in `no_server`, `wrong_server` and `unavailable`).
+**What's kept.** The access token is used for one `GET /users/@me` inside the callback request and then dropped; only the ID is kept, inside the session cookie. The name `GET /api/v1/applications/me` gives is looked up as the bot (`GET /users/{id}`) and held in memory for 10 minutes (`NAME_TTL`), never in the cookie or Redis; deleting the account drops it. Nothing from Discord is logged: a failed sign-in logs Discord's error message, not the user. Results are counted in `discord_sign_ins_total`, labelled by `result` (`success`, `invalid_state`, `denied`, `discord_error`, or for opting a club in `no_server`, `wrong_server` and `unavailable`).
 
 ## Finding a club's server
 
@@ -205,41 +206,67 @@ A trainer ID is public and typed in by the player, so it proves nothing by itsel
 
 | Route | Does |
 |---|---|
-| `GET /api/v1/discord/trainers` | `{"linked": ["…"], "max": 5}`: the trainer IDs the signed-in person owns (`TRAINERS_PATH`) |
-| `POST /api/v1/discord/trainers/{trainer}/verification` | Answers `{"key": "uma-7KQ4XM", "expires_in": 86400}`: the key to put in the profile comment (`VERIFICATION_PATH`) |
-| `POST /api/v1/discord/trainers/{trainer}/link` | Reads the trainer's profile and links the ID if the key is in the comment (`LINK_PATH`) |
+| `GET /api/v1/discord/trainers` | The trainers the signed-in person owns, the most they can, and their pending keys, newest first (`TRAINERS_PATH`); see below |
+| `POST /api/v1/discord/trainers/{trainer}/verification` | Answers `{"key": "uma-7KQ4XMPR", "expires_in": 86400}`: the key to put in the profile comment (`VERIFICATION_PATH`) |
+| `DELETE /api/v1/discord/trainers/{trainer}/verification` | Forgets the pending key and stops its check (204) |
+| `POST /api/v1/discord/trainers/{trainer}/link` | Looks for the key in the trainer's profile and links the ID if it's there; otherwise keeps looking in the background (`LINK_PATH`) |
 | `DELETE /api/v1/discord/trainers/{trainer}` | Unlinks the ID from the signed-in person (`TRAINER_PATH`) |
 
 All need a session, and `{trainer}` is 9 to 12 digits. The key and the list are never cached (`Cache-Control: no-store`).
 
-**Keys.** A key is `uma-` and six characters from letters and digits that can't be mistaken for each other (no `I`, `L`, `O`, `0` or `1`). It is made for one person and one trainer ID, is good for 24 hours (`KEY_LIFETIME`), and is used up when it links. Asking again while one is pending gives the same key. Someone else can't use a key they read in a profile: their own check looks for their own key. The profile can take a while to show a new comment, so the key lasts a day, and checking again is fine.
+**Keys.** A key is `uma-` and eight characters from letters and digits that can't be mistaken for each other (no `I`, `L`, `O`, `0` or `1`): 31⁸, about 850 billion keys. No two pending keys are the same: a key is marked as taken while it is pending, and if a new one is already taken another is made (up to 5 tries, then a 503). The mark goes when the key links, expires, or its owner deletes their account. It is made for one person and one trainer ID, is good for 24 hours (`KEY_LIFETIME`), and is used up when it links. Asking again while one is pending gives the same key. Someone else can't use a key they read in a profile: their own check looks for their own key. The profile can take a while to show a new comment, so the key lasts a day, and checking again is fine.
 
-**Checking.** The check looks for the key anywhere in the comment, ignoring case, in a profile fetched fresh from uma.moe (`TrainerLookup`, given by the server, so this crate doesn't know where profiles come from). It answers:
+The list answers:
+
+```json
+{
+  "linked": [{ "id": "100000000001", "name": "Example Trainer" }],
+  "max": 5,
+  "pending": [
+    {
+      "trainer": "100000000002",
+      "key": "uma-7KQ4XMPR",
+      "expires_in": 86000,
+      "check": { "state": "checking", "seconds_left": 240 }
+    }
+  ]
+}
+```
+
+`name` is the trainer's name when it linked (`null` for links made before names were kept). `check` is `null` until a check runs; then `checking` with the seconds it has left, or how it ended for 15 minutes after: `missing` (never found), `not_found` (uma.moe doesn't know the trainer) or `too_many` (no room). A check that links leaves no `pending` entry, and the trainer shows under `linked`.
+
+**Checking.** The check looks for the key anywhere in the comment, ignoring case, full-width forms and the kind of dash (the game saves `-` as `－`), in a profile fetched fresh from uma.moe (`TrainerLookup`, given by the server, so this crate doesn't know where profiles come from). It answers:
 
 | Status | When |
 |---|---|
 | 200 | Linked: `{"linked": true, "name": "…"}` |
+| 202 | Not found yet, or uma.moe couldn't be reached: `{"checking": true, "seconds_left": 300}`. The server keeps looking (see below). Asking again while it runs gives the same answer without looking again |
 | 400 | `trainer` isn't a trainer ID |
 | 401 | Not signed in |
 | 403 | The person already has `MAX_LINKED_TRAINERS` (5) IDs linked; nothing changes, so no one loses their link to a refused claim |
 | 404 | uma.moe doesn't know the trainer |
 | 409 | No key is pending (ask for one first, or it expired); uma.moe isn't called |
-| 422 | The key isn't in the comment yet |
-| 429 | Too many tries; `Retry-After` says how many seconds to wait. At most 10 checks and 20 keys an hour per person, and a refused check never reaches uma.moe |
-| 502 | uma.moe couldn't be reached; try again |
+| 429 | Too many tries; `Retry-After` says how many seconds to wait. At most 10 checks and 20 keys an hour per person, and a refused check never reaches uma.moe. A check with its retries counts once |
 | 503 | The saved links couldn't be reached |
 
 Asking for a key for an ID the person already owns is a 409 as well.
 
+**Background checks.** When the first look misses, the check keeps going on the server: it looks again every minute (`CHECK_EVERY`) until 5 minutes (`CHECK_FOR`) have passed, six looks in all. Its state is in Redis, so closing or reloading the page doesn't stop it, and the list shows it to a page opened later. `TrainerLinks::run_checks` runs them: the server spawns it once, and every 5 seconds it claims the checks that are due from a sorted set scored by when to look next. Claiming moves a check a minute on first, so several servers sharing Redis never look at once, and checks left by a restart are picked up when the server starts again. A check ends when it links, when the key is forgotten or expires, when uma.moe doesn't know the trainer, when the person has no room, or after the last look.
+
 **Owners.** A trainer ID has one owner at a time. Proving it again replaces the old owner, since the comment shows who controls the account now. A person can own several IDs, up to the limit above.
 
-**What's kept.** Redis never holds a Discord ID, only a keyed hash of it (`KeySecret`, the server's `REDIS_KEY_SECRET`). The trainer ID's owner and the person's set of IDs have no TTL, so eviction can't remove them; they stay until the person unlinks. The pending key and the attempt counters expire.
+**What's kept.** Redis never holds a Discord ID, only a keyed hash of it (`KeySecret`, the server's `REDIS_KEY_SECRET`). The trainer ID's owner and the person's set of IDs have no TTL, so eviction can't remove them; they stay until the person unlinks or deletes their account, and so do the trainers' names, kept when they link. The pending key, the check and the attempt counters expire.
 
 | Key | Holds |
 |---|---|
 | `discord:trainer:{trainer_id}` | The hash of the owner |
 | `discord:applicant:{hash}` | A set of the trainer IDs that person owns |
+| `discord:names:{hash}` | A hash of those trainers' names, by trainer ID |
 | `discord:verify:{hash}:{trainer_id}` | The pending key, for 24 hours |
+| `discord:pending:{hash}` | A set of the trainer IDs the person has keys pending for, for 24 hours |
+| `discord:key:{key}` | Marks a pending key as taken, for as long as it is pending |
+| `discord:check:{hash}:{trainer_id}` | A hash: the check's `state` and `until`, kept 15 minutes after it ends |
+| `discord:checks` | A sorted set of running checks (`{hash}:{trainer_id}`), scored by when to look next. `TrainerStore::with_check_queue` names it differently, so apps sharing a Redis (tests) keep apart |
 | `discord:hits:{action}:{hash}` | Attempts this hour |
 
-Linking needs the app set up with `Discord::with_trainer_links(TrainerLinks::new(store, lookup))`; without it the routes aren't served. Results are counted in `discord_trainer_links_total`, labelled by `result` (`linked`, `mismatch`, `not_found`, `too_many`, `rate_limited`, `unavailable`).
+Linking needs the app set up with `Discord::with_trainer_links(TrainerLinks::new(store, lookup))`; without it the routes aren't served. Results are counted in `discord_trainer_links_total`, labelled by `result` (`linked`, `mismatch`, `not_found`, `too_many`, `rate_limited`, `unavailable`, and `gave_up` when a background check ends without the key). Each look counts, the background ones included.

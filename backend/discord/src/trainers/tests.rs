@@ -25,12 +25,28 @@ fn the_alphabet_leaves_out_lookalikes() {
 
 #[test]
 fn finds_the_key_anywhere_in_the_comment_ignoring_case() {
-    assert!(contains_key("uma-7KQ4XM", "uma-7KQ4XM"));
-    assert!(contains_key("Hi! UMA-7kq4xm :)", "uma-7KQ4XM"));
-    assert!(contains_key("xxuma-7KQ4XMxx", "uma-7KQ4XM"));
-    assert!(!contains_key("uma-7KQ4XN", "uma-7KQ4XM"));
-    assert!(!contains_key("", "uma-7KQ4XM"));
-    assert!(!contains_key("uma 7KQ4XM", "uma-7KQ4XM"));
+    assert!(contains_key("uma-7KQ4XMPR", "uma-7KQ4XMPR"));
+    assert!(contains_key("Hi! UMA-7kq4xmpr :)", "uma-7KQ4XMPR"));
+    assert!(contains_key("xxuma-7KQ4XMPRxx", "uma-7KQ4XMPR"));
+    assert!(!contains_key("uma-7KQ4XMPS", "uma-7KQ4XMPR"));
+    assert!(!contains_key("", "uma-7KQ4XMPR"));
+    assert!(!contains_key("uma 7KQ4XMPR", "uma-7KQ4XMPR"));
+}
+
+#[test]
+fn finds_the_key_the_game_saved_with_full_width_or_other_dashes() {
+    for comment in [
+        "uma－7KQ4XMPR",
+        "ｕｍａ－７ＫＱ４ＸＭＰＲ",
+        "uma‐7KQ4XMPR",
+        "uma—7KQ4XMPR",
+        "uma−7KQ4XMPR",
+        "umaー7KQ4XMPR",
+        "よろしく uma－7kq4xmpr",
+    ] {
+        assert!(contains_key(comment, "uma-7KQ4XMPR"), "{comment}");
+    }
+    assert!(!contains_key("uma－7KQ4XMPS", "uma-7KQ4XMPR"));
 }
 
 #[test]

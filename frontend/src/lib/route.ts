@@ -1,6 +1,6 @@
 /**
  * Which page an address shows: the search, a club page at `/club/{id}?trainer=…`, the wishlist page,
- * or the club applications pages.
+ * the club applications pages, the settings page or the login page.
  */
 
 import { isTrainerId, normaliseTrainerId } from './search';
@@ -85,6 +85,14 @@ export function rememberedSearch(storage: Storage | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/** The address of the settings page, where a signed-in person manages their account. */
+export const SETTINGS_PATH = '/settings';
+
+/** Whether `pathname` is the settings page. */
+export function isSettingsRoute(pathname: string): boolean {
+  return pathname === SETTINGS_PATH || pathname === `${SETTINGS_PATH}/`;
 }
 
 /** The address of the login page for Discord sign-in. */

@@ -78,6 +78,7 @@ describe('currentPage', () => {
     expect(currentPage('/applications')).toBe('applications');
     expect(currentPage('/applications/club/7')).toBe('applications');
     expect(currentPage('/login')).toBe('applications');
+    expect(currentPage('/settings')).toBeNull();
   });
 });
 
