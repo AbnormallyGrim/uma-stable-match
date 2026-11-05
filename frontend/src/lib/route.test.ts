@@ -12,6 +12,7 @@ import {
   rememberSearch,
   clubApplicationsPath,
   WISHLIST_PATH,
+  isSettingsRoute,
 } from './route';
 
 describe('clubRoute', () => {
@@ -134,5 +135,14 @@ describe('applicationsRoute', () => {
     expect(APPLICATIONS_PATH).toBe('/applications');
     expect(clubApplicationsPath(7)).toBe('/applications/club/7');
     expect(clubApplicationsPath('7', true)).toBe('/applications/club/7?linked=1');
+  });
+});
+
+describe('isSettingsRoute', () => {
+  it('matches the settings page with or without a trailing slash', () => {
+    expect(isSettingsRoute('/settings')).toBe(true);
+    expect(isSettingsRoute('/settings/')).toBe(true);
+    expect(isSettingsRoute('/settings/other')).toBe(false);
+    expect(isSettingsRoute('/applications')).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ import {
   APPLICATIONS_PATH,
   applicationsRoute,
   isLoginRoute,
+  isSettingsRoute,
   isWishlistRoute,
   WISHLIST_PATH,
 } from './route';
@@ -70,8 +71,14 @@ export function pages(): Page[] {
   return visiblePages(flags.applications);
 }
 
-/** The page `pathname` belongs to. The club page is part of the finder, sign-in of applications. */
-export function currentPage(pathname: string): Page['id'] {
+/**
+ * The page `pathname` belongs to, or `null` for the settings page, which isn't in the navbar. The
+ * club page is part of the finder, sign-in of applications.
+ */
+export function currentPage(pathname: string): Page['id'] | null {
+  if (isSettingsRoute(pathname)) {
+    return null;
+  }
   if (applicationsRoute(pathname, '') || isLoginRoute(pathname)) {
     return 'applications';
   }

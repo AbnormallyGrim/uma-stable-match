@@ -56,11 +56,22 @@ export function loginUrl(next: string = APPLICATIONS_PATH): string {
   return `/api/v1/auth/discord/login?${new URLSearchParams({ next })}`;
 }
 
-/** The Discord ID of the signed-in leader, or `null` when nobody is signed in. */
-export async function signedInUser(options: RequestOptions = {}): Promise<string | null> {
+/** The person signed in with Discord. */
+export interface Account {
+  discordId: string;
+  /** Their Discord display name, or `null` when the server couldn't look it up. */
+  name: string | null;
+}
+
+/** The signed-in person, or `null` when nobody is signed in. */
+export async function signedInUser(options: RequestOptions = {}): Promise<Account | null> {
   try {
-    const body = await send<{ discord_id: string }>('/api/v1/applications/me', {}, options);
-    return body.discord_id;
+    const body = await send<{ discord_id: string; name?: string | null }>(
+      '/api/v1/applications/me',
+      {},
+      options,
+    );
+    return { discordId: body.discord_id, name: body.name ?? null };
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       return null;
@@ -72,6 +83,95 @@ export async function signedInUser(options: RequestOptions = {}): Promise<string
 /** Ends the session. */
 export async function signOut(options: RequestOptions = {}): Promise<void> {
   await send<null>('/api/v1/auth/sign-out', { method: 'POST' }, options);
+}
+
+/** Deletes the person's trainer links and pending keys, and ends the session. */
+export async function deleteAccount(options: RequestOptions = {}): Promise<void> {
+  await send<null>('/api/v1/auth/account', { method: 'DELETE' }, options);
+}
+
+/** A linked trainer: its ID, and its name when it linked, if kept. */
+export interface LinkedTrainer {
+  id: string;
+  name: string | null;
+}
+
+/** Where the background check for a key stands. */
+export type LinkCheck =
+  { state: 'checking'; seconds_left: number } | { state: 'missing' | 'not_found' | 'too_many' };
+
+/** A key waiting to be found in a trainer's profile, and its check if one ran lately. */
+export interface PendingLink {
+  trainer: string;
+  key: string;
+  expires_in: number;
+  check: LinkCheck | null;
+}
+
+/** The signed-in person's linked trainers, how many they can link, and their pending keys. */
+export interface LinkedTrainers {
+  linked: LinkedTrainer[];
+  max: number;
+  /** Newest first. */
+  pending: PendingLink[];
+}
+
+/** A key to put in the trainer's profile comment, and the seconds it has left. */
+export interface VerificationKey {
+  key: string;
+  expires_in: number;
+}
+
+/** The signed-in person's linked trainer IDs. */
+export async function fetchLinkedTrainers(options: RequestOptions = {}): Promise<LinkedTrainers> {
+  return send<LinkedTrainers>('/api/v1/discord/trainers', {}, options);
+}
+
+/** Starts linking `trainerId`: the key to put in its profile comment. Throws 409 if it's linked. */
+export async function requestVerificationKey(
+  trainerId: string,
+  options: RequestOptions = {},
+): Promise<VerificationKey> {
+  return send<VerificationKey>(
+    `${trainerUrl(trainerId)}/verification`,
+    { method: 'POST' },
+    options,
+  );
+}
+
+/** What pressing Check did: linked at once, or a check that keeps going on the server. */
+export type CheckResult = { linked: true; name: string } | { checking: true; seconds_left: number };
+
+/**
+ * Looks for the key in `trainerId`'s profile comment, linking it if it's there; otherwise the
+ * server keeps looking every minute for 5 minutes. Throws 409 without a key, 404 for an unknown
+ * trainer, 403 with no room, 429 for too many checks.
+ */
+export async function checkTrainerLink(
+  trainerId: string,
+  options: RequestOptions = {},
+): Promise<CheckResult> {
+  return send<CheckResult>(`${trainerUrl(trainerId)}/link`, { method: 'POST' }, options);
+}
+
+/** Forgets the key pending for `trainerId`, stopping any check for it. */
+export async function discardVerificationKey(
+  trainerId: string,
+  options: RequestOptions = {},
+): Promise<void> {
+  await send<null>(`${trainerUrl(trainerId)}/verification`, { method: 'DELETE' }, options);
+}
+
+/** Unlinks `trainerId` from the signed-in person. */
+export async function unlinkTrainer(
+  trainerId: string,
+  options: RequestOptions = {},
+): Promise<void> {
+  await send<null>(trainerUrl(trainerId), { method: 'DELETE' }, options);
+}
+
+function trainerUrl(trainerId: string): string {
+  return `/api/v1/discord/trainers/${encodeURIComponent(trainerId)}`;
 }
 
 /** The address that adds the bot to the club's server, coming back to the club's page. */

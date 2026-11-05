@@ -341,16 +341,18 @@ export const ja: Catalog = {
   'applications.title': 'サークル申請 · Uma Stable Match',
   'applications.heading': 'どちらに当てはまりますか？',
   'applications.intro':
-    'クラブマスターと応募者が、次の一手を見失わないように。サークル申請の管理や進行状況を一か所で確認できます。',
+    'サークルマスターから応募者まで、次に進むべき一手がひと目で分かるように。サークル運営や応募状況を、一箇所でまとめて確認できます。',
   'applications.requirements':
-    '<ul><li>サークルマスターはDiscordの設定とボットの状態を管理できます。</li><li>トレーナーは応募したサークルや進行状況を一覧で確認できます。</li></ul>',
+    '<ul><li>サークルマスターはDiscord設定と運営状況をまとめて管理できます。</li><li>トレーナーは応募済みのサークルを一覧で確認し、進行状況を把握できます。</li></ul>',
   'applications.privacy': ({ href }: { href: string }) =>
     `Discordへのサインインは、サークル申請の管理のためだけに使われます。<a href="${href}">プライバシー情報</a>をご確認ください。`,
   'applications.session.loading': 'Discordセッションを確認しています…',
   'applications.session.signedOut':
     '以下から役割を選んでください。Discordでサインインしてサークルを管理できます。',
+
   'applications.session.signIn': 'Discordでサインイン',
   'applications.session.signedIn': 'Discordセッションは有効です。',
+
   'applications.session.signOut': 'サインアウト',
   'applications.session.error':
     'Discordセッションを確認できませんでした。しばらくしてからもう一度お試しください。',
@@ -358,6 +360,7 @@ export const ja: Catalog = {
   'applications.role.leader.title': 'サークルマスターです',
   'applications.role.leader.description':
     'ボットの状態を確認し、応募状況を見て、サークルのDiscord申請を管理します。',
+
   'applications.role.trainer.title': 'トレーナーです',
   'applications.role.trainer.description':
     '応募したサークルを一覧で確認し、応募履歴をまとめて見られます。',
@@ -511,4 +514,66 @@ export const ja: Catalog = {
   'leader.details.submitted': ({ date }: { date: string }) => `申請日: ${date}`,
   'leader.details.openTicket': 'Discordでチケットを開く',
   'leader.details.ticketGone': 'チケットチャンネルは閉じられました。',
+
+  'account.label': 'アカウント',
+  'account.signIn': 'サインイン',
+  'account.unnamed': 'Discordアカウント',
+  'account.signedInAs': ({ name }: { name: string }) => `${name}としてサインイン中`,
+  'account.settings': '設定',
+  'account.signOut': 'サインアウト',
+  'account.signOutError': 'サインアウトできませんでした。しばらくしてからもう一度お試しください。',
+
+  'settings.title': '設定 · Uma Stable Match',
+  'settings.heading': '設定',
+  'settings.lede': 'Uma Stable Matchのアカウントを管理します。',
+  'settings.link.heading': 'ウマ娘のアカウントを連携',
+  'settings.link.intro':
+    'ゲーム内のプロフィールコメントに短いキーを追加して、そのトレーナーIDが自分のものだと確認します。',
+  'settings.link.label': 'トレーナーID',
+  'settings.link.hint': 'トレーナープロフィールに表示される9〜12桁の数字です。',
+  'settings.link.invalid': '9〜12桁のトレーナーIDを入力してください。',
+  'settings.link.submit': 'アカウントを連携',
+  'settings.link.keyHeading': ({ id }: { id: string }) =>
+    `トレーナー${id}のプロフィールコメントにこのキーを追加してください`,
+  'settings.link.keySteps':
+    'ゲーム内でトレーナープロフィールを開き、コメントを編集してキーをどこかに追加します。その後「確認」を選んでください。uma.moeに新しいコメントが反映されるまで時間がかかることがあります。キーは24時間有効です。',
+  'settings.link.copy': 'キーをコピー',
+  'settings.link.copied': 'コピーしました',
+  'settings.link.check': '確認',
+  'settings.link.checking': '確認中…',
+  'settings.link.cancel': 'キャンセル',
+  'settings.link.verifying': '確認中',
+  'settings.link.verifyingHint':
+    'uma.moeでキーを今すぐ確認し、その後5分間は1分ごとに確認します。このページを離れても確認は続きます。',
+  'settings.link.missing':
+    '5分たってもコメントにキーが見つかりませんでした。uma.moeに表示されているか確かめてから、もう一度「確認」を選んでください。',
+  'settings.link.linked': ({ name }: { name: string }) =>
+    `${name}を連携しました。コメントからキーを削除しても大丈夫です。`,
+  'settings.link.notFound': 'uma.moeでそのトレーナーが見つかりませんでした。',
+  'settings.link.already': 'そのトレーナーはすでに連携されています。',
+  'settings.link.tooMany': ({ n }: { n: number }) =>
+    `連携できるトレーナーは${n}人までです。先にどれかの連携を解除してください。`,
+  'settings.link.tooManyTries': '試行回数が多すぎます。しばらくしてからもう一度お試しください。',
+  'settings.link.expired':
+    'キーの有効期限が切れました。最初からやり直して新しいキーを取得してください。',
+  'settings.link.error': '問題が発生しました。しばらくしてからもう一度お試しください。',
+  'settings.link.linkedHeading': '連携中のトレーナー',
+  'settings.link.none': 'まだ連携しているトレーナーはいません。',
+  'settings.link.unlink': '連携解除',
+  'settings.link.unlinkFor': ({ id }: { id: string }) => `トレーナー${id}の連携を解除`,
+  'settings.link.loadError': '連携中のトレーナーを読み込めませんでした。',
+  'settings.link.unavailable': '現在トレーナーの連携は利用できません。',
+  'settings.session.heading': 'サインアウト',
+  'settings.session.text': 'この端末でのセッションを終了します。',
+  'settings.signOut': 'サインアウト',
+  'settings.delete.heading': 'アカウントを削除',
+  'settings.delete.text':
+    '連携中のトレーナーと確認待ちのキーを削除し、サインアウトします。Botを追加したサークルはそのまま残ります。',
+  'settings.delete.button': 'アカウントを削除',
+  'settings.delete.confirm':
+    'アカウントを削除しますか？連携中のトレーナーは削除され、サインアウトします。元に戻すことはできません。',
+  'settings.delete.yes': '削除',
+  'settings.delete.cancel': 'キャンセル',
+  'settings.delete.error':
+    '今はアカウントを削除できませんでした。しばらくしてからもう一度お試しください。',
 };

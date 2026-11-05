@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use crate::config::DiscordConfig;
 use crate::error::Error;
+use crate::names::Names;
 use crate::opt_in::OptIn;
 use crate::rest::Rest;
 use crate::trainers::TrainerLinks;
@@ -21,6 +22,7 @@ struct Inner {
     http: reqwest::Client,
     opt_in: Option<OptIn>,
     trainer_links: Option<TrainerLinks>,
+    names: Arc<Names>,
 }
 
 impl Discord {
@@ -37,6 +39,7 @@ impl Discord {
                 http,
                 opt_in: None,
                 trainer_links: None,
+                names: Arc::default(),
             }),
         })
     }
@@ -66,6 +69,7 @@ impl Discord {
                 http: inner.http.clone(),
                 opt_in: Some(opt_in),
                 trainer_links: inner.trainer_links.clone(),
+                names: inner.names.clone(),
             }),
         }
     }
@@ -80,6 +84,7 @@ impl Discord {
                 http: inner.http.clone(),
                 opt_in: inner.opt_in.clone(),
                 trainer_links: Some(trainer_links),
+                names: inner.names.clone(),
             }),
         }
     }
@@ -90,5 +95,9 @@ impl Discord {
 
     pub(crate) fn trainer_links(&self) -> Option<&TrainerLinks> {
         self.inner.trainer_links.as_ref()
+    }
+
+    pub(crate) fn names(&self) -> &Names {
+        &self.inner.names
     }
 }

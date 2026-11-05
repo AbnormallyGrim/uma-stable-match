@@ -1,11 +1,14 @@
 <!--
   @component
   The top bar: the brand, linking back to the website, the pages, a button that opens the release
-  notes, a help button that starts the product tour if there is one, and the theme switch. It
-  matches the website's navbar and stays at the top while scrolling.
+  notes, a help button that starts the product tour if there is one, the theme switch and, at the
+  far right for a person signed in with Discord, the account menu. It matches the website's navbar
+  and stays at the top while scrolling.
 -->
 
 <script lang="ts">
+  import { showsAccount } from './account.svelte';
+  import AccountMenu from './AccountMenu.svelte';
   import BrandLogo from './BrandLogo.svelte';
   import { t } from './i18n';
   import LanguageToggle from './LanguageToggle.svelte';
@@ -28,7 +31,7 @@
 </script>
 
 <nav class="navbar" aria-label={t('nav.label')}>
-  <div class="inner">
+  <div class="inner" class:with-account={showsAccount()}>
     <a class="brand" href={WEBSITE}>
       <BrandLogo size={40} />
       <span class="title">{t('app.name')}</span>
@@ -88,6 +91,7 @@
       {/if}
       <LanguageToggle />
       <ThemeToggle />
+      <AccountMenu />
     </div>
   </div>
 </nav>
@@ -115,23 +119,23 @@
 
   /* With room, the brand, pages and tools sit in three columns whose outer two are as wide as the
      wider of them, so the pages stay put from one page to the next. The website's navbar does the
-     same. */
+     same. The account menu or sign-in button makes the tools wider, so then it needs more room. */
   @media (width >= 960px) {
-    .inner {
+    .inner:not(.with-account) {
       display: grid;
       grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
     }
+  }
 
-    .brand {
-      justify-self: start;
-    }
-
-    .tools {
-      justify-self: end;
+  @media (width >= 1100px) {
+    .inner.with-account {
+      display: grid;
+      grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
     }
   }
 
   .brand {
+    justify-self: start;
     display: flex;
     gap: 12px;
     align-items: center;
@@ -141,6 +145,7 @@
   }
 
   .tools {
+    justify-self: end;
     display: flex;
     flex: none;
     gap: 8px;

@@ -2,10 +2,12 @@
   @component
   The pages as a pill of links in the navbar, like the theme switch: the website's home page, the
   club finder and the wishlist page, each with an icon, and the page being shown raised. On narrow
-  screens only the icons show, and a tooltip names each page.
+  screens only the icons show, and a tooltip names each page. With the account menu or sign-in
+  button there, the names wait for a wider screen.
 -->
 
 <script lang="ts">
+  import { showsAccount } from './account.svelte';
   import { t } from './i18n';
   import { currentPage, pages } from './pages';
 
@@ -13,7 +15,7 @@
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- first-party icon drawings from pages.ts -->
-<nav class="pages" aria-label={t('nav.pages')}>
+<nav class="pages" class:with-account={showsAccount()} aria-label={t('nav.pages')}>
   {#each pages() as page (page.id)}
     <a
       class="tooltip"
@@ -82,6 +84,24 @@
   }
 
   @media (width >= 900px) {
+    .pages:not(.with-account) a {
+      padding: 6px 14px;
+    }
+
+    .pages:not(.with-account) .label {
+      position: static;
+      width: auto;
+      height: auto;
+      overflow: visible;
+      clip: auto;
+    }
+
+    .pages:not(.with-account) a::after {
+      display: none;
+    }
+  }
+
+  @media (width >= 1440px) {
     a {
       padding: 6px 14px;
     }

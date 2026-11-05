@@ -207,6 +207,8 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
                 TrainerStore::new(conn.clone(), secret),
                 trainer_lookup(profile_source),
             );
+            // Checks for profile keys keep going in the background, and pick up after a restart.
+            tokio::spawn(trainers.clone().run_checks());
             let store = ClubStore::new(conn);
             let discord = Discord::new(discord.clone())
                 .map_err(RunError::Discord)?

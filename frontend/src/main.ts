@@ -9,9 +9,16 @@ import ClubApplicationsPage from './lib/ClubApplicationsPage.svelte';
 import { fetchFeatures } from './lib/api';
 import { flags } from './lib/flags.svelte';
 import LoginPage from './lib/LoginPage.svelte';
-import { applicationsRoute, clubRoute, isLoginRoute, isWishlistRoute } from './lib/route';
+import {
+  applicationsRoute,
+  clubRoute,
+  isLoginRoute,
+  isSettingsRoute,
+  isWishlistRoute,
+} from './lib/route';
+import SettingsPage from './lib/SettingsPage.svelte';
 import WishlistPage from './lib/WishlistPage.svelte';
-import { signedInUser } from './lib/applications';
+import { loadAccount } from './lib/account.svelte';
 
 Sentry.init({
   dsn: 'https://9e1efba7aae097a3e0c5df71f48e4aeb@o4512370149097472.ingest.us.sentry.io/4512370231279616',
@@ -33,16 +40,19 @@ if (isApplicationsPath) {
     () => false,
   );
 }
-const isProtectedApplications = isApplicationsPath && flags.applications;
+const isSettingsPath = isSettingsRoute(window.location.pathname);
+const isProtected = (isApplicationsPath && flags.applications) || isSettingsPath;
 
 let shouldRedirectToLogin = false;
-if (isProtectedApplications && !isLoginRoute(window.location.pathname)) {
-  const discordId = await signedInUser().catch(() => null);
-  if (discordId === null) {
+if (isProtected) {
+  if ((await loadAccount()) === null) {
     const next = `${window.location.pathname}${window.location.search}`;
     window.location.replace(`/login?next=${encodeURIComponent(next)}`);
     shouldRedirectToLogin = true;
   }
+} else {
+  // Elsewhere the account menu shows once the server answers.
+  void loadAccount();
 }
 
 if (!shouldRedirectToLogin) {
@@ -64,6 +74,8 @@ if (!shouldRedirectToLogin) {
     mount(ApplicationsPage, { target, props: { error: applications.error } });
   } else if (isWishlistRoute(window.location.pathname)) {
     mount(WishlistPage, { target });
+  } else if (isSettingsPath) {
+    mount(SettingsPage, { target });
   } else if (isLoginRoute(window.location.pathname)) {
     mount(LoginPage, { target });
   } else {
