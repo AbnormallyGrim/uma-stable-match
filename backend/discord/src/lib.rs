@@ -4,6 +4,7 @@ mod auth;
 mod bot;
 mod config;
 mod error;
+mod gateway;
 mod guild_access;
 mod interactions;
 mod invites;

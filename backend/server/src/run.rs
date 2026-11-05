@@ -214,6 +214,9 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
                 .map_err(RunError::Discord)?
                 .with_opt_in(OptIn::new(store.clone(), club_lookup(club_source)))
                 .with_trainer_links(trainers);
+            // Keeps the bot showing as online.
+            let gateway = discord.clone();
+            tokio::spawn(async move { gateway.run_gateway().await });
             tracing::info!("serving Discord interactions, club opt-in, settings and trainer links");
             (
                 uma_stable_match_discord::router(discord),
