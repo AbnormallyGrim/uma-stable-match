@@ -12,16 +12,17 @@ use ed25519_dalek::Signature;
 use serde::Deserialize;
 use serde_json::json;
 
+use crate::auth::error;
 use crate::bot::Discord;
 use crate::config::{decode_hex, PublicKey};
 
 /// Path of the interactions endpoint, to set as the Interactions Endpoint URL in Discord.
 pub const INTERACTIONS_PATH: &str = "/discord/interactions";
 
-/// Oldest signature timestamp accepted, either way, so a captured request can't be replayed later.
+/// Largest gap accepted between a signature's timestamp and now, to limit replays.
 pub const MAX_TIMESTAMP_SKEW: Duration = Duration::from_secs(5 * 60);
 
-/// Reply to interactions this server doesn't handle yet.
+/// Reply to unhandled interactions.
 const UNSUPPORTED: &str = "This action isn't available yet.";
 
 const PING: u8 = 1;
@@ -97,10 +98,6 @@ pub(crate) fn verify(
     message.extend_from_slice(timestamp.as_bytes());
     message.extend_from_slice(body);
     key.key().verify_strict(&message, &signature).is_ok()
-}
-
-fn error(status: StatusCode, message: &str) -> Response {
-    (status, Json(json!({ "error": message }))).into_response()
 }
 
 #[cfg(test)]

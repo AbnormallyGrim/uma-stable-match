@@ -1,4 +1,4 @@
-// Applies a saved theme before the page renders, so it never flashes the wrong one.
+// Applies a saved theme before the page renders.
 try {
     const theme = localStorage.getItem('uma-stable-match:theme');
     if (theme === 'light' || theme === 'dark') {

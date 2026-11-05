@@ -6,8 +6,8 @@
 //!   it is used or expires.
 //! - `discord:hits:{action}:{hash}`: how often a user tried an action lately.
 //!
-//! `{hash}` is a keyed hash of the Discord ID, so Redis holds no Discord IDs. The first two have no
-//! TTL, so eviction never removes them; they go when the user unlinks. The others expire.
+//! `{hash}` is a keyed hash of the Discord ID. The first two keys have no TTL and are deleted when
+//! the user unlinks. The others expire.
 
 use std::time::Duration;
 
@@ -80,7 +80,7 @@ end
 return { n, redis.call('TTL', KEYS[1]) }
 ";
 
-/// What a user may try only so often, as each try costs a call to uma.moe or a key in Redis.
+/// A rate-limited user action. Each try costs a call to uma.moe or a key in Redis.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     /// Asking for a verification key: 20 an hour.
@@ -248,7 +248,7 @@ fn pending_key(hash: &str, trainer: u64) -> String {
     format!("{PENDING_PREFIX}{hash}:{trainer}")
 }
 
-/// A keyed hash of a Discord ID, so Redis never holds the ID itself.
+/// A keyed hash of a Discord ID, which Redis stores in place of the ID.
 pub(crate) fn applicant_hash(secret: &KeySecret, user: u64) -> String {
     let mut mac =
         Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("HMAC accepts any key length");

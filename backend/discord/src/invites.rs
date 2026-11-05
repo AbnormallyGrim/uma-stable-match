@@ -21,10 +21,9 @@ const MAX_BARE_LEN: usize = 12;
 /// Invite codes in `description`, in the order they appear, without repeats and at most
 /// [`MAX_INVITE_CANDIDATES`].
 ///
-/// They are guesses: a code is only an invite once Discord resolves it. Links
-/// (`discord.gg/…`, `discord.com/invite/…`, `discordapp.com/invite/…`) count as they are; a bare
-/// code after the word "discord" must also look random (a digit, or capitals inside it), so
-/// ordinary words don't count.
+/// Candidates become invites once Discord resolves them. Links (`discord.gg/…`,
+/// `discord.com/invite/…`, `discordapp.com/invite/…`) count as they are. A bare code after the
+/// word "discord" counts when it looks random: it has a digit, or capitals after the first letter.
 pub fn invite_candidates(description: &str) -> Vec<String> {
     let lower = description.to_ascii_lowercase();
     let mut found: Vec<(usize, String)> = Vec::new();
@@ -54,7 +53,7 @@ pub fn invite_candidates(description: &str) -> Vec<String> {
             continue;
         }
         let mut rest = skip_separators(&description[at + "discord".len()..]);
-        // "discord.gg" and "discordapp" are links or other words, not the word on its own.
+        // Skips "discord" when it runs straight into more text, as in "discord.gg" or "discordapp".
         if rest.len() == description.len() - at - "discord".len() && !rest.is_empty() {
             continue;
         }
@@ -85,9 +84,8 @@ pub fn invite_candidates(description: &str) -> Vec<String> {
     codes
 }
 
-/// The server ID an invite points to, or `None` if Discord doesn't know the invite (expired,
-/// deleted or never real) or it isn't for a server. Other failures are errors, so a Discord outage
-/// isn't read as a missing invite.
+/// The server ID an invite points to, or `None` when Discord answers 404 or the invite has no
+/// server. Other failures are errors.
 pub async fn resolve_invite(rest: &Rest, code: &str) -> Result<Option<u64>, Error> {
     #[derive(serde::Deserialize)]
     struct Invite {
@@ -97,7 +95,7 @@ pub async fn resolve_invite(rest: &Rest, code: &str) -> Result<Option<u64>, Erro
     struct Guild {
         id: String,
     }
-    // Candidates only ever hold letters, digits and hyphens, so the code can't change the path.
+    // Candidates hold letters, digits and hyphens, which are safe in a path segment.
     match rest.get::<Invite>(&format!("/invites/{code}")).await {
         Ok(invite) => Ok(invite.guild.and_then(|guild| guild.id.parse().ok())),
         Err(error) if error.status() == Some(crate::StatusCode::NOT_FOUND) => Ok(None),

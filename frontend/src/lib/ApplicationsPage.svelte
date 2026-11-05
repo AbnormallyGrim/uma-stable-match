@@ -145,8 +145,8 @@
       const details = await fetchClub(candidate, null);
       clubName = details.club.name;
     } catch {
-      // Accept the ID and let the user continue. The backend validates the club when the opt-in
-      // request is sent, and its errors are shown in the confirmation step.
+      // Keeps the ID. The opt-in request validates the club, and the confirmation step shows its
+      // errors.
     } finally {
       checkingClub = false;
     }

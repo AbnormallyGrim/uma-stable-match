@@ -51,7 +51,7 @@ impl Discord {
         &self.inner.rest
     }
 
-    /// The HTTP client for calls made as the signed-in user instead of the bot.
+    /// The HTTP client for calls made as the signed-in user.
     pub(crate) fn http(&self) -> &reqwest::Client {
         &self.inner.http
     }

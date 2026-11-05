@@ -226,8 +226,8 @@ impl SharedCache {
         }
     }
 
-    /// Shared-cache key for a trainer's pace in a month. With Redis, the trainer ID is replaced by
-    /// a keyed hash, so Redis never holds it.
+    /// Shared-cache key for a trainer's pace in a month. With Redis, a keyed hash stands in for the
+    /// trainer ID.
     pub fn pace_key(&self, viewer_id: u64, period: Option<Period>) -> String {
         let id = match &self.backend {
             Backend::None => viewer_id.to_string(),

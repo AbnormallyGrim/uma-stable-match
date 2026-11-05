@@ -102,8 +102,7 @@ fn wants_html(headers: &HeaderMap) -> bool {
         .is_some_and(|accept| accept.contains("text/html"))
 }
 
-/// What an opt-in is meant to do, signed into the `state` so the callback's query string can't
-/// change it.
+/// What an opt-in is meant to do, signed into the `state`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Target {
     /// The club to link.
@@ -322,17 +321,13 @@ pub(crate) fn session_user(config: &DiscordConfig, headers: &HeaderMap) -> Optio
 
 async fn session_info(State(discord): State<Discord>, headers: HeaderMap) -> Response {
     let id = session_user(discord.config(), &headers);
-    let mut response = match id {
+    private(match id {
         Some(id) => Json(Me {
             discord_id: id.to_string(),
         })
         .into_response(),
         None => error(StatusCode::UNAUTHORIZED, "not signed in"),
-    };
-    response
-        .headers_mut()
-        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    response
+    })
 }
 
 async fn sign_out(State(discord): State<Discord>) -> Response {
@@ -433,6 +428,15 @@ pub(crate) fn cookie_values<'a>(
 
 pub(crate) fn error(status: StatusCode, message: &str) -> Response {
     (status, Json(json!({ "error": message }))).into_response()
+}
+
+/// `body` with `Cache-Control: no-store`, for responses that hold a person's data.
+pub(crate) fn private(body: impl IntoResponse) -> Response {
+    let mut response = body.into_response();
+    response
+        .headers_mut()
+        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
 }
 
 #[cfg(test)]

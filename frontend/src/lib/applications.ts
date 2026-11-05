@@ -39,10 +39,7 @@ export function optInUrl(clubId: string): string {
   return `/api/v1/discord/opt-in?${new URLSearchParams({ club: clubId, next: settingsPath(clubId, true) })}`;
 }
 
-/**
- * Parses a club ID taken.
- * Only raw numeric club IDs are accepted
- */
+/** The club ID in `input`: 1 to 18 digits after trimming, else `null`. */
 export function parseClubInput(input: string): string | null {
   const text = input.trim();
   return /^\d{1,18}$/.test(text) ? text : null;

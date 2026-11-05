@@ -4,7 +4,7 @@
 //!   `auto_join`, `open` and `problem`.
 //! - `discord:guild:{guild_id}`: a set of the club IDs linked to that server.
 //!
-//! Neither key has a TTL, so `volatile-lru` eviction never removes them.
+//! Neither key has a TTL, which keeps them out of `volatile-lru` eviction.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -132,7 +132,7 @@ impl SettingsUpdate {
     }
 }
 
-/// Why a store call failed. Holds only the kind of failure, as Redis's messages can hold the URL.
+/// Why a store call failed. Holds the kind of failure, since Redis's messages can contain the URL.
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
     /// Redis answered with an error.

@@ -1,7 +1,7 @@
 name: Deploy
 
-# Deploys the server to Fly.io when run by hand from main. Kept apart from the end-to-end test,
-# which checks out the commit CI ran for, so the manual trigger never reaches that checkout.
+# Deploys the server to Fly.io when run by hand from main. The end-to-end test has its own
+# workflow, which checks out the commit CI ran for.
 on:
   workflow_dispatch:
 
@@ -16,7 +16,7 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to Fly.io
-    # Only a run from main deploys.
+    # Deploys from main.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # FLY_API_TOKEN is a secret of this environment, which can be limited to main. Create it with

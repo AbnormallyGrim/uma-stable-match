@@ -39,7 +39,7 @@ pub struct ClubSummary {
     pub description: Option<String>,
 }
 
-/// The club couldn't be looked up, as opposed to not existing.
+/// The club lookup failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[error("the club could not be looked up")]
 pub struct LookupError;
@@ -203,10 +203,9 @@ async fn unlink(
     }
 }
 
-/// The club with this ID, as `club`, and who may manage it: the signed-in user must own its
-/// server or have Administrator or Manage Server there, checked with Discord each time, as the
-/// same rights are needed to add the bot. Anyone else, or a server the bot can't see, can't prove
-/// them. The `Err` is the response to send.
+/// The club with this ID, as `club`, and the manager's access. The signed-in user must own its
+/// server or have Administrator or Manage Server there, the rights needed to add the bot, checked
+/// with Discord each time. The `Err` is the response to send.
 pub(crate) async fn managed_club(
     discord: &Discord,
     headers: &HeaderMap,
@@ -230,9 +229,8 @@ pub(crate) async fn managed_club(
 }
 
 /// The signed-in user, the club with this ID, as `club`, and what the user can do in the club's
-/// server, checked with Discord each time. Someone who isn't a member, or a server the bot can't
-/// see, can't prove any rights. What the rights allow for this club is up to the caller. The `Err`
-/// is the response to send.
+/// server, checked with Discord each time. The caller decides what the rights allow for this club.
+/// The `Err` is the response to send.
 pub(crate) async fn member_club(
     discord: &Discord,
     headers: &HeaderMap,
@@ -300,8 +298,7 @@ pub(crate) fn store_unavailable(err: &dyn std::fmt::Display) -> Response {
 }
 
 /// Finishes an opt-in from the callback. Links the club only when the same person who started it
-/// approved, and the server Discord says the bot was added to is the one the club's invite points
-/// to. The redirect's own `guild_id` and `permissions` are never read.
+/// approved, and the server in Discord's token response is the one the club's invite points to.
 pub(crate) async fn install(
     discord: &Discord,
     target: Target,
@@ -363,7 +360,7 @@ async fn leave_unless_linked(discord: &Discord, guild_id: u64) {
     match opt_in.store.clubs_on(guild_id).await {
         Ok(clubs) if clubs.is_empty() => leave(discord, guild_id).await,
         Ok(_) => {}
-        // Better to stay in a server than to leave one a club depends on.
+        // Stays in the server when its clubs can't be read.
         Err(err) => tracing::warn!(error = %err, "could not check a server before leaving it"),
     }
 }

@@ -55,7 +55,7 @@ export function applicationsRoute(pathname: string, search: string): Application
   const params = new URLSearchParams(search);
   if (pathname === APPLICATIONS_PATH || pathname === `${APPLICATIONS_PATH}/`) {
     const error = params.get('error');
-    // Only a short label is shown, never text from the address.
+    // Keeps the error when it is a short label, as the page shows it.
     return { page: 'home', error: error !== null && /^[a-z_]{1,32}$/.test(error) ? error : null };
   }
   const match = SETTINGS_PATH.exec(pathname);
