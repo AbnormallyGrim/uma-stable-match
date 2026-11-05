@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+
   import { loginUrl } from './applications';
+  import { applyFeatures } from './features';
   import { APPLICATIONS_PATH } from './route';
   import { language } from './language.svelte';
   import NavBar from './NavBar.svelte';
@@ -10,6 +13,12 @@
   $effect(() => {
     document.documentElement.lang = language.current;
     document.title = 'Sign in to Uma Stable Match';
+  });
+
+  onMount(() => {
+    const features = new AbortController();
+    applyFeatures({ signal: features.signal });
+    return () => features.abort();
   });
 </script>
 

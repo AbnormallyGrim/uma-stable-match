@@ -5,10 +5,11 @@ import './app.css';
 import App from './App.svelte';
 import ClubPage from './lib/ClubPage.svelte';
 import ApplicationsPage from './lib/ApplicationsPage.svelte';
-import { APPLICATIONS_ENABLED } from './lib/flags';
+import ClubApplicationsPage from './lib/ClubApplicationsPage.svelte';
+import { fetchFeatures } from './lib/api';
+import { flags } from './lib/flags.svelte';
 import LoginPage from './lib/LoginPage.svelte';
 import { applicationsRoute, clubRoute, isLoginRoute, isWishlistRoute } from './lib/route';
-import SettingsPage from './lib/SettingsPage.svelte';
 import WishlistPage from './lib/WishlistPage.svelte';
 import { signedInUser } from './lib/applications';
 
@@ -24,11 +25,15 @@ if (!target) {
   throw new Error('missing #app element');
 }
 
-const isProtectedApplications =
-  APPLICATIONS_ENABLED &&
-  (window.location.pathname === '/applications' ||
-    window.location.pathname === '/applications/' ||
-    /^\/applications(?:\/|$)/.test(window.location.pathname));
+// Only the applications pages wait for the flag; elsewhere it just adds a navbar link later.
+const isApplicationsPath = /^\/applications(?:\/|$)/.test(window.location.pathname);
+if (isApplicationsPath) {
+  flags.applications = await fetchFeatures().then(
+    (found) => found.applications,
+    () => false,
+  );
+}
+const isProtectedApplications = isApplicationsPath && flags.applications;
 
 let shouldRedirectToLogin = false;
 if (isProtectedApplications && !isLoginRoute(window.location.pathname)) {
@@ -42,7 +47,7 @@ if (isProtectedApplications && !isLoginRoute(window.location.pathname)) {
 
 if (!shouldRedirectToLogin) {
   const club = clubRoute(window.location.pathname, window.location.search);
-  const applications = APPLICATIONS_ENABLED
+  const applications = flags.applications
     ? applicationsRoute(window.location.pathname, window.location.search)
     : null;
 
@@ -50,8 +55,8 @@ if (!shouldRedirectToLogin) {
 
   if (club) {
     mount(ClubPage, { target, props: { route: club } });
-  } else if (applications?.page === 'settings') {
-    mount(SettingsPage, {
+  } else if (applications?.page === 'club') {
+    mount(ClubApplicationsPage, {
       target,
       props: { clubId: applications.clubId, linked: applications.linked },
     });

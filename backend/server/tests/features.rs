@@ -45,7 +45,10 @@ async fn features(app: axum::Router) -> (StatusCode, Value) {
 async fn everything_is_off_by_default() {
     let (status, body) = features(app(state(), None)).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, json!({ "japanese": false, "web_analytics": null }));
+    assert_eq!(
+        body,
+        json!({ "japanese": false, "applications": false, "web_analytics": null })
+    );
 }
 
 #[tokio::test]
@@ -56,7 +59,20 @@ async fn reports_the_japanese_flag_when_on() {
     };
     let (status, body) = features(app_with_features(state(), None, features_on)).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, json!({ "japanese": true, "web_analytics": null }));
+    assert_eq!(
+        body,
+        json!({ "japanese": true, "applications": false, "web_analytics": null })
+    );
+}
+
+#[tokio::test]
+async fn reports_the_applications_flag_when_on() {
+    let features_on = Features {
+        applications: true,
+        ..Features::default()
+    };
+    let (_, body) = features(app_with_features(state(), None, features_on)).await;
+    assert_eq!(body["applications"], true);
 }
 
 #[tokio::test]

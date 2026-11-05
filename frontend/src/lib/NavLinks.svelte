@@ -7,14 +7,14 @@
 
 <script lang="ts">
   import { t } from './i18n';
-  import { currentPage, PAGES } from './pages';
+  import { currentPage, pages } from './pages';
 
   const current = currentPage(window.location.pathname);
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- first-party icon drawings from pages.ts -->
 <nav class="pages" aria-label={t('nav.pages')}>
-  {#each PAGES as page (page.id)}
+  {#each pages() as page (page.id)}
     <a
       class="tooltip"
       href={page.href}

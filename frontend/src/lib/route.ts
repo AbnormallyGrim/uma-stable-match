@@ -44,11 +44,11 @@ export function isWishlistRoute(pathname: string): boolean {
 /** The address of the club applications page, where a leader sets a club up. */
 export const APPLICATIONS_PATH = '/applications';
 
-/** A club applications page: the start, or one club's settings. */
+/** A club applications page: the start, or one club's page for its leaders. */
 export type ApplicationsRoute =
-  { page: 'home'; error: string | null } | { page: 'settings'; clubId: string; linked: boolean };
+  { page: 'home'; error: string | null } | { page: 'club'; clubId: string; linked: boolean };
 
-const SETTINGS_PATH = /^\/applications\/club\/(\d{1,18})\/?$/;
+const CLUB_APPLICATIONS = /^\/applications\/club\/(\d{1,18})\/?$/;
 
 /** The club applications page `pathname` and `search` point to, or `null` for any other page. */
 export function applicationsRoute(pathname: string, search: string): ApplicationsRoute | null {
@@ -58,14 +58,12 @@ export function applicationsRoute(pathname: string, search: string): Application
     // Keeps the error when it is a short label, as the page shows it.
     return { page: 'home', error: error !== null && /^[a-z_]{1,32}$/.test(error) ? error : null };
   }
-  const match = SETTINGS_PATH.exec(pathname);
-  return match
-    ? { page: 'settings', clubId: match[1]!, linked: params.get('linked') === '1' }
-    : null;
+  const match = CLUB_APPLICATIONS.exec(pathname);
+  return match ? { page: 'club', clubId: match[1]!, linked: params.get('linked') === '1' } : null;
 }
 
-/** The settings page of a club. */
-export function settingsPath(clubId: number | string, linked = false): string {
+/** A club's applications page, where its leaders add the bot and follow applications. */
+export function clubApplicationsPath(clubId: number | string, linked = false): string {
   return `${APPLICATIONS_PATH}/club/${clubId}${linked ? '?linked=1' : ''}`;
 }
 

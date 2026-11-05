@@ -2,8 +2,6 @@
 
 # Builds the web page.
 FROM node:26-bookworm-slim AS frontend
-ARG VITE_APPLICATIONS_ENABLED=false
-ENV VITE_APPLICATIONS_ENABLED=${VITE_APPLICATIONS_ENABLED}
 WORKDIR /build/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci

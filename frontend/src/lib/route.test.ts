@@ -10,7 +10,7 @@ import {
   applicationsRoute,
   rememberedSearch,
   rememberSearch,
-  settingsPath,
+  clubApplicationsPath,
   WISHLIST_PATH,
 } from './route';
 
@@ -107,12 +107,12 @@ describe('applicationsRoute', () => {
 
   it("reads a club's settings page and whether it was just linked", () => {
     expect(applicationsRoute('/applications/club/100000001', '')).toEqual({
-      page: 'settings',
+      page: 'club',
       clubId: '100000001',
       linked: false,
     });
     expect(applicationsRoute('/applications/club/7/', '?linked=1')).toEqual({
-      page: 'settings',
+      page: 'club',
       clubId: '7',
       linked: true,
     });
@@ -132,7 +132,7 @@ describe('applicationsRoute', () => {
 
   it('builds the settings address', () => {
     expect(APPLICATIONS_PATH).toBe('/applications');
-    expect(settingsPath(7)).toBe('/applications/club/7');
-    expect(settingsPath('7', true)).toBe('/applications/club/7?linked=1');
+    expect(clubApplicationsPath(7)).toBe('/applications/club/7');
+    expect(clubApplicationsPath('7', true)).toBe('/applications/club/7?linked=1');
   });
 });

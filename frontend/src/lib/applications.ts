@@ -1,7 +1,7 @@
-/** The club applications side of the API: Discord sign-in, opting a club in, and its settings. */
+/** The club applications side of the API: Discord sign-in, adding the bot and club settings. */
 
 import { ApiError, type RequestOptions } from './api';
-import { APPLICATIONS_PATH, settingsPath } from './route';
+import { APPLICATIONS_PATH, clubApplicationsPath } from './route';
 
 /** A category or role on the club's Discord server. */
 export interface Named {
@@ -21,6 +21,28 @@ export interface Settings {
   roles: Named[];
 }
 
+/** Where an application stands with the club's leaders. */
+export type ApplicationStatus = 'pending' | 'accepted' | 'declined';
+
+/** An application to a club, as the bot posted it to the club's Discord server. */
+export interface Application {
+  id: string;
+  trainerName: string;
+  trainerId: string;
+  /** The applicant's Discord username. */
+  discordName: string;
+  /** Fans per day when they applied. */
+  pace: number;
+  fansThisMonth: number;
+  /** The club they were in when they applied, or `null` for none. */
+  currentClub: string | null;
+  status: ApplicationStatus;
+  /** When they applied, as an ISO 8601 date and time. */
+  submittedAt: string;
+  /** The application's ticket channel in Discord, or `null` once it's gone. */
+  ticketUrl: string | null;
+}
+
 /** What to change. Fields left out stay as they are; `category: null` clears the category. */
 export interface SettingsChange {
   category?: string | null;
@@ -32,17 +54,6 @@ export interface SettingsChange {
 /** The address that sends the visitor to sign in with Discord and back to `next`. */
 export function loginUrl(next: string = APPLICATIONS_PATH): string {
   return `/api/v1/auth/discord/login?${new URLSearchParams({ next })}`;
-}
-
-/** The address that starts opting a club in, ending on the club's settings page. */
-export function optInUrl(clubId: string): string {
-  return `/api/v1/discord/opt-in?${new URLSearchParams({ club: clubId, next: settingsPath(clubId, true) })}`;
-}
-
-/** The club ID in `input`: 1 to 18 digits after trimming, else `null`. */
-export function parseClubInput(input: string): string | null {
-  const text = input.trim();
-  return /^\d{1,18}$/.test(text) ? text : null;
 }
 
 /** The Discord ID of the signed-in leader, or `null` when nobody is signed in. */
@@ -63,23 +74,36 @@ export async function signOut(options: RequestOptions = {}): Promise<void> {
   await send<null>('/api/v1/auth/sign-out', { method: 'POST' }, options);
 }
 
+/** The address that adds the bot to the club's server, coming back to the club's page. */
+export function optInUrl(clubId: string): string {
+  return `/api/v1/discord/opt-in?${new URLSearchParams({ club: clubId, next: clubApplicationsPath(clubId, true) })}`;
+}
+
 /**
- * Checks that opting `clubId` in can start, without leaving the page: the server answers with a
- * redirect to Discord when the club has exactly one working invite, and with an error otherwise.
- *
- * Throws `ApiError`, with the server's status.
+ * Whether the club's description has a working invite to one Discord server, without leaving the
+ * page: the opt-in address only redirects to Discord when it does. Throws `ApiError` for anything
+ * else, such as 401 when signed out.
  */
-export async function checkOptIn(clubId: string, options: RequestOptions = {}): Promise<void> {
+export async function hasInvite(clubId: string, options: RequestOptions = {}): Promise<boolean> {
   const fetchFn = options.fetch ?? globalThis.fetch;
   let response: Response;
   try {
-    response = await fetchFn(optInUrl(clubId), { redirect: 'manual', signal: options.signal });
-  } catch {
+    response = await fetchFn(optInUrl(clubId), {
+      credentials: 'same-origin',
+      redirect: 'manual',
+      signal: options.signal,
+    });
+  } catch (error) {
+    if (options.signal?.aborted) {
+      throw error;
+    }
     throw new ApiError('network', 'Could not reach the server.');
   }
-  // A manual redirect shows up as an opaque response, or with status 0 or a 3xx.
-  if (response.type === 'opaqueredirect' || response.status === 0 || response.status < 400) {
-    return;
+  if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+    return true;
+  }
+  if (response.status === 422) {
+    return false;
   }
   throw await httpError(response);
 }

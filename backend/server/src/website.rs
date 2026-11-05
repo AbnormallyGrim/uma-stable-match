@@ -20,6 +20,8 @@ use crate::frontend;
 
 const IMAGES: &str = "public, max-age=86400";
 const REVALIDATE: &str = "no-cache";
+/// The one app route the website also answers, so its script can read the feature flags.
+const FEATURES_PATH: &str = "/api/v1/features";
 
 /// A static website served for one host name, from `SITE_HOST` and `SITE_DIR`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,8 +39,8 @@ struct Routes {
 }
 
 impl Website {
-    /// Serves the website for requests to [`host`](Self::host), redirects `www.` plus the host to
-    /// it, and passes every other request to `app`.
+    /// Serves the website for requests to [`host`](Self::host), except `GET /api/v1/features`,
+    /// redirects `www.` plus the host to it, and passes every other request to `app`.
     pub fn wrap(&self, app: Router) -> Router {
         let html = fs::read_to_string(self.dir.join("index.html")).unwrap_or_else(|error| {
             tracing::warn!("could not read the website's index.html: {error}");
@@ -84,6 +86,9 @@ async fn dispatch(State(routes): State<Arc<Routes>>, request: Request, next: Nex
         return next.run(request).await;
     };
     if host.eq_ignore_ascii_case(&routes.host) {
+        if request.uri().path() == FEATURES_PATH {
+            return next.run(request).await;
+        }
         match routes.site.clone().oneshot(request).await {
             Ok(response) => response,
             Err(never) => match never {},

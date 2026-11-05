@@ -133,7 +133,7 @@ export const ja: Catalog = {
   'form.trainerIdError': 'トレーナーIDを入力してください(9〜12桁の数字)。',
   'form.paceError': '1日のファン獲得数を百万単位で入力してください(例: 7.6)。',
 
-  'status.loading': 'サークルを検索中…',
+  'status.loading': '�������������������ークルを検索中…',
   'status.waitingTitle': 'サークルのデータを読み込み中です',
   'status.waitingBody': ({ wait }) =>
     `サーバーが初回のサークル取得を行っています(1分ほどかかります)。${wait}後に再試行します。`,
@@ -152,7 +152,7 @@ export const ja: Catalog = {
   'error.network.detail': '接続を確認して、もう一度お試しください。',
   'error.timeout.title': 'サーバーの応答に時間がかかっています',
   'error.invalidResponse.detail':
-    'サーバーから予期しない応答がありました。しばらくしてからもう一度お試しください。',
+    'サーバーから予期し���い���答���あ���ま���た���し���ら���し���からもう一度お試しください。',
   'error.humanCheck.title': '人間であることを確認できませんでした',
   'error.badSearch.title': '検索できませんでした',
   'error.trainerNotFound.title': 'トレーナーが見つかりません',
@@ -167,7 +167,8 @@ export const ja: Catalog = {
 
   'hint.discord': '「Discordあり」をオフにする。',
   'hint.playstyle': 'サークル方針を「指定なし」に戻す。',
-  'hint.closed': '加入方法で「募集停止」を選ぶと、現在募集していないサークルも表示されます。',
+  'hint.closed':
+    '加���方法で���募集停���」を選���と、現���募集し���いない���ークルも表示されます。',
   'hint.balance': 'バランスの強さを下げるか、バランス評価をオフにする。',
   'notice.filtered':
     '加入方法やサークル方針で絞り込んでいるため、いつもより獲得ファン数のペースが離れたサークルが上位に出ることがあります。',
@@ -182,8 +183,8 @@ export const ja: Catalog = {
   'results.topPicks': 'おすすめ',
   'results.allFull':
     '条件に合うサークルはすべて満員です。下の表には表示されていますが、加入できる枠はありません。',
-  'results.none': '条件に合うサークルが見つかりませんでした。',
-  'results.tryThese': '次を試してみてください:',
+  'results.none': '条件に合うサークルが見つかりま���んでし���。',
+  'results.tryThese': '次���試してみて���ださい:',
   'results.fullIncluded':
     '満員(30人中30人)のサークルは、加入できる枠がないため、おすすめには含まれず表のみに表示されます。',
   'results.fullExcluded':
@@ -196,9 +197,9 @@ export const ja: Catalog = {
     'サークルのティアは合計ファン数で決まり、上位メンバーの獲得数に大きく左右されます。このツールはサークルの典型的なメンバーを基準にするため、あなたが真ん中あたりに入れるサークルが選ばれます。上位ティアのサークルの典型的なメンバーよりあなたのペースがかなり低い場合は、1〜2ティア下のサークルが最適になることがあります。',
   'results.topN': ({ n }) => `上位${n}件`,
 
-  'summary.pace': 'あなたのペース',
-  'summary.analysed': '調べたサークル数',
-  'summary.comfortable': 'ちょうどよいサークル',
+  'summary.pace': 'あなた���ペース',
+  'summary.analysed': '調べたサークル���',
+  'summary.comfortable': 'ちょう���よいサークル',
   'summary.comfortableTitle': 'メンバーの上位25%〜60%あたりに入れるサークル',
   'summary.typical': '典型的な順位',
   'summary.typicalTitle': 'これらのサークルでのあなたの順位の中央値',
@@ -226,7 +227,7 @@ export const ja: Catalog = {
 
   'yourClub.heading': 'あなたのサークル',
   'yourClub.best': 'あなたのサークルは、どの検索結果よりもあなたに合っています。',
-  'yourClub.rank': ({ rank }) => `あなたのサークルは検索結果の${rank}位に入ります。`,
+  'yourClub.rank': ({ rank }) => `あ���たのサークルは検索結果${rank}位に入ります。`,
   'yourClub.below': ({ n }) => `あなたのサークルは上位${n}件より下になります。`,
   'yourClub.typical': ({ own, pace }) =>
     `典型的なメンバーの獲得数は${own}で、あなたのペースは${pace}です。`,
@@ -263,7 +264,7 @@ export const ja: Catalog = {
   'chart.labelDaily':
     '今月の各メンバーの1日のファン獲得数を、サークルの中央値とあなたの線と合わせて示す折れ線グラフです。矢印キーで日ごとの値を確認できます。',
   'chart.labelMonth':
-    '今月の各メンバーのファン獲得数の累計を、サークルの中央値とあなたの線と合わせて示す折れ線グラフです。矢印キーで日ごとの値を確認できます。',
+    '今月の各メンバーのファ���獲得数の累���を、サークルの中央値とあなたの線と合わせて示す折れ線グラフです。矢印キーで日ごとの値を確認できます。',
   'chart.members': 'メンバー',
   'chart.median': 'サークルの中央値',
   'chart.you': 'あなた',
@@ -284,7 +285,7 @@ export const ja: Catalog = {
     '「トレーナーID」を選ぶとペースを自動で調べます。「1日の獲得ファン数」を選ぶと自分で入力できます。',
   'tour.field.title': '情報を入力',
   'tour.field.body':
-    'トレーナーIDは、ゲーム内の「メニュー → プロフィール → トレーナーカード」に表示される9〜12桁の数字です。ペースで検索する場合は、1日のファン獲得数を百万単位で入力してください(例: 7.6)。',
+    'トレーナーIDは、ゲーム内の「メニュー → プロフィール → トレーナーカー��」に表示される9〜12桁の数字です。ペースで検索する場合は、1日のファン獲得数を百万単位で入力してください(例: 7.6)。',
   'tour.balance.title': 'バランス評価',
   'tour.balance.body':
     'オンにすると、一部のメンバーだけが支えているサークルの順位が下がります。スライダーで強さを調整できます。',
@@ -296,7 +297,7 @@ export const ja: Catalog = {
     '検索を実行します。検索条件はページのアドレスに保存されるので、ブックマークや共有ができます。',
   'tour.results.title': '結果の見方',
   'tour.results.body':
-    '概要、おすすめをカードで、上位の結果を検索・並べ替えできる表で表示します。トレーナーIDで検索すると、今のサークルとの比較も表示されます。サークル名を選ぶとuma.moeのページが開き、サークルマスターに連絡できます。',
+    '概要、おすすめをカードで、上位の結果を検索・並べ替えできる表で表示します。トレーナーIDで検索すると、今のサークルとの比較も表示されます。サークル名を選ぶとuma.moeのページが開き、サークルマスターに連絡���きます。',
   'tour.howTo.title': '使い方',
   'tour.howTo.body': 'トレーナーIDやペースの調べ方など、手順はここでいつでも確認できます。',
   'tour.theme.title': 'ライト / ダーク',
@@ -310,11 +311,11 @@ export const ja: Catalog = {
   'howTo.step2':
     '<strong>IDで検索する。</strong><strong>トレーナーID</strong>に入力して<strong>サークルを探す</strong>を押します。<strong>この端末にトレーナーIDを記憶する</strong>にチェックすると、次回から自動で入力されます。',
   'howTo.step3': ({ rankings }) =>
-    `<strong>ペースで検索する。</strong><strong>1日の獲得ファン数</strong>に切り替えて、1日に獲得するファン数を百万単位で入力します(<strong>7.6</strong>なら1日760万)。調べるには、<a href="${rankings}" target="_blank" rel="noopener">uma.moeのランキング</a>でトレーナー名またはIDを検索し、1日平均のファン獲得数を確認してください。`,
+    `<strong>ペースで検索する。</strong><strong>1日の獲得ファン数</strong>に切り替えて、1日に獲得するファン数を百万単位で入力します(<strong>7.6</strong>なら1日760万)。調べ���には、<a href="${rankings}" target="_blank" rel="noopener">uma.moeのラン���ング</a>でトレーナー名またはIDを検索し、1日平均のファン獲得数を確認してください。`,
   'howTo.step4':
-    '<strong>必要に応じて調整する。</strong><strong>バランス評価</strong>は、一部のメンバーだけが支えているサークルの順位を下げます。<strong>満員のサークルも含める</strong>は、空きのないサークルを比較用に表へ追加します。<strong>加入方法</strong>(現在募集していないサークルなら<strong>募集停止</strong>など)や<strong>サークル方針</strong>を1つ選ぶと、そのサークルだけが表示されます。もう一度押すか<strong>指定なし</strong>を選ぶと元に戻ります。どちらも候補が少なくなるため、ペースの離れたサークルが上位に出ることがあります。<strong>Discordあり</strong>は、紹介文にDiscordの記載があるサークルに絞ります(あくまで目安です)。',
+    '<strong>必要に応じて調整する。</strong><strong>バランス評価</strong>は、一部のメンバーだけが支えているサークルの順位を下げます。<strong>満員のサークルも含める</strong>は、空きのないサークルを比���用に表へ追加します。<strong>加入方法</strong>(現在募集していないサークルなら<strong>募集停止</strong>など)や<strong>サークル方針</strong>を1つ選ぶと、そのサークルだけが表示されます。もう一度押すか<strong>指定なし</strong>を選ぶと元に戻ります���どちらも候補が少なくなるため、ペースの離れたサークルが上位に出ることがあります。<strong>Discordあり</strong>は、紹介文にDiscordの記載があるサークルに絞ります(あくまで目安です)。',
   'howTo.step5':
-    '<strong>サークルを選ぶ。</strong>まずは<strong>おすすめ</strong>から見てみましょう。メンバーの真ん中あたりに入れるサークルが上位に出ます。<strong>上位の結果</strong>では検索や並べ替えができます。サークル名を選ぶとuma.moeのページが開き、サークルマスターに連絡できます。',
+    '<strong>サークルを選ぶ。</strong>まずは<strong>おすすめ</strong>から見てみましょう。メンバーの真ん中あたりに入れるサークルが上位に出ます。<strong>上位の結果</strong>では検索や並べ替えができます。サークル名を選ぶとuma.moeのページが開き、サ���クルマスターに連絡できます。',
   'howTo.note':
     'ゲームのグローバル版(英語版)に対応しています。トレーナーIDが見つからない場合は、1日の獲得ファン数で検索してください。満員のサークルとあなた自身のサークルは結果に含まれません。自分のサークルとの比較は、トレーナーIDで検索すると表示されます。',
 
@@ -332,7 +333,7 @@ export const ja: Catalog = {
   'wishlist.poll.jpTrainers': '日本版のトレーナーとサークルの投票',
   'wishlist.aboutLabel': '投票について',
   'wishlist.about':
-    'これらの投票は<a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>が運営しており、Uma Stable Matchではありません。あなたの投票はStrawPollが<a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">プライバシーポリシー</a>に基づいて保存・管理します。',
+    'これらの投票は<a href="https://strawpoll.com" target="_blank" rel="noopener noreferrer">StrawPoll</a>が運営しており、Uma Stable Matchでは����ま��ん。あなたの投票はStrawPollが<a href="https://strawpoll.com/privacy" target="_blank" rel="noopener noreferrer">プライバシーポリシー</a>に基づいて保存・管理します。',
 
   'club.applies': 'かんたん応募',
   'club.appliesTitle': 'Uma Stable Matchからこのサークルに直接応募できます',
@@ -341,128 +342,43 @@ export const ja: Catalog = {
   'applications.title': 'サークル申請 · Uma Stable Match',
   'applications.heading': 'どちらに当てはまりますか？',
   'applications.intro':
-    'サークルマスターから応募者まで、次に進むべき一手がひと目で分かるように。サークル運営や応募状況を、一箇所でまとめて確認できます。',
+    'クラブマスターと応募者が、次の一手を見失わないように。サークル申請の管理や進行状況を一か所で確認できます。',
   'applications.requirements':
-    '<ul><li>サークルマスターはDiscord設定と運営状況をまとめて管理できます。</li><li>トレーナーは応募済みのサークルを一覧で確認し、進行状況を把握できます。</li></ul>',
+    '<ul><li>サークルマスターはDiscordの設定とボットの状態を管理できます。</li><li>トレーナーは応募したサークルや進行状況を一覧で確認できます。</li></ul>',
   'applications.privacy': ({ href }: { href: string }) =>
-    `Discordへのサインインはサークル申請の管理のためだけに使われます。<a href="${href}">プライバシー情報</a>をご確認ください。`,
-
-  'applications.session.loading': 'Discordセッションを確認しています…',
+    `Discordへのサインインは、サークル申請の管理のためだけに使われます。<a href="${href}">プライバシー情報</a>をご確認ください。`,
+  'applications.session.loading': 'Discordセッ�����ンを確認しています…',
   'applications.session.signedOut':
     '以下から役割を選んでください。Discordでサインインしてサークルを管理できます。',
-
   'applications.session.signIn': 'Discordでサインイン',
   'applications.session.signedIn': 'Discordセッションは有効です。',
-
   'applications.session.signOut': 'サインアウト',
   'applications.session.error':
     'Discordセッションを確認できませんでした。しばらくしてからもう一度お試しください。',
-
-  'applications.pick.heading': '申請を有効にするサークルを選ぶ',
-  'applications.pick.label': 'サークルURLまたはID',
-  'applications.pick.hint': 'サークルのURLまたはIDを入力して、Discord設定を続けてください。',
-
-  'applications.pick.next': '次へ',
-  'applications.pick.invalid': '有効なサークルIDまたはサークルのURLを入力してください。',
-
-  'applications.confirm.heading': 'サークルを確認',
-  'applications.confirm.club': ({ name }: { name: string }) => name,
-  'applications.confirm.unknownClub': ({ id }: { id: string }) => `サークル ${id}`,
-  'applications.confirm.steps': 'このサークルをDiscordに接続し、応募フローを設定します。',
-
-  'applications.confirm.add': '続行',
-  'applications.confirm.checking': '確認中…',
-  'applications.confirm.back': '別のサークルを選ぶ',
-  'applications.error.heading': '確認が必要です',
-  'applications.error.signIn': '続けるにはDiscordでサインインしてください。',
-
-  'applications.error.notFound':
-    'そのサークルは見つかりませんでした。サークルIDやURLを確認してもう一度お試しください。',
-
-  'applications.error.noInvite':
-    'サークル紹介文に有効なDiscord招待リンクが設定されている必要があります。',
-
-  'applications.error.unavailable':
-    'Discordの設定は一時的に利用できません。しばらくしてからもう一度お試しください。',
-
-  'applications.error.generic': 'サークル申請の設定中に問題が発生しました。',
-
-  'applications.error.invalid_state':
-    'Discordから予期しない応答が返ってきました。もう一度お試しください。',
-
-  'applications.error.denied': 'Discordによりリクエストが拒否されました。もう一度お試しください。',
-
-  'applications.error.discord_error': 'Discordから予期しないエラーが返ってきました。',
-
-  'applications.error.wrong_server':
-    'サークルとDiscordサーバーが招待先と一致していません。招待先を確認してください。',
-
-  'applications.error.no_server':
-    'そのサークルのDiscordサーバーが見つかりませんでした。紹介文に有効な招待リンクを追加してからもう一度お試しください。',
-
-  'applications.error.forbidden': 'このサークルのDiscord設定を管理する権限がありません。',
-
-  'applications.role.heading': 'あなたはどちらですか？',
+  'applications.role.heading': 'どちらに当てはまりますか？',
   'applications.role.leader.title': 'サークルマスターです',
   'applications.role.leader.description':
     'ボットの状態を確認し、応募状況を見て、サークルのDiscord申請を管理します。',
-
   'applications.role.trainer.title': 'トレーナーです',
   'applications.role.trainer.description':
     '応募したサークルを一覧で確認し、応募履歴をまとめて見られます。',
-
-  'settings.title': 'サークルDiscord設定',
-  'settings.heading': ({ name }: { name: string }) => `${name}の設定`,
-  'settings.club': ({ id }: { id: string }) => `サークル ${id}`,
-  'settings.loading': '設定を読み込み中…',
-  'settings.linked': 'このサークルはDiscordに接続済みです。',
-
-  'settings.back': '申請一覧へ戻る',
-  'settings.signIn': 'このサークルを管理するにはDiscordでサインインしてください。',
-
-  'settings.forbidden': 'このサークルのDiscord設定を編集する権限がありません。',
-
-  'settings.notLinked': 'このサークルはまだDiscordと接続されていません。',
-
-  'settings.optIn': '申請を設定する',
-  'settings.loadError': 'サークルのDiscord設定を読み込めませんでした。',
-
-  'settings.open': '応募を受け付ける',
-  'settings.openHint': 'オフにすると、一時的に新規応募を停止できます。',
-
-  'settings.autoJoin': '応募者をサーバーに自動で追加する',
-  'settings.category': 'チケットカテゴリ',
-  'settings.categoryHint': '新しい応募チケットを作成するカテゴリを選択してください。',
-
-  'settings.categoryNone': 'カテゴリが選択されていません',
-  'settings.leaderRoles': 'サークルマスター権限を持つロール',
-  'settings.leaderRolesHint': '応募者に返信できるロールを選択してください。',
-
-  'settings.noRoles': '現在、このサーバーにはロールがありません。',
-
-  'settings.problem': ({ problem }: { problem: string }) => `問題: ${problem}`,
-  'settings.save': '保存',
-  'settings.saving': '保存中…',
-  'settings.saved': '保存しました。',
-
-  'settings.saveError': '変更を保存できませんでした。',
-
-  'settings.unlink': 'サークルの接続を解除',
-  'settings.unlinkHint': 'このサークルのDiscord接続を解除します。',
-
-  'settings.unlinkConfirm': '本当にこのサークルのDiscord接続を解除しますか？',
-  'settings.unlinkYes': '接続を解除',
-  'settings.unlinkError': '今はこのサークルの接続を解除できませんでした。',
-
-  'settings.cancel': 'キャンセル',
-  'settings.unlinked': 'このサークルの接続は解除されました。',
+  'applications.error.generic': 'サークル申請の準備中に問題が発生しました。',
+  'applications.error.wrong_server': 'このDiscordサーバーはこのサークル向けに設定されていません。',
+  'applications.error.no_server': 'このサークルにはまだDiscordサーバーが接続されていません。',
+  'applications.error.denied': 'Discordサインインが拒否されました。もう一度お試しください。',
+  'applications.error.invalid_state':
+    'Discordサインインの状態が無効になりました。もう一度お試しください。',
+  'applications.error.discord_error':
+    'Discordが予期しないエラーを返しました。もう一度���しください。',
+  'applications.error.unavailable':
+    'サークル申請の設定は一時的に利用できません。しばらくしてからもう一度お試しください。',
 
   'footer.tipsSummary': 'サークル移籍のヒント',
   'footer.tip14':
     '<strong>14日ルール:</strong>月間報酬を受け取るには、その月にサークルへ14日以上所属している必要があります。移籍は月初に済ませましょう。',
 
   'footer.tip24':
-    '<strong>24時間のクールダウン:</strong>サークルを抜けると、24時間は別のサークルに加入できません。サークルマスターに除名してもらうとこの制限を避けられるという報告があります。',
+    '<strong>24時間のクールダウン:</strong>サークルを抜けると、24時間は別のサークルに加入できません。サークルマス���ーに除名してもらうとこの制限を避けられるという報告があります���',
 
   'footer.tipLock':
     '<strong>月初のロック:</strong>毎月1日のUTC 10:00〜14:59(日本時間19:00〜23:59)は、サークルの脱退、加入申請、招待ができません。',
@@ -483,8 +399,117 @@ export const ja: Catalog = {
     'Uma Stable Matchは<strong>非公式の非営利ファンツール</strong>です。uma.moeおよび株式会社Cygamesとは提携しておらず、公認・後援も受けていません。',
 
   'footer.data':
-    'サークルとトレーナーのデータは<a href="https://uma.moe" target="_blank" rel="noopener noreferrer">uma.moe</a>から取得しており、遅れや欠けがある場合があります。おすすめは判断の目安となる推定であり、特定のプレイヤーやサークルを評価するものではありません。',
+    'サークルとトレー��ーのデータは<a href="https://uma.moe" target="_blank" rel="noopener noreferrer">uma.moe</a>から取得しており、遅れや欠��がある場合があります。おすすめは判断の目安となる推定であり、特定の��レイヤーやサークルを評価するものではありません。',
 
   'footer.trademark':
     '<em>ウマ娘 プリティーダービー</em>の名称、キャラクター、アートワーク、商標は株式会社Cygamesに帰属します。サークルのティアアイコンは© Cygames, Inc.のもので、Cygamesの<a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener noreferrer">二次創作ガイドライン</a>に沿って非営利で使用しています。',
+
+  'leader.title': 'サークル申請 · Uma Stable Match',
+  'leader.eyebrow': 'サークル申請',
+  'leader.heading': 'あなたのサークル',
+  'leader.loading': '読み込み中…',
+  'leader.signIn':
+    'サインインの有効期限が切れました。このサークルを管理するにはDiscordでサインインしてください。',
+  'leader.forbidden':
+    'このサークルを管理するには、サークルのDiscordサーバーで「サーバー管理」または「管理者」の権限が必要です。',
+  'leader.loadError': 'サークルを読み込めませんでした。しばらくしてからもう一度お試しください。',
+  'leader.linked': 'Botがサーバーに追加されました。',
+  'leader.state.off': '未設定',
+  'leader.state.open': '申請受付中',
+  'leader.state.paused': '一時停止中',
+  'leader.state.problem': '要対応',
+  'leader.callout.problem':
+    '現在、プレイヤーは申請できません。「Botの状態」に表示されている問題を解決してください。',
+  'leader.callout.paused':
+    '申請は一時停止中です。プレイヤーにはこのサークルの申請ボタンが表示されません。',
+  'leader.callout.resume': '再開する',
+  'leader.setup.eyebrow': 'Discordでのサークル申請',
+  'leader.setup.heading': ({ name }: { name: string }) =>
+    `${name}にワンクリックで申請できるようにする`,
+  'leader.setup.yourClub': 'あなたのサークル',
+  'leader.setup.lede':
+    'ここでサークルを見つけたプレイヤーがすぐに申請できます。申請はあなたのDiscordサーバーで確認します。',
+  'leader.flow.applyTitle': 'プレイヤーが申請',
+  'leader.flow.applyText': 'サークルのページや検索結果から申請します。',
+  'leader.flow.ticketTitle': 'Botがチケットを作成',
+  'leader.flow.ticketText': 'サーバー内に、ペースとファン数を載せた専用チャンネルを作ります。',
+  'leader.flow.decideTitle': 'あなたが判断',
+  'leader.flow.decideText': 'Discordで判断し、すべての申請をこのページで確認できます。',
+  'leader.steps.heading': '設定手順',
+  'leader.steps.done': '完了',
+  'leader.steps.todo': '未完了',
+  'leader.steps.invite': 'サークル説明にDiscordサーバーの招待リンクを載せる',
+  'leader.steps.inviteHow':
+    'ゲーム内でサークル説明を編集し、discord.gg/yourcode のような招待リンクを貼り付けてください。サーバーへの招待ならどれでも使え、設定後は期限が切れても構いません。説明は1日1回読み込むため、新しい招待が反映されるまで最大1日かかります。',
+  'leader.steps.inviteFound': 'サークル説明にサーバーへの招待が見つかりました。',
+  'leader.steps.inviteMissing': 'サークル説明に、1つのサーバーへの有効な招待がまだ見つかりません。',
+  'leader.steps.checking': 'サークル説明を確認中…',
+  'leader.steps.checkAgain': 'もう一度確認する',
+  'leader.steps.permissions':
+    'そのサーバーで「サーバー管理」または「管理者」の権限があることを確認する',
+  'leader.steps.permissionsHow':
+    'Botを追加できるのは、どちらかの権限を持つ人だけです。サーバーの所有者は両方を持っています。持っていない場合は、サーバーの管理者に次の手順を依頼してください。',
+  'leader.steps.addBot': 'Botを追加する',
+  'leader.steps.addBotHow':
+    'サーバーが選択された状態でDiscordが開きます。Botを追加すると、このダッシュボードに戻ります。',
+  'leader.addBot': 'Botをサーバーに追加',
+  'leader.status.heading': 'Botの状態',
+  'leader.status.inServer': 'Botはサーバーにいます',
+  'leader.status.problem': ({ problem }: { problem: string }) => `修正が必要です: ${problem}`,
+  'leader.status.category': ({ name }: { name: string }) => `チケットは「${name}」に作成されます`,
+  'leader.status.noCategory': 'チケットカテゴリがまだ選ばれていません',
+  'leader.status.open': '申請受付中',
+  'leader.status.paused': '申請は一時停止中です',
+  'leader.settings.heading': '設定',
+  'leader.settings.open': '申請を受け付ける',
+  'leader.settings.openHint': 'オフにすると、このサークルの申請ボタンが非表示になります。',
+  'leader.settings.autoJoin': '申請者をサーバーに追加する',
+  'leader.settings.autoJoinHint': '申請者は申請時にサーバーへ参加します。',
+  'leader.settings.category': 'チケットカテゴリ',
+  'leader.settings.categoryHint': 'Botが申請ごとにチャンネルを作る場所です。',
+  'leader.settings.categoryNone': '未設定',
+  'leader.settings.save': '保存',
+  'leader.settings.saving': '保存中…',
+  'leader.settings.saved': '保存しました。',
+  'leader.settings.saveError': '変更を保存できませんでした。',
+  'leader.remove.heading': 'Botを外す',
+  'leader.remove.hint':
+    'このサークルの申請を止め、サーバーとの連携を削除します。そのサーバーを使うサークルがほかになければ、Botはサーバーから退出します。',
+  'leader.remove.button': 'このサークルからBotを外す',
+  'leader.remove.confirm': 'このサークルからBotを外しますか？後からもう一度追加できます。',
+  'leader.remove.yes': '外す',
+  'leader.remove.cancel': 'キャンセル',
+  'leader.remove.error': '今はBotを外せませんでした。',
+  'leader.table.heading': '申請',
+  'leader.table.empty': 'まだ申請はありません',
+  'leader.table.emptyHint':
+    'プレイヤーが申請すると、こことサーバー内のチケットチャンネルに表示されます。',
+  'leader.table.trainer': 'トレーナー',
+  'leader.table.submitted': '申請日',
+  'leader.table.pace': 'ペース',
+  'leader.table.fans': '今月のファン数',
+  'leader.table.currentClub': '現在のサークル',
+  'leader.table.noClub': 'なし',
+  'leader.table.status': '状態',
+  'leader.table.actions': '操作',
+  'leader.table.view': '表示',
+  'leader.table.viewFor': ({ name }: { name: string }) => `${name}の申請を表示`,
+  'leader.filter.label': '状態で絞り込む',
+  'leader.filter.all': 'すべて',
+  'leader.filter.pending': '保留中',
+  'leader.filter.accepted': '承認済み',
+  'leader.filter.declined': '不承認',
+  'leader.applicationStatus.pending': '保留中',
+  'leader.applicationStatus.accepted': '承認済み',
+  'leader.applicationStatus.declined': '不承認',
+  'leader.details.heading': ({ name }: { name: string }) => `${name}の申請`,
+  'leader.details.close': '閉じる',
+  'leader.details.intro': 'Botがサーバーに投稿した内容です。',
+  'leader.details.embedTitle': ({ name }: { name: string }) => `${name}への新しい申請`,
+  'leader.details.embedUnnamed': '新しい申請',
+  'leader.details.trainerId': 'トレーナーID',
+  'leader.details.discord': 'Discord',
+  'leader.details.submitted': ({ date }: { date: string }) => `申請日: ${date}`,
+  'leader.details.openTicket': 'Discordでチケットを開く',
+  'leader.details.ticketGone': 'チケットチャンネルは閉じられました。',
 };

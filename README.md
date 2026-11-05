@@ -290,7 +290,7 @@ curl "http://localhost:8080/api/v1/recommendations?trainer_id=123456789012&balan
 | Endpoint | Returns |
 |---|---|
 | `GET /api/v1/health` | `200 OK` while the server is running |
-| `GET /api/v1/features` | The features that are switched on, such as `{"japanese":false,"web_analytics":null}` |
+| `GET /api/v1/features` | The features that are switched on, such as `{"japanese":false,"applications":false,"web_analytics":null}` |
 | `GET /api/v1/clubs/{id}` | A loaded club's current members and their daily fans, and with `trainer_id`, where you'd sit among them. See the [server README](backend/server/README.md#club-page) |
 
 ## Tips for switching clubs

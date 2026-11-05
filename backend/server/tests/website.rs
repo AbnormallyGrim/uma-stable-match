@@ -136,6 +136,18 @@ async fn website_has_no_app_routes_or_page_fallback() {
 }
 
 #[tokio::test]
+async fn website_reads_the_feature_flags_from_the_app() {
+    let dirs = dirs();
+    let reply = get(&server(&dirs), Some(HOST), "/api/v1/features").await;
+    assert_eq!(reply.status, StatusCode::OK);
+    assert!(
+        reply.body.contains("\"applications\":false"),
+        "{}",
+        reply.body
+    );
+}
+
+#[tokio::test]
 async fn redirects_www_to_the_host() {
     let dirs = dirs();
     let reply = get(
