@@ -43,6 +43,44 @@ export interface Application {
   ticketUrl: string | null;
 }
 
+/** An application the signed-in trainer sent to a club. */
+export interface TrainerApplication {
+  id: string;
+  clubId: string;
+  clubName: string;
+  /** The trainer ID they applied with. */
+  trainerId: string;
+  status: ApplicationStatus;
+  /** When they applied, as an ISO 8601 date and time. */
+  submittedAt: string;
+  /** The application's ticket channel in Discord, or `null` once it's gone. */
+  ticketUrl: string | null;
+}
+
+/**
+ * When an application sent at `submittedAt` expires: one calendar month later, on the month's
+ * last day when it has no such date.
+ */
+export function expiresAt(submittedAt: string): Date {
+  const sent = new Date(submittedAt);
+  const expires = new Date(sent);
+  expires.setUTCDate(1);
+  expires.setUTCMonth(expires.getUTCMonth() + 1);
+  const lastDay = new Date(
+    Date.UTC(expires.getUTCFullYear(), expires.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  expires.setUTCDate(Math.min(sent.getUTCDate(), lastDay));
+  return expires;
+}
+
+/** The applications that haven't expired at `now`. */
+export function activeApplications<T extends { submittedAt: string }>(
+  applications: T[],
+  now: Date = new Date(),
+): T[] {
+  return applications.filter((application) => expiresAt(application.submittedAt) > now);
+}
+
 /** What to change. Fields left out stay as they are; `category: null` clears the category. */
 export interface SettingsChange {
   category?: string | null;

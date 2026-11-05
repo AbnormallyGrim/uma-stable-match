@@ -17,6 +17,7 @@ import {
   isWishlistRoute,
 } from './lib/route';
 import SettingsPage from './lib/SettingsPage.svelte';
+import TrainerApplicationsPage from './lib/TrainerApplicationsPage.svelte';
 import WishlistPage from './lib/WishlistPage.svelte';
 import { loadAccount } from './lib/account.svelte';
 
@@ -70,6 +71,8 @@ if (!shouldRedirectToLogin) {
       target,
       props: { clubId: applications.clubId, linked: applications.linked },
     });
+  } else if (applications?.page === 'trainer') {
+    mount(TrainerApplicationsPage, { target });
   } else if (applications && isApplicationHome) {
     mount(ApplicationsPage, { target, props: { error: applications.error } });
   } else if (isWishlistRoute(window.location.pathname)) {

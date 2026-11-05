@@ -3,9 +3,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  activeApplications,
   checkTrainerLink,
   deleteAccount,
   discardVerificationKey,
+  expiresAt,
   fetchLinkedTrainers,
   fetchSettings,
   hasInvite,
@@ -182,5 +184,24 @@ describe('trainer links', () => {
       checking: true,
       seconds_left: 300,
     });
+  });
+});
+
+describe('application expiry', () => {
+  it('expires one calendar month after sending, clamped to the month’s last day', () => {
+    expect(expiresAt('2026-10-05T10:00:00Z').toISOString()).toBe('2026-11-05T10:00:00.000Z');
+    expect(expiresAt('2026-12-20T08:30:00Z').toISOString()).toBe('2027-01-20T08:30:00.000Z');
+    expect(expiresAt('2026-01-31T00:00:00Z').toISOString()).toBe('2026-02-28T00:00:00.000Z');
+  });
+
+  it('keeps only the applications that have not expired', () => {
+    const sent = (submittedAt: string) => ({ submittedAt });
+    const now = new Date('2026-11-05T12:00:00Z');
+    expect(
+      activeApplications(
+        [sent('2026-10-05T11:59:00Z'), sent('2026-10-05T12:00:00Z'), sent('2026-11-01T00:00:00Z')],
+        now,
+      ),
+    ).toEqual([sent('2026-11-01T00:00:00Z')]);
   });
 });

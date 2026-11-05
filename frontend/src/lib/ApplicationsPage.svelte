@@ -14,7 +14,7 @@
   import NavBar from './NavBar.svelte';
   import ReleaseNotes from './ReleaseNotes.svelte';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
-  import { APPLICATIONS_PATH, clubApplicationsPath } from './route';
+  import { APPLICATIONS_PATH, clubApplicationsPath, TRAINER_APPLICATIONS_PATH } from './route';
   import SiteFooter from './SiteFooter.svelte';
 
   interface Props {
@@ -55,9 +55,7 @@
   }
 
   function selectRole(role: RoleKey) {
-    if (role === 'leader') {
-      window.location.assign(clubApplicationsPath(7));
-    }
+    window.location.assign(role === 'leader' ? clubApplicationsPath(7) : TRAINER_APPLICATIONS_PATH);
   }
 
   function appErrorMessage(label: string | null): string | null {

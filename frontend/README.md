@@ -59,7 +59,9 @@ src/lib/ClubApplicationsPage.svelte A club's page for its leaders: adding the bo
 src/lib/BotSetup.svelte       The steps to add the bot, ticked as they're done
 src/lib/BotPanel.svelte       The bot's status, the club's settings and removing the bot
 src/lib/ApplicationsTable.svelte   A club's applications, filtered by status, with ApplicationDetails.svelte for one
-src/lib/applications.ts            The applications API client: sign-in, the invite check, settings, unlink, trainer links and deleting the account
+src/lib/TrainerApplicationsPage.svelte A trainer's own page: the applications they've sent in the last month
+src/lib/TrainerApplicationsTable.svelte A trainer's active applications, filtered by status
+src/lib/applications.ts            The applications API client: sign-in, the invite check, settings, unlink, trainer links, deleting the account and application expiry
 src/lib/SettingsPage.svelte   The settings page: link a trainer ID, sign out, delete the account
 src/lib/AccountMenu.svelte    The navbar's account menu for a person signed in with Discord
 src/lib/account.svelte.ts     Who is signed in, shared by every component
@@ -399,7 +401,7 @@ The navbar keeps the release notes but has no tour button here.
 
 ## Club applications pages
 
-**Feature flag.** The server's `ENABLE_APPLICATIONS` setting, off by default, switches on these pages and the website's `/privacy/` page. It is read at run time from `GET /api/v1/features`, so changing it needs no rebuild. On an `/applications` address, `main.ts` asks for it before mounting; while it is off, or the request fails, these pages aren't mounted, so `/applications` and `/applications/club/{id}` open the club finder like any unknown address. Elsewhere, `applyFeatures()` sets `flags.applications` and `pages()` adds the **Applications** link to the navbar once it's on. The components and their tests don't depend on the flag. The website's `site.js` reads the same endpoint for its privacy page and navbar link; see the notes at the top of that file for what else to change when turning it on.
+**Feature flag.** The server's `ENABLE_APPLICATIONS` setting, off by default, switches on these pages and the website's `/privacy/` page. It is read at run time from `GET /api/v1/features`, so changing it needs no rebuild. On an `/applications` address, `main.ts` asks for it before mounting; while it is off, or the request fails, these pages aren't mounted, so `/applications`, `/applications/club/{id}` and `/applications/mine` open the club finder like any unknown address. Elsewhere, `applyFeatures()` sets `flags.applications` and `pages()` adds the **Applications** link to the navbar once it's on. The components and their tests don't depend on the flag. The website's `site.js` reads the same endpoint for its privacy page and navbar link; see the notes at the top of that file for what else to change when turning it on.
 
 **Placeholder copy.** All text on these pages is lorem ipsum for now: the `applications.*` messages (except `applications.link`, the navbar label), in both languages, and the privacy page's text. Tests read the text through `t()`, so replacing it needs no test changes.
 
@@ -415,6 +417,10 @@ The navbar keeps the release notes but has no tour button here.
 - **Before the bot is added** (a 404), `BotSetup.svelte` explains how applications work and lists three steps with round checkboxes. Only the first can be checked from here: `hasInvite()` calls the opt-in address without following its redirect, so a redirect means the club description has a working invite to one server and a 422 means it doesn't. Until one is found, **Add the bot to my server** stays disabled and **Check again** repeats the check. If the check fails for another reason the button works anyway, since the opt-in checks the invite itself. The other two steps, having Manage Server or Administrator and adding the bot, are done once Discord sends the leader back.
 - **Once it's added**, `BotPanel.svelte` sits beside the applications: the bot's status as a checklist, the settings (**Take applications**, **Add applicants to the server**, **Ticket category**) and **Remove the bot**, which asks once before sending the `DELETE` and then shows the setup steps again. When applications are paused, a notice above the table has a **Resume** button.
 - **Applications.** `ApplicationsTable.svelte` lists them newest first with status filters, as cards on narrow screens, and **View** opens `ApplicationDetails.svelte`, laid out like the message the bot posted, with a link to the ticket channel. No endpoint lists a club's applications yet, so the page passes an empty list and the table shows its empty state.
+
+**A trainer's applications page** (`/applications/mine`, `TRAINER_APPLICATIONS_PATH`) is where a trainer follows the applications they've sent. The **I'm a trainer** card on `/applications` opens it. Like the club's page, it needs a session, so `main.ts` sends a signed-out visitor to `/login` first. It has no bot setup or bot panel: just `TrainerApplicationsTable.svelte`, which lists each application's club (linking to its club page), trainer ID, submitted and expiry dates, status and ticket link, newest first with the same status filters, and as cards on narrow screens.
+
+An application expires one calendar month after it was sent, or on the last day of that month when it has no such date (31 January expires on 28 February). `expiresAt()` in `applications.ts` works this out in UTC, and `activeApplications()` drops the expired ones, so the table only ever shows active applications. No endpoint lists a trainer's applications yet, so the page passes an empty list and the table shows its empty state.
 
 ### Pace chart
 

@@ -406,6 +406,22 @@ export const ja: Catalog = {
   'footer.trademark':
     '<em>ウマ娘 プリティーダービー</em>の名称、キャラクター、アートワーク、商標は株式会社Cygamesに帰属します。サークルのティアアイコンは© Cygames, Inc.のもので、Cygamesの<a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener noreferrer">二次創作ガイドライン</a>に沿って非営利で使用しています。',
 
+  'trainer.title': '自分の申請 · Uma Stable Match',
+  'trainer.eyebrow': 'サークル申請',
+  'trainer.heading': '自分の申請',
+  'trainer.lede':
+    '申請したサークルと、それぞれの申請の状況です。申請は送信から1か月で期限切れになります。',
+  'trainer.table.heading': '有効な申請',
+  'trainer.table.empty': '有効な申請はありません',
+  'trainer.table.emptyHint':
+    'サークル検索からサークルに申請すると、その申請が1か月間ここに表示されます。',
+  'trainer.table.club': 'サークル',
+  'trainer.table.trainerId': 'トレーナーID',
+  'trainer.table.expires': '期限',
+  'trainer.table.ticket': 'チケットを開く',
+  'trainer.table.ticketFor': ({ name }: { name: string }) => `${name}のチケットを開く`,
+  'trainer.table.noTicket': 'チケット終了',
+
   'leader.title': 'サークル申請 · Uma Stable Match',
   'leader.eyebrow': 'サークル申請',
   'leader.heading': 'あなたのサークル',

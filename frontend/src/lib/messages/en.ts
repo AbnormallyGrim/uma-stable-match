@@ -415,6 +415,22 @@ export const en = {
   'footer.trademark':
     '<em>Umamusume: Pretty Derby</em> and its names, characters, artwork and trademarks belong to Cygames, Inc. The club tier icons are © Cygames, Inc. and are used non-commercially in line with Cygames\' <a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener noreferrer">Fan-Created Content Guidelines</a>.',
 
+  'trainer.title': 'My applications · Uma Stable Match',
+  'trainer.eyebrow': 'Club applications',
+  'trainer.heading': 'My applications',
+  'trainer.lede':
+    'The clubs you’ve applied to and where each application stands. Applications expire one month after you send them.',
+  'trainer.table.heading': 'Active applications',
+  'trainer.table.empty': 'No active applications',
+  'trainer.table.emptyHint':
+    'Apply to a club from the club finder and your application shows up here for one month.',
+  'trainer.table.club': 'Club',
+  'trainer.table.trainerId': 'Trainer ID',
+  'trainer.table.expires': 'Expires',
+  'trainer.table.ticket': 'Open ticket',
+  'trainer.table.ticketFor': ({ name }: { name: string }) => `Open your ticket for ${name}`,
+  'trainer.table.noTicket': 'Ticket closed',
+
   'leader.title': 'Club applications · Uma Stable Match',
   'leader.eyebrow': 'Club applications',
   'leader.heading': 'Your club',
