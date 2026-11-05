@@ -9,6 +9,7 @@ import {
   discardVerificationKey,
   expiresAt,
   fetchLinkedTrainers,
+  fetchMyClub,
   fetchSettings,
   hasInvite,
   loginUrl,
@@ -28,12 +29,10 @@ const json = (body: unknown, status = 200) =>
 const settings: Settings = {
   guild_id: '5000',
   category: null,
-  leader_roles: [],
   auto_join: true,
   open: true,
   problem: null,
   categories: [{ id: '10', name: 'Applications' }],
-  roles: [{ id: '20', name: 'Officers' }],
 };
 
 describe('addresses', () => {
@@ -63,6 +62,17 @@ describe('adding the bot', () => {
   it('fails on other answers, such as being signed out', async () => {
     const signedOut = vi.fn<typeof fetch>(async () => json({ error: 'sign in' }, 401));
     await expect(hasInvite('7', { fetch: signedOut })).rejects.toMatchObject({ status: 401 });
+  });
+});
+
+describe('fetchMyClub', () => {
+  it('gives the linked trainer and its club, and fails when signed out', async () => {
+    const body = { trainer: '123456789', club: { id: '7', name: 'Example Club', leader: true } };
+    const ok = vi.fn<typeof fetch>(async () => json(body));
+    expect(await fetchMyClub({ fetch: ok })).toEqual(body);
+    expect(ok.mock.calls[0]?.[0]).toBe('/api/v1/discord/my-club');
+    const signedOut = vi.fn<typeof fetch>(async () => json({ error: 'sign in' }, 401));
+    await expect(fetchMyClub({ fetch: signedOut })).rejects.toMatchObject({ status: 401 });
   });
 });
 

@@ -146,7 +146,6 @@ async fn moving_a_club_leaves_the_old_server_and_drops_its_settings() {
     let record = store.club(club).await.unwrap().unwrap();
     assert_eq!(record.guild_id, new);
     assert_eq!(record.category, None);
-    assert!(record.leader_roles.is_empty());
     assert_eq!(record.problem, None);
     assert!(
         record.auto_join,
@@ -197,25 +196,21 @@ async fn updates_change_only_the_fields_given() {
     store.link(club, guild).await.unwrap();
     let update = SettingsUpdate {
         category: Some(Some(77)),
-        leader_roles: Some(vec![1, 2]),
         ..SettingsUpdate::default()
     };
     assert!(store.update(club, guild, &update).await.unwrap());
     let record = store.club(club).await.unwrap().unwrap();
     assert_eq!(record.category, Some(77));
-    assert_eq!(record.leader_roles, [1, 2]);
     assert!(record.open && record.auto_join);
 
     let clear = SettingsUpdate {
         category: Some(None),
-        leader_roles: Some(vec![]),
         open: Some(false),
         ..SettingsUpdate::default()
     };
     assert!(store.update(club, guild, &clear).await.unwrap());
     let record = store.club(club).await.unwrap().unwrap();
     assert_eq!(record.category, None);
-    assert!(record.leader_roles.is_empty());
     assert!(!record.open && record.auto_join);
     store.unlink(club).await.unwrap();
 }

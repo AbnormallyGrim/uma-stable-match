@@ -41,7 +41,7 @@
 
   // Linked trainers: `null` until loaded.
   let linked = $state<LinkedTrainer[] | null>(null);
-  let max = $state(5);
+  let max = $state(1);
   let listState = $state<'loading' | 'ready' | 'unavailable' | 'error'>('loading');
 
   // Linking: the ID typed, then the key to put in its profile while one is pending.
@@ -176,6 +176,8 @@
       case 401:
         signInAgain();
         return t('settings.link.error');
+      case 403:
+        return t('settings.link.tooMany', { n: max });
       case 409:
         return t('settings.link.already');
       case 429:
@@ -354,6 +356,8 @@
           <p class="hint verifying-hint" role="status">{t('settings.link.verifyingHint')}</p>
         {/if}
       </div>
+    {:else if linked !== null && linked.length >= max}
+      <p class="hint" role="status">{t('settings.link.full')}</p>
     {:else}
       <form class="link-form" onsubmit={startLink} novalidate>
         <label for="trainer-id">{t('settings.link.label')}</label>

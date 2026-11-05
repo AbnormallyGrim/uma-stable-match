@@ -233,23 +233,27 @@ describe('accessibility', () => {
   });
 
   describe('the club applications pages', () => {
+    const leader = () =>
+      json({ trainer: '123456789', club: { id: '7', name: 'Example Club', leader: true } });
     const answer = (routes: Record<string, () => Response>) =>
       vi.stubGlobal(
         'fetch',
         vi.fn((input: string, init?: RequestInit) => {
-          const route = routes[`${init?.method ?? 'GET'} ${input.split('?')[0]}`];
+          const all: Record<string, () => Response> = {
+            'GET /api/v1/discord/my-club': leader,
+            ...routes,
+          };
+          const route = all[`${init?.method ?? 'GET'} ${input.split('?')[0]}`];
           return Promise.resolve(route ? route() : json({ error: 'not found' }, 404));
         }),
       );
     const settings = {
       guild_id: '5000',
       category: '10',
-      leader_roles: ['20'],
       auto_join: true,
       open: true,
       problem: 'made-up problem',
       categories: [{ id: '10', name: 'Applications' }],
-      roles: [{ id: '20', name: 'Officers' }],
     };
 
     it('has no violations when signed out', async () => {
@@ -280,6 +284,13 @@ describe('accessibility', () => {
       answer({ 'GET /api/v1/discord/opt-in': () => json({ error: 'no invite' }, 422) });
       const { container } = render(ClubApplicationsPage, { clubId: '7' });
       await screen.findByRole('button', { name: t('leader.steps.checkAgain') });
+      expect(await violations(container)).toEqual([]);
+    });
+
+    it('has no violations before a trainer is linked', async () => {
+      answer({ 'GET /api/v1/discord/my-club': () => json({ trainer: null, club: null }) });
+      const { container } = render(ClubApplicationsPage);
+      await screen.findByRole('link', { name: t('leader.steps.openSettings') });
       expect(await violations(container)).toEqual([]);
     });
 

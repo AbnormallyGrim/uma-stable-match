@@ -1,5 +1,6 @@
-//! Opting a club in: finding its server from its description, sending its leader to add the bot
-//! there, and linking the club once Discord confirms the bot went to that same server.
+//! Opting a club in: checking the signed-in person leads it, finding its server from its
+//! description, sending them to add the bot there, and linking the club once Discord confirms the
+//! bot went to that same server and they manage it.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -13,18 +14,19 @@ use axum::routing::{delete, get};
 use axum::Router;
 use serde::Deserialize;
 
-use crate::auth::{begin, error, safe_next, send_to_discord, session_user, Failure, Flow, Target};
+use crate::auth::{begin, error, safe_next, send_to_discord, Failure, Flow, Target};
 use crate::bot::Discord;
-use crate::guild_access::{rights, Access, Rights};
+use crate::guild_access::manages;
 use crate::invites::servers_in_description;
+use crate::leaders::{leadership, led_club, managed_club, Leadership, Unchecked};
 use crate::oauth::Authorized;
-use crate::store::{ClubRecord, ClubStore};
+use crate::store::ClubStore;
 
-/// Path that starts opting a club in. Needs a session.
+/// Path that starts opting a club in. Needs a session whose linked trainer leads the club.
 pub const OPT_IN_PATH: &str = "/api/v1/discord/opt-in";
 
 /// Path of a club, with `{club}` the club's ID. `DELETE` unlinks it from its server and needs a
-/// session with Manage Server on the club's server; `GET` says what access the session has.
+/// session whose linked trainer leads the club.
 pub const UNLINK_PATH: &str = "/api/v1/discord/clubs/{club}";
 
 /// The permissions the bot asks for: View Channels, Manage Channels, Manage Roles, Send Messages,
@@ -35,8 +37,12 @@ pub const BOT_PERMISSIONS: u64 =
 /// What opting a club in needs to know about it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClubSummary {
+    /// The club's name.
+    pub name: String,
     /// The club's in-game description, if it has one.
     pub description: Option<String>,
+    /// The leader's trainer ID, if known.
+    pub leader: Option<u64>,
 }
 
 /// The club lookup failed.
@@ -91,6 +97,11 @@ impl OptIn {
     pub fn store(&self) -> &ClubStore {
         &self.store
     }
+
+    /// Where clubs come from.
+    pub(crate) fn clubs(&self) -> &ClubLookup {
+        &self.clubs
+    }
 }
 
 /// Serves the opt-in start route, if opt-in is set up.
@@ -100,9 +111,9 @@ pub(crate) fn router(discord: Discord) -> Router {
     }
     Router::new()
         .route(OPT_IN_PATH, get(start))
-        .route(UNLINK_PATH, delete(unlink).get(crate::clubs::access))
+        .route(UNLINK_PATH, delete(unlink))
         .with_state(discord.clone())
-        .merge(crate::clubs::router(discord.clone()))
+        .merge(crate::leaders::router(discord.clone()))
         .merge(crate::settings::router(discord))
 }
 
@@ -117,20 +128,12 @@ async fn start(
     Query(params): Query<StartParams>,
     headers: HeaderMap,
 ) -> Response {
-    let (Some(opt_in), config) = (discord.opt_in(), discord.config()) else {
-        return error(StatusCode::NOT_FOUND, "not found");
+    let club = params.club.as_deref().unwrap_or_default();
+    let (user, club_id, club) = match led_club(&discord, &headers, club).await {
+        Ok(found) => found,
+        Err(response) => return *response,
     };
-    let Some(user) = session_user(config, &headers) else {
-        return error(StatusCode::UNAUTHORIZED, "sign in with Discord first");
-    };
-    let Some(club_id) = params.club.as_deref().and_then(|id| id.parse::<u64>().ok()) else {
-        return error(StatusCode::BAD_REQUEST, "club must be a club ID");
-    };
-    let club = match opt_in.clubs.get(club_id).await {
-        Ok(Some(club)) => club,
-        Ok(None) => return error(StatusCode::NOT_FOUND, "club not found"),
-        Err(_) => return error(StatusCode::BAD_GATEWAY, "couldn't load the club; try again"),
-    };
+    let config = discord.config();
     let description = club.description.as_deref().unwrap_or_default();
     let servers = match servers_in_description(discord.rest(), description).await {
         Ok(servers) => servers,
@@ -183,7 +186,7 @@ async fn unlink(
     Path(club): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (club_id, _, _) = match managed_club(&discord, &headers, &club).await {
+    let (club_id, _) = match managed_club(&discord, &headers, &club).await {
         Ok(found) => found,
         Err(response) => return *response,
     };
@@ -203,92 +206,6 @@ async fn unlink(
     }
 }
 
-/// The club with this ID, as `club`, and the manager's access. The signed-in user must own its
-/// server or have Administrator or Manage Server there, the rights needed to add the bot, checked
-/// with Discord each time. The `Err` is the response to send.
-pub(crate) async fn managed_club(
-    discord: &Discord,
-    headers: &HeaderMap,
-    club: &str,
-) -> Result<(u64, ClubRecord, Access), Box<Response>> {
-    let (_, club_id, record, rights) = member_club(discord, headers, club).await?;
-    if !rights.manage {
-        metrics::counter!("discord_club_access_total", "result" => "forbidden").increment(1);
-        return Err(Box::new(error(
-            StatusCode::FORBIDDEN,
-            "you need Manage Server on the club's Discord server for this",
-        )));
-    }
-    Ok((
-        club_id,
-        record,
-        Access {
-            roles: rights.roles,
-        },
-    ))
-}
-
-/// The signed-in user, the club with this ID, as `club`, and what the user can do in the club's
-/// server, checked with Discord each time. The caller decides what the rights allow for this club.
-/// The `Err` is the response to send.
-pub(crate) async fn member_club(
-    discord: &Discord,
-    headers: &HeaderMap,
-    club: &str,
-) -> Result<(u64, u64, ClubRecord, Rights), Box<Response>> {
-    let (Some(opt_in), config) = (discord.opt_in(), discord.config()) else {
-        return Err(Box::new(error(StatusCode::NOT_FOUND, "not found")));
-    };
-    let Some(user) = session_user(config, headers) else {
-        return Err(Box::new(error(
-            StatusCode::UNAUTHORIZED,
-            "sign in with Discord first",
-        )));
-    };
-    let Ok(club_id) = club.parse::<u64>() else {
-        return Err(Box::new(error(
-            StatusCode::BAD_REQUEST,
-            "club must be a club ID",
-        )));
-    };
-    let record = match opt_in.store.club(club_id).await {
-        Ok(Some(record)) => record,
-        Ok(None) => {
-            return Err(Box::new(error(
-                StatusCode::NOT_FOUND,
-                "that club isn't linked to a server",
-            )))
-        }
-        Err(err) => return Err(Box::new(store_unavailable(&err))),
-    };
-    let rights = match rights(discord.rest(), record.guild_id, user).await {
-        Ok(rights) => rights,
-        Err(err)
-            if matches!(
-                err.status(),
-                Some(StatusCode::FORBIDDEN | StatusCode::NOT_FOUND)
-            ) =>
-        {
-            None
-        }
-        Err(err) => {
-            tracing::warn!(error = %err, "could not check who manages a Discord server");
-            return Err(Box::new(error(
-                StatusCode::BAD_GATEWAY,
-                "couldn't check your rights on the server; try again",
-            )));
-        }
-    };
-    let Some(rights) = rights else {
-        metrics::counter!("discord_club_access_total", "result" => "forbidden").increment(1);
-        return Err(Box::new(error(
-            StatusCode::FORBIDDEN,
-            "you need Manage Server or a leader role on the club's Discord server for this",
-        )));
-    };
-    Ok((user, club_id, record, rights))
-}
-
 pub(crate) fn store_unavailable(err: &dyn std::fmt::Display) -> Response {
     tracing::warn!(error = %err, "could not reach the Discord club links");
     error(
@@ -298,7 +215,8 @@ pub(crate) fn store_unavailable(err: &dyn std::fmt::Display) -> Response {
 }
 
 /// Finishes an opt-in from the callback. Links the club only when the same person who started it
-/// approved, and the server in Discord's token response is the one the club's invite points to.
+/// approved, the server in Discord's token response is the one the club's invite points to, they
+/// manage that server and they still lead the club.
 pub(crate) async fn install(
     discord: &Discord,
     target: Target,
@@ -332,6 +250,43 @@ pub(crate) async fn install(
             StatusCode::FORBIDDEN,
             "the bot was added to a different server than the one in the club's description",
         ));
+    }
+    match manages(discord.rest(), target.guild, target.user).await {
+        Ok(true) => {}
+        Ok(false) => {
+            leave_unless_linked(discord, target.guild).await;
+            return Err(Failure::new(
+                "not_manager",
+                StatusCode::FORBIDDEN,
+                "you need Manage Server on the club's Discord server to add the bot",
+            ));
+        }
+        Err(err) => {
+            tracing::warn!(error = %err, "could not check who manages a Discord server");
+            return Err(Failure::new(
+                "unavailable",
+                StatusCode::BAD_GATEWAY,
+                "couldn't check your rights on the server; try again",
+            ));
+        }
+    }
+    match leadership(discord, target.user, target.club).await {
+        Ok(Leadership::Leads(_)) => {}
+        Ok(_) => {
+            leave_unless_linked(discord, target.guild).await;
+            return Err(Failure::new(
+                "not_leader",
+                StatusCode::FORBIDDEN,
+                "only the club's leader can add the bot",
+            ));
+        }
+        Err(Unchecked::Store(_) | Unchecked::Lookup) => {
+            return Err(Failure::new(
+                "unavailable",
+                StatusCode::SERVICE_UNAVAILABLE,
+                "couldn't check the club's leader; try again",
+            ));
+        }
     }
     let moved = opt_in
         .store

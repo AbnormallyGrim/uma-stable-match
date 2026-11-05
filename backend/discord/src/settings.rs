@@ -1,4 +1,4 @@
-//! A club's Discord settings, for the people who manage its server.
+//! A club's Discord settings, for the club's leader.
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
@@ -10,17 +10,13 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::auth::error;
 use crate::bot::Discord;
-use crate::guild_access::NamedRole;
-use crate::opt_in::{managed_club, store_unavailable};
+use crate::leaders::managed_club;
+use crate::opt_in::store_unavailable;
 use crate::store::{ClubRecord, SettingsUpdate};
 
 /// Path of a club's settings, with `{club}` the club's ID. `GET` reads them and `PATCH` changes
-/// them. Both need a session with Manage Server on the club's server, checked with Discord
-/// each time.
+/// them. Both need a session whose linked trainer leads the club, checked with uma.moe each time.
 pub const SETTINGS_PATH: &str = "/api/v1/discord/clubs/{club}/settings";
-
-/// Most leader roles a club can have.
-pub const MAX_LEADER_ROLES: usize = 25;
 
 /// Discord's channel type for a category.
 const CATEGORY: u8 = 4;
@@ -41,14 +37,11 @@ struct Named {
 struct Settings {
     guild_id: String,
     category: Option<String>,
-    leader_roles: Vec<String>,
     auto_join: bool,
     open: bool,
     problem: Option<String>,
     /// The server's categories, to pick the ticket category from.
     categories: Vec<Named>,
-    /// The server's roles, to pick the leader roles from.
-    roles: Vec<Named>,
 }
 
 #[derive(Deserialize)]
@@ -65,7 +58,6 @@ struct Channel {
 struct Patch {
     #[serde(default, deserialize_with = "nullable")]
     category: Option<Option<String>>,
-    leader_roles: Option<Vec<String>>,
     auto_join: Option<bool>,
     open: Option<bool>,
 }
@@ -82,12 +74,12 @@ async fn read(
     Path(club): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (_, record, access) = match managed_club(&discord, &headers, &club).await {
+    let (_, record) = match managed_club(&discord, &headers, &club).await {
         Ok(found) => found,
         Err(response) => return *response,
     };
     match categories(&discord, record.guild_id).await {
-        Ok(categories) => Json(view(&record, categories, &access.roles)).into_response(),
+        Ok(categories) => Json(view(&record, categories)).into_response(),
         Err(response) => *response,
     }
 }
@@ -98,7 +90,7 @@ async fn change(
     headers: HeaderMap,
     patch: Result<Json<Patch>, JsonRejection>,
 ) -> Response {
-    let (club_id, record, access) = match managed_club(&discord, &headers, &club).await {
+    let (club_id, record) = match managed_club(&discord, &headers, &club).await {
         Ok(found) => found,
         Err(response) => return *response,
     };
@@ -109,7 +101,7 @@ async fn change(
         Ok(categories) => categories,
         Err(response) => return *response,
     };
-    let update = match checked(&patch, &categories, &access.roles) {
+    let update = match checked(&patch, &categories) {
         Ok(update) => update,
         Err(message) => return error(StatusCode::BAD_REQUEST, message),
     };
@@ -131,19 +123,14 @@ async fn change(
         Err(err) => return store_unavailable(&err),
     }
     match opt_in.store().club(club_id).await {
-        Ok(Some(record)) => Json(view(&record, categories, &access.roles)).into_response(),
+        Ok(Some(record)) => Json(view(&record, categories)).into_response(),
         Ok(None) => error(StatusCode::CONFLICT, "the club was unlinked; reload"),
         Err(err) => store_unavailable(&err),
     }
 }
 
-/// The update `patch` asks for, if its category is one of the server's categories and its roles
-/// are the server's roles.
-fn checked(
-    patch: &Patch,
-    categories: &[Named],
-    roles: &[NamedRole],
-) -> Result<SettingsUpdate, &'static str> {
+/// The update `patch` asks for, if its category is one of the server's categories.
+fn checked(patch: &Patch, categories: &[Named]) -> Result<SettingsUpdate, &'static str> {
     let category = match &patch.category {
         None => None,
         Some(None) => Some(None),
@@ -155,28 +142,8 @@ fn checked(
             Some(Some(id))
         }
     };
-    let leader_roles = match &patch.leader_roles {
-        None => None,
-        Some(ids) => {
-            let mut parsed = Vec::new();
-            for id in ids {
-                let id: u64 = id.parse().map_err(|_| "leader_roles must be role IDs")?;
-                if !roles.iter().any(|role| role.id == id) {
-                    return Err("a leader role isn't a role of the club's server");
-                }
-                if !parsed.contains(&id) {
-                    parsed.push(id);
-                }
-            }
-            if parsed.len() > MAX_LEADER_ROLES {
-                return Err("too many leader roles");
-            }
-            Some(parsed)
-        }
-    };
     let update = SettingsUpdate {
         category,
-        leader_roles,
         auto_join: patch.auto_join,
         open: patch.open,
     };
@@ -211,22 +178,14 @@ async fn categories(discord: &Discord, guild_id: u64) -> Result<Vec<Named>, Box<
     Ok(categories)
 }
 
-fn view(record: &ClubRecord, categories: Vec<Named>, roles: &[NamedRole]) -> Settings {
+fn view(record: &ClubRecord, categories: Vec<Named>) -> Settings {
     Settings {
         guild_id: record.guild_id.to_string(),
         category: record.category.map(|id| id.to_string()),
-        leader_roles: record.leader_roles.iter().map(u64::to_string).collect(),
         auto_join: record.auto_join,
         open: record.open,
         problem: record.problem.clone(),
         categories,
-        roles: roles
-            .iter()
-            .map(|role| Named {
-                id: role.id.to_string(),
-                name: role.name.clone(),
-            })
-            .collect(),
     }
 }
 

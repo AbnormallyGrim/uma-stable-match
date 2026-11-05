@@ -366,6 +366,9 @@ export const ja: Catalog = {
     '応募したサークルを一覧で確認し、応募履歴をまとめて見られます。',
   'applications.error.generic': 'サークル申請の準備中に問題が発生しました。',
   'applications.error.wrong_server': 'このDiscordサーバーはこのサークル向けに設定されていません。',
+  'applications.error.not_manager':
+    'ボットを追加するには、サークルのDiscordサーバーで「サーバー管理」または「管理者」の権限が必要です。',
+  'applications.error.not_leader': 'ボットを追加できるのはサークルマスターだけです。',
   'applications.error.no_server': 'このサークルにはまだDiscordサーバーが接続されていません。',
   'applications.error.denied': 'Discordサインインが拒否されました。もう一度お試しください。',
   'applications.error.invalid_state':
@@ -429,7 +432,7 @@ export const ja: Catalog = {
   'leader.signIn':
     'サインインの有効期限が切れました。このサークルを管理するにはDiscordでサインインしてください。',
   'leader.forbidden':
-    'このサークルを管理するには、サークルのDiscordサーバーで「サーバー管理」または「管理者」の権限が必要です。',
+    'このサークルを管理できるのはサークルマスターだけです。設定で連携しているトレーナーを確認してください。',
   'leader.loadError': 'サークルを読み込めませんでした。しばらくしてからもう一度お試しください。',
   'leader.linked': 'Botがサーバーに追加されました。',
   'leader.state.off': '未設定',
@@ -456,9 +459,16 @@ export const ja: Catalog = {
   'leader.steps.heading': '設定手順',
   'leader.steps.done': '完了',
   'leader.steps.todo': '未完了',
+  'leader.steps.account': 'ウマ娘のアカウントを連携する',
+  'leader.steps.accountHow':
+    '設定でトレーナーIDを連携してください。これでどのサークルのマスターかがわかります。ボットを追加できるのはサークルマスターだけです。',
+  'leader.steps.accountDone': ({ id }: { id: string }) => `トレーナー ${id} を連携済みです。`,
+  'leader.steps.notLeader':
+    'このトレーナーはサークルマスターではありません。ボットを追加できるのはサークルマスターだけです。',
+  'leader.steps.openSettings': '設定を開く',
   'leader.steps.invite': 'サークル説明にDiscordサーバーの招待リンクを載せる',
   'leader.steps.inviteHow':
-    'ゲーム内でサークル説明を編集し、discord.gg/yourcode のような招待リンクを貼り付けてください。サーバーへの招待ならどれでも使え、設定後は期限が切れても構いません。説明は1日1回読み込むため、新しい招待が反映されるまで最大1日かかります。',
+    'これでサーバーがあなたのサークルのものだとわかります。ゲーム内でサークル説明を編集し、discord.gg/yourcode のような招待リンクを貼り付けてください。サーバーへの招待ならどれでも使え、設定後は期限が切れても構いません。新しい説明がuma.moeに反映されるまで時間がかかることがあります。',
   'leader.steps.inviteFound': 'サークル説明にサーバーへの招待が見つかりました。',
   'leader.steps.inviteMissing': 'サークル説明に、1つのサーバーへの有効な招待がまだ見つかりません。',
   'leader.steps.checking': 'サークル説明を確認中…',
@@ -568,7 +578,11 @@ export const ja: Catalog = {
   'settings.link.notFound': 'uma.moeでそのトレーナーが見つかりませんでした。',
   'settings.link.already': 'そのトレーナーはすでに連携されています。',
   'settings.link.tooMany': ({ n }: { n: number }) =>
-    `連携できるトレーナーは${n}人までです。先にどれかの連携を解除してください。`,
+    n === 1
+      ? '連携できるトレーナーは1人だけです。先に連携を解除してください。'
+      : `連携できるトレーナーは${n}人までです。先にどれかの連携を解除してください。`,
+  'settings.link.full':
+    'トレーナーを連携済みです。別のトレーナーを連携するには、先に連携を解除してください。',
   'settings.link.tooManyTries': '試行回数が多すぎます。しばらくしてからもう一度お試しください。',
   'settings.link.expired':
     'キーの有効期限が切れました。最初からやり直して新しいキーを取得してください。',

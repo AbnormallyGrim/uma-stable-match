@@ -68,6 +68,7 @@ pub enum RunError {
 pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunError> {
     let source = source.into();
     let profile_source = source.clone();
+    let club_source = source.clone();
     let metrics = match config.metrics_addr {
         None => None,
         Some(addr) => {
@@ -165,7 +166,6 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
             site.dir.display()
         );
     }
-    let club_details = details.clone();
     let state = AppState {
         cache,
         paces: paces.with_details(details.clone()),
@@ -212,7 +212,7 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
             let store = ClubStore::new(conn);
             let discord = Discord::new(discord.clone())
                 .map_err(RunError::Discord)?
-                .with_opt_in(OptIn::new(store.clone(), club_lookup(club_details)))
+                .with_opt_in(OptIn::new(store.clone(), club_lookup(club_source)))
                 .with_trainer_links(trainers);
             tracing::info!("serving Discord interactions, club opt-in, settings and trainer links");
             (

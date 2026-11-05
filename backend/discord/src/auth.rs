@@ -355,14 +355,11 @@ async fn delete_account(State(discord): State<Discord>, headers: HeaderMap) -> R
     signed_out(&discord)
 }
 
-/// A 204 that clears the session and the remembered server.
+/// A 204 that clears the session.
 fn signed_out(discord: &Discord) -> Response {
-    let config = discord.config();
-    let session = set_cookie(config, SESSION_COOKIE, "", "/", Duration::ZERO);
-    let hint = crate::clubs::clear_hint(config);
+    let session = set_cookie(discord.config(), SESSION_COOKIE, "", "/", Duration::ZERO);
     let mut response = StatusCode::NO_CONTENT.into_response();
     response.headers_mut().append(SET_COOKIE, session);
-    response.headers_mut().append(SET_COOKIE, hint);
     response
 }
 

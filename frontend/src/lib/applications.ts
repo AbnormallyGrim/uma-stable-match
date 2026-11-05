@@ -3,22 +3,20 @@
 import { ApiError, type RequestOptions } from './api';
 import { APPLICATIONS_PATH, clubApplicationsPath } from './route';
 
-/** A category or role on the club's Discord server. */
+/** A category on the club's Discord server. */
 export interface Named {
   id: string;
   name: string;
 }
 
-/** A club's Discord settings, with the server's categories and roles to choose from. */
+/** A club's Discord settings, with the server's categories to choose from. */
 export interface Settings {
   guild_id: string;
   category: string | null;
-  leader_roles: string[];
   auto_join: boolean;
   open: boolean;
   problem: string | null;
   categories: Named[];
-  roles: Named[];
 }
 
 /** Where an application stands with the club's leaders. */
@@ -84,7 +82,6 @@ export function activeApplications<T extends { submittedAt: string }>(
 /** What to change. Fields left out stay as they are; `category: null` clears the category. */
 export interface SettingsChange {
   category?: string | null;
-  leader_roles?: string[];
   auto_join?: boolean;
   open?: boolean;
 }
@@ -212,6 +209,19 @@ function trainerUrl(trainerId: string): string {
   return `/api/v1/discord/trainers/${encodeURIComponent(trainerId)}`;
 }
 
+/** The signed-in person's linked trainer, the club it's in, and whether it leads that club. */
+export interface MyClub {
+  /** The linked trainer ID, or `null` with none linked. */
+  trainer: string | null;
+  /** The trainer's club, or `null` when it's in none. */
+  club: { id: string; name: string; leader: boolean } | null;
+}
+
+/** Where the signed-in person stands with their club. Throws `ApiError`: 401 when signed out. */
+export async function fetchMyClub(options: RequestOptions = {}): Promise<MyClub> {
+  return send<MyClub>('/api/v1/discord/my-club', {}, options);
+}
+
 /** The address that adds the bot to the club's server, coming back to the club's page. */
 export function optInUrl(clubId: string): string {
   return `/api/v1/discord/opt-in?${new URLSearchParams({ club: clubId, next: clubApplicationsPath(clubId, true) })}`;
@@ -220,7 +230,7 @@ export function optInUrl(clubId: string): string {
 /**
  * Whether the club's description has a working invite to one Discord server, without leaving the
  * page: the opt-in address only redirects to Discord when it does. Throws `ApiError` for anything
- * else, such as 401 when signed out.
+ * else, such as 401 when signed out or 403 for someone who doesn't lead the club.
  */
 export async function hasInvite(clubId: string, options: RequestOptions = {}): Promise<boolean> {
   const fetchFn = options.fetch ?? globalThis.fetch;
@@ -246,7 +256,7 @@ export async function hasInvite(clubId: string, options: RequestOptions = {}): P
   throw await httpError(response);
 }
 
-/** The club's settings. Throws `ApiError`: 401 signed out, 403 not allowed, 404 not linked. */
+/** The club's settings. Throws `ApiError`: 401 signed out, 403 not its leader, 404 not linked. */
 export async function fetchSettings(
   clubId: string,
   options: RequestOptions = {},

@@ -1,8 +1,8 @@
 <!--
   @component
   How a club's leader adds the bot to the club's Discord server: what taking applications does,
-  then the steps, ticked as the page can tell they're done. Only the invite can be checked before
-  Discord; the other steps are done once the bot is added.
+  then the steps, ticked as the page can tell they're done. The linked account and the invite can
+  be checked before Discord; the other steps are done once the bot is added.
 -->
 
 <script lang="ts">
@@ -11,18 +11,28 @@
   import { hasInvite, optInUrl } from './applications';
   import DiscordIcon from './DiscordIcon.svelte';
   import { t } from './i18n';
+  import { SETTINGS_PATH } from './route';
 
   interface Props {
-    clubId: string;
+    /** The club the leader leads, or `null` until they lead one. */
+    clubId: string | null;
     /** The club's name, or `null` while it's unknown. */
     clubName: string | null;
+    /** The signed-in person's linked trainer, or `null` with none. */
+    trainer: string | null;
+    /** Whether that trainer leads the club. */
+    leads: boolean;
   }
 
-  let { clubId, clubName }: Props = $props();
+  let { clubId, clubName, trainer, leads }: Props = $props();
 
-  /** `unknown` when the check failed: adding the bot still checks the invite. */
-  type Invite = 'checking' | 'found' | 'missing' | 'unknown';
-  let invite = $state<Invite>('checking');
+  /**
+   * `waiting` until the person leads a club, and `unknown` when the check failed: adding the bot
+   * still checks the invite.
+   */
+  type Invite = 'waiting' | 'checking' | 'found' | 'missing' | 'unknown';
+  let invite = $state<Invite>('waiting');
+  const ready = $derived(leads && clubId !== null);
 
   const flow = [
     ['leader.flow.applyTitle', 'leader.flow.applyText'],
@@ -31,6 +41,9 @@
   ] as const;
 
   async function check(signal?: AbortSignal) {
+    if (clubId === null) {
+      return;
+    }
     invite = 'checking';
     try {
       invite = (await hasInvite(clubId, { signal })) ? 'found' : 'missing';
@@ -43,7 +56,9 @@
 
   onMount(() => {
     const checking = new AbortController();
-    void check(checking.signal);
+    if (ready) {
+      void check(checking.signal);
+    }
     return () => checking.abort();
   });
 </script>
@@ -68,7 +83,27 @@
 <section class="card" aria-labelledby="steps-heading">
   <h2 id="steps-heading">{t('leader.steps.heading')}</h2>
   <ol class="steps">
-    <li class:done={invite === 'found'} class:current={invite !== 'found'}>
+    <li class:done={trainer !== null} class:current={trainer === null}>
+      <span
+        class="box"
+        role="img"
+        aria-label={t(trainer !== null ? 'leader.steps.done' : 'leader.steps.todo')}
+      ></span>
+      <div class="text">
+        <strong>{t('leader.steps.account')}</strong>
+        {#if trainer === null}
+          <p>{t('leader.steps.accountHow')}</p>
+          <a class="link-button" href={SETTINGS_PATH}>{t('leader.steps.openSettings')}</a>
+        {:else}
+          <p>{t('leader.steps.accountDone', { id: trainer })}</p>
+          {#if !leads}
+            <p class="warning" role="status">{t('leader.steps.notLeader')}</p>
+            <a class="link-button" href={SETTINGS_PATH}>{t('leader.steps.openSettings')}</a>
+          {/if}
+        {/if}
+      </div>
+    </li>
+    <li class:done={invite === 'found'} class:current={ready && invite !== 'found'}>
       <span
         class="box"
         role="img"
@@ -82,7 +117,7 @@
           <p>{t('leader.steps.inviteHow')}</p>
           {#if invite === 'checking'}
             <p class="muted" role="status">{t('leader.steps.checking')}</p>
-          {:else}
+          {:else if invite !== 'waiting'}
             {#if invite === 'missing'}
               <p class="warning" role="status">{t('leader.steps.inviteMissing')}</p>
             {/if}
@@ -104,7 +139,7 @@
         <strong>{t('leader.steps.addBot')}</strong>
         <p>{t('leader.steps.addBotHow')}</p>
       </div>
-      {#if invite === 'checking' || invite === 'missing'}
+      {#if clubId === null || !leads || invite === 'waiting' || invite === 'checking' || invite === 'missing'}
         <button class="provider-btn discord" type="button" disabled>
           <span class="provider-icon"><DiscordIcon /></span>{t('leader.addBot')}
         </button>
@@ -208,8 +243,26 @@
     font-size: 0.9rem;
   }
 
-  .text button {
+  .text button,
+  .link-button {
     margin-top: 10px;
+  }
+
+  /* A link to another page, looking like the page's other buttons. */
+  .link-button {
+    display: inline-block;
+    padding: 6px 14px;
+    background: var(--card);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .link-button:hover {
+    background: var(--surface);
   }
 
   .text .warning {

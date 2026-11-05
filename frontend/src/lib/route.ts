@@ -47,13 +47,19 @@ export const APPLICATIONS_PATH = '/applications';
 /** The address of the page where a trainer follows the applications they've sent. */
 export const TRAINER_APPLICATIONS_PATH = `${APPLICATIONS_PATH}/mine`;
 
-/** A club applications page: the start, one club's page for its leaders, or a trainer's own. */
+/** The address of the leader's page, which finds their club from their linked trainer. */
+export const CLUB_APPLICATIONS_PATH = `${APPLICATIONS_PATH}/club`;
+
+/**
+ * A club applications page: the start, the leader's page (with the club when the address names
+ * one), or a trainer's own.
+ */
 export type ApplicationsRoute =
   | { page: 'home'; error: string | null }
-  | { page: 'club'; clubId: string; linked: boolean }
+  | { page: 'club'; clubId: string | null; linked: boolean }
   | { page: 'trainer' };
 
-const CLUB_APPLICATIONS = /^\/applications\/club\/(\d{1,18})\/?$/;
+const CLUB_APPLICATIONS = /^\/applications\/club(?:\/(\d{1,18}))?\/?$/;
 
 /** The club applications page `pathname` and `search` point to, or `null` for any other page. */
 export function applicationsRoute(pathname: string, search: string): ApplicationsRoute | null {
@@ -67,7 +73,9 @@ export function applicationsRoute(pathname: string, search: string): Application
     return { page: 'trainer' };
   }
   const match = CLUB_APPLICATIONS.exec(pathname);
-  return match ? { page: 'club', clubId: match[1]!, linked: params.get('linked') === '1' } : null;
+  return match
+    ? { page: 'club', clubId: match[1] ?? null, linked: params.get('linked') === '1' }
+    : null;
 }
 
 /** A club's applications page, where its leaders add the bot and follow applications. */
