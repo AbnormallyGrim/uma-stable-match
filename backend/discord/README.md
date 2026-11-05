@@ -2,7 +2,7 @@
 
 The Discord side of club applications: a REST client that calls Discord as the bot, the endpoint Discord sends interactions to, such as button clicks, Sign in with Discord, and the club-to-server links kept in Redis. The server mounts it when Discord is configured; see [Discord](../server/README.md#discord-applications) in the server README.
 
-There's no gateway connection and no always-on bot process. Everything the bot does is a REST call, and everything Discord tells it arrives as a signed HTTP request.
+Everything the bot does is a REST call, and everything Discord tells it arrives as a signed HTTP request. The one exception is the [gateway connection](#gateway), which only makes the bot show as online.
 
 ## Usage
 
@@ -54,6 +54,12 @@ Discord limits each route separately, plus a global limit per bot. The client fo
 - **Long waits:** a call that would wait longer than `RateLimitConfig::max_wait` (30 seconds) fails at once with `Error::RateLimited`, so a visitor's request is never held for long.
 
 Two calls made at once can both see one remaining call; the second gets a 429 and is retried. Every response is counted in `discord_requests_total`, labelled by `status`.
+
+## Gateway
+
+`Discord::run_gateway` opens the bot's gateway connection (`twilight-gateway`, no privileged intents) so Discord shows the bot online. It receives no events and sends nothing beyond the heartbeat, a few bytes every 40 seconds or so. It reconnects and resumes by itself, and returns only when Discord closes it for good, such as for a bad token, after which the bot shows offline.
+
+The server spawns it once at startup. Run one instance of the server: each one holds its own connection.
 
 ## Interactions endpoint
 
