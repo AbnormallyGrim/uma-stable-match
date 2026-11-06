@@ -15,6 +15,7 @@ use governor::clock::Clock;
 use governor::{DefaultKeyedRateLimiter, Quota};
 use uma_stable_match_discord::{
     APPLICATIONS_PAGE, APPLY_PATH, CALLBACK_PATH, INTERACTIONS_PATH, OPT_IN_PATH,
+    WEBHOOK_EVENTS_PATH,
 };
 
 use crate::api_error::ApiError;
@@ -93,14 +94,15 @@ fn at_least_one(n: u32) -> NonZeroU32 {
 
 /// `routes`, the Discord routes, behind per-visitor limits: the sign-in callback and starting an
 /// application or an opt-in share the hourly limit, and everything else the per-minute one. The
-/// interactions endpoint isn't limited, as Discord sends it and signs every request.
+/// interactions and webhook events endpoints aren't limited, as Discord sends them and signs every
+/// request.
 pub fn limit_discord(routes: Router, limits: RateLimits) -> Router {
     routes.layer(from_fn_with_state(limits, discord_limit))
 }
 
 async fn discord_limit(State(limits): State<RateLimits>, request: Request, next: Next) -> Response {
     let path = request.uri().path();
-    let (limiter, label) = if path == INTERACTIONS_PATH {
+    let (limiter, label) = if [INTERACTIONS_PATH, WEBHOOK_EVENTS_PATH].contains(&path) {
         return next.run(request).await;
     } else if [CALLBACK_PATH, APPLY_PATH, OPT_IN_PATH].contains(&path) {
         (&limits.discord_sign_ins, "discord_sign_ins")

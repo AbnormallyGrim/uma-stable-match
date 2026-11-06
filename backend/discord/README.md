@@ -73,6 +73,15 @@ Every request must be signed by Discord. The endpoint checks the `X-Signature-Ed
 
 Discord sends a signed PING, and a badly signed request, when the URL is saved in the portal; the endpoint answers the PING with a PONG and rejects the other, as Discord requires. Clicks on a ticket's Accept and Decline buttons are [answered](#applying-to-a-club). Other interactions get a private "This action isn't available yet." reply.
 
+## Webhook events
+
+`router` also serves `POST /discord/webhook-events` (`WEBHOOK_EVENTS_PATH`), the endpoint to set under **Webhooks** in the Discord Developer Portal, with **Events** on and **Application Deauthorized** picked.
+
+- Requests are signed like interactions and checked the same way: a missing or wrong signature, or a timestamp more than 5 minutes off, gets a 401. Discord sends badly signed requests on purpose and removes the URL if one is accepted.
+- A signed PING (`type` 0) gets an empty 204, which Discord needs before it saves the URL.
+- `APPLICATION_DEAUTHORIZED`, sent when someone removes the app from their Discord account, ends every session of `event.data.user` on any device, through the `SessionStore`, and drops their cached name (204). If Redis can't be reached it answers 503, and Discord retries for up to 10 minutes. Trainer links stay, as they belong to the site, not to Discord. Counted in `discord_deauthorizations_total`.
+- Other events get a 204 and are ignored.
+
 ## Sign in with Discord
 
 `router` also serves the OAuth2 sign-in. Add `<PUBLIC_URL>/api/v1/auth/discord/callback` as a Redirect under OAuth2 in the Discord Developer Portal.
@@ -96,7 +105,7 @@ Discord sends a signed PING, and a badly signed request, when the URL is saved i
 | Key | Holds |
 |---|---|
 | `discord:session:revoked:{hash}` | A session that signed out, by a hash of its cookie, until it would have expired. Only that browser's session ends; others stay signed in |
-| `discord:session:ended:{hash}` | When the person, by the keyed hash of their Discord ID, had every session ended, for 12 hours. Deleting the account sets it, and sessions started before then stop working. One started in the same second is kept, so signing in again at once works |
+| `discord:session:ended:{hash}` | When the person, by the keyed hash of their Discord ID, had every session ended, for 12 hours. Deleting the account and removing the app from one's Discord account ([webhook events](#webhook-events)) set it, and sessions started before then stop working. One started in the same second is kept, so signing in again at once works |
 
 **Sign-out's origin.** Browsers send `Origin` with every `POST`. Sign-out is refused when it names another site, so a form elsewhere can't sign people out. The scheme and host must match `PUBLIC_URL`; the port is ignored, so a local dev server's proxy still works. A request with no `Origin` isn't from a browser page and is allowed.
 

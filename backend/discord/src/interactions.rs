@@ -34,11 +34,12 @@ const MANAGE_GUILD: u64 = 1 << 5;
 const ADMINISTRATOR: u64 = 1 << 3;
 const EPHEMERAL: u32 = 1 << 6;
 
-/// Serves `POST /discord/interactions` and the sign-in routes.
+/// Serves `POST /discord/interactions`, the webhook events endpoint and the sign-in routes.
 pub fn router(discord: Discord) -> Router {
     Router::new()
         .route(INTERACTIONS_PATH, post(interactions))
         .with_state(discord.clone())
+        .merge(crate::webhook_events::router(discord.clone()))
         .merge(crate::auth::router(discord))
 }
 
