@@ -26,6 +26,9 @@ export const ja: Catalog = {
   'releases.change.improved': '改善',
   'releases.change.fixed': '修正',
 
+  'releases.trainerLookup.title': 'サークルに所属していないトレーナーが見つからない問題を修正',
+  'releases.trainerLookup.body':
+    'トレーナーIDで検索すると、現在サークルに所属していないトレーナーや、今月まだファン数の増加がないトレーナーにもおすすめが表示されます。',
   'releases.earlyChart.title': '月初めにサークルのグラフが表示されない問題を修正',
   'releases.earlyChart.body':
     '月初めにサークルページのグラフに「データが足りない」と表示されなくなり、今月のデータがそろうまでは先月のグラフを表示します。',
