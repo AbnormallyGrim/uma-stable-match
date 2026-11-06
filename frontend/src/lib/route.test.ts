@@ -12,6 +12,8 @@ import {
   rememberedSearch,
   rememberSearch,
   clubApplicationsPath,
+  clubComparePath,
+  MAX_COMPARED,
   WISHLIST_PATH,
   isSettingsRoute,
 } from './route';
@@ -169,5 +171,42 @@ describe('isSettingsRoute', () => {
     expect(isSettingsRoute('/settings/')).toBe(true);
     expect(isSettingsRoute('/settings/other')).toBe(false);
     expect(isSettingsRoute('/applications')).toBe(false);
+  });
+});
+
+describe('compare route', () => {
+  it('reads the club and its trainers in order', () => {
+    expect(
+      applicationsRoute('/applications/club/7/compare', '?trainers=100000000011,1000-0000-0022'),
+    ).toEqual({ page: 'compare', clubId: '7', trainerIds: ['100000000011', '100000000022'] });
+  });
+
+  it('drops broken and repeated IDs and keeps at most five', () => {
+    const many = Array.from({ length: 8 }, (_, i) => `10000000001${i}`).join(',');
+    expect(
+      applicationsRoute('/applications/club/7/compare/', '?trainers=me,100000000011,100000000011'),
+    ).toEqual({ page: 'compare', clubId: '7', trainerIds: ['100000000011'] });
+    const route = applicationsRoute('/applications/club/7/compare', `?trainers=${many}`);
+    expect(route?.page === 'compare' && route.trainerIds).toHaveLength(MAX_COMPARED);
+  });
+
+  it('shows no trainers without any, and leaves the leader page alone', () => {
+    expect(applicationsRoute('/applications/club/7/compare', '')).toEqual({
+      page: 'compare',
+      clubId: '7',
+      trainerIds: [],
+    });
+    expect(applicationsRoute('/applications/club/7', '')).toEqual({
+      page: 'club',
+      clubId: '7',
+      linked: false,
+    });
+  });
+
+  it('builds the address', () => {
+    expect(clubComparePath(7)).toBe('/applications/club/7/compare');
+    expect(clubComparePath('7', ['100000000011', '100000000022'])).toBe(
+      '/applications/club/7/compare?trainers=100000000011%2C100000000022',
+    );
   });
 });

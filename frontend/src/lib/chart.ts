@@ -3,6 +3,15 @@
 /** What the chart plots. */
 export type ChartMode = 'daily' | 'month';
 
+/** A trainer's line: cumulative fans this month, and last month for the early-month chart. */
+export interface ChartLine {
+  label: string;
+  fans: number[] | null;
+  previousFans: number[] | null;
+  /** A CSS colour. */
+  colour: string;
+}
+
 /** One line: a value for each day index, or `null` where there's no data. */
 export type Series = (number | null)[];
 

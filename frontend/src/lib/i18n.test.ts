@@ -78,6 +78,7 @@ const SAMPLE = {
   high: '8.0M/day',
   gap: '+1.2M/day',
   date: 'October 24, 2026',
+  max: 5,
 } as never;
 
 function text(message: unknown): string {

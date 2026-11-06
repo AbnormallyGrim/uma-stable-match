@@ -427,3 +427,135 @@ async fn a_failed_fetch_shows_this_month_alone_and_tries_again_later() {
         assert_eq!(body["previous"], Value::Null);
     }
 }
+
+const OTHER: u64 = 4343;
+
+async fn mount_other(server: &MockServer, pace: i64) {
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("viewer_id", OTHER.to_string()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "circle": { "circle_id": 3, "name": "Other Club" },
+            "members": [{ "viewer_id": OTHER, "year": 2026, "month": 3, "daily_fans": series(pace) }],
+        })))
+        .mount(server)
+        .await;
+}
+
+#[tokio::test]
+async fn compare_places_each_trainer_among_the_members_alone() {
+    let server = MockServer::start().await;
+    let state = scanned(&server, club_detail(false)).await;
+    mount_trainer(&server, home_club()).await;
+    mount_other(&server, 8_000_000).await;
+
+    let uri = format!("/api/v1/clubs/1/compare?trainer_ids={OTHER},{TRAINER},{OTHER}");
+    let (status, body) = get(&state, &uri).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["club"]["name"], "Page Club");
+    assert_eq!(body["members"].as_array().unwrap().len(), 10);
+    assert_eq!(body["median_per_day"].as_f64().unwrap(), 6.25 * M);
+    // Repeats are dropped and the order is the request's.
+    let trainers = body["trainers"].as_array().unwrap();
+    assert_eq!(trainers.len(), 2);
+    assert_eq!(trainers[0]["trainer_id"], OTHER);
+    assert_eq!(trainers[0]["your_place"], 2);
+    assert_eq!(trainers[0]["club_size"], 11);
+    assert_eq!(trainers[1]["trainer_id"], TRAINER);
+    assert_eq!(trainers[1]["your_place"], 6);
+    assert_eq!(trainers[1]["club_size"], 11);
+    assert_eq!(trainers[1]["daily_fans"], json!(series(6_000_000)));
+    assert_eq!(body["previous"], Value::Null);
+}
+
+#[tokio::test]
+async fn compare_leaves_a_member_candidates_row_out() {
+    let server = MockServer::start().await;
+    let state = scanned(&server, club_detail(true)).await;
+    mount_trainer(&server, club_detail(true)).await;
+
+    let uri = format!("/api/v1/clubs/1/compare?trainer_ids={TRAINER}");
+    let (status, body) = get(&state, &uri).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["members"].as_array().unwrap().len(), 10);
+    assert_eq!(body["trainers"][0]["in_club"], true);
+    assert_eq!(body["trainers"][0]["your_place"], 6);
+}
+
+#[tokio::test]
+async fn compare_rejects_invalid_input() {
+    let server = MockServer::start().await;
+    let state = scanned(&server, club_detail(false)).await;
+    let cases = [
+        (
+            "/api/v1/clubs/abc/compare?trainer_ids=1",
+            "club ID must be a club ID",
+        ),
+        (
+            "/api/v1/clubs/1/compare",
+            "trainer_ids must be 1 to 5 trainer IDs",
+        ),
+        (
+            "/api/v1/clubs/1/compare?trainer_ids=",
+            "trainer_ids must be 1 to 5 trainer IDs",
+        ),
+        (
+            "/api/v1/clubs/1/compare?trainer_ids=me",
+            "trainer_ids must be 1 to 5 trainer IDs",
+        ),
+        (
+            "/api/v1/clubs/1/compare?trainer_ids=1,2,3,4,5,6",
+            "trainer_ids must be 1 to 5 trainer IDs",
+        ),
+    ];
+    for (uri, message) in cases {
+        let (status, body) = get(&state, uri).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{uri}");
+        assert_eq!(body["error"], message, "{uri}");
+    }
+}
+
+#[tokio::test]
+async fn compare_counts_every_lookup_before_fetching_any() {
+    let server = MockServer::start().await;
+    let mut state = scanned(&server, club_detail(false)).await;
+    state.limits = RateLimits::new(10_000, 1, false);
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("viewer_id", TRAINER.to_string()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(home_club()))
+        .expect(0)
+        .mount(&server)
+        .await;
+
+    let uri = format!("/api/v1/clubs/1/compare?trainer_ids={TRAINER},{OTHER}");
+    let (status, _) = get(&state, &uri).await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+}
+
+#[tokio::test]
+async fn compare_adds_last_months_fans_early_in_the_month() {
+    let server = MockServer::start().await;
+    let state = scanned(&server, early_detail()).await;
+    mount_previous(
+        &server,
+        ResponseTemplate::new(200).set_body_json(previous_detail()),
+        1,
+    )
+    .await;
+    mount_trainer(&server, home_club()).await;
+    mount_other(&server, 8_000_000).await;
+    mount_previous_trainer(&server).await;
+
+    let uri = format!("/api/v1/clubs/1/compare?trainer_ids={TRAINER},{OTHER}");
+    let (status, body) = get(&state, &uri).await;
+    assert_eq!(status, StatusCode::OK);
+    let previous = &body["previous"];
+    assert_eq!(previous["month"], "2026-02");
+    let trainers = previous["trainers"].as_array().unwrap();
+    assert_eq!(trainers.len(), 2);
+    assert_eq!(trainers[0], json!(series(5_000_000)));
+    assert!(trainers[1].is_null() || trainers[1].is_array());
+    assert_eq!(
+        previous["members"].as_array().unwrap().len(),
+        body["members"].as_array().unwrap().len()
+    );
+}

@@ -108,6 +108,8 @@ The private `/status`, on the metrics address, reports the running scan's phase 
 
 `GET /api/v1/clubs/{id}` answers from clubs already in memory or Redis and never fetches one. Early in the month it fetches a loaded club's previous month, kept in memory for 10 minutes, so the page can chart last month. With `trainer_id`, it looks up the trainer like a search and places them among the members.
 
+`GET /api/v1/clubs/{id}/compare` is the same for up to 5 trainers at once, for the leader's applicant comparison: each is placed among the members alone, and every lookup is counted against the visitor's limit before the first fetch.
+
 ## Caches
 
 The server keeps everything in memory. Without Redis, restarting it starts with an empty cache and a fresh scan. With Redis, a restarted server loads the current published scan, the refresh schedule and the cached clubs from Redis instead. The bundled Redis keeps its data on disk, so they also survive a Redis restart.
