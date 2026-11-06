@@ -92,7 +92,7 @@ src/lib/messages/en.ts        Every message in English, and the shape other lang
 src/lib/messages/ja.ts        The same messages in Japanese
 src/lib/language.ts           Saving the language choice, and which language to show
 src/lib/language.svelte.ts    The language shown right now, shared by every component
-src/lib/SiteFooter.svelte     Tips, the logo, a link to report a problem, and the disclaimer
+src/lib/SiteFooter.svelte     Tips, the logo, buttons to report a problem and support the project, the disclaimer, and a Privacy Policy link once applications are on
 src/lib/BrandLogo.svelte      The logo, in the version for the current theme
 src/lib/api.ts                Typed API client
 src/lib/features.ts           Switches on Japanese, applications and analytics from the server's features, on every page
@@ -312,7 +312,7 @@ Card descriptions are capped at `80ch` so they stay easy to read on wide screens
 
 ### Footer
 
-`SiteFooter.svelte` is the page's `<footer>` landmark, below `<main>`.
+`SiteFooter.svelte` is the page's `<footer>` landmark, below `<main>`. Its last line is a **Privacy Policy** link to the website's `/privacy/` page, in a new tab, shown only once `flags.applications` is on, because the website redirects that page home until then.
 
 | Part | Content |
 |---|---|
@@ -403,13 +403,13 @@ The navbar keeps the release notes but has no tour button here.
 
 **Feature flag.** The server's `ENABLE_APPLICATIONS` setting, off by default, switches on these pages and the website's `/privacy/` page. It is read at run time from `GET /api/v1/features`, so changing it needs no rebuild. On an `/applications` address, `main.ts` asks for it before mounting; while it is off, or the request fails, these pages aren't mounted, so `/applications`, `/applications/club/{id}` and `/applications/mine` open the club finder like any unknown address. Elsewhere, `applyFeatures()` sets `flags.applications` and `pages()` adds the **Applications** link to the navbar once it's on. The components and their tests don't depend on the flag. The website's `site.js` reads the same endpoint for its privacy page and navbar link; see the notes at the top of that file for what else to change when turning it on.
 
-**Placeholder copy.** All text on these pages is lorem ipsum for now: the `applications.*` messages (except `applications.link`, the navbar label), in both languages, and the privacy page's text. Tests read the text through `t()`, so replacing it needs no test changes.
+**Placeholder copy.** All text on these pages is lorem ipsum for now: the `applications.*` messages (except `applications.link`, the navbar label), in both languages. The website's privacy page is real, English-only text. Tests read the text through `t()`, so replacing it needs no test changes.
 
 `/applications`, `/applications/club` and `/applications/club/{id}` are where a club leader sets up applications through Discord. `main.ts` mounts `ApplicationsPage.svelte` or `ClubApplicationsPage.svelte`; `applicationsRoute()` reads the address and `clubApplicationsPath()` builds it. A **Club applications** link joins the navbar's pages. `applications.ts` wraps the [Discord endpoints](../backend/discord/README.md); they aren't behind the human check, and they use the session cookie, so requests are same-origin.
 
-**The page at `/applications`** says what taking applications through Discord does and what it needs, in the wording written for club leaders: a working invite in the club description while opting in, and Manage Server or Administrator in the server. It links to the website's [privacy section](../site/index.md). Then:
+**The page at `/applications`** says what taking applications through Discord does and what it needs, in the wording written for club leaders: a working invite in the club description while opting in, and Manage Server or Administrator in the server. It has no sign-out button or privacy link of its own: signing out is in the account menu and the settings page, and the privacy link is in the footer and on the sign-in page. Then:
 
-1. **Sign in:** a signed-out visitor gets **Sign in with Discord**, which goes through `/api/v1/auth/discord/login` and comes back here. A signed-in one sees **Sign out**.
+1. **Sign in:** only the sign-in page (`LoginPage.svelte`) offers **Sign in with Discord**, which goes through `/api/v1/auth/discord/login` and comes back here. The page links to the website's privacy page beneath its card.
 2. **Result:** Discord sends the leader to the club's applications page with `?linked=1`. If something fails in the callback, the server sends the browser back to `/applications?error=<label>`, and the page shows what each label means (`wrong_server`, `no_server`, `not_manager`, `not_leader`, `denied`, `invalid_state`, `discord_error`, `unavailable`). An unknown label reads as a generic problem, and only a short lowercase label is accepted from the address.
 
 **The applicant comparison** (`ClubComparePage.svelte`) is at `/applications/club/{id}/compare?trainers=a,b`, opened by **Compare in club** in an application's details. It's for the club's leader only: the page checks `fetchMyClub()` says they lead club `{id}` and otherwise shows the same sign-in and forbidden messages as the applications page. It calls `fetchClubCompare()`, which wraps [`GET /api/v1/clubs/{id}/compare`](../backend/server/README.md#comparing-trainers) with the [human check](#human-check), and shows the club's chart (`PaceChart`'s `lines`: one coloured line per trainer, up to 5) and, below it, one list of the members and the compared trainers, ranked together (`compareRows()`): a trainer's card is placed after everyone faster, shows their live pace, the gap to the club median and a remove button, and takes a place in the numbering like a member. (The server's `your_place` is each trainer among the members alone; the page doesn't show it.) It starts with the trainers in the address, normally one applicant. The leader adds more from the club's active applications or by trainer ID, up to 5 (`MAX_COMPARED`), and removes any but the last; the address follows with `history.replaceState`. The club's size doesn't matter, so nothing is hidden when the club is full.

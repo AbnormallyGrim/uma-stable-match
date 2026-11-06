@@ -1,4 +1,4 @@
-// Whether the club applications privacy page (/privacy/) and its navbar link are shown, from the
+// Whether the privacy page (/privacy/) and the applications navbar link are shown, from the
 // server's ENABLE_APPLICATIONS. While it is off, or the server can't be asked, the page sends
 // visitors to the home page. When turning it on, also remove the noindex tag from
 // privacy/index.html, and add /privacy/ back to sitemap.xml and index.md.
@@ -133,25 +133,14 @@ if (location.hostname === 'site.localhost') {
         'faq.6.a': 'トレーナーID(ゲーム内の「メニュー」→「プロフィール」にある9〜12桁の数字)か、1日のファン獲得数です。インストールもアカウント作成も必要ありません。',
         'faq.7.q': 'インストールせずにブラウザで使えますか?',
         'faq.7.a': 'はい。スマートフォンやパソコンで<a href="https://app.umastable.com">app.umastable.com</a>を開き、トレーナーIDか1日のファン獲得数を入力してください。',
-        'privacy.title': 'Do eiusmod tempor incididunt ut',
-        'privacy.signin.q': 'Ex ea commodo consequat duis aute irure dolor?',
-        'privacy.signin.a': 'In reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt in culpa qui officia deserunt mollit anim id est laborum lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
-        'privacy.kept.q': 'Duis aute irure dolor in reprehenderit in?',
-        'privacy.kept.a': 'Voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt in culpa qui officia deserunt mollit anim id est laborum lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor in reprehenderit.',
-        'privacy.shared.q': 'In voluptate velit esse cillum dolore eu?',
-        'privacy.shared.a': 'Fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt in culpa qui officia deserunt mollit anim id est laborum lorem ipsum.',
-        'privacy.delete.q': 'Dolor sit amet consectetur adipiscing elit sed?',
-        'privacy.delete.a': 'Lorem ipsum dolor sit amet <a href="https://app.umastable.com/applications">consectetur</a> adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation <a href="https://github.com/AbnormallyGrim/uma-stable-match/issues" target="_blank" rel="noopener">ullamco</a> laboris nisi ut aliquip ex ea commodo consequat.',
         'footer.links': 'プロジェクトのリンク',
         'footer.report': '問題を報告',
+        'footer.privacy': 'プライバシーポリシー',
         'footer.kofi': 'にんじんをおごる',
         'footer.support': '任意の支援はホスティング費用に充てられます。すべての機能は無料のままです。',
         'footer.unofficial': 'Uma Stable Matchは<strong>非公式の非営利ファンツール</strong>です。uma.moeおよび株式会社Cygamesとは提携しておらず、公認・後援も受けていません。',
         'footer.data': 'サークルとトレーナーのデータは<a href="https://uma.moe" target="_blank" rel="noopener noreferrer">uma.moe</a>から取得しており、遅れや欠けがある場合があります。おすすめは判断の目安となる推定であり、特定のプレイヤーやサークルを評価するものではありません。',
         'footer.trademark': '<em>ウマ娘 プリティーダービー</em>の名称、キャラクター、アートワーク、商標は株式会社Cygamesに帰属します。サークルのティアアイコンは© Cygames, Inc.のもので、Cygamesの<a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener noreferrer">二次創作ガイドライン</a>に沿って非営利で使用しています。',
-        'privacy.page.intro': 'Labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip.',
-        'meta.privacy.title': 'Lorem ipsum dolor sit amet consectetur adipiscing elit sed',
-        'meta.privacy.description': 'Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna.',
     };
 
     // The page's own English, kept so a switch back restores it.

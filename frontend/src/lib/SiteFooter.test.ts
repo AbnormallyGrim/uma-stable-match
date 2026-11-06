@@ -3,10 +3,15 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { flags } from './flags.svelte';
+import { websiteUrl } from './pages';
 import SiteFooter from './SiteFooter.svelte';
 
 describe('SiteFooter', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    flags.applications = false;
+  });
 
   it('is the page footer landmark with the disclaimer', () => {
     render(SiteFooter);
@@ -53,6 +58,25 @@ describe('SiteFooter', () => {
       '_blank',
       'noopener,noreferrer',
     );
+  });
+
+  it('ends with a Privacy Policy link once the applications flag is on', () => {
+    const { unmount } = render(SiteFooter);
+    expect(screen.queryByRole('link', { name: 'Privacy Policy' })).toBeNull();
+    unmount();
+    flags.applications = true;
+    render(SiteFooter);
+    const link = screen.getByRole('link', { name: 'Privacy Policy' });
+    expect(link).toHaveAttribute('href', `${websiteUrl(window.location)}/privacy/`);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    const links = within(screen.getByRole('contentinfo')).getAllByRole('link');
+    expect(links.at(-1)).toBe(link);
+    expect(
+      within(screen.getByRole('navigation', { name: 'Project links' })).queryByText(
+        'Privacy Policy',
+      ),
+    ).toBeNull();
   });
 
   it('shows the Free carats button only on 1 April', async () => {
