@@ -98,7 +98,7 @@ pub(crate) struct OAuthState {
 pub const APPLICATIONS_PAGE: &str = "/applications";
 
 /// Whether the request is a page load, which asks for HTML.
-fn wants_html(headers: &HeaderMap) -> bool {
+pub(crate) fn wants_html(headers: &HeaderMap) -> bool {
     headers
         .get(ACCEPT)
         .and_then(|value| value.to_str().ok())
@@ -126,6 +126,7 @@ pub(crate) fn router(discord: Discord) -> Router {
         .route(ACCOUNT_PATH, delete(delete_account))
         .with_state(discord.clone())
         .merge(crate::trainers::router(discord.clone()))
+        .merge(crate::apply::router(discord.clone()))
         .merge(crate::opt_in::router(discord))
 }
 
@@ -241,6 +242,18 @@ pub(crate) struct Failure {
 }
 
 impl Failure {
+    /// What to send for this failure: a browser lands on the applications page, which explains
+    /// it, and anything else gets the JSON error.
+    pub(crate) fn respond(self, headers: &HeaderMap) -> Response {
+        if wants_html(headers) {
+            Redirect::to(&format!("{APPLICATIONS_PAGE}?error={}", self.label)).into_response()
+        } else {
+            error(self.status, self.message)
+        }
+    }
+}
+
+impl Failure {
     pub(crate) fn new(label: &'static str, status: StatusCode, message: &'static str) -> Self {
         Self {
             label,
@@ -298,6 +311,10 @@ async fn finish(
         (Flow::SignIn, _) => Ok((authorized.user_id, state.r)),
         (Flow::OptIn, Some(target)) => {
             crate::opt_in::install(discord, target, &authorized).await?;
+            Ok((authorized.user_id, state.r))
+        }
+        (Flow::Apply, Some(target)) => {
+            crate::apply::submit(discord, target, &authorized).await?;
             Ok((authorized.user_id, state.r))
         }
         _ => Err(invalid()),

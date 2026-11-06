@@ -377,6 +377,15 @@ export const ja: Catalog = {
     'Discordサインインの状態が無効になりました。もう一度お試しください。',
   'applications.error.discord_error':
     'Discordから予期しないエラーが返ってきました。もう一度お試しください。',
+  'applications.error.not_open': 'このサークルは現在、Discordでの応募を受け付けていません。',
+  'applications.error.no_trainer': '応募する前に、設定でトレーナーIDを連携してください。',
+  'applications.error.bad_club': 'このサークルのリンクは正しくありません。',
+  'applications.error.already_applied': 'このサークルへの応募は、すでに返事待ちです。',
+  'applications.error.too_many_applications':
+    '1日に送れる応募数の上限に達しました。明日もう一度お試しください。',
+  'applications.error.join_failed': 'Discordがサークルのサーバーへの参加を許可しませんでした。',
+  'applications.error.ticket_failed':
+    'サークルのサーバーでチケットを開けませんでした。もう一度お試しください。',
   'applications.error.unavailable':
     'サークル申請の設定は一時的に利用できません。しばらくしてからもう一度お試しください。',
 

@@ -6,13 +6,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import type { TrainerApplication } from './applications';
+  import { ApiError } from './api';
+  import { fetchMyApplications, loginUrl, type TrainerApplication } from './applications';
   import { applyFeatures } from './features';
   import { t } from './i18n';
   import { language } from './language.svelte';
   import NavBar from './NavBar.svelte';
   import ReleaseNotes from './ReleaseNotes.svelte';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
+  import { TRAINER_APPLICATIONS_PATH } from './route';
   import SiteFooter from './SiteFooter.svelte';
   import TrainerApplicationsTable from './TrainerApplicationsTable.svelte';
 
@@ -26,8 +28,7 @@
     markReleaseSeen(storage);
   }
 
-  // No endpoint lists a trainer's applications yet, so the table shows its empty state.
-  const applications: TrainerApplication[] = [];
+  let applications = $state<TrainerApplication[]>([]);
 
   $effect(() => {
     document.documentElement.lang = language.current;
@@ -37,6 +38,15 @@
   onMount(() => {
     const features = new AbortController();
     applyFeatures({ signal: features.signal });
+    fetchMyApplications({ signal: features.signal }).then(
+      (found) => (applications = found),
+      (reason) => {
+        // Applications are for people signed in with Discord.
+        if (reason instanceof ApiError && reason.status === 401) {
+          window.location.assign(loginUrl(TRAINER_APPLICATIONS_PATH));
+        }
+      },
+    );
     return () => features.abort();
   });
 </script>

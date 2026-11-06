@@ -1,7 +1,10 @@
 #![doc = include_str!("../README.md")]
 
+mod application_store;
+mod apply;
 mod auth;
 mod bot;
+mod calendar;
 mod config;
 mod error;
 mod gateway;
@@ -16,10 +19,17 @@ mod rate_limit;
 mod rest;
 mod settings;
 mod store;
+mod tickets;
 mod token;
 mod trainer_store;
 mod trainers;
 
+pub use application_store::{
+    Application, ApplicationStore, NewApplication, Sent, Status, MAX_PER_DAY,
+};
+pub use apply::{
+    Applicant, ApplicantLookup, Applying, APPLICATIONS_PATH, APPLY_PATH, CLUB_APPLICATIONS_PATH,
+};
 pub use auth::{
     ACCOUNT_PATH, APPLICATIONS_ME_PATH, APPLICATIONS_PAGE, CALLBACK_PATH, LOGIN_PATH,
     MAX_SESSION_AGE, MAX_STATE_AGE, SIGN_OUT_PATH,

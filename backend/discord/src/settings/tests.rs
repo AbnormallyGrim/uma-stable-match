@@ -35,6 +35,7 @@ fn builds_an_update_from_valid_settings() {
             category: Some(Some(10)),
             auto_join: None,
             open: Some(false),
+            leader: None,
         }
     );
 }

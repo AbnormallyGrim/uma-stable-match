@@ -2,6 +2,7 @@
 
 mod api_error;
 mod app;
+mod applicants;
 mod applications;
 mod cache;
 mod calibration;

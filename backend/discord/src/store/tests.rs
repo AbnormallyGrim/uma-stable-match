@@ -16,6 +16,7 @@ fn reads_a_full_record() {
         ("auto_join", "1"),
         ("open", "1"),
         ("problem", "missing permission"),
+        ("leader", "40"),
     ]))
     .unwrap();
     assert_eq!(
@@ -26,6 +27,7 @@ fn reads_a_full_record() {
             auto_join: true,
             open: true,
             problem: Some("missing permission".into()),
+            leader: Some(40),
         }
     );
 }
@@ -42,6 +44,7 @@ fn a_record_needs_a_server_and_defaults_the_rest() {
             auto_join: false,
             open: false,
             problem: None,
+            leader: None,
         }
     );
 }

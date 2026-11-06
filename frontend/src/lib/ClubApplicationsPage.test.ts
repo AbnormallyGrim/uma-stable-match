@@ -125,6 +125,30 @@ describe('ClubApplicationsPage', () => {
       expect(screen.getByText(t('leader.table.empty'))).toBeInTheDocument();
     });
 
+    it('lists the applications the club has had', async () => {
+      answer({
+        'GET /api/v1/discord/clubs/7/settings': () => json(settings()),
+        'GET /api/v1/discord/clubs/7/applications': () =>
+          json([
+            {
+              id: 'a',
+              trainerName: 'Example Trainer',
+              trainerId: '123456789',
+              discordName: 'example_player',
+              pace: 6_400_000,
+              fansThisMonth: 48_000_000,
+              currentClub: null,
+              status: 'pending',
+              submittedAt: new Date().toISOString(),
+              ticketUrl: 'https://discord.com/channels/1/2',
+            },
+          ]),
+      });
+      render(ClubApplicationsPage, { clubId: '7', linked: true });
+      expect(await screen.findByText('Example Trainer')).toBeInTheDocument();
+      expect(screen.queryByText(t('leader.table.empty'))).not.toBeInTheDocument();
+    });
+
     it('flags a setup problem', async () => {
       answer({
         'GET /api/v1/discord/clubs/7/settings': () =>

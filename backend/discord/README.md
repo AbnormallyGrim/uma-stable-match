@@ -71,7 +71,7 @@ Every request must be signed by Discord. The endpoint checks the `X-Signature-Ed
 - A timestamp more than 5 minutes from the server's clock (`MAX_TIMESTAMP_SKEW`) gets a 401 too, so a captured request can't be replayed later.
 - A signed body that isn't an interaction gets a 400.
 
-Discord sends a signed PING, and a badly signed request, when the URL is saved in the portal; the endpoint answers the PING with a PONG and rejects the other, as Discord requires. Interactions this crate doesn't handle yet get a private "This action isn't available yet." reply.
+Discord sends a signed PING, and a badly signed request, when the URL is saved in the portal; the endpoint answers the PING with a PONG and rejects the other, as Discord requires. Clicks on a ticket's Accept and Decline buttons are [answered](#applying-to-a-club). Other interactions get a private "This action isn't available yet." reply.
 
 ## Sign in with Discord
 
@@ -85,7 +85,7 @@ Discord sends a signed PING, and a badly signed request, when the URL is saved i
 | `POST /api/v1/auth/sign-out` | Clears the session cookie (204). A POST, so another site can't trigger it with a link |
 | `DELETE /api/v1/auth/account` | Deletes the person's [trainer links](#club-links), pending keys and attempt counts, then signs them out like `sign-out` (204). Clubs they opted in stay linked. 401 without a session, 503 if the saved links can't be reached (nothing is deleted and the session stays). A DELETE, so another site can't trigger it with a link or form (`ACCOUNT_PATH`) |
 
-**Flows.** The scopes depend on what the sign-in is for: `sign_in` asks for `identify`, `opt_in` for `bot identify` and `apply` for `identify guilds.join`. Only `sign_in` is open so far; the others answer 404 until the features that use them land.
+**Flows.** The scopes depend on what the sign-in is for: `sign_in` asks for `identify`, `opt_in` for `bot identify` and `apply` for `identify guilds.join`. `login` only starts `sign_in`; opting a club in and applying start from their own routes, which set the flow and its target.
 
 **State and nonce.** `login` sends Discord a `state` signed with `TOKEN_SIGNING_KEY` (HMAC-SHA256): the flow, where to go next, a random nonce and a 10-minute expiry (`MAX_STATE_AGE`). The same nonce goes to the browser in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie that only the callback path receives. The callback needs both, and the `state` must verify and not have expired, so a forged, tampered, expired or someone else's callback gets a 400 before Discord is called. The nonce cookie is cleared by every callback, so a replay from the same browser carries none. Discord's own codes work once.
 
@@ -110,7 +110,7 @@ These are only guesses. A code is an invite once Discord resolves it: `resolve_i
 
 | Key | Holds |
 |---|---|
-| `discord:club:{club_id}` | A hash: `server`, `category`, `auto_join` and `open` (`1` or absent), and `problem`. Clubs linked before leader roles were dropped may still hold `leader_roles`, which nothing reads |
+| `discord:club:{club_id}` | A hash: `server`, `category`, `auto_join` and `open` (`1` or absent), `leader` (the Discord ID of the leader who last opted the club in or changed its settings, who is added to its tickets) and `problem`. Clubs linked before leader roles were dropped may still hold `leader_roles`, which nothing reads |
 | `discord:guild:{guild_id}` | A set of the IDs of the clubs linked to that server |
 
 Many clubs can share a server, and a club is linked to one server at a time:
@@ -121,6 +121,7 @@ Many clubs can share a server, and a club is linked to one server at a time:
 - `takes_applications(club_ids)` says for each club whether it is linked, open and has no setup problem, in one round trip. The server adds the club's own join style and spots to decide the `applications` badge.
 - `unlink(club_id)` deletes the club's hash and takes it out of its server's set, returning the `Departure` if it was linked. A `remaining` of 0 means no club needs the bot on that server any more.
 - `club(club_id)` reads the `ClubRecord`, and `clubs_on(server_id)` lists a server's clubs, lowest ID first.
+- `with_dev_guild(server_id)` makes the store answer as if every club were open in that server, for trying applications on one's own machine. The server only allows it on a `localhost` address.
 
 Each of `link` and `unlink` is one Lua script, so a crash can't leave a club in one set and not the other. Calls time out after 5 seconds. Errors name only the kind of Redis failure, as Redis's own messages can include its URL.
 
@@ -178,6 +179,36 @@ Everything about a linked club, from its settings to unlinking it, is for its le
 ```
 
 `trainer` is their linked trainer (`null` with none), and `club` the club it's in, from its profile (`null` with none), with whether it leads it. It's never cached. Someone who linked several trainers before only one was allowed gets the first that leads a club. It needs a session (401), and a 502 means uma.moe couldn't be reached.
+
+## Applying to a club
+
+`GET /api/v1/discord/apply?club={id}` (`APPLY_PATH`) is where a club's Quick Apply button goes. Applying needs `Applying`, set with `Discord::with_applications`: an `ApplicationStore` and an `ApplicantLookup`, which gives a trainer's name, club, pace and fans this month.
+
+1. Not signed in: the player is sent through Discord's sign-in and back to the same address.
+2. Signed in: the club must be linked, open and without a setup problem, and the player must have a linked trainer. If not, a browser lands on `/applications?error=<label>` (`not_open`, `no_trainer`, `bad_club`) and anything else gets JSON. Otherwise the player goes to Discord with the `identify guilds.join` scopes.
+3. The callback finishes it, only for the person who started it. It checks the club again and:
+   - saves the application, unless the player has a pending one to this club (`already_applied`, 409) or sent `MAX_PER_DAY` (5) in the last day (`too_many_applications`, 429);
+   - adds the player to the club's server with their access token, which lives only in that call. Players are always added, whatever the club's `auto_join` says;
+   - opens the ticket and notes it on the application. If any step after saving fails, the application is taken back, so a failed try costs nothing (`join_failed`, `ticket_failed`).
+4. The player lands on `/applications/mine`.
+
+**The ticket** is a private text channel named `app-<trainer name>`, in the club's category if it has one. Everyone else is shut out; the applicant, the leader noted on the club and the bot can see it. If Discord refuses it, the leader may have left the server, so it's tried once more without them. The bot posts an embed with the trainer's name and a link to `https://uma.moe/profile/<trainer ID>`, the applicant, their current club, pace and fans this month, and Accept and Decline buttons.
+
+**The buttons** go through the interactions endpoint. Only the leader noted on the club can answer, or, for a club with no leader noted, someone with Manage Server. The first answer wins and removes the buttons; the applicant can then apply to that club again.
+
+**Lists.** `GET /api/v1/discord/applications` (`APPLICATIONS_PATH`) gives the signed-in player's applications and `GET /api/v1/discord/clubs/{club}/applications` (`CLUB_APPLICATIONS_PATH`) a club's, for its leader (the 100 newest). Both are newest first, never cached, and use the shapes the web app reads.
+
+**What's kept.** In Redis, until a calendar month after it was sent (one calendar month later, on the month's last day when it has no such date):
+
+| Key | Holds |
+|---|---|
+| `discord:app:{id}` | A hash: the club and its name, server, the applicant's Discord ID and keyed hash, the trainer and its name, current club, pace, fans, status, when it was sent, and the ticket's channel and message |
+| `discord:club-apps:{club_id}` | The club's application IDs, scored by when they were sent |
+| `discord:my-apps:{hash}` | The same for one applicant |
+| `discord:applied:{hash}:{club_id}` | The applicant's pending application to the club, which stops a second one |
+| `discord:apply-day:{hash}` | How many applications the applicant sent in the last day, for 24 hours |
+
+The lists drop expired applications when read. Results are counted in `discord_applications_total` by `result`, and answers in `discord_application_answers_total`.
 
 ## Unlinking a club
 

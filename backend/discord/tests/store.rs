@@ -261,3 +261,43 @@ async fn reports_which_clubs_take_applications() {
         store.unlink(club).await.unwrap();
     }
 }
+
+#[tokio::test]
+async fn a_dev_server_takes_every_clubs_applications() {
+    let Some((store, _)) = connect().await else {
+        return;
+    };
+    let (club, other, ..) = ids();
+    let dev = store.clone().with_dev_guild(555);
+    assert_eq!(
+        dev.takes_applications(&[club, other]).await.unwrap(),
+        vec![true, true]
+    );
+    let record = dev.club(club).await.unwrap().unwrap();
+    assert_eq!(record.guild_id, 555);
+    assert!(record.open && record.auto_join);
+    assert_eq!(record.problem, None);
+    // The store itself still knows nothing about the club.
+    assert_eq!(store.club(club).await.unwrap(), None);
+    assert_eq!(
+        store.takes_applications(&[club]).await.unwrap(),
+        vec![false]
+    );
+}
+
+#[tokio::test]
+async fn keeps_the_leader_who_set_the_club_up() {
+    let Some((store, _)) = connect().await else {
+        return;
+    };
+    let (club, ..) = ids();
+    store.link(club, 10).await.unwrap();
+    assert_eq!(store.club(club).await.unwrap().unwrap().leader, None);
+    let update = SettingsUpdate {
+        leader: Some(42),
+        ..SettingsUpdate::default()
+    };
+    assert!(store.update(club, 10, &update).await.unwrap());
+    assert_eq!(store.club(club).await.unwrap().unwrap().leader, Some(42));
+    store.unlink(club).await.unwrap();
+}

@@ -123,6 +123,9 @@ pub struct Config {
     /// `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_SECRET`, with
     /// `TOKEN_SIGNING_KEY` and `PUBLIC_URL`. `None` turns them off.
     pub discord: Option<DiscordConfig>,
+    /// A Discord server that takes every club's applications, from `DISCORD_DEV_GUILD`, for
+    /// trying them on one's own machine. Only allowed when `PUBLIC_URL` is a local address.
+    pub discord_dev_guild: Option<u64>,
 }
 
 /// Invalid or missing settings.
@@ -198,6 +201,12 @@ pub enum ConfigError {
     /// `PUBLIC_URL` isn't an `http` or `https` address without a path.
     #[error("PUBLIC_URL must be an address such as https://example.com, with no path, got {0:?}")]
     InvalidPublicUrl(String),
+    /// `DISCORD_DEV_GUILD` isn't a positive whole number.
+    #[error("DISCORD_DEV_GUILD must be a Discord server ID, got {0:?}")]
+    InvalidDiscordDevGuild(String),
+    /// `DISCORD_DEV_GUILD` is set without Discord, or with a `PUBLIC_URL` that isn't local.
+    #[error("DISCORD_DEV_GUILD needs Discord set up and a PUBLIC_URL on localhost or 127.0.0.1")]
+    DiscordDevGuildNeedsLocal,
     /// `METRICS_ADDR` isn't an IP address with a port from 1 to 65535.
     #[error("METRICS_ADDR must be an IP address and port, such as 127.0.0.1:9464, got {0:?}")]
     InvalidMetricsAddr(String),
@@ -441,6 +450,29 @@ impl Config {
             }
             _ => return Err(ConfigError::IncompleteDiscord),
         };
+        let discord_dev_guild = match get("DISCORD_DEV_GUILD") {
+            None => None,
+            Some(value) => {
+                let id = value
+                    .parse::<u64>()
+                    .ok()
+                    .filter(|id| *id > 0)
+                    .ok_or(ConfigError::InvalidDiscordDevGuild(value))?;
+                // Never on a real site: it would send every club's applicants to one server.
+                let local = get("PUBLIC_URL").is_some_and(|url| {
+                    ["http://localhost", "http://127.0.0.1", "http://[::1]"]
+                        .iter()
+                        .any(|prefix| {
+                            url.strip_prefix(prefix)
+                                .is_some_and(|rest| rest.is_empty() || rest.starts_with(':'))
+                        })
+                });
+                if discord.is_none() || !local {
+                    return Err(ConfigError::DiscordDevGuildNeedsLocal);
+                }
+                Some(id)
+            }
+        };
         let metrics_addr = match get("METRICS_ADDR") {
             None => None,
             Some(value) => Some(
@@ -497,6 +529,7 @@ impl Config {
             excluded_trainers,
             serve_only,
             discord,
+            discord_dev_guild,
         })
     }
 }

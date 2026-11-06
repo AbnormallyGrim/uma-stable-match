@@ -7,6 +7,7 @@
 
 <script lang="ts">
   import type { Club } from './api';
+  import { applyUrl } from './applications';
   import ClubTags from './ClubTags.svelte';
   import DiscordIcon from './DiscordIcon.svelte';
   import MembersLink from './MembersLink.svelte';
@@ -49,9 +50,9 @@
     {#if !flags.applications}
       <!-- Quick apply is off. -->
     {:else if club.applications === 'discord'}
-      <button type="button" class="quick-apply">
+      <a class="quick-apply" href={applyUrl(club.circle_id)}>
         <span class="icon"><DiscordIcon /></span>{t('club.quickApply')}
-      </button>
+      </a>
     {:else}
       <span class="quick-apply-wrap" data-tip={t('club.quickApplyOff')}>
         <button type="button" class="quick-apply" aria-disabled="true" aria-describedby={offId}>
@@ -237,6 +238,7 @@
     color: #ffffff;
     font-size: 0.8125rem;
     font-weight: 600;
+    text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
   }

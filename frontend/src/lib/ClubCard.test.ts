@@ -101,14 +101,14 @@ describe('ClubCard', () => {
 
   it('hides Quick Apply while applications are off', () => {
     render(ClubCard, { club: club({ applications: 'discord' }), position: 1 });
-    expect(screen.queryByRole('button', { name: /Quick Apply/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Quick Apply')).not.toBeInTheDocument();
   });
 
   it('offers Quick Apply on clubs with the bot', () => {
     flags.applications = true;
     render(ClubCard, { club: club({ applications: 'discord' }), position: 1 });
-    const button = screen.getByRole('button', { name: 'Quick Apply' });
-    expect(button).not.toHaveAttribute('aria-disabled');
+    const link = screen.getByRole('link', { name: 'Quick Apply' });
+    expect(link).toHaveAttribute('href', '/api/v1/discord/apply?club=1');
   });
 
   it('greys out Quick Apply, with a tooltip, on clubs without the bot', () => {
