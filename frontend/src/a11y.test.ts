@@ -262,12 +262,10 @@ describe('accessibility', () => {
       expect(await violations(container)).toEqual([]);
     });
 
-    it('has no violations when signed in and the sign-out button shows', async () => {
+    it('has no violations when signed in', async () => {
       answer({ 'GET /api/v1/applications/me': () => json({ discord_id: '42' }) });
       const { container } = render(ApplicationsPage);
-      expect(
-        await screen.findByRole('button', { name: t('applications.session.signOut') }),
-      ).toBeInTheDocument();
+      await screen.findByText(t('applications.role.leader.title'));
       expect(await violations(container)).toEqual([]);
     });
 

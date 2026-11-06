@@ -374,11 +374,8 @@ export const en = {
   'applications.privacy': ({ href }: { href: string }) =>
     `Your Discord sign-in is only used for club application management. See our <a href="${href}">privacy information</a>.`,
   'applications.session.loading': 'Checking your Discord session…',
-  'applications.session.signedOut':
-    'Choose your role below to continue, or sign in with Discord to manage a club.',
   'applications.session.signIn': 'Sign in with Discord',
   'applications.session.signedIn': 'Your Discord session is active.',
-  'applications.session.signOut': 'Sign out',
   'applications.session.error':
     'We could not check your Discord session right now. Please try again in a moment.',
   'applications.role.heading': 'Who are you?',
@@ -426,6 +423,7 @@ export const en = {
   'footer.tipsNote': 'These rules can change. Check in-game if there is a difference.',
   'footer.links': 'Project links',
   'footer.report': 'Report a problem',
+  'footer.privacy': 'Privacy Policy',
   'footer.kofi': 'Buy me a carrot',
   'footer.carats': 'Free carats',
   'footer.support': 'Optional tips help cover hosting. Every feature stays free.',

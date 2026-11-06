@@ -1,13 +1,16 @@
 <!--
   @component
-  The page footer: the logo, buttons to report a problem and to support the project, and the
-  disclaimer and attributions. Keep the wording in step with the root README's Disclaimer section.
+  The page footer: the logo, buttons to report a problem and to support the project, the
+  disclaimer and attributions, and last a Privacy Policy link (once the applications flag is on).
+  Keep the wording in step with the root README's Disclaimer section.
 -->
 
 <script lang="ts">
   import carats from '../assets/carats/carats.webp';
   import BrandLogo from './BrandLogo.svelte';
+  import { flags } from './flags.svelte';
   import { t } from './i18n';
+  import { websiteUrl } from './pages';
 
   const REPO = 'https://github.com/AbnormallyGrim/uma-stable-match';
   const KOFI = 'https://ko-fi.com/L5P6299MV1';
@@ -45,6 +48,16 @@
       <p>{@html t('footer.data')}</p>
       <p>{@html t('footer.trademark')}</p>
     </div>
+
+    {#if flags.applications}
+      <p class="policy">
+        <a
+          href={`${websiteUrl(window.location)}/privacy/`}
+          target="_blank"
+          rel="noopener noreferrer">{t('footer.privacy')}</a
+        >
+      </p>
+    {/if}
   </div>
 </footer>
 
@@ -181,6 +194,10 @@
 
   .notes p {
     margin: 0 0 8px;
+  }
+
+  .policy {
+    margin: 0;
   }
 
   .site-footer :global(strong) {

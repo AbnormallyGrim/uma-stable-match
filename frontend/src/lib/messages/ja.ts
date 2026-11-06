@@ -352,13 +352,10 @@ export const ja: Catalog = {
   'applications.privacy': ({ href }: { href: string }) =>
     `Discordへのサインインは、サークル申請の管理のためだけに使われます。<a href="${href}">プライバシー情報</a>をご確認ください。`,
   'applications.session.loading': 'Discordセッションを確認しています…',
-  'applications.session.signedOut':
-    '以下から役割を選んでください。Discordでサインインしてサークルを管理できます。',
 
   'applications.session.signIn': 'Discordでサインイン',
   'applications.session.signedIn': 'Discordセッションは有効です。',
 
-  'applications.session.signOut': 'サインアウト',
   'applications.session.error':
     'Discordセッションを確認できませんでした。しばらくしてからもう一度お試しください。',
   'applications.role.heading': 'どちらに当てはまりますか？',
@@ -412,6 +409,7 @@ export const ja: Catalog = {
 
   'footer.links': 'プロジェクトのリンク',
   'footer.report': '問題を報告',
+  'footer.privacy': 'プライバシーポリシー',
   'footer.kofi': 'にんじんをおごる',
   'footer.carats': '無料ジュエル',
   'footer.support': '任意の支援はホスティング費用に充てられます。すべての機能は無料のままです。',

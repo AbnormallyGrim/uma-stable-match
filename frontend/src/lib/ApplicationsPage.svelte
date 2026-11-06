@@ -7,14 +7,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import { loginUrl, signOut, signedInUser } from './applications';
+  import { signedInUser } from './applications';
   import { applyFeatures } from './features';
   import { t, hasMessage } from './i18n';
   import { language } from './language.svelte';
   import NavBar from './NavBar.svelte';
   import ReleaseNotes from './ReleaseNotes.svelte';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
-  import { APPLICATIONS_PATH, CLUB_APPLICATIONS_PATH, TRAINER_APPLICATIONS_PATH } from './route';
+  import { CLUB_APPLICATIONS_PATH, TRAINER_APPLICATIONS_PATH } from './route';
   import SiteFooter from './SiteFooter.svelte';
 
   interface Props {
@@ -24,12 +24,10 @@
   let { error = null }: Props = $props();
 
   const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
-  const privacyHref = '/privacy/';
   let readingReleases = $state(false);
   let unseenRelease = $state(hasUnseenRelease(storage));
-  let session = $state<'loading' | 'signed-out' | 'signed-in' | 'error'>('loading');
+  let session = $state<'loading' | 'ready' | 'error'>('loading');
   let statusMessage = $state<string | null>(null);
-  let showSignInLink = $state(false);
 
   type RoleKey = 'leader' | 'trainer';
 
@@ -68,28 +66,11 @@
 
   async function checkSession() {
     try {
-      const discordId = await signedInUser();
-      session = discordId === null ? 'signed-out' : 'signed-in';
-      if (discordId === null) {
-        showSignInLink = false;
-      }
+      await signedInUser();
+      session = 'ready';
     } catch (reason) {
       console.warn(reason);
       session = 'error';
-      statusMessage = t('applications.session.error');
-      showSignInLink = false;
-    }
-  }
-
-  async function signOutNow() {
-    try {
-      await signOut();
-      session = 'signed-out';
-      showSignInLink = true;
-      statusMessage = null;
-    } catch {
-      session = 'signed-out';
-      showSignInLink = true;
       statusMessage = t('applications.session.error');
     }
   }
@@ -135,51 +116,10 @@
     <p class="status-alert" role="alert">{appErrorMessage(error)}</p>
   {/if}
 
-  <p class="privacy-link"><a href={privacyHref}>Privacy</a></p>
-
   {#if session === 'loading'}
     <p class="card muted" role="status">{t('applications.session.loading')}</p>
   {:else if session === 'error'}
     <p class="status-alert" role="alert">{t('applications.session.error')}</p>
-  {:else if session === 'signed-out'}
-    {#if statusMessage !== null}
-      <p class="status-alert" role="alert">{statusMessage}</p>
-    {/if}
-    {#if showSignInLink}
-      <div class="card">
-        <p>{t('applications.session.signedOut')}</p>
-        <a class="provider-btn discord" href={loginUrl(APPLICATIONS_PATH)}>
-          <span class="provider-icon" aria-hidden="true">
-            <svg
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              stroke="none"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              width="20"
-              height="20"
-              aria-hidden="true"
-            >
-              <path
-                d="M20.32 4.37A19.8 19.8 0 0 0 15.43 2.85c-.21.38-.46.9-.63 1.3a18.27 18.27 0 0 0-5.49 0c-.17-.4-.42-.92-.64-1.3A19.74 19.74 0 0 0 3.78 4.38C.69 8.96-.15 13.31.27 17.61a19.94 19.94 0 0 0 6.04 3.05c.49-.66.92-1.36 1.28-2.08-.7-.26-1.37-.59-2-.96.17-.12.33-.25.49-.38a14.25 14.25 0 0 0 11.84 0c.16.13.32.26.49.38-.63.37-1.3.7-2 .96.36.72.79 1.42 1.28 2.08a19.9 19.9 0 0 0 6.04-3.05c.5-5-.84-9.31-3.41-13.24ZM8.02 14.96c-1.18 0-2.15-1.08-2.15-2.41s.95-2.41 2.15-2.41 2.17 1.09 2.15 2.41c0 1.33-.95 2.41-2.15 2.41Zm7.96 0c-1.18 0-2.15-1.08-2.15-2.41s.95-2.41 2.15-2.41 2.17 1.09 2.15 2.41c0 1.33-.95 2.41-2.15 2.41Z"
-              />
-            </svg>
-          </span>
-          <span>{t('applications.session.signIn')}</span>
-        </a>
-      </div>
-    {/if}
-  {:else if session === 'signed-in'}
-    {#if statusMessage !== null}
-      <p class="status-alert" role="alert">{statusMessage}</p>
-    {/if}
-
-    <div class="session-actions">
-      <button type="button" class="button secondary" onclick={signOutNow}>
-        {t('applications.session.signOut')}
-      </button>
-    </div>
   {/if}
 </main>
 
@@ -196,18 +136,18 @@
 
   .intro {
     max-width: 920px;
-    margin: 0 auto 20px;
+    margin: 0 auto 36px;
     text-align: center;
   }
 
   .intro h1 {
-    margin: 0;
+    margin: 0 0 16px;
     font-size: clamp(2rem, 3vw, 2.75rem);
     line-height: 1.15;
   }
 
   .intro p {
-    margin: 0 0 6px;
+    margin: 0;
     color: var(--text-2);
     font-size: 0.94rem;
     line-height: 1.5;
@@ -277,32 +217,6 @@
     color: var(--text-2);
     font-size: 0.94rem;
     line-height: 1.5;
-  }
-
-  .button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-    padding: 0.75rem 1.05rem;
-    border: 1px solid var(--border-strong);
-    border-radius: 10px;
-    background: var(--surface);
-    color: var(--text);
-    font-weight: 600;
-    text-decoration: none;
-    cursor: pointer;
-  }
-
-  .button:disabled {
-    opacity: 0.6;
-    cursor: wait;
-  }
-
-  .session-actions {
-    display: flex;
-    justify-content: center;
-    margin-top: 18px;
   }
 
   .status-alert {
