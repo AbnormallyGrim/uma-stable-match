@@ -175,6 +175,38 @@ fn message(application: &Application, applicant: &Applicant, leader: Option<u64>
             "inline": true,
         }));
     }
+    if let Some(alltime) = &applicant.alltime {
+        fields.push(json!({
+            "name": "Total fans",
+            "value": grouped(alltime.total_fans),
+            "inline": true,
+        }));
+        for (name, average) in [
+            ("Average per day", alltime.avg_day),
+            ("Average per week", alltime.avg_week),
+            ("Average per month", alltime.avg_month),
+        ] {
+            if let Some(average) = average {
+                fields.push(json!({
+                    "name": name,
+                    "value": grouped(average.round() as i64),
+                    "inline": true,
+                }));
+            }
+        }
+        if let Some(rank) = alltime.rank {
+            fields.push(json!({
+                "name": "Fans rank",
+                "value": format!("#{}", grouped(rank)),
+                "inline": true,
+            }));
+        }
+        fields.push(json!({
+            "name": "Days tracked",
+            "value": grouped(alltime.active_days),
+            "inline": true,
+        }));
+    }
     let mut users = vec![details.applicant.to_string()];
     let mut content = format!("New application to **{}**.", details.club_name);
     if let Some(leader) = leader {

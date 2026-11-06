@@ -51,6 +51,25 @@ pub struct Applicant {
     pub pace_per_day: Option<f64>,
     /// Fans gained this month, if known.
     pub fans_this_month: Option<i64>,
+    /// All-time fan totals and averages, if known.
+    pub alltime: Option<Alltime>,
+}
+
+/// A trainer's all-time fans.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Alltime {
+    /// Total fans.
+    pub total_fans: i64,
+    /// Days with data.
+    pub active_days: i64,
+    /// Average fans gained per day.
+    pub avg_day: Option<f64>,
+    /// Average fans gained per week.
+    pub avg_week: Option<f64>,
+    /// Average fans gained per month.
+    pub avg_month: Option<f64>,
+    /// Rank by total fans.
+    pub rank: Option<i64>,
 }
 
 type Lookup = dyn Fn(u64) -> Pin<Box<dyn Future<Output = Result<Option<Applicant>, LookupError>> + Send>>

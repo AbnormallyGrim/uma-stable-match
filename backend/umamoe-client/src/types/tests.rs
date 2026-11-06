@@ -160,3 +160,20 @@ fn a_profile_without_a_comment_or_club_reads() {
     assert_eq!(r.trainer.comment, None);
     assert_eq!(r.circle, None);
 }
+
+#[test]
+fn a_profile_reads_the_alltime_fans() {
+    let r: ProfileResponse = serde_json::from_str(
+        r#"{"trainer":{"account_id":"100000001","name":"A"},
+            "fan_history":{"alltime":{"total_fans":1500000000,"total_gain":900000000,
+            "active_days":300,"avg_day":3000000.5,"avg_week":null,"avg_month":90000000.0,
+            "rank_total_fans":42}}}"#,
+    )
+    .unwrap();
+    let alltime = r.fan_history.unwrap().alltime.unwrap();
+    assert_eq!(alltime.total_fans, 1_500_000_000);
+    assert_eq!(alltime.active_days, 300);
+    assert_eq!(alltime.avg_day, Some(3_000_000.5));
+    assert_eq!(alltime.avg_week, None);
+    assert_eq!(alltime.rank_total_fans, Some(42));
+}

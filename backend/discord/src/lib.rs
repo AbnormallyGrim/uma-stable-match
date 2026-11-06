@@ -28,7 +28,8 @@ pub use application_store::{
     Application, ApplicationStore, NewApplication, Sent, Status, MAX_PER_DAY,
 };
 pub use apply::{
-    Applicant, ApplicantLookup, Applying, APPLICATIONS_PATH, APPLY_PATH, CLUB_APPLICATIONS_PATH,
+    Alltime, Applicant, ApplicantLookup, Applying, APPLICATIONS_PATH, APPLY_PATH,
+    CLUB_APPLICATIONS_PATH,
 };
 pub use auth::{
     ACCOUNT_PATH, APPLICATIONS_ME_PATH, APPLICATIONS_PAGE, CALLBACK_PATH, LOGIN_PATH,

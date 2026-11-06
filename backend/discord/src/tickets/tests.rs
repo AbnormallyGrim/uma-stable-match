@@ -1,5 +1,6 @@
 use super::*;
 use crate::application_store::{NewApplication, Status};
+use crate::apply::Alltime;
 
 fn application() -> Application {
     Application {
@@ -28,6 +29,14 @@ fn applicant() -> Applicant {
         club_name: Some("Other Club".into()),
         pace_per_day: Some(6_400_000.0),
         fans_this_month: Some(48_123_456),
+        alltime: Some(Alltime {
+            total_fans: 1_500_000_000,
+            active_days: 300,
+            avg_day: Some(3_000_000.4),
+            avg_week: Some(21_000_000.0),
+            avg_month: None,
+            rank: Some(1_234),
+        }),
     }
 }
 
@@ -58,6 +67,12 @@ fn the_message_shows_the_applicant_and_links_the_profile() {
     assert!(fields.contains("Other Club"));
     assert!(fields.contains("6,400,000/day"));
     assert!(fields.contains("48,123,456"));
+    assert!(fields.contains("1,500,000,000"));
+    assert!(fields.contains("Average per day"));
+    assert!(fields.contains("3,000,000"));
+    assert!(fields.contains("21,000,000"));
+    assert!(!fields.contains("Average per month"));
+    assert!(fields.contains("#1,234"));
     assert!(body["content"].as_str().unwrap().starts_with("<@30> "));
     assert_eq!(body["allowed_mentions"]["users"], json!(["20", "30"]));
 }
@@ -78,10 +93,12 @@ fn leaves_out_what_isnt_known() {
         club_name: None,
         pace_per_day: None,
         fans_this_month: None,
+        alltime: None,
     };
     let body = message(&application(), &unknown, None);
     let fields = body["embeds"][0]["fields"].to_string();
     assert!(!fields.contains("Pace"));
     assert!(!fields.contains("Fans this month"));
+    assert!(!fields.contains("Total fans"));
     assert!(fields.contains("None"));
 }

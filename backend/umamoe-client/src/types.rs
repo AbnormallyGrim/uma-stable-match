@@ -123,14 +123,44 @@ pub struct ProfileCircle {
     pub name: String,
 }
 
+/// A trainer's all-time fan totals and averages, from the profile's `fan_history.alltime`.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ProfileAlltime {
+    /// Total fans.
+    pub total_fans: i64,
+    /// Fans gained over the tracked period.
+    pub total_gain: i64,
+    /// Days with data.
+    pub active_days: i64,
+    /// Average fans gained per day.
+    pub avg_day: Option<f64>,
+    /// Average fans gained per week.
+    pub avg_week: Option<f64>,
+    /// Average fans gained per month.
+    pub avg_month: Option<f64>,
+    /// Rank by total fans.
+    pub rank_total_fans: Option<i64>,
+}
+
+/// The fan history of a profile, without the parts not used here.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ProfileFanHistory {
+    /// All-time totals and averages, if the API has them.
+    pub alltime: Option<ProfileAlltime>,
+}
+
 /// Response from `GET /api/v4/user/profile/{account_id}`, without the parts not used here.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ProfileResponse {
     /// The trainer.
     pub trainer: ProfileTrainer,
     /// The trainer's current club, if they have one.
     pub circle: Option<ProfileCircle>,
+    /// The trainer's fan history, if the API has it.
+    pub fan_history: Option<ProfileFanHistory>,
 }
 
 /// Response from `GET /api/v4/circles/list`.

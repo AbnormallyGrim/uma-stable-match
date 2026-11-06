@@ -16,3 +16,24 @@ fn needs_two_days() {
     assert_eq!(fans_this_month(&[0, 0]), None);
     assert_eq!(fans_this_month(&[500]), None);
 }
+
+#[test]
+fn alltime_is_copied_from_the_fan_history() {
+    use uma_stable_match_umamoe_client::ProfileAlltime;
+    let history = ProfileFanHistory {
+        alltime: Some(ProfileAlltime {
+            total_fans: 5_000,
+            active_days: 10,
+            avg_day: Some(500.0),
+            rank_total_fans: Some(3),
+            ..Default::default()
+        }),
+    };
+    let found = alltime(Some(history)).unwrap();
+    assert_eq!(found.total_fans, 5_000);
+    assert_eq!(found.avg_day, Some(500.0));
+    assert_eq!(found.avg_week, None);
+    assert_eq!(found.rank, Some(3));
+    assert_eq!(alltime(None), None);
+    assert_eq!(alltime(Some(ProfileFanHistory::default())), None);
+}
