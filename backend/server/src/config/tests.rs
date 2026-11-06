@@ -22,6 +22,8 @@ fn defaults() {
     assert_eq!(config.trainer_cache, Duration::from_secs(10 * 60));
     assert_eq!(config.rate_limit_per_minute, 30);
     assert_eq!(config.trainer_lookups_per_minute, 10);
+    assert_eq!(config.discord_requests_per_minute, 30);
+    assert_eq!(config.discord_sign_ins_per_hour, 10);
     assert!(!config.trust_forwarded_for);
     assert!(!config.features.japanese);
     assert_eq!(config.features.web_analytics, None);
@@ -237,11 +239,15 @@ fn reads_rate_limit_settings() {
         ("UMAMOE_API_KEY", "test-key"),
         ("RATE_LIMIT_PER_MINUTE", "60"),
         ("TRAINER_LOOKUPS_PER_MINUTE", "5"),
+        ("DISCORD_REQUESTS_PER_MINUTE", "20"),
+        ("DISCORD_SIGN_INS_PER_HOUR", "4"),
         ("TRUST_FORWARDED_FOR", "true"),
     ]))
     .unwrap();
     assert_eq!(config.rate_limit_per_minute, 60);
     assert_eq!(config.trainer_lookups_per_minute, 5);
+    assert_eq!(config.discord_requests_per_minute, 20);
+    assert_eq!(config.discord_sign_ins_per_hour, 4);
     assert!(config.trust_forwarded_for);
 }
 
@@ -256,6 +262,19 @@ fn invalid_rate_limit_settings_fail() {
         error,
         ConfigError::InvalidNumber {
             name: "RATE_LIMIT_PER_MINUTE",
+            ..
+        }
+    ));
+
+    let error = Config::from_lookup(lookup(&[
+        ("UMAMOE_API_KEY", "test-key"),
+        ("DISCORD_SIGN_INS_PER_HOUR", "0"),
+    ]))
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        ConfigError::InvalidNumber {
+            name: "DISCORD_SIGN_INS_PER_HOUR",
             ..
         }
     ));

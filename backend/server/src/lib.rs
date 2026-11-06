@@ -36,8 +36,9 @@ pub use applications::Applications;
 pub use cache::{Cache, CacheStatus, ScanFailure, ScanPhase, ScanProgress, Snapshot};
 pub use calibration::{club_median, Calibration, MIN_CALIBRATION_SAMPLES};
 pub use config::{
-    Config, ConfigError, UmaMoeConfig, DEFAULT_DETAIL_CACHE_MB, DEFAULT_HOST, DEFAULT_PORT,
-    DEFAULT_RATE_LIMIT_PER_MINUTE, DEFAULT_SCAN_INTERVAL_MINUTES,
+    Config, ConfigError, UmaMoeConfig, DEFAULT_DETAIL_CACHE_MB,
+    DEFAULT_DISCORD_REQUESTS_PER_MINUTE, DEFAULT_DISCORD_SIGN_INS_PER_HOUR, DEFAULT_HOST,
+    DEFAULT_PORT, DEFAULT_RATE_LIMIT_PER_MINUTE, DEFAULT_SCAN_INTERVAL_MINUTES,
     DEFAULT_TRAINER_LOOKUPS_PER_MINUTE,
 };
 pub use details::{club_weight, BackgroundLoader, ClubDetails, DetailConfig, SharedPool};
@@ -45,7 +46,7 @@ pub use discord_clubs::club_lookup;
 pub use features::Features;
 pub use frontend::{CONTENT_SECURITY, CONTENT_SECURITY_WITH_ANALYTICS};
 pub use human::{HumanCheck, SigningKey, TurnstileSecret, TOKEN_COOKIE, TOKEN_LIFETIME};
-pub use limits::RateLimits;
+pub use limits::{limit_discord, RateLimits};
 pub use logging::{init_logging, InvalidLogFormat, LogFormat};
 pub use pace::{
     ExcludedTrainers, PaceError, PaceLookup, TrainerPace, DEFAULT_PACE_TTL, MAX_PRIOR_RATIO,

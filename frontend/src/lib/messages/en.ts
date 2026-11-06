@@ -408,6 +408,8 @@ export const en = {
     "We couldn't open your ticket on the club's server. Please try again.",
   'applications.error.unavailable':
     'The club applications setup is temporarily unavailable. Please try again later.',
+  'applications.error.rate_limited':
+    'Too many tries in a short time. Please wait a while and try again.',
 
   'footer.tipsSummary': 'Tips for switching clubs',
   'footer.tip14':

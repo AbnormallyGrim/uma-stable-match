@@ -20,7 +20,7 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::details::{ClubDetails, DetailConfig, SharedPool};
 use crate::discord_clubs::club_lookup;
-use crate::limits::RateLimits;
+use crate::limits::{limit_discord, RateLimits};
 use crate::pace::PaceLookup;
 use crate::refresher::RefreshConfig;
 use crate::scheduler::{follow_scans, run_scheduler};
@@ -116,6 +116,10 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
         config.rate_limit_per_minute,
         config.trainer_lookups_per_minute,
         config.trust_forwarded_for,
+    )
+    .with_discord(
+        config.discord_requests_per_minute,
+        config.discord_sign_ins_per_hour,
     );
     let window = u64::from(config.scan.rank_to - config.scan.rank_from + 1);
     let refresh = RefreshConfig {
@@ -239,7 +243,10 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
                 "serving Discord interactions, club opt-in, settings, trainer links and applications"
             );
             (
-                uma_stable_match_discord::router(discord),
+                limit_discord(
+                    uma_stable_match_discord::router(discord),
+                    state.limits.clone(),
+                ),
                 Some(Applications::new(store)),
             )
         }

@@ -388,6 +388,8 @@ export const ja: Catalog = {
     'サークルのサーバーでチケットを開けませんでした。もう一度お試しください。',
   'applications.error.unavailable':
     'サークル申請の設定は一時的に利用できません。しばらくしてからもう一度お試しください。',
+  'applications.error.rate_limited':
+    '短時間に試行が多すぎます。しばらく待ってからもう一度お試しください。',
 
   'footer.tipsSummary': 'サークル移籍のヒント',
   'footer.tip14':

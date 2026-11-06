@@ -36,6 +36,8 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `TRAINER_CACHE_MINUTES` | `10` | Minutes a trainer's looked-up pace is reused |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Recommendation requests each visitor can make per minute |
 | `TRAINER_LOOKUPS_PER_MINUTE` | `10` | Trainer lookups each visitor can make per minute that need a call to uma.moe |
+| `DISCORD_REQUESTS_PER_MINUTE` | `30` | Requests to the [Discord routes](#rate-limits) each visitor can make per minute |
+| `DISCORD_SIGN_INS_PER_HOUR` | `10` | Trips to and from Discord each visitor can make per hour: returning from a sign-in, and starting an application or an opt-in |
 | `TRUST_FORWARDED_FOR` | `false` | `true` to identify visitors by `X-Forwarded-For`. Only turn this on behind a reverse proxy that sets the header |
 | `ENABLE_JAPANESE` | `false` | `true` to offer the Japanese translation and its language button in the web app. Reported on `GET /api/v1/features` |
 | `ENABLE_APPLICATIONS` | `false` | `true` to show the club applications pages in the web app and the privacy page on the website. Reported on `GET /api/v1/features` |
@@ -649,12 +651,16 @@ The [human check](#human-check) and [rate limits](#rate-limits) apply as for rec
 
 ### Rate limits
 
-`/api/v1/recommendations` and `/api/v1/clubs/{id}` are limited per visitor. Health isn't limited.
+`/api/v1/recommendations`, `/api/v1/clubs/{id}` and the [Discord routes](#discord-applications) are limited per visitor. Health and Discord's interactions endpoint, which Discord signs, aren't limited.
 
 - **All requests:** `RATE_LIMIT_PER_MINUTE` (30 by default).
 - **Trainer lookups:** `TRAINER_LOOKUPS_PER_MINUTE` (10 by default). This only counts `trainer_id` requests that need a call to uma.moe, and club pages that fetch a club's [previous month](#club-page). Cached trainers and `pace` requests don't use it, so a public instance can't be used to flood uma.moe.
+- **Discord routes:** `DISCORD_REQUESTS_PER_MINUTE` (30 by default), for the sign-in, settings, trainer-link and application routes.
+- **Trips to Discord:** `DISCORD_SIGN_INS_PER_HOUR` (10 by default), shared by the sign-in callback, `GET /api/v1/discord/apply` and `GET /api/v1/discord/opt-in` instead of the per-minute limit. Signing in uses one; applying while signed out uses four, two to sign in and two to apply.
 
-Each limit allows a burst of its full size, then frees one request every 60 ÷ limit seconds. With the defaults, that's one request every 2 seconds and one trainer lookup every 6 seconds. Over the limit, the response is `429` with `Retry-After` and an error such as `"too many requests; try again in 2 seconds"`.
+Each limit allows a burst of its full size, then frees one request every 60 ÷ limit seconds (60 ÷ limit minutes for the hourly one). With the defaults, that's one request every 2 seconds, one trainer lookup every 6 seconds and one trip to Discord every 6 minutes. Over the limit, the response is `429` with `Retry-After` and an error such as `"too many requests; try again in 2 seconds"`. A page load to the Discord routes, one that accepts `text/html`, goes to `/applications?error=rate_limited` instead.
+
+`limit_discord(routes, limits)` puts the Discord routes behind these limits; set them with `RateLimits::with_discord`.
 
 Visitors are identified by IP address:
 
