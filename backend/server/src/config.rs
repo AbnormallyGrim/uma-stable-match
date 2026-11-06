@@ -30,6 +30,12 @@ pub const DEFAULT_RATE_LIMIT_PER_MINUTE: u32 = 30;
 /// Uncached trainer lookups per visitor per minute when `TRAINER_LOOKUPS_PER_MINUTE` isn't set.
 pub const DEFAULT_TRAINER_LOOKUPS_PER_MINUTE: u32 = 10;
 
+/// Discord route requests per visitor per minute when `DISCORD_REQUESTS_PER_MINUTE` isn't set.
+pub const DEFAULT_DISCORD_REQUESTS_PER_MINUTE: u32 = 30;
+
+/// Trips to and from Discord per visitor per hour when `DISCORD_SIGN_INS_PER_HOUR` isn't set.
+pub const DEFAULT_DISCORD_SIGN_INS_PER_HOUR: u32 = 10;
+
 // TODO(#51): adjust the default once uma.moe agrees how often we may scan.
 /// Minutes between scans for a detail cache without a refresher, and how long a saved scan in
 /// progress can be resumed, when `SCAN_INTERVAL_MINUTES` isn't set.
@@ -96,6 +102,10 @@ pub struct Config {
     pub rate_limit_per_minute: u32,
     /// Uncached trainer lookups per visitor per minute, from `TRAINER_LOOKUPS_PER_MINUTE`.
     pub trainer_lookups_per_minute: u32,
+    /// Discord route requests per visitor per minute, from `DISCORD_REQUESTS_PER_MINUTE`.
+    pub discord_requests_per_minute: u32,
+    /// Trips to and from Discord per visitor per hour, from `DISCORD_SIGN_INS_PER_HOUR`.
+    pub discord_sign_ins_per_hour: u32,
     /// Whether to identify visitors by `X-Forwarded-For`, from `TRUST_FORWARDED_FOR`.
     pub trust_forwarded_for: bool,
     /// Features that are switched on, from `ENABLE_JAPANESE`, `ENABLE_APPLICATIONS` and
@@ -333,6 +343,14 @@ impl Config {
             "TRAINER_LOOKUPS_PER_MINUTE",
             DEFAULT_TRAINER_LOOKUPS_PER_MINUTE,
         )?;
+        let discord_requests_per_minute = number(
+            "DISCORD_REQUESTS_PER_MINUTE",
+            DEFAULT_DISCORD_REQUESTS_PER_MINUTE,
+        )?;
+        let discord_sign_ins_per_hour = number(
+            "DISCORD_SIGN_INS_PER_HOUR",
+            DEFAULT_DISCORD_SIGN_INS_PER_HOUR,
+        )?;
         let boolean = |name: &'static str| match get(name).as_deref() {
             None | Some("false") => Ok(false),
             Some("true") => Ok(true),
@@ -518,6 +536,8 @@ impl Config {
             trainer_cache,
             rate_limit_per_minute,
             trainer_lookups_per_minute,
+            discord_requests_per_minute,
+            discord_sign_ins_per_hour,
             trust_forwarded_for,
             features,
             frontend_dir,

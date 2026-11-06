@@ -6,14 +6,20 @@ use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use axum::extract::{ConnectInfo, Request, State};
+use axum::http::header::ACCEPT;
 use axum::http::HeaderMap;
-use axum::middleware::Next;
-use axum::response::{IntoResponse, Response};
+use axum::middleware::{from_fn_with_state, Next};
+use axum::response::{IntoResponse, Redirect, Response};
+use axum::Router;
 use governor::clock::Clock;
 use governor::{DefaultKeyedRateLimiter, Quota};
+use uma_stable_match_discord::{
+    APPLICATIONS_PAGE, APPLY_PATH, CALLBACK_PATH, INTERACTIONS_PATH, OPT_IN_PATH,
+};
 
 use crate::api_error::ApiError;
 use crate::app::AppState;
+use crate::config::{DEFAULT_DISCORD_REQUESTS_PER_MINUTE, DEFAULT_DISCORD_SIGN_INS_PER_HOUR};
 
 // Forget idle visitors once this many are tracked.
 const PRUNE_ABOVE: usize = 10_000;
@@ -26,6 +32,8 @@ pub(crate) struct Visitor(IpAddr);
 pub struct RateLimits {
     requests: Arc<DefaultKeyedRateLimiter<IpAddr>>,
     lookups: Arc<DefaultKeyedRateLimiter<IpAddr>>,
+    discord_requests: Arc<DefaultKeyedRateLimiter<IpAddr>>,
+    discord_sign_ins: Arc<DefaultKeyedRateLimiter<IpAddr>>,
     trust_forwarded_for: bool,
 }
 
@@ -38,7 +46,8 @@ impl fmt::Debug for RateLimits {
 }
 
 impl RateLimits {
-    /// Limits per minute for all recommendation requests and for uncached trainer lookups.
+    /// Limits per minute for all recommendation requests and for uncached trainer lookups, with the
+    /// default Discord limits.
     ///
     /// With `trust_forwarded_for`, visitors are identified by the right-most `X-Forwarded-For` address.
     pub fn new(
@@ -46,17 +55,74 @@ impl RateLimits {
         lookups_per_minute: u32,
         trust_forwarded_for: bool,
     ) -> Self {
-        let quota = |n: u32| Quota::per_minute(NonZeroU32::new(n).unwrap_or(NonZeroU32::MIN));
         Self {
-            requests: Arc::new(DefaultKeyedRateLimiter::keyed(quota(requests_per_minute))),
-            lookups: Arc::new(DefaultKeyedRateLimiter::keyed(quota(lookups_per_minute))),
+            requests: keyed(Quota::per_minute(at_least_one(requests_per_minute))),
+            lookups: keyed(Quota::per_minute(at_least_one(lookups_per_minute))),
             trust_forwarded_for,
+            discord_requests: keyed(Quota::per_minute(at_least_one(
+                DEFAULT_DISCORD_REQUESTS_PER_MINUTE,
+            ))),
+            discord_sign_ins: keyed(Quota::per_hour(at_least_one(
+                DEFAULT_DISCORD_SIGN_INS_PER_HOUR,
+            ))),
+        }
+    }
+
+    /// The same limits, with `requests_per_minute` for the Discord routes and `sign_ins_per_hour`
+    /// for the ones that go to or come back from Discord. See [`limit_discord`].
+    pub fn with_discord(self, requests_per_minute: u32, sign_ins_per_hour: u32) -> Self {
+        Self {
+            discord_requests: keyed(Quota::per_minute(at_least_one(requests_per_minute))),
+            discord_sign_ins: keyed(Quota::per_hour(at_least_one(sign_ins_per_hour))),
+            ..self
         }
     }
 
     pub(crate) fn check_lookup(&self, visitor: Visitor) -> Result<(), ApiError> {
         check(&self.lookups, visitor, "trainer_lookups")
     }
+}
+
+fn keyed(quota: Quota) -> Arc<DefaultKeyedRateLimiter<IpAddr>> {
+    Arc::new(DefaultKeyedRateLimiter::keyed(quota))
+}
+
+fn at_least_one(n: u32) -> NonZeroU32 {
+    NonZeroU32::new(n).unwrap_or(NonZeroU32::MIN)
+}
+
+/// `routes`, the Discord routes, behind per-visitor limits: the sign-in callback and starting an
+/// application or an opt-in share the hourly limit, and everything else the per-minute one. The
+/// interactions endpoint isn't limited, as Discord sends it and signs every request.
+pub fn limit_discord(routes: Router, limits: RateLimits) -> Router {
+    routes.layer(from_fn_with_state(limits, discord_limit))
+}
+
+async fn discord_limit(State(limits): State<RateLimits>, request: Request, next: Next) -> Response {
+    let path = request.uri().path();
+    let (limiter, label) = if path == INTERACTIONS_PATH {
+        return next.run(request).await;
+    } else if [CALLBACK_PATH, APPLY_PATH, OPT_IN_PATH].contains(&path) {
+        (&limits.discord_sign_ins, "discord_sign_ins")
+    } else {
+        (&limits.discord_requests, "discord_requests")
+    };
+    let visitor = visitor(&request, limits.trust_forwarded_for);
+    match check(limiter, visitor, label) {
+        Ok(()) => next.run(request).await,
+        // A page load lands on the applications page, which explains it.
+        Err(_) if wants_html(request.headers()) => {
+            Redirect::to(&format!("{APPLICATIONS_PAGE}?error=rate_limited")).into_response()
+        }
+        Err(error) => error.into_response(),
+    }
+}
+
+fn wants_html(headers: &HeaderMap) -> bool {
+    headers
+        .get(ACCEPT)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|accept| accept.contains("text/html"))
 }
 
 fn check(
