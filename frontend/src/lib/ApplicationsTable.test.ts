@@ -34,13 +34,13 @@ const names = () =>
 
 describe('ApplicationsTable', () => {
   it('says when there are no applications yet', () => {
-    render(ApplicationsTable, { applications: [], clubName: 'Example Club' });
+    render(ApplicationsTable, { applications: [], clubName: 'Example Club', clubId: '7' });
     expect(screen.getByText(t('leader.table.empty'))).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('lists the newest first and filters by status', async () => {
-    render(ApplicationsTable, { applications, clubName: 'Example Club' });
+    render(ApplicationsTable, { applications, clubName: 'Example Club', clubId: '7' });
     expect(names()).toEqual(['Trainer Bravo', 'Trainer Charlie', 'Trainer Alpha']);
     await fireEvent.click(
       screen.getByRole('button', { name: `${t('leader.filter.pending')} (1)` }),
@@ -48,8 +48,18 @@ describe('ApplicationsTable', () => {
     expect(names()).toEqual(['Trainer Bravo']);
   });
 
+  it('links an application to its comparison in the club', async () => {
+    render(ApplicationsTable, { applications, clubName: 'Example Club', clubId: '7' });
+    await fireEvent.click(
+      screen.getByRole('button', { name: t('leader.table.viewFor', { name: 'Trainer Alpha' }) }),
+    );
+    expect(
+      within(screen.getByRole('dialog')).getByRole('link', { name: t('leader.details.compare') }),
+    ).toHaveAttribute('href', '/applications/club/7/compare?trainers=100000000011');
+  });
+
   it('opens an application as the bot posted it, and closes it', async () => {
-    render(ApplicationsTable, { applications, clubName: 'Example Club' });
+    render(ApplicationsTable, { applications, clubName: 'Example Club', clubId: '7' });
     await fireEvent.click(
       screen.getByRole('button', { name: t('leader.table.viewFor', { name: 'Trainer Alpha' }) }),
     );

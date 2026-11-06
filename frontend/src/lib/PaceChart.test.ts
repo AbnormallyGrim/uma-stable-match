@@ -52,6 +52,24 @@ describe('PaceChart', () => {
     ]);
   });
 
+  it('draws one line per entry of `lines`, each in its colour and named in the legend', () => {
+    const lines = [
+      { label: 'Applicant A', fans: fans(7 * M), previousFans: null, colour: 'rgb(1, 2, 3)' },
+      { label: 'Applicant B', fans: fans(5 * M), previousFans: null, colour: 'rgb(4, 5, 6)' },
+      { label: 'No data', fans: null, previousFans: null, colour: 'rgb(7, 8, 9)' },
+    ];
+    const { container } = render(PaceChart, { details: details(false), lines });
+    const paths = [...container.querySelectorAll<SVGPathElement>('path.yours')];
+    expect(paths.map((path) => path.style.stroke)).toEqual(['rgb(1, 2, 3)', 'rgb(4, 5, 6)']);
+    const legend = within(screen.getByRole('list'));
+    expect(legend.getAllByRole('listitem').map((li) => li.textContent?.trim())).toEqual([
+      'Members',
+      'Club median',
+      'Applicant A',
+      'Applicant B',
+    ]);
+  });
+
   it('leaves the trainer out when there is none', () => {
     const { container } = render(PaceChart, { details: details(false) });
     expect(container.querySelector('path.yours')).toBeNull();

@@ -6,6 +6,7 @@ import App from './App.svelte';
 import ClubPage from './lib/ClubPage.svelte';
 import ApplicationsPage from './lib/ApplicationsPage.svelte';
 import ClubApplicationsPage from './lib/ClubApplicationsPage.svelte';
+import ClubComparePage from './lib/ClubComparePage.svelte';
 import { fetchFeatures } from './lib/api';
 import { flags } from './lib/flags.svelte';
 import LoginPage from './lib/LoginPage.svelte';
@@ -70,6 +71,11 @@ if (!shouldRedirectToLogin) {
     mount(ClubApplicationsPage, {
       target,
       props: { clubId: applications.clubId, linked: applications.linked },
+    });
+  } else if (applications?.page === 'compare') {
+    mount(ClubComparePage, {
+      target,
+      props: { clubId: applications.clubId, trainerIds: applications.trainerIds },
     });
   } else if (applications?.page === 'trainer') {
     mount(TrainerApplicationsPage, { target });

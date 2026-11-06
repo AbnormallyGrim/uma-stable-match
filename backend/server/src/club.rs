@@ -44,6 +44,14 @@ struct PreviousView {
     trainer: Option<Vec<i64>>,
 }
 
+// Last month's daily fans for the members and each trainer, in order.
+#[derive(Debug, Serialize)]
+struct PreviousFans {
+    month: String,
+    members: Vec<Option<Vec<i64>>>,
+    trainers: Vec<Option<Vec<i64>>>,
+}
+
 #[derive(Debug, Serialize)]
 struct MemberView {
     name: Option<String>,
@@ -92,7 +100,10 @@ pub(crate) async fn club(
         None => Club::clone(&loaded),
     };
     let trainer = match trainer_id {
-        Some(id) => Some(trainer_view(&state, visitor, id, &club, in_club).await?),
+        Some(id) => {
+            charge(&state, visitor, id)?;
+            Some(trainer_view(&state, id, &club, in_club).await?)
+        }
         None => None,
     };
     let mut info = club_info(&club);
@@ -101,17 +112,20 @@ pub(crate) async fn club(
     mark(&applications, [&mut info]).await;
     let (ids, members): (Vec<u64>, Vec<MemberView>) = members(&club).into_iter().unzip();
     let previous = match data_period(&loaded) {
-        Some(period) if data_days(&loaded) < PREVIOUS_MONTH_BELOW_DAYS => {
-            previous_view(
-                &state,
-                visitor,
-                circle_id,
-                month_before(period),
-                &ids,
-                trainer_id,
-            )
-            .await
-        }
+        Some(period) if data_days(&loaded) < PREVIOUS_MONTH_BELOW_DAYS => previous_fans(
+            &state,
+            visitor,
+            circle_id,
+            month_before(period),
+            &ids,
+            trainer_id.as_slice(),
+        )
+        .await
+        .map(|fans| PreviousView {
+            month: fans.month,
+            members: fans.members,
+            trainer: fans.trainers.into_iter().next().flatten(),
+        }),
         _ => None,
     };
 
@@ -134,16 +148,16 @@ pub(crate) async fn club(
 // chart leaves out the day under way and needs two gains, so it takes 4 days.
 const PREVIOUS_MONTH_BELOW_DAYS: usize = 4;
 
-// The club's previous month for `ids`, its current members, and the trainer. `None` when the
+// Last month's daily fans for the members and each of `trainer_ids`, in order. `None` when the
 // visitor is over their lookup limit for an uncached month, or the fetch fails.
-async fn previous_view(
+async fn previous_fans(
     state: &AppState,
     visitor: Visitor,
     circle_id: u64,
     period: Period,
     ids: &[u64],
-    trainer_id: Option<u64>,
-) -> Option<PreviousView> {
+    trainer_ids: &[u64],
+) -> Option<PreviousFans> {
     if !state.details.has_previous_month(circle_id, period) {
         state.limits.check_lookup(visitor).ok()?;
     }
@@ -161,20 +175,22 @@ async fn previous_view(
         .filter(|m| m.year.zip(m.month).is_none_or(|p| p == period))
         .map(|m| (m.viewer_id, m.daily_fans.iter().map(|v| v.abs()).collect()))
         .collect();
-    let trainer = match trainer_id {
-        Some(id) => state
-            .paces
-            .daily_fans(id, Some(period))
-            .await
-            .ok()
-            .flatten()
-            .map(|fans| fans.iter().map(|v| v.abs()).collect()),
-        None => None,
-    };
-    Some(PreviousView {
+    let mut trainers = Vec::with_capacity(trainer_ids.len());
+    for id in trainer_ids {
+        trainers.push(
+            state
+                .paces
+                .daily_fans(*id, Some(period))
+                .await
+                .ok()
+                .flatten()
+                .map(|fans| fans.iter().map(|v| v.abs()).collect()),
+        );
+    }
+    Some(PreviousFans {
         month: month_label(period),
         members: ids.iter().map(|id| fans.get(id).cloned()).collect(),
-        trainer,
+        trainers,
     })
 }
 
@@ -199,17 +215,21 @@ fn members(club: &Club) -> Vec<(u64, MemberView)> {
     members
 }
 
+// Counts a lookup against the visitor's limit, unless the trainer's pace is cached.
+fn charge(state: &AppState, visitor: Visitor, trainer_id: u64) -> Result<(), ApiError> {
+    if !state.paces.is_cached(trainer_id, None) {
+        state.limits.check_lookup(visitor)?;
+    }
+    Ok(())
+}
+
 // The trainer's pace and fans, and their place in `club`, which no longer has their own row.
 async fn trainer_view(
     state: &AppState,
-    visitor: Visitor,
     trainer_id: u64,
     club: &Club,
     in_club: bool,
 ) -> Result<TrainerView, ApiError> {
-    if !state.paces.is_cached(trainer_id, None) {
-        state.limits.check_lookup(visitor)?;
-    }
     let found = state
         .paces
         .blended(trainer_id, state.details.prior_period())
@@ -235,6 +255,9 @@ async fn trainer_view(
         club_size: scored.as_ref().map(|s| s.club_size),
     })
 }
+
+mod compare;
+pub(crate) use compare::compare;
 
 #[cfg(test)]
 mod tests;
