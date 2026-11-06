@@ -17,6 +17,7 @@ mod oauth;
 mod opt_in;
 mod rate_limit;
 mod rest;
+mod sealed;
 mod settings;
 mod store;
 mod tickets;

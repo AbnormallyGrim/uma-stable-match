@@ -19,6 +19,7 @@ use tokio::time::timeout;
 
 use crate::calendar::add_month;
 use crate::config::KeySecret;
+use crate::sealed::Sealer;
 use crate::store::StoreError;
 use crate::token::random;
 use crate::trainer_store::applicant_hash;
@@ -189,6 +190,7 @@ pub enum Sent {
 pub struct ApplicationStore {
     conn: ConnectionManager,
     secret: KeySecret,
+    sealer: Sealer,
 }
 
 impl std::fmt::Debug for ApplicationStore {
@@ -200,7 +202,12 @@ impl std::fmt::Debug for ApplicationStore {
 impl ApplicationStore {
     /// A store using this connection, hashing Discord IDs with `secret`.
     pub fn new(conn: ConnectionManager, secret: KeySecret) -> Self {
-        Self { conn, secret }
+        let sealer = Sealer::new(&secret);
+        Self {
+            conn,
+            secret,
+            sealer,
+        }
     }
 
     /// Saves an application sent now, unless the applicant has a pending one to the club or has
@@ -213,7 +220,10 @@ impl ApplicationStore {
             ("club", application.club.to_string()),
             ("club_name", application.club_name.clone()),
             ("guild", application.guild.to_string()),
-            ("applicant", application.applicant.to_string()),
+            (
+                "applicant",
+                self.sealer.seal(&application.applicant.to_string(), &id),
+            ),
             ("h", hash.clone()),
             ("trainer", application.trainer.to_string()),
             ("trainer_name", application.trainer_name.clone()),
@@ -298,7 +308,7 @@ impl ApplicationStore {
                     .query_async(&mut self.conn.clone()),
             )
             .await?;
-        Ok(parse(id, &fields))
+        Ok(parse(&self.sealer, id, &fields))
     }
 
     /// A club's applications, newest first.
@@ -336,9 +346,11 @@ impl ApplicationStore {
         let mut found = Vec::new();
         let mut expired = Vec::new();
         for (id, fields) in ids.iter().zip(&rows) {
-            match parse(id, fields) {
+            match parse(&self.sealer, id, fields) {
                 Some(application) => found.push(application),
-                None => expired.push(id.as_str()),
+                // Only a record that's gone has expired; one that can't be read stays.
+                None if fields.is_empty() => expired.push(id.as_str()),
+                None => {}
             }
         }
         if !expired.is_empty() {
@@ -388,7 +400,7 @@ fn applied_key(hash: &str, club: u64) -> String {
     format!("{APPLIED_PREFIX}{hash}:{club}")
 }
 
-fn parse(id: &str, fields: &HashMap<String, String>) -> Option<Application> {
+fn parse(sealer: &Sealer, id: &str, fields: &HashMap<String, String>) -> Option<Application> {
     let number = |field: &str| fields.get(field)?.parse::<u64>().ok();
     let text = |field: &str| fields.get(field).filter(|v| !v.is_empty()).cloned();
     Some(Application {
@@ -397,7 +409,7 @@ fn parse(id: &str, fields: &HashMap<String, String>) -> Option<Application> {
             club: number("club")?,
             club_name: text("club_name")?,
             guild: number("guild")?,
-            applicant: number("applicant")?,
+            applicant: sealer.open(fields.get("applicant")?, id)?.parse().ok()?,
             trainer: number("trainer")?,
             trainer_name: text("trainer_name")?,
             current_club: text("current_club"),

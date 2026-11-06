@@ -196,3 +196,50 @@ async fn lists_skip_applications_that_expired() {
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].id, kept.id);
 }
+
+#[tokio::test]
+async fn the_discord_id_is_not_kept_in_the_clear() {
+    let Some((store, conn)) = connect().await else {
+        return;
+    };
+    let base = base();
+    let new = application(base + 1, 123_456_789_012_345_678);
+    let found = saved(&store, &new).await;
+    let key = format!("discord:app:{}", found.id);
+
+    let fields: std::collections::HashMap<String, String> = redis::cmd("HGETALL")
+        .arg(&key)
+        .query_async(&mut conn.clone())
+        .await
+        .unwrap();
+    let everything = format!("{fields:?}");
+    assert!(!everything.contains("123456789012345678"));
+    assert!(fields["applicant"].starts_with("v1."));
+    // What uma.moe gives is kept as it is.
+    assert_eq!(fields["trainer_name"], "Example Trainer");
+
+    // A sealed ID copied onto another application can't be read there.
+    let other = saved(&store, &application(base + 3, base + 4)).await;
+    let _: () = redis::cmd("HSET")
+        .arg(format!("discord:app:{}", other.id))
+        .arg("applicant")
+        .arg(&fields["applicant"])
+        .query_async(&mut conn.clone())
+        .await
+        .unwrap();
+    assert_eq!(store.get(&other.id).await.unwrap(), None);
+    // And it isn't dropped from the club's list for it.
+    assert_eq!(store.for_club(base + 3).await.unwrap(), Vec::new());
+    let still_there: i64 = redis::cmd("EXISTS")
+        .arg(format!("discord:app:{}", other.id))
+        .query_async(&mut conn.clone())
+        .await
+        .unwrap();
+    assert_eq!(still_there, 1);
+    let listed: i64 = redis::cmd("ZCARD")
+        .arg(format!("discord:club-apps:{}", base + 3))
+        .query_async(&mut conn.clone())
+        .await
+        .unwrap();
+    assert_eq!(listed, 1);
+}
