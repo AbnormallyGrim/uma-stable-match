@@ -92,7 +92,7 @@ src/lib/messages/en.ts        Every message in English, and the shape other lang
 src/lib/messages/ja.ts        The same messages in Japanese
 src/lib/language.ts           Saving the language choice, and which language to show
 src/lib/language.svelte.ts    The language shown right now, shared by every component
-src/lib/SiteFooter.svelte     Tips, the logo, buttons to report a problem and support the project, the disclaimer, and a Privacy Policy link once applications are on
+src/lib/SiteFooter.svelte     Tips, the logo, buttons to report a problem and support the project, the disclaimer, and Privacy Policy and Terms of Service links once applications are on
 src/lib/BrandLogo.svelte      The logo, in the version for the current theme
 src/lib/api.ts                Typed API client
 src/lib/features.ts           Switches on Japanese, applications and analytics from the server's features, on every page
@@ -312,7 +312,7 @@ Card descriptions are capped at `80ch` so they stay easy to read on wide screens
 
 ### Footer
 
-`SiteFooter.svelte` is the page's `<footer>` landmark, below `<main>`. Its last line is a **Privacy Policy** link to the website's `/privacy/` page, in a new tab, shown only once `flags.applications` is on, because the website redirects that page home until then.
+`SiteFooter.svelte` is the page's `<footer>` landmark, below `<main>`. Its last line is **Privacy Policy** and **Terms of Service** links to the website's `/privacy/` and `/terms/` pages, in new tabs, shown only once `flags.applications` is on, because the website redirects that page home until then.
 
 | Part | Content |
 |---|---|

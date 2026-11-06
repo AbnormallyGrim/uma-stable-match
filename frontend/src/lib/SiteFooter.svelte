@@ -1,7 +1,8 @@
 <!--
   @component
   The page footer: the logo, buttons to report a problem and to support the project, the
-  disclaimer and attributions, and last a Privacy Policy link (once the applications flag is on).
+  disclaimer and attributions, and last the Privacy Policy and Terms of Service links (once the
+  applications flag is on).
   Keep the wording in step with the root README's Disclaimer section.
 -->
 
@@ -55,6 +56,10 @@
           href={`${websiteUrl(window.location)}/privacy/`}
           target="_blank"
           rel="noopener noreferrer">{t('footer.privacy')}</a
+        >
+        <span aria-hidden="true">·</span>
+        <a href={`${websiteUrl(window.location)}/terms/`} target="_blank" rel="noopener noreferrer"
+          >{t('footer.terms')}</a
         >
       </p>
     {/if}
