@@ -202,11 +202,13 @@ Everything about a linked club, from its settings to unlinking it, is for its le
 
 | Key | Holds |
 |---|---|
-| `discord:app:{id}` | A hash: the club and its name, server, the applicant's Discord ID and keyed hash, the trainer and its name, current club, pace, fans, status, when it was sent, and the ticket's channel and message |
+| `discord:app:{id}` | A hash: the club and its name, server, the applicant's Discord ID (encrypted) and keyed hash, the trainer and its name, current club, pace, fans, status, when it was sent, and the ticket's channel and message |
 | `discord:club-apps:{club_id}` | The club's application IDs, scored by when they were sent |
 | `discord:my-apps:{hash}` | The same for one applicant |
 | `discord:applied:{hash}:{club_id}` | The applicant's pending application to the club, which stops a second one |
 | `discord:apply-day:{hash}` | How many applications the applicant sent in the last day, for 24 hours |
+
+The applicant's Discord ID is the only field kept encrypted: AES-256-GCM, with a key derived from the key secret (`REDIS_KEY_SECRET`) and the application's ID as associated data, so a copy moved onto another application doesn't open. Everything else is what uma.moe shows publicly or an ID that is useless alone. Changing the key secret makes saved applications unreadable until they expire; an application that can't be read is skipped in lists, not removed.
 
 The lists drop expired applications when read. Results are counted in `discord_applications_total` by `result`, and answers in `discord_application_answers_total`.
 
