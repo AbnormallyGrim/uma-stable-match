@@ -1,6 +1,8 @@
 //! Lets Discord applications show a trainer's pace and fans.
 
-use uma_stable_match_discord::{Applicant, ApplicantLookup, LookupError};
+use uma_stable_match_discord::{Alltime, Applicant, ApplicantLookup, LookupError};
+
+use uma_stable_match_umamoe_client::ProfileFanHistory;
 
 use crate::pace::{PaceError, PaceLookup};
 use crate::source::Source;
@@ -38,12 +40,26 @@ pub fn applicant_lookup(source: Source, paces: PaceLookup) -> ApplicantLookup {
                 .flatten()
                 .and_then(|daily| fans_this_month(&daily));
             Ok(Some(Applicant {
-                name: profile.trainer.name,
+                name: profile.trainer.name.clone(),
                 club_name: profile.circle.map(|circle| circle.name),
                 pace_per_day: pace,
                 fans_this_month: fans,
+                alltime: alltime(profile.fan_history),
             }))
         }
+    })
+}
+
+/// The all-time fans from a profile's fan history, if it has them.
+pub(crate) fn alltime(history: Option<ProfileFanHistory>) -> Option<Alltime> {
+    let alltime = history?.alltime?;
+    Some(Alltime {
+        total_fans: alltime.total_fans,
+        active_days: alltime.active_days,
+        avg_day: alltime.avg_day,
+        avg_week: alltime.avg_week,
+        avg_month: alltime.avg_month,
+        rank: alltime.rank_total_fans,
     })
 }
 

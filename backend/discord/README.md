@@ -182,7 +182,7 @@ Everything about a linked club, from its settings to unlinking it, is for its le
 
 ## Applying to a club
 
-`GET /api/v1/discord/apply?club={id}` (`APPLY_PATH`) is where a club's Quick Apply button goes. Applying needs `Applying`, set with `Discord::with_applications`: an `ApplicationStore` and an `ApplicantLookup`, which gives a trainer's name, club, pace and fans this month.
+`GET /api/v1/discord/apply?club={id}` (`APPLY_PATH`) is where a club's Quick Apply button goes. Applying needs `Applying`, set with `Discord::with_applications`: an `ApplicationStore` and an `ApplicantLookup`, which gives a trainer's name, club, pace, fans this month and all-time fans.
 
 1. Not signed in: the player is sent through Discord's sign-in and back to the same address.
 2. Signed in: the club must be linked, open and without a setup problem, and the player must have a linked trainer. If not, a browser lands on `/applications?error=<label>` (`not_open`, `no_trainer`, `bad_club`) and anything else gets JSON. Otherwise the player goes to Discord with the `identify guilds.join` scopes.
@@ -192,7 +192,7 @@ Everything about a linked club, from its settings to unlinking it, is for its le
    - opens the ticket and notes it on the application. If any step after saving fails, the application is taken back, so a failed try costs nothing (`join_failed`, `ticket_failed`).
 4. The player lands on `/applications/mine`.
 
-**The ticket** is a private text channel named `app-<trainer name>`, in the club's category if it has one. Everyone else is shut out; the applicant, the leader noted on the club and the bot can see it. If Discord refuses it, the leader may have left the server, so it's tried once more without them. The bot posts an embed with the trainer's name and a link to `https://uma.moe/profile/<trainer ID>`, the applicant, their current club, pace and fans this month, and Accept and Decline buttons.
+**The ticket** is a private text channel named `app-<trainer name>`, in the club's category if it has one. Everyone else is shut out; the applicant, the leader noted on the club and the bot can see it. If Discord refuses it, the leader may have left the server, so it's tried once more without them. The bot posts an embed with the trainer's name and a link to `https://uma.moe/profile/<trainer ID>`, the applicant, their current club, pace, fans this month, total fans, average fans per day, week and month, fans rank and days tracked, and Accept and Decline buttons.
 
 **The buttons** go through the interactions endpoint. Only the leader noted on the club can answer, or, for a club with no leader noted, someone with Manage Server. The first answer wins and removes the buttons; the applicant can then apply to that club again.
 

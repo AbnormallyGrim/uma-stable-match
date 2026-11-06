@@ -60,6 +60,7 @@ impl ClubSource for Fixed {
                         comment: Some("made-up comment".into()),
                     },
                     circle: None,
+                    ..Default::default()
                 }),
                 _ => Err(SourceError::NotFound),
             }
