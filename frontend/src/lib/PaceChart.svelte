@@ -1,20 +1,21 @@
 <!--
   @component
   The club page chart: each member's daily gain or fans this month as a thin muted line, the club
-  median in bold, the trainer's line in the accent colour and the chosen member's line in the
-  highlight colour. A crosshair shows every line's value for a day, on hover or with the arrow keys,
+  median in bold, the trainer's line in the accent colour (or one line per entry of `lines`, each in
+  its own colour) and the chosen member's line in the highlight colour. A crosshair shows every line's value for a day, on hover or with the arrow keys,
   which move it like a slider over the days. In the current month, the day still under way is left
   out. While this month has too few days, it shows the server's `previous` month instead.
 -->
 
 <script lang="ts">
-  import type { ClubDetails } from './api';
+  import type { ClubDetails, PreviousMonth } from './api';
   import {
     lastDay,
     medianSeries,
     tickLabel,
     ticks,
     toSeries,
+    type ChartLine,
     type ChartMode,
     type Series,
   } from './chart';
@@ -22,14 +23,19 @@
   import { t } from './i18n';
 
   interface Props {
-    details: Pick<ClubDetails, 'members' | 'trainer' | 'month' | 'previous'>;
+    details: Pick<ClubDetails, 'members' | 'month'> & {
+      trainer?: ClubDetails['trainer'];
+      previous: (Pick<PreviousMonth, 'members'> & Partial<Pick<PreviousMonth, 'trainer'>>) | null;
+    };
+    /** The trainers to draw, replacing the one in `details.trainer`. */
+    lines?: ChartLine[];
     /** The index in `details.members` of the member whose line stands out, if any. */
     highlight?: number | null;
     /** Replaceable in tests. */
     now?: Date;
   }
 
-  let { details, highlight = null, now = new Date() }: Props = $props();
+  let { details, lines, highlight = null, now = new Date() }: Props = $props();
 
   let mode = $state<ChartMode>('daily');
   let width = $state(0);
@@ -46,10 +52,30 @@
       ? previous.members.map((fans) => fans ?? [])
       : details.members.map((m) => m.daily_fans),
   );
-  const yourFans = $derived(previous ? previous.trainer : (details.trainer?.daily_fans ?? null));
+  const drawn = $derived<ChartLine[]>(
+    lines ??
+      (details.trainer
+        ? [
+            {
+              label: t('chart.you'),
+              fans: details.trainer.daily_fans,
+              previousFans: details.previous?.trainer ?? null,
+              colour: 'var(--accent)',
+            },
+          ]
+        : []),
+  );
+  // The trainers with a line to draw: last month's while the chart shows it.
+  const yours = $derived(
+    drawn.flatMap((line) => {
+      const fans = previous ? line.previousFans : line.fans;
+      return fans ? [{ ...line, series: toSeries(fans, mode) }] : [];
+    }),
+  );
   const members = $derived(memberFans.map((fans) => toSeries(fans, mode)));
-  const yours = $derived(yourFans ? toSeries(yourFans, mode) : null);
-  const days = $derived(Math.max(0, ...memberFans.map((fans) => fans.length), yours?.length ?? 0));
+  const days = $derived(
+    Math.max(0, ...memberFans.map((fans) => fans.length), ...yours.map((l) => l.series.length)),
+  );
   const median = $derived(medianSeries(members, days));
   const chosen = $derived(
     highlight === null || !members[highlight]
@@ -63,13 +89,13 @@
   const today = $derived(
     !previous && (details.month === null || details.month === gameMonth(now.toISOString())),
   );
-  const last = $derived(lastDay(yours ? [...members, yours] : members) - (today ? 1 : 0));
+  const last = $derived(lastDay([...members, ...yours.map((l) => l.series)]) - (today ? 1 : 0));
   const first = $derived(mode === 'daily' ? 1 : 0);
   const yTicks = $derived(
     ticks(
       Math.max(
         0,
-        ...[...members, median, yours ?? []].flatMap((s) =>
+        ...[...members, median, ...yours.map((l) => l.series)].flatMap((s) =>
           s.slice(0, last + 1).filter((v): v is number => v !== null),
         ),
       ),
@@ -104,7 +130,7 @@
     return day < 0 ? null : { day, value: series[day]! };
   }
 
-  const yoursEnd = $derived(end(yours));
+  const yoursEnd = $derived(yours.map((line) => end(line.series)));
   const chosenEnd = $derived(end(chosen?.series ?? null));
 
   const format = (value: number) => (mode === 'daily' ? formatPace(value) : formatMillions(value));
@@ -114,7 +140,7 @@
     return {
       day,
       chosen: chosen?.series[day] ?? null,
-      yours: yours?.[day] ?? null,
+      yours: yours.map((line) => line.series[day] ?? null),
       median: median[day] ?? null,
       low: values.length ? Math.min(...values) : null,
       high: values.length ? Math.max(...values) : null,
@@ -128,7 +154,10 @@
     const values = valuesOn(hover ?? last);
     const parts = [t('chart.day', { n: values.day + 1 })];
     if (chosen && values.chosen !== null) parts.push(`${chosen.name} ${format(values.chosen)}`);
-    if (values.yours !== null) parts.push(`${t('chart.you')} ${format(values.yours)}`);
+    yours.forEach((line, i) => {
+      const value = values.yours[i];
+      if (value !== null && value !== undefined) parts.push(`${line.label} ${format(value)}`);
+    });
     if (values.median !== null) parts.push(`${t('chart.median')} ${format(values.median)}`);
     if (values.low !== null && values.high !== null) {
       const range = t('chart.range', { low: format(values.low), high: format(values.high) });
@@ -182,9 +211,12 @@
     <ul class="legend">
       <li><span class="key members" aria-hidden="true"></span>{t('chart.members')}</li>
       <li><span class="key median" aria-hidden="true"></span>{t('chart.median')}</li>
-      {#if yours}
-        <li><span class="key yours" aria-hidden="true"></span>{t('chart.you')}</li>
-      {/if}
+      {#each yours as line (line.label)}
+        <li>
+          <span class="key yours" style:border-color={line.colour} aria-hidden="true"
+          ></span>{line.label}
+        </li>
+      {/each}
       {#if chosen}
         <li><span class="key chosen" aria-hidden="true"></span>{chosen.name}</li>
       {/if}
@@ -220,12 +252,18 @@
           <path class="member" d={path(series)} />
         {/each}
         <path class="median" d={path(median)} />
-        {#if yours}
-          <path class="yours" d={path(yours)} />
-          {#if yoursEnd}
-            <circle class="end" cx={x(yoursEnd.day)} cy={y(yoursEnd.value)} r="4" />
+        {#each yours as line, i (line.label)}
+          <path class="yours" d={path(line.series)} style:stroke={line.colour} />
+          {#if yoursEnd[i]}
+            <circle
+              class="end"
+              cx={x(yoursEnd[i].day)}
+              cy={y(yoursEnd[i].value)}
+              r="4"
+              style:fill={line.colour}
+            />
           {/if}
-        {/if}
+        {/each}
         {#if chosen}
           <path class="chosen" d={path(chosen.series)} />
           {#if chosenEnd}
@@ -254,9 +292,16 @@
           {#if chosen && readout.chosen !== null}
             <p><span class="key chosen"></span><b>{format(readout.chosen)}</b> {chosen.name}</p>
           {/if}
-          {#if readout.yours !== null}
-            <p><span class="key yours"></span><b>{format(readout.yours)}</b> {t('chart.you')}</p>
-          {/if}
+          {#each yours as line, i (line.label)}
+            {#if readout.yours[i] !== null && readout.yours[i] !== undefined}
+              <p>
+                <span class="key yours" style:border-color={line.colour}></span><b
+                  >{format(readout.yours[i])}</b
+                >
+                {line.label}
+              </p>
+            {/if}
+          {/each}
           {#if readout.median !== null}
             <p>
               <span class="key median"></span><b>{format(readout.median)}</b>

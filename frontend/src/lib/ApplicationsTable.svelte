@@ -14,9 +14,11 @@
     applications: Application[];
     /** The club's name, or `null` while it's unknown. */
     clubName: string | null;
+    /** The club's ID, or `null` while it's unknown. */
+    clubId: string | null;
   }
 
-  let { applications, clubName }: Props = $props();
+  let { applications, clubName, clubId }: Props = $props();
 
   type Filter = 'all' | ApplicationStatus;
   const FILTERS: Filter[] = ['all', 'pending', 'accepted', 'declined'];
@@ -101,7 +103,7 @@
 </section>
 
 {#if showing}
-  <ApplicationDetails application={showing} {clubName} onclose={() => (showing = null)} />
+  <ApplicationDetails application={showing} {clubName} {clubId} onclose={() => (showing = null)} />
 {/if}
 
 <style>

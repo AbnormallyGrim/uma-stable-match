@@ -193,7 +193,7 @@
           </div>
           {#if resumeFailed}<p class="failed" role="alert">{t('leader.settings.saveError')}</p>{/if}
         {/if}
-        <ApplicationsTable {applications} {clubName} />
+        <ApplicationsTable {applications} {clubName} {clubId} />
       </div>
     </div>
   {/if}

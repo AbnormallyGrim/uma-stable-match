@@ -438,6 +438,7 @@ All endpoints are under `/api/v1`.
 | `GET` | `/api/v1/features` | `200 {"japanese":false,"applications":false,"web_analytics":null}`: the features that are switched on, and the Web Analytics token if set |
 | `GET` | `/api/v1/recommendations` | Ranked clubs for a trainer or a pace, below |
 | `GET` | `/api/v1/clubs/{id}` | A loaded club's members, and where a trainer would sit among them; see [Club page](#club-page) |
+| `GET` | `/api/v1/clubs/{id}/compare` | The same with up to 5 trainers, each placed on their own; see [Comparing trainers](#comparing-trainers) |
 
 There's no public status endpoint. The page takes the data's age from each search's `updated_at`, and the full scan state is served privately at [`/status`](#status), next to the metrics.
 
@@ -650,9 +651,20 @@ Errors come back as `{"error": "..."}`:
 
 The [human check](#human-check) and [rate limits](#rate-limits) apply as for recommendations. Errors are the same as [recommendations' errors](#errors) for a trainer, plus `400` when the club ID isn't a number, and `404` with `"club not loaded yet; try again later"`.
 
+#### Comparing trainers
+
+`GET /api/v1/clubs/{id}/compare?trainer_ids=a,b,c` is the club page for a leader comparing applicants: the same club, `month`, `updated_at`, `median_per_day` and `members` as above, with 1 to 5 trainers placed among the members.
+
+- `trainer_ids` is required: 1 to 5 comma-separated trainer IDs. Repeats are dropped, and the order is kept. Anything else, including more than 5, is `400`.
+- `trainers` replaces `trainer`: one entry per ID, in order, each with the fields of `trainer` above. Each trainer is placed among the members on their own, as if they were the only one joining, so adding a trainer never changes another's place. A trainer already in the club has their own row left out, and so does any other asked-for trainer who is a member.
+- `previous` has `trainers`, a list in the same order as `trainers`, in place of `trainer`.
+- Every trainer that isn't cached counts against the visitor's [trainer lookup limit](#rate-limits), all before the first fetch, so a visitor who would go over gets `429` and nothing is fetched.
+- Nothing limits the club's size: the response is the same whether or not the club has room.
+- The route is as open as `/api/v1/clubs/{id}`. The web app's page for it is only for the club's leader.
+
 ### Rate limits
 
-`/api/v1/recommendations`, `/api/v1/clubs/{id}` and the [Discord routes](#discord-applications) are limited per visitor. Health and Discord's interactions and webhook events endpoints, which Discord signs, aren't limited.
+`/api/v1/recommendations`, `/api/v1/clubs/{id}`, `/api/v1/clubs/{id}/compare` and the [Discord routes](#discord-applications) are limited per visitor. Health and Discord's interactions and webhook events endpoints, which Discord signs, aren't limited.
 
 - **All requests:** `RATE_LIMIT_PER_MINUTE` (30 by default).
 - **Trainer lookups:** `TRAINER_LOOKUPS_PER_MINUTE` (10 by default). This only counts `trainer_id` requests that need a call to uma.moe, and club pages that fetch a club's [previous month](#club-page). Cached trainers and `pace` requests don't use it, so a public instance can't be used to flood uma.moe.

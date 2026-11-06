@@ -57,9 +57,20 @@ export const CLUB_APPLICATIONS_PATH = `${APPLICATIONS_PATH}/club`;
 export type ApplicationsRoute =
   | { page: 'home'; error: string | null }
   | { page: 'club'; clubId: string | null; linked: boolean }
+  | { page: 'compare'; clubId: string; trainerIds: string[] }
   | { page: 'trainer' };
 
 const CLUB_APPLICATIONS = /^\/applications\/club(?:\/(\d{1,18}))?\/?$/;
+const CLUB_COMPARE = /^\/applications\/club\/(\d{1,18})\/compare\/?$/;
+
+/** Most trainers one comparison shows. */
+export const MAX_COMPARED = 5;
+
+/** The valid trainer IDs in `value`, comma separated, without repeats, at most `MAX_COMPARED`. */
+function comparedTrainers(value: string | null): string[] {
+  const ids = (value ?? '').split(',').filter(isTrainerId).map(normaliseTrainerId);
+  return [...new Set(ids)].slice(0, MAX_COMPARED);
+}
 
 /** The club applications page `pathname` and `search` point to, or `null` for any other page. */
 export function applicationsRoute(pathname: string, search: string): ApplicationsRoute | null {
@@ -72,6 +83,14 @@ export function applicationsRoute(pathname: string, search: string): Application
   if (pathname === TRAINER_APPLICATIONS_PATH || pathname === `${TRAINER_APPLICATIONS_PATH}/`) {
     return { page: 'trainer' };
   }
+  const compare = CLUB_COMPARE.exec(pathname);
+  if (compare) {
+    return {
+      page: 'compare',
+      clubId: compare[1]!,
+      trainerIds: comparedTrainers(params.get('trainers')),
+    };
+  }
   const match = CLUB_APPLICATIONS.exec(pathname);
   return match
     ? { page: 'club', clubId: match[1] ?? null, linked: params.get('linked') === '1' }
@@ -81,6 +100,14 @@ export function applicationsRoute(pathname: string, search: string): Application
 /** A club's applications page, where its leaders add the bot and follow applications. */
 export function clubApplicationsPath(clubId: number | string, linked = false): string {
   return `${APPLICATIONS_PATH}/club/${clubId}${linked ? '?linked=1' : ''}`;
+}
+
+/** The page where a leader compares applicants in their club, such as `…/compare?trainers=…`. */
+export function clubComparePath(clubId: number | string, trainerIds: string[] = []): string {
+  const path = `${APPLICATIONS_PATH}/club/${clubId}/compare`;
+  return trainerIds.length === 0
+    ? path
+    : `${path}?${new URLSearchParams({ trainers: trainerIds.join(',') })}`;
 }
 
 const FROM_KEY = 'uma-stable-match:club-from';

@@ -121,6 +121,23 @@ export interface PreviousMonth {
   trainer: number[] | null;
 }
 
+/** Response from `GET /api/v1/clubs/{id}/compare`: the club with each trainer placed among it. */
+export interface ClubCompare {
+  club: ClubInfo;
+  month: string | null;
+  updated_at: string | null;
+  median_per_day: number | null;
+  members: ClubMember[];
+  /** In the order asked for, each placed among the members alone. */
+  trainers: ClubTrainer[];
+  previous: {
+    month: string;
+    members: (number[] | null)[];
+    /** Each trainer's cumulative fans last month, in the same order as `trainers`. */
+    trainers: (number[] | null)[];
+  } | null;
+}
+
 /** Features the server has switched on. */
 export interface Features {
   japanese: boolean;
@@ -245,6 +262,20 @@ export async function fetchClub(
 ): Promise<ClubDetails> {
   const params = trainerId === null ? '' : `?${new URLSearchParams({ trainer_id: trainerId })}`;
   return getChecked(`/api/v1/clubs/${encodeURIComponent(circleId)}${params}`, options);
+}
+
+/**
+ * Fetches a loaded club's members with each of `trainerIds` (1 to 5) placed among them alone.
+ *
+ * Throws `ApiError`, or the caller's abort error when `signal` is aborted.
+ */
+export async function fetchClubCompare(
+  circleId: string,
+  trainerIds: string[],
+  options: RequestOptions = {},
+): Promise<ClubCompare> {
+  const params = new URLSearchParams({ trainer_ids: trainerIds.join(',') });
+  return getChecked(`/api/v1/clubs/${encodeURIComponent(circleId)}/compare?${params}`, options);
 }
 
 // Fetches a path that needs the human check's token when `options.human` is given. If no check

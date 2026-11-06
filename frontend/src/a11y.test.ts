@@ -338,6 +338,7 @@ describe('accessibility', () => {
       const { container } = render(ApplicationsTable, {
         applications: [application],
         clubName: 'Example Club',
+        clubId: '7',
       });
       expect(await violations(container)).toEqual([]);
       await fireEvent.click(

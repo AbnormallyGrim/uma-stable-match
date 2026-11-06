@@ -8,15 +8,18 @@
   import type { Application } from './applications';
   import { formatDate, formatMillions, formatPace } from './format';
   import { t } from './i18n';
+  import { clubComparePath } from './route';
 
   interface Props {
     application: Application;
     /** The club's name, or `null` while it's unknown. */
     clubName: string | null;
+    /** The club's ID, or `null` while it's unknown. */
+    clubId: string | null;
     onclose: () => void;
   }
 
-  let { application, clubName, onclose }: Props = $props();
+  let { application, clubName, clubId, onclose }: Props = $props();
 
   let closeButton: HTMLButtonElement | undefined = $state();
   let returnFocus: HTMLElement | null = null;
@@ -102,16 +105,24 @@
         · {t(`leader.applicationStatus.${application.status}`)}
       </p>
     </div>
-    {#if application.ticketUrl}
-      <a
-        class="provider-btn discord"
-        href={application.ticketUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        {t('leader.details.openTicket')}
-      </a>
-    {:else}
+    <div class="actions">
+      {#if clubId !== null}
+        <a class="provider-btn compare" href={clubComparePath(clubId, [application.trainerId])}>
+          {t('leader.details.compare')}
+        </a>
+      {/if}
+      {#if application.ticketUrl}
+        <a
+          class="provider-btn discord"
+          href={application.ticketUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {t('leader.details.openTicket')}
+        </a>
+      {/if}
+    </div>
+    {#if !application.ticketUrl}
       <p class="muted">{t('leader.details.ticketGone')}</p>
     {/if}
   </div>
@@ -196,7 +207,21 @@
     font-size: 0.75rem;
   }
 
-  .provider-btn {
-    justify-self: end;
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .compare {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .compare:hover {
+    background: color-mix(in srgb, var(--accent) 88%, var(--text));
+    border-color: color-mix(in srgb, var(--accent) 88%, var(--text));
   }
 </style>
