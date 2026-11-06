@@ -15,7 +15,9 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::application_store::{Application, ApplicationStore, NewApplication, Sent, Status};
-use crate::auth::{begin, private, send_to_discord, session_user, Failure, Flow, Target};
+use crate::auth::{
+    begin, private, send_to_discord, session_user, signed_in, Failure, Flow, Target,
+};
 use crate::bot::Discord;
 use crate::calendar::iso;
 use crate::leaders::managed_club;
@@ -196,11 +198,18 @@ async fn start(
         )
         .respond(&headers);
     };
-    let Some(user) = session_user(config, &headers) else {
-        // Sign in, then come back here.
-        let next = format!("{APPLY_PATH}?club={club_id}");
-        let (state, nonce) = begin(config, Flow::SignIn, &next, None, SystemTime::now());
-        return send_to_discord(config, Flow::SignIn, &state, &nonce, &[("prompt", "none")]);
+    let user = match session_user(&discord, &headers).await {
+        Ok(Some(user)) => user,
+        Ok(None) => {
+            // Sign in, then come back here.
+            let next = format!("{APPLY_PATH}?club={club_id}");
+            let (state, nonce) = begin(config, Flow::SignIn, &next, None, SystemTime::now());
+            return send_to_discord(config, Flow::SignIn, &state, &nonce, &[("prompt", "none")]);
+        }
+        Err(err) => {
+            tracing::warn!(error = %err, "could not check a session");
+            return unavailable().respond(&headers);
+        }
     };
     let checked = async {
         let record = open_club(&discord, club_id).await?;
@@ -398,8 +407,9 @@ async fn mine(State(discord): State<Discord>, headers: HeaderMap) -> Response {
     let Some(applying) = discord.applying() else {
         return crate::auth::error(StatusCode::NOT_FOUND, "not found");
     };
-    let Some(user) = session_user(discord.config(), &headers) else {
-        return crate::auth::error(StatusCode::UNAUTHORIZED, "sign in with Discord first");
+    let user = match signed_in(&discord, &headers).await {
+        Ok(user) => user,
+        Err(response) => return *response,
     };
     let applications = match applying.store.for_applicant(user).await {
         Ok(applications) => applications,
@@ -427,7 +437,7 @@ async fn for_club(
     Path(club): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (club_id, _) = match managed_club(&discord, &headers, &club).await {
+    let (_, club_id, _) = match managed_club(&discord, &headers, &club).await {
         Ok(found) => found,
         Err(response) => return *response,
     };

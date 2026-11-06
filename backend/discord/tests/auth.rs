@@ -1,7 +1,7 @@
 //! Sign-in tests against a mock Discord. All values are made up.
 
 use axum::body::Body;
-use axum::http::header::{CACHE_CONTROL, COOKIE, LOCATION, SET_COOKIE};
+use axum::http::header::{CACHE_CONTROL, COOKIE, LOCATION, ORIGIN, SET_COOKIE};
 use axum::http::{Request, Response, StatusCode};
 use axum::Router;
 use http_body_util::BodyExt;
@@ -427,6 +427,48 @@ async fn sign_out_clears_the_session() {
     // Signing out is a POST, so a link or image on another site can't trigger it.
     let response = get(&app, SIGN_OUT_PATH, None).await;
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+}
+
+async fn sign_out_from(app: &Router, origin: Option<&str>) -> Response<Body> {
+    let mut request = Request::post(SIGN_OUT_PATH);
+    if let Some(origin) = origin {
+        request = request.header(ORIGIN, origin);
+    }
+    app.clone()
+        .oneshot(request.body(Body::empty()).unwrap())
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn sign_out_from_another_site_is_refused() {
+    let server = MockServer::start().await;
+    let app = app(&server);
+    for origin in [
+        "https://made-up-other-site.test",
+        "http://example.test",
+        "https://example.test.made-up-other-site.test",
+        "null",
+    ] {
+        let response = sign_out_from(&app, Some(origin)).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{origin}");
+        assert!(set_cookies(&response).is_empty(), "{origin}");
+    }
+}
+
+#[tokio::test]
+async fn sign_out_from_this_site_or_without_an_origin_works() {
+    let server = MockServer::start().await;
+    let app = app(&server);
+    // A local dev server's proxy keeps its own port.
+    for origin in [
+        Some("https://example.test"),
+        Some("https://example.test:5173"),
+        None,
+    ] {
+        let response = sign_out_from(&app, origin).await;
+        assert_eq!(response.status(), StatusCode::NO_CONTENT, "{origin:?}");
+    }
 }
 
 #[tokio::test]

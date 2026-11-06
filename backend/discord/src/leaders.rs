@@ -9,7 +9,7 @@ use axum::routing::get;
 use axum::{Json, Router};
 use serde_json::{json, Value};
 
-use crate::auth::{error, private, session_user};
+use crate::auth::{error, private, signed_in};
 use crate::bot::Discord;
 use crate::opt_in::{store_unavailable, ClubSummary};
 use crate::store::ClubRecord;
@@ -83,9 +83,7 @@ pub(crate) async fn led_club(
     if discord.opt_in().is_none() || discord.trainer_links().is_none() {
         return fail(StatusCode::NOT_FOUND, "not found");
     }
-    let Some(user) = session_user(discord.config(), headers) else {
-        return fail(StatusCode::UNAUTHORIZED, "sign in with Discord first");
-    };
+    let user = signed_in(discord, headers).await?;
     let Ok(club_id) = club.parse::<u64>() else {
         return fail(StatusCode::BAD_REQUEST, "club must be a club ID");
     };
@@ -111,19 +109,19 @@ pub(crate) async fn led_club(
     }
 }
 
-/// The club with this ID, as `club`, and its link, when the signed-in user leads it and the bot is
-/// in its server. The `Err` is the response to send.
+/// The signed-in user, the club with this ID, as `club`, and its link, when the user leads it and
+/// the bot is in its server. The `Err` is the response to send.
 pub(crate) async fn managed_club(
     discord: &Discord,
     headers: &HeaderMap,
     club: &str,
-) -> Result<(u64, ClubRecord), Box<Response>> {
-    let (_, club_id, _) = led_club(discord, headers, club).await?;
+) -> Result<(u64, u64, ClubRecord), Box<Response>> {
+    let (user, club_id, _) = led_club(discord, headers, club).await?;
     let Some(opt_in) = discord.opt_in() else {
         return Err(Box::new(error(StatusCode::NOT_FOUND, "not found")));
     };
     match opt_in.store().club(club_id).await {
-        Ok(Some(record)) => Ok((club_id, record)),
+        Ok(Some(record)) => Ok((user, club_id, record)),
         Ok(None) => Err(Box::new(error(
             StatusCode::NOT_FOUND,
             "that club isn't linked to a server",
@@ -138,8 +136,9 @@ async fn my_club(State(discord): State<Discord>, headers: HeaderMap) -> Response
     let (Some(opt_in), Some(links)) = (discord.opt_in(), discord.trainer_links()) else {
         return error(StatusCode::NOT_FOUND, "not found");
     };
-    let Some(user) = session_user(discord.config(), &headers) else {
-        return error(StatusCode::UNAUTHORIZED, "sign in with Discord first");
+    let user = match signed_in(&discord, &headers).await {
+        Ok(user) => user,
+        Err(response) => return *response,
     };
     let linked = match links.store().linked(user).await {
         Ok(linked) => linked,

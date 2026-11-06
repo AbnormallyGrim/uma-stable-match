@@ -48,12 +48,22 @@ pub(crate) fn open<T: DeserializeOwned>(
     token: &str,
     now: SystemTime,
 ) -> Option<T> {
+    open_expiring(key, purpose, token, now).map(|(value, _)| value)
+}
+
+/// Like [`open`], with the expiry (Unix seconds) too.
+pub(crate) fn open_expiring<T: DeserializeOwned>(
+    key: &SigningKey,
+    purpose: &str,
+    token: &str,
+    now: SystemTime,
+) -> Option<(T, u64)> {
     let (payload, tag) = token.split_once('.')?;
     let tag = URL_SAFE_NO_PAD.decode(tag).ok()?;
     mac(key, purpose, payload).verify_slice(&tag).ok()?;
     let payload: Payload<T> =
         serde_json::from_slice(&URL_SAFE_NO_PAD.decode(payload).ok()?).ok()?;
-    (payload.e > seconds(now)).then_some(payload.v)
+    (payload.e > seconds(now)).then_some((payload.v, payload.e))
 }
 
 /// A random value for a nonce, as URL-safe text.

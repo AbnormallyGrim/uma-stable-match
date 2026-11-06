@@ -14,7 +14,7 @@ use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use serde_json::json;
 
-use crate::auth::{error, private, session_user};
+use crate::auth::{error, private};
 use crate::bot::Discord;
 use crate::opt_in::{store_unavailable, LookupError};
 use crate::store::StoreError;
@@ -174,7 +174,7 @@ pub(crate) fn router(discord: Discord) -> Router {
 }
 
 async fn list(State(discord): State<Discord>, headers: HeaderMap) -> Response {
-    let (links, user) = match signed_in(&discord, &headers) {
+    let (links, user) = match signed_in(&discord, &headers).await {
         Ok(found) => found,
         Err(response) => return *response,
     };
@@ -222,7 +222,7 @@ async fn discard(
     Path(trainer): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (links, user) = match signed_in(&discord, &headers) {
+    let (links, user) = match signed_in(&discord, &headers).await {
         Ok(found) => found,
         Err(response) => return *response,
     };
@@ -240,7 +240,7 @@ async fn start(
     Path(trainer): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (links, user) = match signed_in(&discord, &headers) {
+    let (links, user) = match signed_in(&discord, &headers).await {
         Ok(found) => found,
         Err(response) => return *response,
     };
@@ -288,7 +288,7 @@ async fn check(
     Path(trainer): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (links, user) = match signed_in(&discord, &headers) {
+    let (links, user) = match signed_in(&discord, &headers).await {
         Ok(found) => found,
         Err(response) => return *response,
     };
@@ -401,7 +401,7 @@ async fn unlink(
     Path(trainer): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (links, user) = match signed_in(&discord, &headers) {
+    let (links, user) = match signed_in(&discord, &headers).await {
         Ok(found) => found,
         Err(response) => return *response,
     };
@@ -419,20 +419,14 @@ async fn unlink(
 }
 
 /// The trainer links and the signed-in user, or the response to send.
-fn signed_in<'a>(
+async fn signed_in<'a>(
     discord: &'a Discord,
     headers: &HeaderMap,
 ) -> Result<(&'a TrainerLinks, u64), Box<Response>> {
     let Some(links) = discord.trainer_links() else {
         return Err(Box::new(error(StatusCode::NOT_FOUND, "not found")));
     };
-    match session_user(discord.config(), headers) {
-        Some(user) => Ok((links, user)),
-        None => Err(Box::new(error(
-            StatusCode::UNAUTHORIZED,
-            "sign in with Discord first",
-        ))),
-    }
+    Ok((links, crate::auth::signed_in(discord, headers).await?))
 }
 
 /// The response for a user who has tried `action` too often, or a failed count; `None` if allowed.

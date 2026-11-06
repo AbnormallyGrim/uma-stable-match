@@ -186,7 +186,7 @@ async fn unlink(
     Path(club): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (club_id, _) = match managed_club(&discord, &headers, &club).await {
+    let (_, club_id, _) = match managed_club(&discord, &headers, &club).await {
         Ok(found) => found,
         Err(response) => return *response,
     };
