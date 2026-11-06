@@ -105,21 +105,24 @@
         · {t(`leader.applicationStatus.${application.status}`)}
       </p>
     </div>
-    {#if clubId !== null}
-      <a class="compare" href={clubComparePath(clubId, [application.trainerId])}>
-        {t('leader.details.compare')}
-      </a>
-    {/if}
-    {#if application.ticketUrl}
-      <a
-        class="provider-btn discord"
-        href={application.ticketUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        {t('leader.details.openTicket')}
-      </a>
-    {:else}
+    <div class="actions">
+      {#if clubId !== null}
+        <a class="provider-btn compare" href={clubComparePath(clubId, [application.trainerId])}>
+          {t('leader.details.compare')}
+        </a>
+      {/if}
+      {#if application.ticketUrl}
+        <a
+          class="provider-btn discord"
+          href={application.ticketUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {t('leader.details.openTicket')}
+        </a>
+      {/if}
+    </div>
+    {#if !application.ticketUrl}
       <p class="muted">{t('leader.details.ticketGone')}</p>
     {/if}
   </div>
@@ -204,8 +207,21 @@
     font-size: 0.75rem;
   }
 
-  .provider-btn,
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
   .compare {
-    justify-self: end;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .compare:hover {
+    background: color-mix(in srgb, var(--accent) 88%, var(--text));
+    border-color: color-mix(in srgb, var(--accent) 88%, var(--text));
   }
 </style>

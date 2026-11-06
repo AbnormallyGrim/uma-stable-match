@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ClubMember, ClubTrainer } from './api';
-import { rosterRows } from './roster';
+import { compareRows, rosterRows } from './roster';
 
 const member = (pace: number | null): ClubMember => ({
   name: pace === null ? null : `Made-up ${pace}`,
@@ -63,5 +63,23 @@ describe('rosterRows', () => {
       true,
       false,
     ]);
+  });
+});
+
+describe('compareRows', () => {
+  it('ranks compared trainers among the members, ahead of ties', () => {
+    const rows = compareRows([member(9), member(6), member(null)], [6, 12, 3]);
+    expect(rows.map((r) => [r.candidate, r.member, r.place])).toEqual([
+      [1, null, 1],
+      [null, 0, 2],
+      [0, null, 3],
+      [null, 1, 4],
+      [2, null, 5],
+      [null, 2, null],
+    ]);
+  });
+
+  it('shows the members alone without trainers', () => {
+    expect(compareRows([member(9)], []).map((r) => r.place)).toEqual([1]);
   });
 });
