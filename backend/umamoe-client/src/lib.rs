@@ -20,5 +20,5 @@ pub use reqwest::StatusCode;
 pub use types::{
     Circle, CircleListResponse, CircleMember, CircleResponse, GainsRanking, GainsRankingsResponse,
     MonthlyRanking, MonthlyRankingsResponse, ProfileAlltime, ProfileCircle, ProfileFanHistory,
-    ProfileResponse, ProfileTrainer,
+    ProfileMonth, ProfileResponse, ProfileTrainer,
 };

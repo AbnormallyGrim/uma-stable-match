@@ -9,7 +9,8 @@ use tracing::field::Empty;
 use tracing::{Instrument, Span};
 use uma_stable_match_scoring::{blended_pace, daily_pace};
 use uma_stable_match_umamoe_client::{
-    CircleRequest, CircleResponse, Priority, RankingsGainsRequest, RankingsMonthlyRequest,
+    CircleRequest, CircleResponse, Error, Priority, ProfileResponse, RankingsGainsRequest,
+    RankingsMonthlyRequest,
 };
 
 use crate::details::ClubDetails;
@@ -328,10 +329,51 @@ impl PaceLookup {
         } else {
             ranked
         };
+        let outcome = if outcome == Outcome::NotFound {
+            self.lookup_profile(viewer_id, period).await?
+        } else {
+            outcome
+        };
         match period {
             Some(_) if !outcome.has_pace() => self.seven_day_gains(viewer_id, outcome).await,
             _ => Ok(outcome),
         }
+    }
+
+    /// Last resort for a trainer the rankings and club lookups miss, such as one without a club
+    /// or without gains yet this month: their profile's current club, then their month history.
+    async fn lookup_profile(
+        &self,
+        viewer_id: u64,
+        period: Option<Period>,
+    ) -> Result<Outcome, PaceError> {
+        let profile = match self.source.profile(viewer_id).await {
+            Ok(profile) => profile,
+            // An ID of the wrong length is rejected before any request is made.
+            Err(error)
+                if error.is_not_found()
+                    || matches!(error, SourceError::UmaMoe(Error::InvalidRequest(_))) =>
+            {
+                return Ok(Outcome::NotFound)
+            }
+            Err(error) => {
+                tracing::warn!(
+                    trainer_id = viewer_id,
+                    origin = error.origin(),
+                    status = error.status().map(|status| status.as_u16()),
+                    %error,
+                    "trainer profile lookup failed"
+                );
+                return Err(PaceError::Upstream(error));
+            }
+        };
+        if let Some(circle) = profile.circle.as_ref().filter(|c| c.circle_id != 0) {
+            let outcome = self.pace_in_club(circle.circle_id, viewer_id, period).await;
+            if outcome != Outcome::NotFound {
+                return Ok(outcome);
+            }
+        }
+        Ok(pace_from_months(&profile, period))
     }
 
     async fn ranked_club(&self, viewer_id: u64, period: Option<Period>) -> Option<u64> {
@@ -454,6 +496,31 @@ impl PaceLookup {
         let mut entries = self.entries.lock().unwrap_or_else(|e| e.into_inner());
         entries.retain(|_, (at, _)| at.elapsed() < self.ttl);
         entries.insert((viewer_id, period), (Instant::now(), outcome));
+    }
+}
+
+/// The pace of the trainer's month in `period`, or their latest finished month, from a profile's
+/// history. It has no club: the trainer isn't in one that has them this month.
+fn pace_from_months(profile: &ProfileResponse, period: Option<Period>) -> Outcome {
+    let mut months = profile
+        .fan_history
+        .iter()
+        .flat_map(|history| history.monthly.iter());
+    let month = match period {
+        Some((year, month)) => months.find(|m| (m.year, m.month) == (year, month)),
+        None => months.max_by_key(|m| (m.year, m.month)),
+    };
+    match month {
+        None => Outcome::NotFound,
+        Some(month) => match month.avg_daily {
+            Some(pace) if pace > 0.0 && month.active_days.unwrap_or(0) > 0 => {
+                Outcome::Pace(TrainerPace {
+                    pace,
+                    circle_id: None,
+                })
+            }
+            _ => Outcome::NotEnoughData,
+        },
     }
 }
 

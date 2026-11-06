@@ -143,12 +143,30 @@ pub struct ProfileAlltime {
     pub rank_total_fans: Option<i64>,
 }
 
+/// One month of a profile's fan history, from `fan_history.monthly`.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ProfileMonth {
+    /// Year.
+    pub year: i32,
+    /// Month (1–12).
+    pub month: u32,
+    /// Days with data.
+    pub active_days: Option<i32>,
+    /// Average fans gained per day.
+    pub avg_daily: Option<f64>,
+    /// The club the trainer was in that month.
+    pub circle_id: Option<u64>,
+}
+
 /// The fan history of a profile, without the parts not used here.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ProfileFanHistory {
     /// All-time totals and averages, if the API has them.
     pub alltime: Option<ProfileAlltime>,
+    /// Finished months, newest first.
+    pub monthly: Vec<ProfileMonth>,
 }
 
 /// Response from `GET /api/v4/user/profile/{account_id}`, without the parts not used here.
