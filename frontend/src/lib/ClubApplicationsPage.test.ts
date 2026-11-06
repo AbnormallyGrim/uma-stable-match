@@ -65,6 +65,18 @@ describe('ClubApplicationsPage', () => {
       expect(fetch.mock.calls.filter(([url]) => url.includes('opt-in'))).toHaveLength(0);
     });
 
+    it('links to the docs even before the bot can be added', async () => {
+      answer({
+        'GET /api/v1/discord/my-club': () => json({ trainer: null, club: null }),
+      });
+      render(ClubApplicationsPage);
+      expect(await screen.findByText(t('leader.steps.accountHow'))).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: t('leader.docs') })).toHaveAttribute(
+        'href',
+        'http://site.localhost:3000/bot/',
+      );
+    });
+
     it('says when the linked trainer leads no club', async () => {
       const fetch = answer({
         'GET /api/v1/discord/my-club': () =>

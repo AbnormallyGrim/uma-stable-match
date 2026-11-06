@@ -4,5 +4,5 @@
         <loc>https://umastable.com/</loc>
         <lastmod>2026-10-22</lastmod>
     </url>
-    <!-- /privacy/ is listed once ENABLE_APPLICATIONS is on. -->
+    <!-- /privacy/ and /bot/ are listed once ENABLE_APPLICATIONS is on. -->
 </urlset>

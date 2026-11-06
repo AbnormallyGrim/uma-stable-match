@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Uma Stable Match Discord bot: club applications for Umamusume clubs</title>
+    <meta name="description" content="A Discord bot for Umamusume club leaders. Trainers apply in one click, and each application opens a private ticket with their fan pace and history, ready to accept or decline." />
+    <!-- Remove noindex, and add /bot/ to sitemap.xml and index.md, when ENABLE_APPLICATIONS is turned on. -->
+    <meta name="robots" content="noindex" />
+    <link rel="canonical" href="https://umastable.com/bot/" />
+    <link rel="alternate" type="text/markdown" href="/bot/index.md" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/images/apple-touch-icon.png" />
+    <meta name="theme-color" content="#eef1f5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1217" media="(prefers-color-scheme: dark)" />
+    <script src="/theme-init.js"></script>
+    <script src="/bot/bot.js"></script>
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Uma Stable Match" />
+    <meta property="og:url" content="https://umastable.com/bot/" />
+    <meta property="og:title" content="Uma Stable Match Discord bot" />
+    <meta property="og:description" content="Club applications for Umamusume clubs: one-click apply, private tickets with fan stats, accept or decline in Discord." />
+    <meta property="og:image" content="https://umastable.com/images/share.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/bot/bot.css" />
+</head>
+<body class="bot">
+
+<nav class="navbar" data-i18n-attr="aria-label:nav.label" aria-label="Main">
+    <div class="nav-container">
+        <a href="/" class="brand">
+            <img src="/images/logo-light.webp" alt="" width="40" height="40" class="nav-logo only-light" />
+            <img src="/images/logo.webp" alt="" width="40" height="40" class="nav-logo only-dark" />
+            <span class="brand-title">Uma Stable Match</span>
+        </a>
+        <nav class="pages" aria-label="Pages" data-i18n-attr="aria-label:nav.pages">
+            <a href="/" data-tooltip="Home" data-i18n-attr="data-tooltip:nav.home">
+                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 7.5 8 2.5l6 5M3.5 6.5v6.5h3.25v-3.5h2.5V13H12.5V6.5" /></svg>
+                <span class="label" data-i18n="nav.home">Home</span>
+            </a>
+            <a href="https://app.umastable.com" data-tooltip="Club finder" data-i18n-attr="data-tooltip:nav.finder">
+                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
+                <span class="label" data-i18n="nav.finder">Club finder</span>
+            </a>
+            <a href="https://app.umastable.com/wishlist" data-tooltip="Wishlist" data-i18n-attr="data-tooltip:nav.wishlist">
+                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" /><path d="m5.25 8.25 2 2 3.5-4.5" /></svg>
+                <span class="label" data-i18n="nav.wishlist">Wishlist</span>
+            </a>
+            <a href="https://app.umastable.com/applications" data-applications hidden data-tooltip="Applications" data-i18n-attr="data-tooltip:nav.applications">
+                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="5.25" r="2.5" /><path d="M3 13.5c.5-2.75 2.5-4 5-4s4.5 1.25 5 4" /></svg>
+                <span class="label" data-i18n="nav.applications">Applications</span>
+            </a>
+        </nav>
+        <div class="nav-links">
+            <a href="#how" class="nav-link" data-i18n="nav.how">How it works</a>
+            <button type="button" class="lang-switch" id="lang-switch" hidden aria-label="Switch to Japanese (日本語)" title="Switch to Japanese (日本語)" data-i18n-attr="aria-label:lang.switch;title:lang.switch">
+                <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M4.545 6.714 4.11 8H3l1.862-5h1.284L8 8H6.833l-.435-1.286zm1.634-.736L5.5 3.956h-.049l-.679 2.022z"/><path d="M0 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zm7.138 9.995q.289.451.63.846c-.748.575-1.673 1.001-2.768 1.292.178.217.451.635.555.867 1.125-.359 2.08-.844 2.886-1.494.777.665 1.739 1.165 2.93 1.472.133-.254.414-.673.629-.89-1.125-.253-2.057-.694-2.82-1.284.681-.747 1.222-1.651 1.621-2.757H14V8h-3v1.047h.765c-.318.844-.74 1.546-1.272 2.13a6 6 0 0 1-.415-.492 2 2 0 0 1-.94.31"/></svg>
+            </button>
+            <fieldset class="theme-switch">
+                <legend class="visually-hidden" data-i18n="theme.label">Theme</legend>
+                <label data-i18n-attr="data-tooltip:theme.system" data-tooltip="System">
+                    <input type="radio" name="theme" value="system" />
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.75" y="2.5" width="12.5" height="8.5" rx="1.5" /><path d="M5.5 14h5M8 11v3" /></svg>
+                    <span class="visually-hidden" data-i18n="theme.system">System</span>
+                </label>
+                <label data-i18n-attr="data-tooltip:theme.light" data-tooltip="Light">
+                    <input type="radio" name="theme" value="light" />
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3" /><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M3.4 12.6l1.06-1.06M11.54 4.46l1.06-1.06" /></svg>
+                    <span class="visually-hidden" data-i18n="theme.light">Light</span>
+                </label>
+                <label data-i18n-attr="data-tooltip:theme.dark" data-tooltip="Dark">
+                    <input type="radio" name="theme" value="dark" />
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7Z" /></svg>
+                    <span class="visually-hidden" data-i18n="theme.dark">Dark</span>
+                </label>
+            </fieldset>
+        </div>
+    </div>
+</nav>
+
+<header class="hero">
+    <div class="container">
+        <div class="badge reveal"><b>New</b> Club applications on Discord</div>
+        <h1 class="reveal d1">Recruit trainers<br><span class="gold">without the spreadsheets</span></h1>
+        <p class="reveal d2">Trainers apply with one click from your club's page. The bot opens a private ticket in your Discord server with their fan pace and history, and you accept or decline right there.</p>
+        <div class="cta-group reveal d3">
+            <a href="https://app.umastable.com/applications" class="btn btn-primary">Set up your club</a>
+            <a href="#how" class="btn btn-secondary">See how it works</a>
+        </div>
+
+        <div class="mock reveal d4">
+            <div class="dc-channel"># app-speedytrainer</div>
+            <div class="dc-message">
+                <div class="dc-avatar"><img src="/images/logo.webp" alt="" width="42" height="42" /></div>
+                <div class="dc-body">
+                    <div class="dc-name">Uma Stable Match<small>BOT</small></div>
+                    <div class="dc-embed">
+                        <b>New application: SpeedyTrainer</b><br><a href="#how">View trainer profile</a>
+                        <div class="dc-fields">
+                            <div><span>Current club</span>Moonlit Gate</div>
+                            <div><span>Pace</span>3.1M / day</div>
+                            <div><span>Fans this month</span>58,200,000</div>
+                            <div><span>Total fans</span>1,204,000,000</div>
+                            <div><span>Fans rank</span>#4,321</div>
+                            <div><span>Days tracked</span>212</div>
+                        </div>
+                        <div class="dc-buttons"><span class="dc-accept">Accept</span><span class="dc-decline">Decline</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <p class="mock-note reveal">Example ticket with made-up data.</p>
+    </div>
+</header>
+
+<main>
+    <section id="how">
+        <div class="container">
+            <div class="section-title reveal">
+                <h2>From “how do I join?” to accepted in a minute</h2>
+                <p>No forms to copy, no screenshots of profile pages.</p>
+            </div>
+
+            <div class="row">
+                <div class="txt reveal">
+                    <div class="eyebrow">Step 1</div>
+                    <h3>Trainers hit Quick Apply</h3>
+                    <p>Every club that has added the bot gets a Quick Apply button. Trainers sign in with Discord and allow it to add them to your server, all in one step.</p>
+                </div>
+                <div class="vis reveal d1" aria-hidden="true">
+                    <div class="inner">
+                        <div class="chip"><span><span class="tier">S</span>Starlight Stable</span><em>3 spots open</em></div>
+                        <div class="chip go">Quick Apply</div>
+                        <div class="chip"><span>Sign in with Discord</span><em>✓</em></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="txt reveal">
+                    <div class="eyebrow">Step 2</div>
+                    <h3>A private ticket opens</h3>
+                    <p>The bot creates an <code>app-</code> channel that only the applicant, the club's leader and the bot can see, in your club's category if it has one.</p>
+                </div>
+                <div class="vis reveal d1" aria-hidden="true">
+                    <div class="inner">
+                        <div class="chip"><span># general</span><em>🔒 hidden</em></div>
+                        <div class="chip highlight"><span># app-speedytrainer</span><em>applicant + leader</em></div>
+                        <div class="chip"><span># app-luckystride</span><em>applicant + leader</em></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="txt reveal">
+                    <div class="eyebrow">Step 3</div>
+                    <h3>Decide with real numbers</h3>
+                    <p>Pace, fans this month, all-time totals, averages and rank are filled in from uma.moe. One click to accept or decline.</p>
+                </div>
+                <div class="vis reveal d1" aria-hidden="true">
+                    <div class="inner">
+                        <div class="chip"><span>Average per day</span><b>3,000,000</b></div>
+                        <div class="chip"><span>Average per week</span><b>21,000,000</b></div>
+                        <div class="chip"><span>Fans rank</span><b>#1,234</b></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<section id="features" class="band">
+    <div class="container">
+        <div class="section-title reveal">
+            <h2>Built for club leaders</h2>
+            <p>Everything you need to keep your roster full and your pace up.</p>
+        </div>
+        <div class="grid-3">
+            <div class="card reveal"><div class="card-icon" aria-hidden="true">⚡</div><h3>One-click apply</h3><p>Trainers apply from the club page. No DMs, no forms.</p></div>
+            <div class="card reveal d1"><div class="card-icon" aria-hidden="true">📊</div><h3>Stats on every ticket</h3><p>Pace and fan history attached, so you can compare at a glance.</p></div>
+            <div class="card reveal d2"><div class="card-icon" aria-hidden="true">🔒</div><h3>Private channels</h3><p>Each application gets its own ticket, hidden from the rest of the server.</p></div>
+            <div class="card reveal"><div class="card-icon" aria-hidden="true">🛡️</div><h3>Fair limits</h3><p>One pending application per club, and five a day per trainer.</p></div>
+            <div class="card reveal d1"><div class="card-icon" aria-hidden="true">🗂️</div><h3>Applications list</h3><p>See every application for your club in one place on the web.</p></div>
+            <div class="card reveal d2"><div class="card-icon" aria-hidden="true">✅</div><h3>Permission checks</h3><p>The bot checks it has the access it needs before your club goes live.</p></div>
+        </div>
+    </div>
+</section>
+
+<section>
+    <div class="container">
+        <div class="stats">
+            <div class="stat reveal"><b>1 click</b><span>to apply</span></div>
+            <div class="stat reveal d1"><b>1</b><span>pending per club</span></div>
+            <div class="stat reveal d2"><b>5</b><span>applications a day, max</span></div>
+        </div>
+    </div>
+</section>
+
+<div class="final-wrap">
+    <div class="final reveal">
+        <h2>Fill your roster tonight</h2>
+        <p>Only your club's leader in the game can add the bot. Sign in, link your trainer and pick your server.</p>
+        <a href="https://app.umastable.com/applications" class="btn">Set up your club</a>
+    </div>
+</div>
+
+<footer>
+    <div class="meta">
+        <div class="footer-brand">
+            <img src="/images/logo-light.webp" alt="" width="32" height="32" class="footer-logo only-light" />
+            <img src="/images/logo.webp" alt="" width="32" height="32" class="footer-logo only-dark" />
+            <span>Uma Stable Match</span>
+        </div>
+        <nav aria-label="Project links" data-i18n-attr="aria-label:footer.links">
+            <a href="https://github.com/AbnormallyGrim/uma-stable-match/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.report">Report a problem</a>
+            <a href="https://ko-fi.com/L5P6299MV1" class="kofi" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">🥕</span> <span data-i18n="footer.kofi">Buy me a carrot</span></a>
+        </nav>
+        <p class="support" data-i18n="footer.support">Optional tips help cover hosting. Every feature stays free.</p>
+        <div class="notes">
+            <p data-i18n="footer.unofficial">Uma Stable Match is an <strong>unofficial, non-commercial fan tool</strong>. It isn't affiliated with, endorsed by or sponsored by uma.moe or Cygames, Inc.</p>
+            <p data-i18n="footer.data">Club and trainer data comes from <a href="https://uma.moe" target="_blank" rel="noopener noreferrer">uma.moe</a> and may be delayed or incomplete. Recommendations are estimates to help you decide, not judgements of any player or club.</p>
+            <p data-i18n="footer.trademark"><em>Umamusume: Pretty Derby</em> and its names, characters, artwork and trademarks belong to Cygames, Inc. The club tier icons are © Cygames, Inc. and are used non-commercially in line with Cygames' <a href="https://umamusume.com/fan-createdguide" target="_blank" rel="noopener noreferrer">Fan-Created Content Guidelines</a>.</p>
+        </div>
+    </div>
+</footer>
+
+<script src="/site.js" defer></script>
+
+</body>
+</html>

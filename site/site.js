@@ -1,7 +1,8 @@
-// Whether the privacy page (/privacy/) and the applications navbar link are shown, from the
-// server's ENABLE_APPLICATIONS. While it is off, or the server can't be asked, the page sends
+// Whether the club applications pages (/privacy/ and /bot/) and the navbar link are shown, from the
+// server's ENABLE_APPLICATIONS. While it is off, or the server can't be asked, those pages send
 // visitors to the home page. When turning it on, also remove the noindex tag from
-// privacy/index.html, and add /privacy/ back to sitemap.xml and index.md.
+// privacy/index.html and bot/index.html, and add /privacy/ and /bot/ back to sitemap.xml and
+// index.md.
 fetch('/api/v1/features')
     .then((response) => (response.ok ? response.json() : {}))
     .catch(() => ({}))
@@ -10,7 +11,7 @@ fetch('/api/v1/features')
             for (const el of document.querySelectorAll('[data-applications]')) {
                 el.hidden = false;
             }
-        } else if (location.pathname.startsWith('/privacy')) {
+        } else if (location.pathname.startsWith('/privacy') || location.pathname.startsWith('/bot')) {
             location.replace('/');
         }
     });

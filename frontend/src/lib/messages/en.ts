@@ -504,7 +504,8 @@ export const en = {
   'leader.steps.addBot': 'Add the bot',
   'leader.steps.addBotHow':
     'Discord opens with your server already picked. Once the bot is added, you come back here to your dashboard.',
-  'leader.addBot': 'Add the bot to my server',
+  'leader.addBot': 'Add to Discord',
+  'leader.docs': 'Read the docs',
   'leader.status.heading': 'Bot status',
   'leader.status.inServer': 'The bot is in your server',
   'leader.status.problem': ({ problem }: { problem: string }) =>

@@ -494,7 +494,8 @@ export const ja: Catalog = {
   'leader.steps.addBot': 'Botを追加する',
   'leader.steps.addBotHow':
     'サーバーが選択された状態でDiscordが開きます。Botを追加すると、このダッシュボードに戻ります。',
-  'leader.addBot': 'Botをサーバーに追加',
+  'leader.addBot': 'Discordに追加',
+  'leader.docs': 'ドキュメントを読む',
   'leader.status.heading': 'Botの状態',
   'leader.status.inServer': 'Botはサーバーにいます',
   'leader.status.problem': ({ problem }: { problem: string }) => `修正が必要です: ${problem}`,
