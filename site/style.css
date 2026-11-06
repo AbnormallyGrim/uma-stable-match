@@ -810,14 +810,14 @@ footer strong {
     }
 }
 
-/* The privacy page. */
-.privacy-page {
+/* The privacy and terms pages. */
+.legal-page {
     max-width: 46rem;
     padding-top: 4rem;
     padding-bottom: 4rem;
 }
 
-.privacy-page h1 {
+.legal-page h1 {
     font-size: 2.25rem;
     font-weight: 800;
     letter-spacing: -0.5px;
@@ -825,51 +825,51 @@ footer strong {
     margin-bottom: 0.75rem;
 }
 
-.privacy-page .lead {
+.legal-page .lead {
     color: var(--text-muted);
     font-size: 1.1rem;
     margin-bottom: 1rem;
 }
 
-.privacy-page section {
+.legal-page section {
     padding: 0;
     margin: 0;
 }
 
-.privacy-page h2 {
+.legal-page h2 {
     font-size: 1.2rem;
     font-weight: 700;
     letter-spacing: -0.2px;
     margin: 2rem 0 0.5rem;
 }
 
-.privacy-page p {
+.legal-page p {
     color: var(--text-muted);
     margin-bottom: 1rem;
 }
 
-.privacy-page .updated {
+.legal-page .updated {
     font-size: 0.9rem;
     margin-bottom: 0;
 }
 
-.privacy-page ul {
+.legal-page ul {
     color: var(--text-muted);
     margin: 0 0 1rem 1.25rem;
 }
 
-.privacy-page li {
+.legal-page li {
     margin-bottom: 0.4rem;
 }
 
-.privacy-page table {
+.legal-page table {
     border-collapse: collapse;
     margin-bottom: 1rem;
     width: 100%;
 }
 
-.privacy-page th,
-.privacy-page td {
+.legal-page th,
+.legal-page td {
     border-bottom: 1px solid var(--border-color);
     color: var(--text-muted);
     overflow-wrap: anywhere;
@@ -878,7 +878,7 @@ footer strong {
     vertical-align: top;
 }
 
-.privacy-page th {
+.legal-page th {
     color: var(--text-main);
     font-weight: 600;
 }

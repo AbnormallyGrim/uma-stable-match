@@ -1,8 +1,8 @@
-// Whether the club applications pages (/privacy/ and /bot/) and the navbar link are shown, from the
-// server's ENABLE_APPLICATIONS. While it is off, or the server can't be asked, those pages send
-// visitors to the home page. When turning it on, also remove the noindex tag from
-// privacy/index.html and bot/index.html, and add /privacy/ and /bot/ back to sitemap.xml and
-// index.md.
+// Whether the club applications pages (/privacy/, /terms/ and /bot/) and the navbar link are shown,
+// from the server's ENABLE_APPLICATIONS. While it is off, or the server can't be asked, those pages
+// send visitors to the home page. When turning it on, also remove the noindex tag from
+// privacy/index.html, terms/index.html and bot/index.html, and add /privacy/, /terms/ and /bot/
+// back to sitemap.xml and index.md.
 fetch('/api/v1/features')
     .then((response) => (response.ok ? response.json() : {}))
     .catch(() => ({}))
@@ -11,7 +11,7 @@ fetch('/api/v1/features')
             for (const el of document.querySelectorAll('[data-applications]')) {
                 el.hidden = false;
             }
-        } else if (location.pathname.startsWith('/privacy') || location.pathname.startsWith('/bot')) {
+        } else if (['/privacy', '/terms', '/bot'].some((path) => location.pathname.startsWith(path))) {
             location.replace('/');
         }
     });
@@ -137,6 +137,7 @@ if (location.hostname === 'site.localhost') {
         'footer.links': 'プロジェクトのリンク',
         'footer.report': '問題を報告',
         'footer.privacy': 'プライバシーポリシー',
+        'footer.terms': 'サービス利用規約',
         'footer.kofi': 'にんじんをおごる',
         'footer.support': '任意の支援はホスティング費用に充てられます。すべての機能は無料のままです。',
         'footer.unofficial': 'Uma Stable Matchは<strong>非公式の非営利ファンツール</strong>です。uma.moeおよび株式会社Cygamesとは提携しておらず、公認・後援も受けていません。',

@@ -60,9 +60,10 @@ describe('SiteFooter', () => {
     );
   });
 
-  it('ends with a Privacy Policy link once the applications flag is on', () => {
+  it('ends with Privacy Policy and Terms of Service links once the applications flag is on', () => {
     const { unmount } = render(SiteFooter);
     expect(screen.queryByRole('link', { name: 'Privacy Policy' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Terms of Service' })).toBeNull();
     unmount();
     flags.applications = true;
     render(SiteFooter);
@@ -71,7 +72,11 @@ describe('SiteFooter', () => {
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     const links = within(screen.getByRole('contentinfo')).getAllByRole('link');
-    expect(links.at(-1)).toBe(link);
+    const terms = screen.getByRole('link', { name: 'Terms of Service' });
+    expect(terms).toHaveAttribute('href', `${websiteUrl(window.location)}/terms/`);
+    expect(terms).toHaveAttribute('target', '_blank');
+    expect(terms).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(links.slice(-2)).toEqual([link, terms]);
     expect(
       within(screen.getByRole('navigation', { name: 'Project links' })).queryByText(
         'Privacy Policy',

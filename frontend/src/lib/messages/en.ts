@@ -424,6 +424,7 @@ export const en = {
   'footer.links': 'Project links',
   'footer.report': 'Report a problem',
   'footer.privacy': 'Privacy Policy',
+  'footer.terms': 'Terms of Service',
   'footer.kofi': 'Buy me a carrot',
   'footer.carats': 'Free carats',
   'footer.support': 'Optional tips help cover hosting. Every feature stays free.',

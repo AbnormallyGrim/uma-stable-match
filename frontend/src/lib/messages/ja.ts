@@ -410,6 +410,7 @@ export const ja: Catalog = {
   'footer.links': 'プロジェクトのリンク',
   'footer.report': '問題を報告',
   'footer.privacy': 'プライバシーポリシー',
+  'footer.terms': 'サービス利用規約',
   'footer.kofi': 'にんじんをおごる',
   'footer.carats': '無料ジュエル',
   'footer.support': '任意の支援はホスティング費用に充てられます。すべての機能は無料のままです。',

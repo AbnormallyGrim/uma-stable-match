@@ -94,7 +94,7 @@ You can do these yourself:
 
 Deleting your account doesn't remove pending applications, which expire after a month, clubs you opted in, which stay until you unlink them, or tickets already in Discord.
 
-To ask for a copy of your data, to correct it or to have anything else deleted, email privacy@umastable.com. We reply within 30 days. You can withdraw consent or object to processing the same way. If you're unhappy with our answer, you can complain to your data protection authority, such as the Information Regulator in South Africa.
+To ask for a copy of your data, to correct it or to have anything else deleted, email privacy@umastable.com. We reply within 30 days. You can withdraw consent or object to processing the same way. If you're unhappy with our answer, you can complain to your local data protection authority.
 
 ## 8. Changes to this policy
 
