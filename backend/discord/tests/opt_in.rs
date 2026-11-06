@@ -59,7 +59,10 @@ impl World {
         let conn = ConnectionManager::new(redis::Client::open(url).unwrap())
             .await
             .expect("REDIS_TEST_URL is reachable");
-        let store = ClubStore::new(conn.clone());
+        let store = ClubStore::new(
+            conn.clone(),
+            &KeySecret::parse("made-up-key-secret-of-32-chars!!").unwrap(),
+        );
         let trainers = TrainerStore::new(
             conn,
             KeySecret::parse("made-up-key-secret-of-32-chars!!").unwrap(),

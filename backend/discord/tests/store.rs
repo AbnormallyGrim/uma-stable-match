@@ -6,7 +6,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use redis::aio::ConnectionManager;
-use uma_stable_match_discord::{ClubStore, Departure, SettingsUpdate};
+use uma_stable_match_discord::{ClubStore, Departure, KeySecret, SettingsUpdate};
 
 /// A store and its connection, or `None` without `REDIS_TEST_URL`.
 async fn connect() -> Option<(ClubStore, ConnectionManager)> {
@@ -17,7 +17,8 @@ async fn connect() -> Option<(ClubStore, ConnectionManager)> {
     let conn = ConnectionManager::new(redis::Client::open(url).unwrap())
         .await
         .expect("REDIS_TEST_URL is reachable");
-    Some((ClubStore::new(conn.clone()), conn))
+    let secret = KeySecret::parse("made-up-key-secret-of-32-chars!!").unwrap();
+    Some((ClubStore::new(conn.clone(), &secret), conn))
 }
 
 /// IDs no other test, or run of the tests, uses.
@@ -286,18 +287,29 @@ async fn a_dev_server_takes_every_clubs_applications() {
 }
 
 #[tokio::test]
-async fn keeps_the_leader_who_set_the_club_up() {
-    let Some((store, _)) = connect().await else {
+async fn keeps_the_leader_who_set_the_club_up_encrypted() {
+    let Some((store, conn)) = connect().await else {
         return;
     };
     let (club, ..) = ids();
     store.link(club, 10).await.unwrap();
     assert_eq!(store.club(club).await.unwrap().unwrap().leader, None);
+    let leader = 100_000_000_000_000_042_u64;
     let update = SettingsUpdate {
-        leader: Some(42),
+        leader: Some(leader),
         ..SettingsUpdate::default()
     };
     assert!(store.update(club, 10, &update).await.unwrap());
-    assert_eq!(store.club(club).await.unwrap().unwrap().leader, Some(42));
+    assert_eq!(
+        store.club(club).await.unwrap().unwrap().leader,
+        Some(leader)
+    );
+    let saved: String = redis::cmd("HGET")
+        .arg(format!("discord:club:{club}"))
+        .arg("leader")
+        .query_async(&mut conn.clone())
+        .await
+        .unwrap();
+    assert!(!saved.contains(&leader.to_string()));
     store.unlink(club).await.unwrap();
 }

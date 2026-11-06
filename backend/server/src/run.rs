@@ -223,9 +223,9 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
                         guild,
                         "DISCORD_DEV_GUILD is set: every club takes applications in that server"
                     );
-                    ClubStore::new(conn.clone()).with_dev_guild(guild)
+                    ClubStore::new(conn.clone(), &secret).with_dev_guild(guild)
                 }
-                None => ClubStore::new(conn.clone()),
+                None => ClubStore::new(conn.clone(), &secret),
             };
             // Sign-out and account deletion end sessions early.
             let sessions = SessionStore::new(conn.clone(), secret.clone());

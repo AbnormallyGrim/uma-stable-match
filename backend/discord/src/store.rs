@@ -1,7 +1,7 @@
 //! Which club is linked to which Discord server, kept in Redis.
 //!
 //! - `discord:club:{club_id}`: a hash with the club's `server`, `category`, `auto_join`, `open`,
-//!   `leader` (the Discord ID of the leader who last set it up) and `problem`. Clubs linked before leader roles were dropped may still hold `leader_roles`,
+//!   `leader` (the Discord ID of the leader who last set it up, encrypted) and `problem`. Clubs linked before leader roles were dropped may still hold `leader_roles`,
 //!   which nothing reads.
 //! - `discord:guild:{guild_id}`: a set of the club IDs linked to that server.
 //!
@@ -13,6 +13,9 @@ use std::time::Duration;
 use redis::aio::ConnectionManager;
 use redis::Script;
 use tokio::time::timeout;
+
+use crate::config::KeySecret;
+use crate::sealed::Sealer;
 
 const CLUB_PREFIX: &str = "discord:club:";
 const GUILD_PREFIX: &str = "discord:guild:";
@@ -153,6 +156,7 @@ impl From<redis::RedisError> for StoreError {
 #[derive(Clone)]
 pub struct ClubStore {
     conn: ConnectionManager,
+    sealer: Sealer,
     dev_guild: Option<u64>,
 }
 
@@ -163,10 +167,11 @@ impl std::fmt::Debug for ClubStore {
 }
 
 impl ClubStore {
-    /// A store using this connection.
-    pub fn new(conn: ConnectionManager) -> Self {
+    /// A store using this connection, encrypting leaders' Discord IDs with a key from `secret`.
+    pub fn new(conn: ConnectionManager, secret: &KeySecret) -> Self {
         Self {
             conn,
+            sealer: Sealer::new(secret),
             dev_guild: None,
         }
     }
@@ -215,6 +220,11 @@ impl ClubStore {
         let mut invocation = script.key(club_key(club_id));
         invocation.arg(guild_id);
         for (field, value) in update.pairs() {
+            let value = if field == "leader" {
+                self.sealer.seal(&value, &leader_context(club_id))
+            } else {
+                value
+            };
             invocation.arg(field).arg(value);
         }
         let changed: i64 = self
@@ -272,7 +282,7 @@ impl ClubStore {
                     .query_async(&mut self.conn.clone()),
             )
             .await?;
-        Ok(parse_record(&fields))
+        Ok(parse_record(&self.sealer, club_id, &fields))
     }
 
     /// The clubs linked to a server, lowest ID first.
@@ -314,7 +324,24 @@ fn departure(reply: &[String]) -> Option<Departure> {
     }
 }
 
-fn parse_record(fields: &HashMap<String, String>) -> Option<ClubRecord> {
+/// Ties an encrypted leader to its club, so it can't be copied to another.
+fn leader_context(club_id: u64) -> String {
+    format!("club:{club_id}:leader")
+}
+
+/// The leader's Discord ID: encrypted, or a plain number from before leaders were encrypted.
+fn leader(sealer: &Sealer, club_id: u64, value: &str) -> Option<u64> {
+    value
+        .parse()
+        .ok()
+        .or_else(|| sealer.open(value, &leader_context(club_id))?.parse().ok())
+}
+
+fn parse_record(
+    sealer: &Sealer,
+    club_id: u64,
+    fields: &HashMap<String, String>,
+) -> Option<ClubRecord> {
     let guild_id = fields.get("server")?.parse().ok()?;
     Some(ClubRecord {
         guild_id,
@@ -322,7 +349,9 @@ fn parse_record(fields: &HashMap<String, String>) -> Option<ClubRecord> {
         auto_join: fields.get("auto_join").is_some_and(|v| v == "1"),
         open: fields.get("open").is_some_and(|v| v == "1"),
         problem: fields.get("problem").filter(|v| !v.is_empty()).cloned(),
-        leader: fields.get("leader").and_then(|id| id.parse().ok()),
+        leader: fields
+            .get("leader")
+            .and_then(|value| leader(sealer, club_id, value)),
     })
 }
 
