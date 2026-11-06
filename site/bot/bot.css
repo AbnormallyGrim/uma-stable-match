@@ -1,0 +1,431 @@
+/* Styles for the Discord bot page, on top of ../style.css. No inline styles are allowed by the
+   website's security policy, so delays and colours are classes. */
+
+.bot section {
+    margin: 0;
+    padding: 5rem 0;
+}
+
+.bot .container {
+    max-width: 1100px;
+}
+
+/* Hero */
+.bot .hero {
+    padding: 5.5rem 0 3rem;
+}
+
+.bot .hero h1 {
+    font-size: clamp(2.5rem, 6.5vw, 4.25rem);
+    letter-spacing: -0.03em;
+    line-height: 1.08;
+}
+
+.bot .hero h1 .gold {
+    background: linear-gradient(90deg, var(--accent-gold), color-mix(in srgb, var(--accent-gold) 55%, var(--accent-silver)), var(--accent-gold));
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
+.badge {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding: 6px 14px;
+    background: color-mix(in srgb, var(--card-bg) 80%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-gold) 35%, var(--border-color));
+    border-radius: 999px;
+    backdrop-filter: blur(8px);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.badge b {
+    color: var(--accent-gold);
+}
+
+/* The ticket, in Discord's own colours in both themes. */
+.mock {
+    max-width: 720px;
+    margin: 4rem auto 0;
+    padding: 20px;
+    background: #313338;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--accent-gold) 10%, transparent),
+        0 24px 60px var(--shadow),
+        0 0 90px color-mix(in srgb, var(--accent-gold) 14%, transparent);
+    font-family: system-ui, sans-serif;
+    text-align: left;
+}
+
+.dc-channel {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #3f4147;
+    color: #949ba4;
+    font-size: 14px;
+}
+
+.dc-message {
+    display: flex;
+    gap: 14px;
+}
+
+.dc-avatar {
+    flex: none;
+    width: 42px;
+    height: 42px;
+    border: 1px solid #3f4147;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.dc-avatar img {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.dc-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.dc-name {
+    color: #fff;
+    font-weight: 600;
+}
+
+.dc-name small {
+    margin-left: 6px;
+    padding: 1px 5px;
+    background: #5865f2;
+    border-radius: 3px;
+    font-size: 10px;
+    vertical-align: 2px;
+}
+
+.dc-embed {
+    margin-top: 8px;
+    padding: 14px 16px;
+    background: #2b2d31;
+    border-left: 4px solid #d4af37;
+    border-radius: 4px;
+    color: #dbdee1;
+    font-size: 14px;
+}
+
+.dc-embed b {
+    color: #fff;
+}
+
+.dc-embed a {
+    color: #00a8fc;
+}
+
+.dc-fields {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px 16px;
+    margin-top: 12px;
+}
+
+.dc-fields span {
+    display: block;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.dc-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.dc-buttons span {
+    padding: 6px 16px;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.dc-accept {
+    background: #248046;
+}
+
+.dc-decline {
+    background: #da373c;
+}
+
+.mock-note {
+    margin-top: 0.9rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+/* Steps */
+.eyebrow {
+    color: var(--accent-gold);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+    margin-bottom: 6rem;
+}
+
+.row:last-child {
+    margin-bottom: 0;
+}
+
+.row:nth-child(even) .txt {
+    order: 2;
+}
+
+.row h3 {
+    margin: 0.6rem 0 1rem;
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+.row p {
+    color: var(--text-muted);
+    font-size: 1.05rem;
+}
+
+.row code {
+    padding: 1px 6px;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.vis {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    box-shadow: 0 24px 60px var(--shadow);
+}
+
+.vis::before {
+    position: absolute;
+    width: 65%;
+    height: 65%;
+    content: '';
+    background: var(--accent-gold);
+    border-radius: 50%;
+    filter: blur(90px);
+    opacity: 0.18;
+}
+
+.vis .inner {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 80%;
+}
+
+.chip {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    font-size: 0.95rem;
+}
+
+.chip em {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-style: normal;
+}
+
+.chip b {
+    color: var(--accent-gold);
+}
+
+.chip.highlight {
+    background: color-mix(in srgb, var(--accent-gold) 8%, var(--card-bg));
+    border-color: color-mix(in srgb, var(--accent-gold) 50%, transparent);
+}
+
+.chip.go {
+    justify-content: center;
+    background: var(--accent-gold);
+    border: 0;
+    color: var(--on-accent);
+    font-weight: 700;
+}
+
+.tier {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin-right: 8px;
+    background: #1e2a44;
+    border-radius: 6px;
+    color: #d4af37;
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+/* Features */
+.band {
+    background: var(--card-bg);
+    border-block: 1px solid var(--border-color);
+}
+
+.band .card {
+    background: var(--bg-color);
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    text-align: center;
+}
+
+.stat {
+    padding: 2rem 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+}
+
+.stat b {
+    display: block;
+    color: var(--accent-gold);
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+}
+
+.stat span {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/* Closing banner: navy with a gold glow in both themes. */
+.final {
+    position: relative;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 5rem 1.5rem;
+    overflow: hidden;
+    background: linear-gradient(135deg, #14213d, #1e2a44 55%, #2b3550);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    box-shadow: 0 24px 60px var(--shadow);
+    color: #f0f4f8;
+    text-align: center;
+}
+
+.final::before {
+    position: absolute;
+    inset: auto -10% -60%;
+    height: 120%;
+    content: '';
+    background: radial-gradient(closest-side, rgb(212 175 55 / 35%), transparent);
+    pointer-events: none;
+}
+
+.final h2 {
+    position: relative;
+    font-size: clamp(2rem, 5vw, 3.25rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+
+.final p {
+    position: relative;
+    max-width: 540px;
+    margin: 1rem auto 2rem;
+    color: #cbd5e1;
+}
+
+.final .btn {
+    position: relative;
+    background: #d4af37;
+    color: #0f1217;
+}
+
+.final .btn:hover {
+    background: #c29f2e;
+}
+
+.final-wrap {
+    padding: 0 var(--gutter) 5rem;
+}
+
+/* Scroll reveal: only hidden when the script ran, so the page reads without it. */
+.js .reveal {
+    opacity: 0;
+    transform: translateY(56px);
+    transition: opacity 0.9s ease, transform 0.9s cubic-bezier(0.2, 0.75, 0.25, 1);
+    transition-delay: var(--d, 0s);
+}
+
+.js .reveal.in {
+    opacity: 1;
+    transform: none;
+}
+
+.d1 { --d: 0.1s; }
+.d2 { --d: 0.2s; }
+.d3 { --d: 0.3s; }
+.d4 { --d: 0.45s; }
+
+@media (prefers-reduced-motion: reduce) {
+    .js .reveal {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+}
+
+@media (max-width: 860px) {
+    .row {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+        margin-bottom: 4rem;
+    }
+
+    .row:nth-child(even) .txt {
+        order: 0;
+    }
+
+    .dc-fields {
+        grid-template-columns: 1fr 1fr;
+    }
+}

@@ -11,6 +11,7 @@
   import { hasInvite, optInUrl } from './applications';
   import DiscordIcon from './DiscordIcon.svelte';
   import { t } from './i18n';
+  import { websiteUrl } from './pages';
   import { SETTINGS_PATH } from './route';
 
   interface Props {
@@ -133,21 +134,43 @@
         <p>{t('leader.steps.permissionsHow')}</p>
       </div>
     </li>
-    <li class="add" class:current={invite === 'found'}>
+    <li class:current={invite === 'found'}>
       <span class="box" role="img" aria-label={t('leader.steps.todo')}></span>
       <div class="text">
         <strong>{t('leader.steps.addBot')}</strong>
         <p>{t('leader.steps.addBotHow')}</p>
       </div>
-      {#if clubId === null || !leads || invite === 'waiting' || invite === 'checking' || invite === 'missing'}
-        <button class="provider-btn discord" type="button" disabled>
-          <span class="provider-icon"><DiscordIcon /></span>{t('leader.addBot')}
-        </button>
-      {:else}
-        <a class="provider-btn discord" href={optInUrl(clubId)}>
-          <span class="provider-icon"><DiscordIcon /></span>{t('leader.addBot')}
+      <div class="actions">
+        <a class="provider-btn" href={`${websiteUrl(window.location)}/bot/`}>
+          <span class="provider-icon">
+            <svg
+              viewBox="0 0 16 16"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path
+                d="M8 3.5C6.9 2.6 5.3 2.25 2 2.25v9.5c3.3 0 4.9.35 6 1.25m0-9.5c1.1-.9 2.7-1.25 6-1.25v9.5c-3.3 0-4.9.35-6 1.25m0-9.5V13"
+              />
+            </svg>
+          </span>
+          {t('leader.docs')}
         </a>
-      {/if}
+        {#if clubId === null || !leads || invite === 'waiting' || invite === 'checking' || invite === 'missing'}
+          <button class="provider-btn discord" type="button" disabled>
+            <span class="provider-icon"><DiscordIcon /></span>{t('leader.addBot')}
+          </button>
+        {:else}
+          <a class="provider-btn discord" href={optInUrl(clubId)}>
+            <span class="provider-icon"><DiscordIcon /></span>{t('leader.addBot')}
+          </a>
+        {/if}
+      </div>
     </li>
   </ol>
 </section>
@@ -301,22 +324,14 @@
     color: var(--muted);
   }
 
-  /* The Discord button sits under step 3 on phones, and beside it with room. */
-  .add .provider-btn {
-    grid-column: 2;
-    justify-self: start;
-    margin-top: 6px;
-  }
-
-  @media (width >= 720px) {
-    .add {
-      grid-template-columns: 24px 1fr auto;
-    }
-
-    .add .provider-btn {
-      grid-column: 3;
-      align-self: center;
-      margin-top: 0;
-    }
+  /* Two equal columns centred across the card: docs on the left, Discord on the right. */
+  .actions {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: min(100%, 480px);
+    justify-self: center;
+    margin-top: 16px;
   }
 </style>
