@@ -3,7 +3,7 @@
 use std::time::{Duration, SystemTime};
 
 use axum::extract::{Query, State};
-use axum::http::header::{ACCEPT, CACHE_CONTROL, COOKIE, SET_COOKIE};
+use axum::http::header::{ACCEPT, CACHE_CONTROL, COOKIE, ORIGIN, SET_COOKIE};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{delete, get, post};
@@ -13,7 +13,9 @@ use serde_json::json;
 
 use crate::bot::Discord;
 use crate::config::DiscordConfig;
-use crate::token::{open, random, seal, seconds};
+use crate::opt_in::store_unavailable;
+use crate::store::StoreError;
+use crate::token::{open, open_expiring, random, seal, seconds};
 
 /// Path that sends the visitor to Discord to sign in.
 pub const LOGIN_PATH: &str = "/api/v1/auth/discord/login";
@@ -328,23 +330,58 @@ struct Me {
     name: Option<String>,
 }
 
-/// The Discord ID in the request's session, if it has a valid one.
-pub(crate) fn session_user(config: &DiscordConfig, headers: &HeaderMap) -> Option<u64> {
-    cookie_values(headers, SESSION_COOKIE)
-        .find_map(|token| {
-            open::<String>(
-                &config.signing_key,
-                SESSION_PURPOSE,
-                token,
-                SystemTime::now(),
-            )
-        })
-        .and_then(|id| id.parse().ok())
+/// The request's signed, unexpired session: its token, Discord ID and expiry (Unix seconds).
+fn signed_session<'a>(
+    config: &DiscordConfig,
+    headers: &'a HeaderMap,
+) -> Option<(&'a str, u64, u64)> {
+    cookie_values(headers, SESSION_COOKIE).find_map(|token| {
+        let (id, expires) = open_expiring::<String>(
+            &config.signing_key,
+            SESSION_PURPOSE,
+            token,
+            SystemTime::now(),
+        )?;
+        Some((token, id.parse().ok()?, expires))
+    })
+}
+
+/// The Discord ID in the request's session, if it has a valid one that hasn't been ended.
+pub(crate) async fn session_user(
+    discord: &Discord,
+    headers: &HeaderMap,
+) -> Result<Option<u64>, StoreError> {
+    let Some((token, user, expires)) = signed_session(discord.config(), headers) else {
+        return Ok(None);
+    };
+    let started = expires.saturating_sub(MAX_SESSION_AGE.as_secs());
+    match discord.sessions() {
+        Some(sessions) if !sessions.valid(token, user, started).await? => Ok(None),
+        _ => Ok(Some(user)),
+    }
+}
+
+/// The signed-in user, or the response to send: a 401 without a session, a 503 if it can't be
+/// checked.
+pub(crate) async fn signed_in(
+    discord: &Discord,
+    headers: &HeaderMap,
+) -> Result<u64, Box<Response>> {
+    match session_user(discord, headers).await {
+        Ok(Some(user)) => Ok(user),
+        Ok(None) => Err(Box::new(error(
+            StatusCode::UNAUTHORIZED,
+            "sign in with Discord first",
+        ))),
+        Err(err) => Err(Box::new(store_unavailable(&err))),
+    }
 }
 
 async fn session_info(State(discord): State<Discord>, headers: HeaderMap) -> Response {
-    let Some(id) = session_user(discord.config(), &headers) else {
-        return private(error(StatusCode::UNAUTHORIZED, "not signed in"));
+    let id = match session_user(&discord, &headers).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return private(error(StatusCode::UNAUTHORIZED, "not signed in")),
+        Err(err) => return private(store_unavailable(&err)),
     };
     let name = discord.names().get(discord.rest(), id).await;
     private(Json(Me {
@@ -353,18 +390,60 @@ async fn session_info(State(discord): State<Discord>, headers: HeaderMap) -> Res
     }))
 }
 
-async fn sign_out(State(discord): State<Discord>) -> Response {
+/// Ends the session, so a copy of the cookie stops working too. Refused from another site.
+async fn sign_out(State(discord): State<Discord>, headers: HeaderMap) -> Response {
+    let config = discord.config();
+    if !from_this_site(config, &headers) {
+        return error(StatusCode::FORBIDDEN, "sign out from this site");
+    }
+    if let (Some(sessions), Some((token, _, expires))) =
+        (discord.sessions(), signed_session(config, &headers))
+    {
+        let now = seconds(SystemTime::now());
+        if let Err(err) = sessions.revoke(token, expires, now).await {
+            return store_unavailable(&err);
+        }
+    }
     signed_out(&discord)
 }
 
-/// Deletes the person's trainer links and pending keys, then signs them out.
+/// Whether the request's `Origin`, if it has one, is this site's scheme and host. Browsers send it
+/// with every `POST`; the port is ignored, so a local dev server's proxy still matches.
+fn from_this_site(config: &DiscordConfig, headers: &HeaderMap) -> bool {
+    let Some(origin) = headers.get(ORIGIN) else {
+        return true;
+    };
+    let site = reqwest::Url::parse(config.public_url.as_str()).expect("the public URL is valid");
+    origin
+        .to_str()
+        .ok()
+        .and_then(|origin| reqwest::Url::parse(origin).ok())
+        .is_some_and(|origin| origin.scheme() == site.scheme() && origin.host() == site.host())
+}
+
+/// Deletes the person's trainer links and pending keys, ends all their sessions and signs them
+/// out.
 async fn delete_account(State(discord): State<Discord>, headers: HeaderMap) -> Response {
-    let Some(user) = session_user(discord.config(), &headers) else {
-        return error(StatusCode::UNAUTHORIZED, "sign in with Discord first");
+    let user = match signed_in(&discord, &headers).await {
+        Ok(user) => user,
+        Err(response) => return *response,
     };
     if let Some(links) = discord.trainer_links() {
         if let Err(err) = links.store().forget(user).await {
-            return crate::opt_in::store_unavailable(&err);
+            return store_unavailable(&err);
+        }
+    }
+    if let Some(sessions) = discord.sessions() {
+        let now = seconds(SystemTime::now());
+        let mut ended = sessions.end_all(user, now).await;
+        // This one too, since a session started in the same second is kept.
+        if let (Ok(()), Some((token, _, expires))) =
+            (&ended, signed_session(discord.config(), &headers))
+        {
+            ended = sessions.revoke(token, expires, now).await;
+        }
+        if let Err(err) = ended {
+            return store_unavailable(&err);
         }
     }
     discord.names().forget(user);

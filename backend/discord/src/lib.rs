@@ -18,6 +18,7 @@ mod opt_in;
 mod rate_limit;
 mod rest;
 mod sealed;
+mod sessions;
 mod settings;
 mod store;
 mod tickets;
@@ -53,6 +54,7 @@ pub use opt_in::{
 };
 pub use reqwest::StatusCode;
 pub use rest::Rest;
+pub use sessions::SessionStore;
 pub use settings::SETTINGS_PATH;
 pub use store::{ClubRecord, ClubStore, Departure, SettingsUpdate, StoreError};
 pub use trainer_store::{

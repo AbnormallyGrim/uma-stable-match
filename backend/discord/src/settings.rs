@@ -8,7 +8,7 @@ use axum::routing::get;
 use axum::{Json, Router};
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::auth::{error, session_user};
+use crate::auth::error;
 use crate::bot::Discord;
 use crate::error::Error;
 use crate::leaders::managed_club;
@@ -79,7 +79,7 @@ async fn read(
     Path(club): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (_, record) = match managed_club(&discord, &headers, &club).await {
+    let (_, _, record) = match managed_club(&discord, &headers, &club).await {
         Ok(found) => found,
         Err(response) => return *response,
     };
@@ -96,7 +96,7 @@ async fn change(
     headers: HeaderMap,
     patch: Result<Json<Patch>, JsonRejection>,
 ) -> Response {
-    let (club_id, record) = match managed_club(&discord, &headers, &club).await {
+    let (user, club_id, record) = match managed_club(&discord, &headers, &club).await {
         Ok(found) => found,
         Err(response) => return *response,
     };
@@ -113,7 +113,7 @@ async fn change(
         Err(message) => return error(StatusCode::BAD_REQUEST, message),
     };
     // The leader who changes the settings is the one tickets go to.
-    update.leader = session_user(discord.config(), &headers);
+    update.leader = Some(user);
     let Some(opt_in) = discord.opt_in() else {
         return error(StatusCode::NOT_FOUND, "not found");
     };

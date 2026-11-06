@@ -10,7 +10,7 @@ use tokio::net::TcpListener;
 use tokio::sync::watch;
 use uma_stable_match_discord::{
     ApplicationStore, Applying, ClubStore, Discord, KeySecret as DiscordKeySecret, OptIn,
-    TrainerLinks, TrainerStore,
+    SessionStore, TrainerLinks, TrainerStore,
 };
 
 use crate::app::{app_with_routes, AppState};
@@ -227,6 +227,8 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
                 }
                 None => ClubStore::new(conn.clone()),
             };
+            // Sign-out and account deletion end sessions early.
+            let sessions = SessionStore::new(conn.clone(), secret.clone());
             let applying = Applying::new(
                 ApplicationStore::new(conn, secret),
                 applicant_lookup(applicant_source, applicant_paces),
@@ -235,6 +237,7 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
                 .map_err(RunError::Discord)?
                 .with_opt_in(OptIn::new(store.clone(), club_lookup(club_source)))
                 .with_trainer_links(trainers)
+                .with_sessions(sessions)
                 .with_applications(applying);
             // Keeps the bot showing as online.
             let gateway = discord.clone();

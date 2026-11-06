@@ -8,6 +8,7 @@ use crate::error::Error;
 use crate::names::Names;
 use crate::opt_in::OptIn;
 use crate::rest::Rest;
+use crate::sessions::SessionStore;
 use crate::trainers::TrainerLinks;
 
 /// The Discord application, shared by every route. Cheap to clone.
@@ -25,6 +26,7 @@ struct Inner {
     trainer_links: Option<TrainerLinks>,
     applying: Option<Applying>,
     names: Arc<Names>,
+    sessions: Option<SessionStore>,
 }
 
 impl Discord {
@@ -43,6 +45,7 @@ impl Discord {
                 trainer_links: None,
                 applying: None,
                 names: Arc::default(),
+                sessions: None,
             }),
         })
     }
@@ -74,6 +77,7 @@ impl Discord {
                 trainer_links: inner.trainer_links.clone(),
                 applying: inner.applying.clone(),
                 names: inner.names.clone(),
+                sessions: inner.sessions.clone(),
             }),
         }
     }
@@ -90,6 +94,7 @@ impl Discord {
                 trainer_links: Some(trainer_links),
                 applying: inner.applying.clone(),
                 names: inner.names.clone(),
+                sessions: inner.sessions.clone(),
             }),
         }
     }
@@ -106,8 +111,31 @@ impl Discord {
                 trainer_links: inner.trainer_links.clone(),
                 applying: Some(applying),
                 names: inner.names.clone(),
+                sessions: inner.sessions.clone(),
             }),
         }
+    }
+
+    /// The same application, ending sessions early in `sessions` when people sign out or delete
+    /// their account.
+    pub fn with_sessions(self, sessions: SessionStore) -> Self {
+        let inner = &self.inner;
+        Self {
+            inner: Arc::new(Inner {
+                config: inner.config.clone(),
+                rest: inner.rest.clone(),
+                http: inner.http.clone(),
+                opt_in: inner.opt_in.clone(),
+                trainer_links: inner.trainer_links.clone(),
+                applying: inner.applying.clone(),
+                names: inner.names.clone(),
+                sessions: Some(sessions),
+            }),
+        }
+    }
+
+    pub(crate) fn sessions(&self) -> Option<&SessionStore> {
+        self.inner.sessions.as_ref()
     }
 
     pub(crate) fn applying(&self) -> Option<&Applying> {
