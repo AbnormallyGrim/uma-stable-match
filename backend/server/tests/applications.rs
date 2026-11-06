@@ -13,7 +13,7 @@ use redis::aio::ConnectionManager;
 use serde_json::{json, Value};
 use tokio::sync::watch;
 use tower::ServiceExt;
-use uma_stable_match_discord::{ClubStore, SettingsUpdate};
+use uma_stable_match_discord::{ClubStore, KeySecret, SettingsUpdate};
 use uma_stable_match_server::{
     router, run_scheduler, AppState, Applications, Cache, ClubDetails, DetailConfig, MatchSettings,
     PaceLookup, RateLimits, ScanConfig, SharedPool, DEFAULT_PACE_TTL,
@@ -32,7 +32,8 @@ async fn store() -> Option<ClubStore> {
     let conn = ConnectionManager::new(redis::Client::open(url).unwrap())
         .await
         .expect("REDIS_TEST_URL is reachable");
-    Some(ClubStore::new(conn))
+    let secret = KeySecret::parse("made-up-key-secret-of-32-chars!!").unwrap();
+    Some(ClubStore::new(conn, &secret))
 }
 
 fn client(server: &MockServer) -> Client {

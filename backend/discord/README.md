@@ -119,7 +119,7 @@ These are only guesses. A code is an invite once Discord resolves it: `resolve_i
 
 | Key | Holds |
 |---|---|
-| `discord:club:{club_id}` | A hash: `server`, `category`, `auto_join` and `open` (`1` or absent), `leader` (the Discord ID of the leader who last opted the club in or changed its settings, who is added to its tickets) and `problem`. Clubs linked before leader roles were dropped may still hold `leader_roles`, which nothing reads |
+| `discord:club:{club_id}` | A hash: `server`, `category`, `auto_join` and `open` (`1` or absent), `leader` (the Discord ID of the leader who last opted the club in or changed its settings, who is added to its tickets; encrypted, see below) and `problem`. Clubs linked before leader roles were dropped may still hold `leader_roles`, which nothing reads |
 | `discord:guild:{guild_id}` | A set of the IDs of the clubs linked to that server |
 
 Many clubs can share a server, and a club is linked to one server at a time:
@@ -131,6 +131,8 @@ Many clubs can share a server, and a club is linked to one server at a time:
 - `unlink(club_id)` deletes the club's hash and takes it out of its server's set, returning the `Departure` if it was linked. A `remaining` of 0 means no club needs the bot on that server any more.
 - `club(club_id)` reads the `ClubRecord`, and `clubs_on(server_id)` lists a server's clubs, lowest ID first.
 - `with_dev_guild(server_id)` makes the store answer as if every club were open in that server, for trying applications on one's own machine. The server only allows it on a `localhost` address.
+
+The leader's Discord ID is encrypted like an [applicant's](#applying-to-a-club), with the club's ID as associated data, so it can't be copied onto another club. `ClubStore::new` takes the key secret (`REDIS_KEY_SECRET`) for it. A leader saved as a plain number before this is still read, and is encrypted the next time the club is opted in or its settings change.
 
 Each of `link` and `unlink` is one Lua script, so a crash can't leave a club in one set and not the other. Calls time out after 5 seconds. Errors name only the kind of Redis failure, as Redis's own messages can include its URL.
 

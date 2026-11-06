@@ -63,7 +63,7 @@ impl World {
             .await
             .expect("REDIS_TEST_URL is reachable");
         let secret = || KeySecret::parse("made-up-key-secret-of-32-chars!!").unwrap();
-        let clubs = ClubStore::new(conn.clone());
+        let clubs = ClubStore::new(conn.clone(), &secret());
         let trainers = TrainerStore::new(conn.clone(), secret())
             .with_check_queue(&format!("test:checks:{base}"));
         let applications = ApplicationStore::new(conn, secret());
