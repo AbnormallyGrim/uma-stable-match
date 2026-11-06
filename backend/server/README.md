@@ -651,7 +651,7 @@ The [human check](#human-check) and [rate limits](#rate-limits) apply as for rec
 
 ### Rate limits
 
-`/api/v1/recommendations`, `/api/v1/clubs/{id}` and the [Discord routes](#discord-applications) are limited per visitor. Health and Discord's interactions endpoint, which Discord signs, aren't limited.
+`/api/v1/recommendations`, `/api/v1/clubs/{id}` and the [Discord routes](#discord-applications) are limited per visitor. Health and Discord's interactions and webhook events endpoints, which Discord signs, aren't limited.
 
 - **All requests:** `RATE_LIMIT_PER_MINUTE` (30 by default).
 - **Trainer lookups:** `TRAINER_LOOKUPS_PER_MINUTE` (10 by default). This only counts `trainer_id` requests that need a call to uma.moe, and club pages that fetch a club's [previous month](#club-page). Cached trainers and `pace` requests don't use it, so a public instance can't be used to flood uma.moe.
@@ -725,6 +725,7 @@ To set it up:
 2. Set the variables, with `PUBLIC_URL` the site's address (`https://app.example.com`, no path) and `TOKEN_SIGNING_KEY` from `openssl rand -hex 32`. At Fly.io, set them as secrets: `fly secrets set DISCORD_APP_ID=… DISCORD_PUBLIC_KEY=… DISCORD_BOT_TOKEN=… DISCORD_CLIENT_SECRET=… TOKEN_SIGNING_KEY=… PUBLIC_URL=…`.
 3. Once the server is running with them, set **Interactions Endpoint URL** in **General Information** to `https://<your host>/discord/interactions`. Discord checks it with a signed PING and a badly signed request before saving; the server must answer the first and reject the second.
 4. Under **OAuth2** → **Redirects**, add `<PUBLIC_URL>/api/v1/auth/discord/callback`. Sign-in fails until it's listed exactly.
+5. Under **Webhooks**, set the endpoint to `https://<your host>/discord/webhook-events`, turn on **Events** and pick **Application Deauthorized**. Someone who removes the app from their Discord account is then signed out here on every device. Without it, their sessions last until they expire.
 
 The bot never needs privileged gateway intents; the server holds one gateway connection, with no intents, only so the bot shows as online. Sign-in is `GET /api/v1/auth/discord/login`, which sends the visitor to Discord and back to the callback; a signed 12-hour cookie then identifies the person to `GET /api/v1/applications/me`, `POST /api/v1/auth/sign-out` ends it, and `DELETE /api/v1/auth/account` deletes their trainer links and ends all their sessions. Both are kept in Redis, so a copy of the cookie stops working too. Discord's access token is dropped after one call, and nothing from Discord is logged.
 

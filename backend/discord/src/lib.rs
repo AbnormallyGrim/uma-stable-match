@@ -25,6 +25,7 @@ mod tickets;
 mod token;
 mod trainer_store;
 mod trainers;
+mod webhook_events;
 
 pub use application_store::{
     Application, ApplicationStore, NewApplication, Sent, Status, MAX_PER_DAY,
@@ -65,3 +66,4 @@ pub use trainers::{
     TrainerLinks, TrainerLookup, TrainerSummary, CHECK_EVERY, CHECK_FOR, LINK_PATH, TRAINERS_PATH,
     TRAINER_PATH, VERIFICATION_PATH,
 };
+pub use webhook_events::WEBHOOK_EVENTS_PATH;

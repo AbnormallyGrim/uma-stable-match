@@ -8,7 +8,7 @@ use tower::ServiceExt;
 use uma_stable_match_discord::{
     router as discord_router, ApplicationId, BotToken, ClientSecret, Discord, DiscordConfig,
     PublicKey, PublicUrl, SigningKey, APPLICATIONS_ME_PATH, APPLY_PATH, CALLBACK_PATH,
-    INTERACTIONS_PATH, LOGIN_PATH, OPT_IN_PATH,
+    INTERACTIONS_PATH, LOGIN_PATH, OPT_IN_PATH, WEBHOOK_EVENTS_PATH,
 };
 use uma_stable_match_server::{limit_discord, RateLimits};
 
@@ -105,10 +105,14 @@ async fn a_limited_page_load_lands_on_the_applications_page() {
 }
 
 #[tokio::test]
-async fn interactions_are_not_limited() {
+async fn interactions_and_webhook_events_are_not_limited() {
     let app = app();
-    for _ in 0..5 {
-        let request = Request::post(INTERACTIONS_PATH)
+    for path in [INTERACTIONS_PATH, WEBHOOK_EVENTS_PATH]
+        .into_iter()
+        .cycle()
+        .take(10)
+    {
+        let request = Request::post(path)
             .header("x-forwarded-for", "192.0.2.1")
             .header("content-type", "application/json")
             .body(Body::from(r#"{"type":1}"#))
