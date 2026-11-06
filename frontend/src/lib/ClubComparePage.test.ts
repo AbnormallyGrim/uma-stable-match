@@ -86,10 +86,13 @@ describe('ClubComparePage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Page Club' })).toBeInTheDocument();
     expect(load).toHaveBeenCalledWith('7', [ALPHA], expect.anything());
-    const card = (await screen.findByText('Applicant Alpha', { selector: '.name' })).closest('li')!;
-    expect(within(card).getByText('5.0M/day')).toBeInTheDocument();
-    expect(within(card).getByText('3 of 4')).toBeInTheDocument();
-    expect(document.querySelectorAll('.roster li')).toHaveLength(3);
+    const card = (await screen.findByText('Applicant Alpha', { selector: '.member-name' })).closest(
+      'li',
+    )!;
+    expect(within(card).getByText(/^5\.0M\/day/)).toBeInTheDocument();
+    // Ranked with the members: 9M and 7M are faster, 4M slower.
+    expect(card.querySelector('.place')).toHaveTextContent('3');
+    expect(document.querySelectorAll('.roster li')).toHaveLength(4);
   });
 
   it('is for the leader of the club only', async () => {
@@ -128,7 +131,9 @@ describe('ClubComparePage', () => {
     expect(window.location.pathname + window.location.search).toBe(
       `/applications/club/7/compare?trainers=${ALPHA}%2C${BRAVO}`,
     );
-    expect(await screen.findByText('Applicant Bravo', { selector: '.name' })).toBeInTheDocument();
+    expect(
+      await screen.findByText('Applicant Bravo', { selector: '.member-name' }),
+    ).toBeInTheDocument();
   });
 
   it('adds a trainer by ID, and rejects one that is not an ID', async () => {

@@ -18,7 +18,7 @@
   } from './applications';
   import { applyFeatures } from './features';
   import ClubTags from './ClubTags.svelte';
-  import { formatGap, formatPace, formatPlace, formatUpdated, monthLabel } from './format';
+  import { formatGap, formatPace, formatUpdated, monthLabel } from './format';
   import { HumanCheck } from './human';
   import { t } from './i18n';
   import { language } from './language.svelte';
@@ -26,6 +26,7 @@
   import PaceChart from './PaceChart.svelte';
   import ReleaseNotes from './ReleaseNotes.svelte';
   import RunnerProgress from './RunnerProgress.svelte';
+  import { compareRows } from './roster';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
   import {
     CLUB_APPLICATIONS_PATH,
@@ -201,12 +202,15 @@
     }));
   });
 
-  // Members fastest first, with a place for those with a pace.
-  const places = $derived.by(() => {
-    if (page.phase !== 'done') return [];
-    let place = 0;
-    return page.details.members.map((member) => (member.pace_per_day === null ? null : ++place));
-  });
+  // Members and the compared trainers, ranked together.
+  const rows = $derived(
+    page.phase === 'done'
+      ? compareRows(
+          page.details.members,
+          page.details.trainers.map((trainer) => trainer.pace_per_day),
+        )
+      : [],
+  );
 
   // The member whose line the chart highlights.
   let selected = $state<number | null>(null);
@@ -317,7 +321,7 @@
         {/if}
       </div>
     {:else}
-      {@const { club, trainers, median_per_day: median } = page.details}
+      {@const { club, median_per_day: median } = page.details}
       <header class="club">
         <TierBadge tier={club.tier} />
         <div class="info">
@@ -335,46 +339,6 @@
           </dl>
         {/if}
       </header>
-
-      <ul class="candidates">
-        {#each trainers as trainer, i (trainer.trainer_id)}
-          <li class="candidate" style:--line={COLOURS[i]}>
-            <div class="who">
-              <span class="swatch" aria-hidden="true"></span>
-              <span class="name">{labels[i]}</span>
-              <button
-                type="button"
-                class="remove"
-                aria-label={t('compare.remove', { name: labels[i] ?? '' })}
-                disabled={ids.length === 1}
-                onclick={() => setIds(ids.filter((id) => id !== String(trainer.trainer_id)))}
-                >×</button
-              >
-            </div>
-            <dl>
-              <div>
-                <dt>{t('leader.table.pace')}</dt>
-                <dd>{formatPace(trainer.pace_per_day)}</dd>
-              </div>
-              {#if trainer.your_place !== null && trainer.club_size !== null}
-                <div>
-                  <dt>{t('clubPage.youdBe')}</dt>
-                  <dd>{formatPlace(trainer.your_place, trainer.club_size)}</dd>
-                </div>
-              {/if}
-              {#if median !== null}
-                <div>
-                  <dt>{t('compare.vsMedian')}</dt>
-                  <dd>{formatGap(trainer.pace_per_day - median)}</dd>
-                </div>
-              {/if}
-            </dl>
-            {#if trainer.in_club}
-              <p class="note">{t('compare.alreadyMember')}</p>
-            {/if}
-          </li>
-        {/each}
-      </ul>
 
       <div class="chart-box" bind:this={chart}>
         <PaceChart
@@ -401,25 +365,56 @@
           {t('clubPage.pickHint')}
         </p>
         <ol class="roster">
-          {#each page.details.members as member, i (i)}
+          {#each rows as row (row.candidate === null ? `m${row.member}` : `c${row.candidate}`)}
             <li>
-              <button
-                type="button"
-                class="card"
-                class:chosen={selected === i}
-                aria-pressed={selected === i}
-                onclick={() => select(i)}
-              >
-                <span class="place">{places[i] ?? '–'}</span>
-                <span class="who-member">
-                  <span class="member-name">{member.name ?? t('clubPage.unknown')}</span>
-                  <span class="pace">
-                    {member.pace_per_day === null
-                      ? t('clubPage.new')
-                      : formatPace(member.pace_per_day)}
+              {#if row.candidate !== null}
+                {@const trainer = page.details.trainers[row.candidate]!}
+                <div class="card candidate" style:--line={COLOURS[row.candidate]}>
+                  <span class="place">{row.place ?? '–'}</span>
+                  <span class="who-member">
+                    <span class="member-name">
+                      <span class="swatch" aria-hidden="true"></span>{labels[row.candidate]}
+                    </span>
+                    <span class="pace">
+                      {formatPace(trainer.pace_per_day)}
+                      {#if page.details.median_per_day !== null}
+                        · {t('compare.vsMedian')}
+                        {formatGap(trainer.pace_per_day - page.details.median_per_day)}
+                      {/if}
+                    </span>
+                    {#if trainer.in_club}
+                      <span class="note">{t('compare.alreadyMember')}</span>
+                    {/if}
                   </span>
-                </span>
-              </button>
+                  <button
+                    type="button"
+                    class="remove"
+                    aria-label={t('compare.remove', { name: labels[row.candidate] ?? '' })}
+                    disabled={ids.length === 1}
+                    onclick={() => setIds(ids.filter((id) => id !== String(trainer.trainer_id)))}
+                    >×</button
+                  >
+                </div>
+              {:else}
+                {@const member = page.details.members[row.member!]!}
+                <button
+                  type="button"
+                  class="card"
+                  class:chosen={selected === row.member}
+                  aria-pressed={selected === row.member}
+                  onclick={() => select(row.member!)}
+                >
+                  <span class="place">{row.place ?? '–'}</span>
+                  <span class="who-member">
+                    <span class="member-name">{member.name ?? t('clubPage.unknown')}</span>
+                    <span class="pace">
+                      {member.pace_per_day === null
+                        ? t('clubPage.new')
+                        : formatPace(member.pace_per_day)}
+                    </span>
+                  </span>
+                </button>
+              {/if}
             </li>
           {/each}
         </ol>
@@ -473,8 +468,7 @@
 
   .status,
   .add,
-  .club,
-  .candidate {
+  .club {
     margin: 0;
     padding: 14px 16px;
     background: var(--card);
@@ -592,55 +586,31 @@
     white-space: nowrap;
   }
 
-  .candidates {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 8px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .candidate {
-    display: grid;
-    gap: 8px;
-    align-content: start;
+  .card.candidate {
+    grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+    cursor: default;
+    background: color-mix(in srgb, var(--line) 12%, var(--card));
+    border-color: color-mix(in srgb, var(--line) 50%, transparent);
     border-left: 4px solid var(--line);
   }
 
-  .who {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
   .swatch {
-    flex: none;
+    display: inline-block;
     width: 14px;
     height: 0;
+    margin-right: 6px;
     border-top: 3px solid var(--line);
-  }
-
-  .name {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    color: var(--text);
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    vertical-align: middle;
   }
 
   .remove {
-    flex: none;
     padding: 0 8px;
     line-height: 1.4;
   }
 
   .note {
-    margin: 0;
     color: var(--muted);
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
   }
 
   .chart-box {
