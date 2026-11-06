@@ -28,6 +28,7 @@ fn alltime_is_copied_from_the_fan_history() {
             rank_total_fans: Some(3),
             ..Default::default()
         }),
+        ..Default::default()
     };
     let found = alltime(Some(history)).unwrap();
     assert_eq!(found.total_fans, 5_000);

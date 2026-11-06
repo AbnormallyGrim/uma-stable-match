@@ -28,6 +28,9 @@ export const en = {
   'releases.change.improved': 'Improved',
   'releases.change.fixed': 'Fixed',
 
+  'releases.trainerLookup.title': "Fixed trainers not being found when they're between clubs",
+  'releases.trainerLookup.body':
+    "Searching by trainer ID now gives recommendations for trainers who aren't in a club right now, or have no fan gains yet this month.",
   'releases.earlyChart.title': 'Fixed the empty club chart early in the month',
   'releases.earlyChart.body':
     "The club page chart no longer says there are too few days of data at the start of the month, and shows last month's until this month has enough.",

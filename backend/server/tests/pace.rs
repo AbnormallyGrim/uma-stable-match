@@ -16,7 +16,7 @@ use uma_stable_match_umamoe_client::{ApiKey, Client, ClientConfig, RetryConfig};
 use wiremock::matchers::{path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-const TRAINER: u64 = 4242;
+const TRAINER: u64 = 100000042;
 
 fn client(server: &MockServer) -> Client {
     Client::new(ClientConfig {
@@ -843,4 +843,133 @@ async fn a_failed_last_month_lookup_with_too_little_data_is_upstream() {
 
     let error = lookup(&server).blended(TRAINER, None).await.unwrap_err();
     assert!(matches!(error, PaceError::Upstream(_)));
+}
+
+async fn mount_profile(server: &MockServer, response: ResponseTemplate) {
+    Mock::given(path(format!("/api/v4/user/profile/{TRAINER}")))
+        .respond_with(response)
+        .mount(server)
+        .await;
+}
+
+fn profile(circle: Value, monthly: Value) -> ResponseTemplate {
+    ResponseTemplate::new(200).set_body_json(json!({
+        "trainer": { "account_id": TRAINER.to_string(), "name": "Made Up" },
+        "circle": circle,
+        "fan_history": { "monthly": monthly },
+    }))
+}
+
+#[tokio::test]
+async fn a_trainer_the_lookups_miss_is_found_in_their_profile_club() {
+    let server = MockServer::start().await;
+    let cache = scanned(&server).await;
+    mount_trainer(&server, ResponseTemplate::new(404), 1).await;
+    mount_profile(
+        &server,
+        profile(json!({ "circle_id": 2, "name": "Home Club" }), json!([])),
+    )
+    .await;
+    Mock::given(path("/api/v4/circles"))
+        .and(query_param("circle_id", "2"))
+        .respond_with(trainer_club(series(2_000_000)))
+        .mount(&server)
+        .await;
+    let state = app(&server, cache, DEFAULT_PACE_TTL);
+
+    let (status, body) = get(&state, &by_trainer()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["trainer"]["pace_per_day"].as_f64().unwrap(),
+        2_000_000.0
+    );
+}
+
+#[tokio::test]
+async fn a_trainer_without_a_club_uses_their_latest_month() {
+    let server = MockServer::start().await;
+    let cache = scanned(&server).await;
+    mount_trainer(&server, ResponseTemplate::new(404), 1).await;
+    mount_profile(
+        &server,
+        profile(
+            Value::Null,
+            json!([
+                { "year": 2026, "month": 2, "active_days": 28, "avg_daily": 1_000_000.0 },
+                { "year": 2026, "month": 3, "active_days": 30, "avg_daily": 3_000_000.0 },
+            ]),
+        ),
+    )
+    .await;
+    let state = app(&server, cache, DEFAULT_PACE_TTL);
+
+    let (status, body) = get(&state, &by_trainer()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["trainer"]["pace_per_day"].as_f64().unwrap(),
+        3_000_000.0
+    );
+}
+
+#[tokio::test]
+async fn a_profile_without_history_is_not_found() {
+    let server = MockServer::start().await;
+    let cache = scanned(&server).await;
+    mount_trainer(&server, ResponseTemplate::new(404), 1).await;
+    mount_profile(&server, profile(Value::Null, json!([]))).await;
+    let state = app(&server, cache, DEFAULT_PACE_TTL);
+
+    let (status, _) = get(&state, &by_trainer()).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_failing_profile_lookup_is_bad_gateway() {
+    let server = MockServer::start().await;
+    let cache = scanned(&server).await;
+    mount_trainer(&server, ResponseTemplate::new(404), 1).await;
+    mount_profile(&server, ResponseTemplate::new(500)).await;
+    let state = app(&server, cache, DEFAULT_PACE_TTL);
+
+    let (status, _) = get(&state, &by_trainer()).await;
+    assert_eq!(status, StatusCode::BAD_GATEWAY);
+}
+
+#[tokio::test]
+async fn a_latest_month_without_gains_is_not_enough_data() {
+    let server = MockServer::start().await;
+    let cache = scanned(&server).await;
+    mount_trainer(&server, ResponseTemplate::new(404), 1).await;
+    mount_profile(
+        &server,
+        profile(
+            Value::Null,
+            json!([{ "year": 2026, "month": 3, "active_days": 0, "avg_daily": 0.0 }]),
+        ),
+    )
+    .await;
+    let state = app(&server, cache, DEFAULT_PACE_TTL);
+
+    let (status, _) = get(&state, &by_trainer()).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn a_trainer_the_lookups_find_never_reaches_the_profile() {
+    let server = MockServer::start().await;
+    let cache = scanned(&server).await;
+    mount_trainer(&server, trainer_club(series(6_000_000)), 1).await;
+    Mock::given(path(format!("/api/v4/user/profile/{TRAINER}")))
+        .respond_with(ResponseTemplate::new(500))
+        .expect(0)
+        .mount(&server)
+        .await;
+    let state = app(&server, cache, DEFAULT_PACE_TTL);
+
+    let (status, body) = get(&state, &by_trainer()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["trainer"]["pace_per_day"].as_f64().unwrap(),
+        6_000_000.0
+    );
 }

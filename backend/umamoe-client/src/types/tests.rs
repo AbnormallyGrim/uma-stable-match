@@ -177,3 +177,16 @@ fn a_profile_reads_the_alltime_fans() {
     assert_eq!(alltime.avg_week, None);
     assert_eq!(alltime.rank_total_fans, Some(42));
 }
+
+#[test]
+fn a_profile_reads_its_monthly_history() {
+    let r: ProfileResponse = serde_json::from_str(
+        r#"{"fan_history":{"monthly":[{"year":2026,"month":3,"active_days":30,"avg_daily":1500.5,"circle_id":9}]}}"#,
+    )
+    .unwrap();
+    let months = r.fan_history.unwrap().monthly;
+    assert_eq!(months.len(), 1);
+    assert_eq!((months[0].year, months[0].month), (2026, 3));
+    assert_eq!(months[0].avg_daily, Some(1500.5));
+    assert_eq!(months[0].circle_id, Some(9));
+}

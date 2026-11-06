@@ -492,6 +492,7 @@ pace = Z × this month's pace + (1 − Z) × last month's pace
 - **Missing months.** With no data this month, the 2nd and 3rd use last month's pace alone, and later days return "not found". With no pace last month, or a failed lookup, this month's is used alone if it has 3 days of data.
 - **Why.** A backtest on real trainers found a pace from 2 or 3 daily gains has a median error of about 31%, against about 22% for the blend. The [scoring crate's README](../scoring/README.md#blended-pace) has the formula.
 
+- **Profile fallback.** A trainer the rankings and club lookups miss (no club, or no gains yet this month) is looked up by their uma.moe profile: their current club's data if it has them, otherwise the pace of their latest finished month (`avg_daily`), with no club. A profile with no usable month is "not found", or "not enough data" if that month had no gains.
 - **Cached for `TRAINER_CACHE_MINUTES`** (10 by default). A found pace, and a "not found" or "not enough data" answer, is reused for that long, so repeat requests don't call uma.moe again. Failed uma.moe requests aren't cached.
 - **IDs stay out of logs.** Trainer IDs never appear in log messages or error responses, only in the response to the trainer's own request. Failed lookups log only the HTTP status.
 - **No lookup without results.** Before the first scan has listed the clubs, the endpoint returns `503` without contacting uma.moe.
