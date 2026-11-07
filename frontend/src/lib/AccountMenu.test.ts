@@ -5,13 +5,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { account } from './account.svelte';
 import AccountMenu from './AccountMenu.svelte';
-import { flags } from './flags.svelte';
 import NavBar from './NavBar.svelte';
 
 afterEach(() => {
   account.current = null;
   account.known = false;
-  flags.applications = false;
   vi.unstubAllGlobals();
 });
 
@@ -22,14 +20,12 @@ function signIn(name: string | null = 'Made Up') {
 
 describe('AccountMenu', () => {
   it('shows nothing until the server has said who is signed in', () => {
-    flags.applications = true;
     render(AccountMenu);
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('shows a sign-in silhouette while signed out, coming back to the page', () => {
-    flags.applications = true;
     account.known = true;
     render(AccountMenu);
     const link = screen.getByRole('link', { name: 'Sign in' });
@@ -37,15 +33,8 @@ describe('AccountMenu', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('leaves the silhouette out while applications are off', () => {
-    account.known = true;
-    render(AccountMenu);
-    expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
-  });
-
   it('leaves the silhouette out on the login page', () => {
     vi.stubGlobal('location', { ...window.location, pathname: '/login', search: '' });
-    flags.applications = true;
     account.known = true;
     render(AccountMenu);
     expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
@@ -108,7 +97,6 @@ describe('AccountMenu', () => {
       expect.objectContaining({ method: 'POST' }),
     );
     expect(screen.queryByRole('button', { name: 'Made Up' })).not.toBeInTheDocument();
-    flags.applications = true;
     expect(await screen.findByRole('link', { name: 'Sign in' })).toBeInTheDocument();
   });
 
@@ -128,7 +116,6 @@ describe('AccountMenu', () => {
 
 describe('NavBar', () => {
   it('puts the sign-in silhouette last while signed out', () => {
-    flags.applications = true;
     account.known = true;
     render(NavBar, { onhelp: () => {}, onreleases: () => {}, unseen: false });
     const link = screen.getByRole('link', { name: 'Sign in' });

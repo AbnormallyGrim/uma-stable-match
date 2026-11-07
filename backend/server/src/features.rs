@@ -10,8 +10,6 @@ use serde_json::{json, Value};
 pub struct Features {
     /// Whether the Japanese translation and its language button are offered.
     pub japanese: bool,
-    /// Whether the club applications pages, and the website's privacy page, are shown.
-    pub applications: bool,
     /// Cloudflare Web Analytics token. When set, the web app loads Cloudflare's beacon.
     pub web_analytics: Option<String>,
 }
@@ -25,7 +23,6 @@ pub(crate) fn router(features: Features) -> Router {
 async fn show(State(features): State<Features>) -> Json<Value> {
     Json(json!({
         "japanese": features.japanese,
-        "applications": features.applications,
         "web_analytics": features.web_analytics,
     }))
 }

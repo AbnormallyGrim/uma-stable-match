@@ -3,7 +3,7 @@
   The navbar's account menu for a person signed in with Discord: a button with their name that
   opens who they're signed in as, a link to the settings page, and signing out. It follows the
   ARIA menu button pattern. Signed out, it's a round silhouette linking to sign-in, shown once the
-  server has answered and while applications are on.
+  server has answered.
 -->
 
 <script lang="ts">
@@ -11,7 +11,6 @@
 
   import { account, clearAccount } from './account.svelte';
   import { signOut } from './applications';
-  import { flags } from './flags.svelte';
   import { t } from './i18n';
   import {
     APPLICATIONS_PATH,
@@ -185,7 +184,7 @@
       </div>
     {/if}
   </div>
-{:else if account.known && flags.applications && !onLoginPage}
+{:else if account.known && !onLoginPage}
   <a
     class="sign-in tooltip"
     href={signInHref}

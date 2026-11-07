@@ -1,7 +1,6 @@
 /** Who is signed in with Discord, shared by every component. */
 
 import { type Account, signedInUser } from './applications';
-import { flags } from './flags.svelte';
 
 /** The signed-in person, `null` when nobody is; `known` once the server has answered. */
 export const account = $state<{ current: Account | null; known: boolean }>({
@@ -36,5 +35,5 @@ export function clearAccount(): void {
 
 /** Whether the navbar holds the account menu or the sign-in button, which take room. */
 export function showsAccount(): boolean {
-  return account.current !== null || (account.known && flags.applications);
+  return account.current !== null || account.known;
 }

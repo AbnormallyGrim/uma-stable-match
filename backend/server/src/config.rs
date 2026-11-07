@@ -108,8 +108,7 @@ pub struct Config {
     pub discord_sign_ins_per_hour: u32,
     /// Whether to identify visitors by `X-Forwarded-For`, from `TRUST_FORWARDED_FOR`.
     pub trust_forwarded_for: bool,
-    /// Features that are switched on, from `ENABLE_JAPANESE`, `ENABLE_APPLICATIONS` and
-    /// `WEB_ANALYTICS_TOKEN`.
+    /// Features that are switched on, from `ENABLE_JAPANESE` and `WEB_ANALYTICS_TOKEN`.
     pub features: Features,
     /// Built frontend to serve, from `FRONTEND_DIR`. `None` serves only the API.
     pub frontend_dir: Option<PathBuf>,
@@ -367,7 +366,6 @@ impl Config {
         };
         let features = Features {
             japanese: boolean("ENABLE_JAPANESE")?,
-            applications: boolean("ENABLE_APPLICATIONS")?,
             web_analytics,
         };
         let frontend_dir = match get("FRONTEND_DIR") {

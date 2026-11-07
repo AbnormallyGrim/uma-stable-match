@@ -1,8 +1,8 @@
 <!--
   @component
-  One recommended club: tier, link to uma.moe, rank trend, tags, buttons to the club page and, when
-  applications are on, to quick apply, and stats on how you'd compare and, when balance scoring is on, on balance. The top
-  three get medal colours.
+  One recommended club: tier, link to uma.moe, rank trend, tags, buttons to the club page and to quick
+  apply, and stats on how you'd compare and, when balance scoring is on, on balance. The top three
+  get medal colours.
 -->
 
 <script lang="ts">
@@ -11,7 +11,6 @@
   import ClubTags from './ClubTags.svelte';
   import DiscordIcon from './DiscordIcon.svelte';
   import MembersLink from './MembersLink.svelte';
-  import { flags } from './flags.svelte';
   import { formatPercent, formatPerDay, formatPlace } from './format';
   import { t } from './i18n';
   import TierBadge from './TierBadge.svelte';
@@ -47,9 +46,7 @@
 
   <div class="side">
     <MembersLink circleId={club.circle_id} name={club.name} {trainerId} />
-    {#if !flags.applications}
-      <!-- Quick apply is off. -->
-    {:else if club.applications === 'discord'}
+    {#if club.applications === 'discord'}
       <a class="quick-apply" href={applyUrl(club.circle_id)}>
         <span class="icon"><DiscordIcon /></span>{t('club.quickApply')}
       </a>

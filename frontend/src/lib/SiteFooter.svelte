@@ -1,15 +1,13 @@
 <!--
   @component
   The page footer: the logo, buttons to report a problem and to support the project, the
-  disclaimer and attributions, and last the Privacy Policy and Terms of Service links (once the
-  applications flag is on).
+  disclaimer and attributions, and last the Privacy Policy and Terms of Service links.
   Keep the wording in step with the root README's Disclaimer section.
 -->
 
 <script lang="ts">
   import carats from '../assets/carats/carats.webp';
   import BrandLogo from './BrandLogo.svelte';
-  import { flags } from './flags.svelte';
   import { t } from './i18n';
   import { websiteUrl } from './pages';
 
@@ -50,19 +48,15 @@
       <p>{@html t('footer.trademark')}</p>
     </div>
 
-    {#if flags.applications}
-      <p class="policy">
-        <a
-          href={`${websiteUrl(window.location)}/privacy/`}
-          target="_blank"
-          rel="noopener noreferrer">{t('footer.privacy')}</a
-        >
-        <span aria-hidden="true">·</span>
-        <a href={`${websiteUrl(window.location)}/terms/`} target="_blank" rel="noopener noreferrer"
-          >{t('footer.terms')}</a
-        >
-      </p>
-    {/if}
+    <p class="policy">
+      <a href={`${websiteUrl(window.location)}/privacy/`} target="_blank" rel="noopener noreferrer"
+        >{t('footer.privacy')}</a
+      >
+      <span aria-hidden="true">·</span>
+      <a href={`${websiteUrl(window.location)}/terms/`} target="_blank" rel="noopener noreferrer"
+        >{t('footer.terms')}</a
+      >
+    </p>
   </div>
 </footer>
 

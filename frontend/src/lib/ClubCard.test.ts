@@ -1,17 +1,12 @@
 // ClubCard component tests. All data is made up.
 
 import { render, screen } from '@testing-library/svelte';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import ClubCard from './ClubCard.svelte';
-import { flags } from './flags.svelte';
 import { club } from './test-data';
 
 describe('ClubCard', () => {
-  afterEach(() => {
-    flags.applications = false;
-  });
-
   it('shows the club and links to uma.moe in a new tab', () => {
     render(ClubCard, { club: club(), position: 1 });
     const link = screen.getByRole('link', { name: 'Example Club' });
@@ -99,20 +94,13 @@ describe('ClubCard', () => {
     expect(screen.queryByText('Discord')).not.toBeInTheDocument();
   });
 
-  it('hides Quick Apply while applications are off', () => {
-    render(ClubCard, { club: club({ applications: 'discord' }), position: 1 });
-    expect(screen.queryByText('Quick Apply')).not.toBeInTheDocument();
-  });
-
   it('offers Quick Apply on clubs with the bot', () => {
-    flags.applications = true;
     render(ClubCard, { club: club({ applications: 'discord' }), position: 1 });
     const link = screen.getByRole('link', { name: 'Quick Apply' });
     expect(link).toHaveAttribute('href', '/api/v1/discord/apply?club=1');
   });
 
   it('greys out Quick Apply, with a tooltip, on clubs without the bot', () => {
-    flags.applications = true;
     render(ClubCard, { club: club(), position: 1 });
     const button = screen.getByRole('button', { name: /Quick Apply/ });
     expect(button).toHaveAttribute('aria-disabled', 'true');
