@@ -32,6 +32,20 @@ Search and sort your 100 best fits, then open a club's uma.moe page and contact 
 | Balance | 86/100 | How evenly members contribute. Higher is better |
 | Passengers | 0 of 27 | Members gaining under 1M fans a day, or under a quarter of the club's median |
 
+## Apply to clubs in one click
+
+Sign in with Discord and apply straight from your results. Clubs that use the Uma Stable Match bot get your fan pace and history in a private ticket, and you follow every application in one place.
+
+- **Quick Apply.** Select Quick Apply on a club that has the bot and your application is sent. There's no form to fill in and no screenshots to share.
+- **A ticket with your numbers.** The club's leaders see your daily fan gain, fans this month and current club in a private Discord ticket, then accept or decline.
+- **Follow every application.** See which applications are pending, accepted or declined, and when each one expires.
+
+Open [Applications](https://app.umastable.com/applications). Running a club? See the [Discord bot](https://umastable.com/bot/), [Privacy](https://umastable.com/privacy/) and [Terms of Service](https://umastable.com/terms/).
+
+## Help decide what gets built next
+
+Vote on the ideas for Uma Stable Match you'd actually use, from a dashboard for club leaders to Japanese trainers and clubs, on the [wishlist](https://app.umastable.com/wishlist).
+
 ## Frequently asked questions
 
 ### How do I find a good club in Umamusume?

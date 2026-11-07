@@ -95,8 +95,7 @@ src/lib/language.svelte.ts    The language shown right now, shared by every comp
 src/lib/SiteFooter.svelte     Tips, the logo, buttons to report a problem and support the project, the disclaimer, and Privacy Policy and Terms of Service links once applications are on
 src/lib/BrandLogo.svelte      The logo, in the version for the current theme
 src/lib/api.ts                Typed API client
-src/lib/features.ts           Switches on Japanese, applications and analytics from the server's features, on every page
-src/lib/flags.svelte.ts       Feature flags from the server, shared by every component
+src/lib/features.ts           Switches on Japanese and analytics from the server's features, on every page
 src/lib/human.ts              The human check: Turnstile challenge and API token
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
@@ -131,7 +130,7 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 
 `main.ts` asks `GET /api/v1/applications/me` who is signed in once per page (`loadAccount()` in `account.svelte.ts`), waiting for the answer only on pages that need a session. Once someone is, `AccountMenu.svelte` shows last in the navbar: a pill with their Discord name (or "Discord account" when the server couldn't look it up), cut short with an ellipsis when long. It opens a menu with **Signed in as …**, **Settings** and **Sign Out**, following the ARIA menu button pattern: arrow keys, Home and End move between the items, and Escape, Tab or a click elsewhere closes it. Signing out from a page that needs a session goes to the club finder; elsewhere the menu gives way to the sign-in button.
 
-Signed out, the same place holds a round silhouette button, **Sign in**, linking to `/login?next=<this page>`. It waits for the server's answer (`account.known`), so a signed-in person never sees it flash first, and it's left out while applications are off and on the login page itself.
+Signed out, the same place holds a round silhouette button, **Sign in**, linking to `/login?next=<this page>`. It waits for the server's answer (`account.known`), so a signed-in person never sees it flash first, and it's left out on the login page itself.
 
 The menu or the sign-in button makes the tools wider, so while either shows (`showsAccount()`) the page names in the pill show from 1440px rather than 900px, and the three-column layout starts at 1100px rather than 960px. Below that the navbar wraps, as it does on phones.
 
@@ -312,7 +311,7 @@ Card descriptions are capped at `80ch` so they stay easy to read on wide screens
 
 ### Footer
 
-`SiteFooter.svelte` is the page's `<footer>` landmark, below `<main>`. Its last line is **Privacy Policy** and **Terms of Service** links to the website's `/privacy/` and `/terms/` pages, in new tabs, shown only once `flags.applications` is on, because the website redirects that page home until then.
+`SiteFooter.svelte` is the page's `<footer>` landmark, below `<main>`. Its last line is **Privacy Policy** and **Terms of Service** links to the website's `/privacy/` and `/terms/` pages, in new tabs.
 
 | Part | Content |
 |---|---|
@@ -400,8 +399,6 @@ The navbar keeps the release notes but has no tour button here.
 `ClubTags.svelte` adds a **Quick apply** badge when a club's `applications` is `"discord"`: on result cards, table rows and the club page. It is separate from the **Discord** tag, which only says the description mentions Discord. The server sets `applications` for clubs that are opted in, open, joinable and without a setup problem, so the badge needs no logic here, and the field is left out when Discord isn't set up. The badge uses the Discord tag's colours, so the same [contrast](#accessibility) pair covers it.
 
 ## Club applications pages
-
-**Feature flag.** The server's `ENABLE_APPLICATIONS` setting, off by default, switches on these pages and the website's `/privacy/` page. It is read at run time from `GET /api/v1/features`, so changing it needs no rebuild. On an `/applications` address, `main.ts` asks for it before mounting; while it is off, or the request fails, these pages aren't mounted, so `/applications`, `/applications/club/{id}` and `/applications/mine` open the club finder like any unknown address. Elsewhere, `applyFeatures()` sets `flags.applications` and `pages()` adds the **Applications** link to the navbar once it's on. The components and their tests don't depend on the flag. The website's `site.js` reads the same endpoint for its privacy page and navbar link; see the notes at the top of that file for what else to change when turning it on.
 
 **Placeholder copy.** All text on these pages is lorem ipsum for now: the `applications.*` messages (except `applications.link`, the navbar label), in both languages. The website's privacy page is real, English-only text. Tests read the text through `t()`, so replacing it needs no test changes.
 
