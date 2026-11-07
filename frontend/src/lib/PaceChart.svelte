@@ -29,20 +29,28 @@
     };
     /** The trainers to draw, replacing the one in `details.trainer`. */
     lines?: ChartLine[];
+    /** A club's fan requirement in fans a day, drawn as a dashed line, or `null` for none. */
+    requirementPerDay?: number | null;
     /** The index in `details.members` of the member whose line stands out, if any. */
     highlight?: number | null;
     /** Replaceable in tests. */
     now?: Date;
   }
 
-  let { details, lines, highlight = null, now = new Date() }: Props = $props();
+  let {
+    details,
+    lines,
+    requirementPerDay = null,
+    highlight = null,
+    now = new Date(),
+  }: Props = $props();
 
   let mode = $state<ChartMode>('daily');
   let width = $state(0);
   let hover = $state<number | null>(null);
 
-  const HEIGHT = 260;
-  const PAD = { top: 12, right: 16, bottom: 28, left: 48 };
+  const HEIGHT = 284;
+  const PAD = { top: 12, right: 16, bottom: 48, left: 68 };
 
   // While this month has too few days, the server sends last month, which the chart plots
   // instead, every day of it.
@@ -89,13 +97,21 @@
   const today = $derived(
     !previous && (details.month === null || details.month === gameMonth(now.toISOString())),
   );
+  // The requirement as a line: the same every day, or growing by it each day since the first.
+  const need = $derived<Series | null>(
+    requirementPerDay === null
+      ? null
+      : Array.from({ length: days }, (_, day) =>
+          mode === 'daily' ? (day === 0 ? null : requirementPerDay) : requirementPerDay * day,
+        ),
+  );
   const last = $derived(lastDay([...members, ...yours.map((l) => l.series)]) - (today ? 1 : 0));
   const first = $derived(mode === 'daily' ? 1 : 0);
   const yTicks = $derived(
     ticks(
       Math.max(
         0,
-        ...[...members, median, ...yours.map((l) => l.series)].flatMap((s) =>
+        ...[...members, median, ...yours.map((l) => l.series), need ?? []].flatMap((s) =>
           s.slice(0, last + 1).filter((v): v is number => v !== null),
         ),
       ),
@@ -141,6 +157,7 @@
       day,
       chosen: chosen?.series[day] ?? null,
       yours: yours.map((line) => line.series[day] ?? null),
+      requirement: need?.[day] ?? null,
       median: median[day] ?? null,
       low: values.length ? Math.min(...values) : null,
       high: values.length ? Math.max(...values) : null,
@@ -158,6 +175,9 @@
       const value = values.yours[i];
       if (value !== null && value !== undefined) parts.push(`${line.label} ${format(value)}`);
     });
+    if (values.requirement !== null) {
+      parts.push(`${t('chart.requirement')} ${format(values.requirement)}`);
+    }
     if (values.median !== null) parts.push(`${t('chart.median')} ${format(values.median)}`);
     if (values.low !== null && values.high !== null) {
       const range = t('chart.range', { low: format(values.low), high: format(values.high) });
@@ -211,6 +231,9 @@
     <ul class="legend">
       <li><span class="key members" aria-hidden="true"></span>{t('chart.members')}</li>
       <li><span class="key median" aria-hidden="true"></span>{t('chart.median')}</li>
+      {#if need}
+        <li><span class="key requirement" aria-hidden="true"></span>{t('chart.requirement')}</li>
+      {/if}
       {#each yours as line (line.label)}
         <li>
           <span class="key yours" style:border-color={line.colour} aria-hidden="true"
@@ -245,13 +268,26 @@
             >
           {/each}
           {#each xTicks as day (day)}
-            <text x={x(day)} y={HEIGHT - 8} text-anchor="middle">{day + 1}</text>
+            <text x={x(day)} y={HEIGHT - 28} text-anchor="middle">{day + 1}</text>
           {/each}
+          <text class="axis" x={PAD.left + plotWidth / 2} y={HEIGHT - 6} text-anchor="middle"
+            >{t('chart.axisDay')}</text
+          >
+          <text
+            class="axis"
+            transform="rotate(-90)"
+            x={-(PAD.top + plotHeight / 2)}
+            y="14"
+            text-anchor="middle">{t(mode === 'daily' ? 'chart.axisDaily' : 'chart.axisMonth')}</text
+          >
         </g>
         {#each members as series, i (i)}
           <path class="member" d={path(series)} />
         {/each}
         <path class="median" d={path(median)} />
+        {#if need}
+          <path class="requirement" d={path(need)} />
+        {/if}
         {#each yours as line, i (line.label)}
           <path class="yours" d={path(line.series)} style:stroke={line.colour} />
           {#if yoursEnd[i]}
@@ -302,6 +338,12 @@
               </p>
             {/if}
           {/each}
+          {#if readout.requirement !== null}
+            <p>
+              <span class="key requirement"></span><b>{format(readout.requirement)}</b>
+              {t('chart.requirement')}
+            </p>
+          {/if}
           {#if readout.median !== null}
             <p>
               <span class="key median"></span><b>{format(readout.median)}</b>
@@ -382,6 +424,11 @@
     border-color: var(--text);
   }
 
+  .key.requirement {
+    border-color: var(--requirement);
+    border-top-style: dashed;
+  }
+
   .key.yours {
     border-color: var(--accent);
   }
@@ -435,6 +482,18 @@
   .median {
     stroke: var(--text);
     stroke-width: 2;
+  }
+
+  .requirement {
+    stroke: var(--requirement);
+    stroke-dasharray: 7 5;
+    stroke-width: 2.5;
+  }
+
+  .grid text.axis {
+    fill: var(--text-2);
+    font-size: 12px;
+    font-weight: 600;
   }
 
   .yours {

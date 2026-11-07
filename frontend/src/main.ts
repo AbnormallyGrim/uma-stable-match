@@ -75,7 +75,11 @@ if (!shouldRedirectToLogin) {
   } else if (applications?.page === 'compare') {
     mount(ClubComparePage, {
       target,
-      props: { clubId: applications.clubId, trainerIds: applications.trainerIds },
+      props: {
+        clubId: applications.clubId,
+        trainerIds: applications.trainerIds,
+        requirement: applications.requirement,
+      },
     });
   } else if (applications?.page === 'trainer') {
     mount(TrainerApplicationsPage, { target });
