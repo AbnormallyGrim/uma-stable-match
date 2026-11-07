@@ -5,9 +5,7 @@
   import { applyFeatures } from './features';
   import { APPLICATIONS_PATH } from './route';
   import { language } from './language.svelte';
-  import { t } from './i18n';
   import NavBar from './NavBar.svelte';
-  import { websiteUrl } from './pages';
   import SiteFooter from './SiteFooter.svelte';
 
   const next = new URLSearchParams(window.location.search).get('next') ?? APPLICATIONS_PATH;
@@ -53,10 +51,6 @@
       <span>Sign in with Discord</span>
     </a>
   </section>
-
-  <p class="privacy-link">
-    <a href={`${websiteUrl(window.location)}/privacy/`}>{t('footer.privacy')}</a>
-  </p>
 </main>
 
 <SiteFooter />
@@ -106,10 +100,5 @@
 
   .provider-btn {
     width: 100%;
-  }
-
-  .privacy-link {
-    margin: 16px 0 0;
-    font-size: 0.875rem;
   }
 </style>

@@ -1,6 +1,6 @@
 // ApplicationsPage component tests with a stubbed fetch. All data is made up.
 
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import ApplicationsPage from './ApplicationsPage.svelte';
@@ -29,14 +29,14 @@ afterEach(() => {
 });
 
 describe('ApplicationsPage', () => {
-  it('shows its heading and intro, with no privacy link of its own', () => {
+  it('shows its heading and intro, with no privacy link outside the footer', () => {
     stub(signedOut);
     render(ApplicationsPage);
     expect(
       screen.getByRole('heading', { level: 1, name: t('applications.heading') }),
     ).toBeInTheDocument();
     expect(screen.getByText(t('applications.intro'))).toBeInTheDocument();
-    const links = screen.queryAllByRole('link');
+    const links = within(screen.getByRole('main')).queryAllByRole('link');
     expect(links.some((link) => /\/privacy\/$/.test(link.getAttribute('href') ?? ''))).toBe(false);
   });
 

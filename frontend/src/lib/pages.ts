@@ -1,6 +1,5 @@
 /** The pages the navbar links to, and which one is showing. */
 
-import { flags } from './flags.svelte';
 import type { MessageKey } from './i18n';
 import {
   APPLICATIONS_PATH,
@@ -33,8 +32,8 @@ export function websiteUrl({ protocol, hostname, port }: Origin): string {
     : 'https://umastable.com';
 }
 
-/** Every page the navbar can link to. See `pages()` for the ones shown. */
-const ALL_PAGES: Page[] = [
+/** The pages the navbar links to: the website's home page, the club finder, wishlist and applications. */
+export const PAGES: Page[] = [
   {
     id: 'home',
     href: websiteUrl(window.location),
@@ -60,16 +59,6 @@ const ALL_PAGES: Page[] = [
     icon: '<circle cx="8" cy="5.25" r="2.5" /><path d="M3 13.5c.5-2.75 2.5-4 5-4s4.5 1.25 5 4" />',
   },
 ];
-
-/** The pages in the navbar, leaving out the club applications page unless `applications` is on. */
-export function visiblePages(applications: boolean): Page[] {
-  return ALL_PAGES.filter((page) => page.id !== 'applications' || applications);
-}
-
-/** The website's home page, the club finder, the wishlist page and, when it's on, applications. */
-export function pages(): Page[] {
-  return visiblePages(flags.applications);
-}
 
 /**
  * The page `pathname` belongs to, or `null` for the settings page, which isn't in the navbar. The

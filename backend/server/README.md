@@ -40,7 +40,6 @@ To run it in Docker instead, see [Installation](../../README.md#installation) in
 | `DISCORD_SIGN_INS_PER_HOUR` | `10` | Trips to and from Discord each visitor can make per hour: returning from a sign-in, and starting an application or an opt-in |
 | `TRUST_FORWARDED_FOR` | `false` | `true` to identify visitors by `X-Forwarded-For`. Only turn this on behind a reverse proxy that sets the header |
 | `ENABLE_JAPANESE` | `false` | `true` to offer the Japanese translation and its language button in the web app. Reported on `GET /api/v1/features` |
-| `ENABLE_APPLICATIONS` | `false` | `true` to show the club applications pages in the web app and the privacy page on the website. Reported on `GET /api/v1/features` |
 | `WEB_ANALYTICS_TOKEN` | none | A [Cloudflare Web Analytics](https://developers.cloudflare.com/web-analytics/) site token, letters and digits only. Set, the web app loads Cloudflare's beacon and the `Content-Security-Policy` allows it. Reported on `GET /api/v1/features`. Unset, analytics are off |
 | `FRONTEND_DIR` | none | Built frontend to serve, such as `frontend/dist`. Unset, the server serves only the API |
 | `SITE_HOST` | none | Host name to serve a static website on, such as `example.com`. Set it with `SITE_DIR`. See [Serving the website](#serving-the-website) |
