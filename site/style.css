@@ -240,6 +240,49 @@ a {
     white-space: nowrap;
 }
 
+/* The account link, a round person icon like the web app's sign-in button. */
+.account-link {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    box-sizing: border-box;
+    color: var(--text-muted);
+}
+
+.account-link:hover {
+    color: var(--text-main);
+}
+
+.account-link::after {
+    position: absolute;
+    z-index: 1;
+    top: calc(100% + 8px);
+    right: 0;
+    padding: 3px 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    color: var(--text-main);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    content: attr(data-tooltip);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s;
+}
+
+.account-link:hover::after,
+.account-link:focus-visible::after {
+    opacity: 1;
+}
+
 /* System / Light / Dark switch, as in the web app: a pill of icon buttons with tooltips. */
 .theme-switch {
     display: inline-flex;
