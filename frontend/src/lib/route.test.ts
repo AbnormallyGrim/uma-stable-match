@@ -178,14 +178,19 @@ describe('compare route', () => {
   it('reads the club and its trainers in order', () => {
     expect(
       applicationsRoute('/applications/club/7/compare', '?trainers=100000000011,1000-0000-0022'),
-    ).toEqual({ page: 'compare', clubId: '7', trainerIds: ['100000000011', '100000000022'] });
+    ).toEqual({
+      page: 'compare',
+      clubId: '7',
+      trainerIds: ['100000000011', '100000000022'],
+      requirement: null,
+    });
   });
 
   it('drops broken and repeated IDs and keeps at most five', () => {
     const many = Array.from({ length: 8 }, (_, i) => `10000000001${i}`).join(',');
     expect(
       applicationsRoute('/applications/club/7/compare/', '?trainers=me,100000000011,100000000011'),
-    ).toEqual({ page: 'compare', clubId: '7', trainerIds: ['100000000011'] });
+    ).toEqual({ page: 'compare', clubId: '7', trainerIds: ['100000000011'], requirement: null });
     const route = applicationsRoute('/applications/club/7/compare', `?trainers=${many}`);
     expect(route?.page === 'compare' && route.trainerIds).toHaveLength(MAX_COMPARED);
   });
@@ -195,12 +200,29 @@ describe('compare route', () => {
       page: 'compare',
       clubId: '7',
       trainerIds: [],
+      requirement: null,
     });
     expect(applicationsRoute('/applications/club/7', '')).toEqual({
       page: 'club',
       clubId: '7',
       linked: false,
     });
+  });
+
+  it('reads a requirement, and keeps it in the address', () => {
+    const requirement = { fans: 8_000_000, per: 'week' as const };
+    expect(applicationsRoute('/applications/club/7/compare', '?need=8000000&per=week')).toEqual({
+      page: 'compare',
+      clubId: '7',
+      trainerIds: [],
+      requirement,
+    });
+    expect(clubComparePath(7, ['100000000011'], requirement)).toBe(
+      '/applications/club/7/compare?trainers=100000000011&need=8000000&per=week',
+    );
+    expect(clubComparePath(7, [], requirement)).toBe(
+      '/applications/club/7/compare?need=8000000&per=week',
+    );
   });
 
   it('builds the address', () => {

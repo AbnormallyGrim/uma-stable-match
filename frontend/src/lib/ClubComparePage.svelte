@@ -34,7 +34,15 @@
     clubApplicationsPath,
     clubComparePath,
   } from './route';
-  import { isTrainerId, normaliseTrainerId } from './search';
+  import {
+    INTERVALS,
+    perDay,
+    rememberedRequirement,
+    rememberRequirement,
+    type Interval,
+    type Requirement,
+  } from './requirement';
+  import { isTrainerId, normaliseTrainerId, parsePaceMillions } from './search';
   import SiteFooter from './SiteFooter.svelte';
   import { describeClubError, type ErrorMessage } from './states';
   import TierBadge from './TierBadge.svelte';
@@ -44,11 +52,13 @@
     clubId: string;
     /** The trainers the address names, in order. */
     trainerIds?: string[];
+    /** The fan requirement the address names, if any. */
+    requirement?: Requirement | null;
     /** Replaceable in tests. */
     load?: typeof fetchClubCompare;
   }
 
-  let { clubId, trainerIds = [], load = fetchClubCompare }: Props = $props();
+  let { clubId, trainerIds = [], requirement = null, load = fetchClubCompare }: Props = $props();
 
   const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
   let readingReleases = $state(false);
@@ -136,6 +146,7 @@
   onMount(() => {
     const features = new AbortController();
     applyFeatures({ signal: features.signal });
+    if (need !== null) updateAddress();
     const loading = new AbortController();
     void open(loading.signal);
     return () => {
@@ -145,9 +156,42 @@
     };
   });
 
+  // The address follows the trainers and the requirement, so a reload or a shared link keeps both.
+  function updateAddress() {
+    history.replaceState(history.state, '', clubComparePath(clubId, ids, need));
+  }
+
   function setIds(next: string[]) {
     ids = next;
-    history.replaceState(history.state, '', clubComparePath(clubId, next));
+    updateAddress();
+  }
+
+  // The requirement on the chart, and what the form holds.
+  // The address wins; otherwise the one this browser remembers for the club.
+  // svelte-ignore state_referenced_locally
+  const startNeed = requirement ?? rememberedRequirement(storage, clubId);
+  let need = $state<Requirement | null>(startNeed);
+  let needAmount = $state(startNeed ? String(startNeed.fans / 1_000_000) : '');
+  let needPer = $state<Interval>(startNeed?.per ?? 'week');
+  let needInvalid = $state(false);
+
+  function setRequirement(event: SubmitEvent) {
+    event.preventDefault();
+    const fans = parsePaceMillions(needAmount);
+    needInvalid = fans === null;
+    if (fans !== null) {
+      need = { fans, per: needPer };
+      rememberRequirement(storage, clubId, need);
+      updateAddress();
+    }
+  }
+
+  function clearRequirement() {
+    need = null;
+    needAmount = '';
+    needInvalid = false;
+    rememberRequirement(storage, clubId, null);
+    updateAddress();
   }
 
   const names = $derived(new Map(applications.map((a) => [a.trainerId, a.trainerName])));
@@ -212,6 +256,13 @@
       : [],
   );
 
+  // How a pace stands against the requirement, or `null` without one.
+  function standing(pace: number | null) {
+    if (need === null || pace === null || page.phase !== 'done') return null;
+    const gap = pace - perDay(need, page.details.month);
+    return { meets: gap >= 0, gap: formatPace(Math.abs(gap)) };
+  }
+
   // The member whose line the chart highlights.
   let selected = $state<number | null>(null);
   let chart = $state<HTMLElement>();
@@ -232,6 +283,15 @@
       page.phase === 'done' ? t('compare.title', { name: page.details.club.name }) : t('app.name');
   });
 </script>
+
+{#snippet badge(state: { meets: boolean; gap: string } | null)}
+  {#if state}
+    <span class="badge" class:meets={state.meets} class:short={!state.meets}>
+      <span aria-hidden="true">{state.meets ? '✓' : '✗'}</span>
+      {t(state.meets ? 'compare.req.meets' : 'compare.req.short', { gap: state.gap })}
+    </span>
+  {/if}
+{/snippet}
 
 <NavBar onreleases={openReleases} unseen={unseenRelease} />
 
@@ -305,6 +365,48 @@
       {/if}
     </section>
 
+    <section class="add" aria-labelledby="req-heading">
+      <h2 id="req-heading">{t('compare.req.heading')}</h2>
+      <p class="muted">{t('compare.req.intro')}</p>
+      <form class="req-form" onsubmit={setRequirement}>
+        <div class="field">
+          <label for="req-amount">{t('compare.req.amount')}</label>
+          <input
+            id="req-amount"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            placeholder="8"
+            bind:value={needAmount}
+            aria-invalid={needInvalid}
+            aria-describedby={needInvalid ? 'req-error' : undefined}
+          />
+        </div>
+        <div class="field">
+          <label for="req-per">{t('compare.req.interval')}</label>
+          <select id="req-per" bind:value={needPer}>
+            {#each INTERVALS as interval (interval)}
+              <option value={interval}>{t(`compare.req.${interval}`)}</option>
+            {/each}
+          </select>
+        </div>
+        <div class="req-buttons">
+          <button type="submit" class="primary">{t('compare.req.set')}</button>
+          {#if need}
+            <button type="button" onclick={clearRequirement}>{t('compare.req.clear')}</button>
+          {/if}
+        </div>
+      </form>
+      {#if needInvalid}
+        <p id="req-error" class="failed" role="alert">{t('compare.req.invalid')}</p>
+      {/if}
+      {#if need && page.phase === 'done'}
+        <p class="muted req-summary">
+          {t('compare.req.summary', { pace: formatPace(perDay(need, page.details.month)) })}
+        </p>
+      {/if}
+    </section>
+
     {#if ids.length === 0}
       <p class="status">{t('compare.empty')}</p>
     {:else if page.phase === 'loading'}
@@ -348,6 +450,9 @@
             previous: page.details.previous ? { members: page.details.previous.members } : null,
           }}
           {lines}
+          requirementPerDay={need && page.phase === 'done'
+            ? perDay(need, page.details.month)
+            : null}
           highlight={selected}
         />
       </div>
@@ -382,6 +487,7 @@
                         {formatGap(trainer.pace_per_day - page.details.median_per_day)}
                       {/if}
                     </span>
+                    {@render badge(standing(trainer.pace_per_day))}
                     {#if trainer.in_club}
                       <span class="note">{t('compare.alreadyMember')}</span>
                     {/if}
@@ -412,6 +518,7 @@
                         ? t('clubPage.new')
                         : formatPace(member.pace_per_day)}
                     </span>
+                    {@render badge(standing(member.pace_per_day))}
                   </span>
                 </button>
               {/if}
@@ -529,6 +636,28 @@
     min-width: 0;
   }
 
+  .req-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: end;
+    margin-top: 8px;
+  }
+
+  .req-form .field {
+    min-width: 140px;
+  }
+
+  .req-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .req-summary {
+    margin-top: 8px;
+    font-size: 0.8125rem;
+  }
+
   .failed {
     margin: 0;
     color: var(--closed);
@@ -606,6 +735,19 @@
   .remove {
     padding: 0 8px;
     line-height: 1.4;
+  }
+
+  .badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .badge.meets {
+    color: var(--up);
+  }
+
+  .badge.short {
+    color: var(--down);
   }
 
   .note {

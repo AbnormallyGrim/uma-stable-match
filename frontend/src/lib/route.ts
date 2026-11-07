@@ -3,6 +3,7 @@
  * the club applications pages, the settings page or the login page.
  */
 
+import { parseRequirement, type Requirement } from './requirement';
 import { isTrainerId, normaliseTrainerId } from './search';
 
 /** A club page address: the club, and the trainer to place among its members, if any. */
@@ -57,7 +58,7 @@ export const CLUB_APPLICATIONS_PATH = `${APPLICATIONS_PATH}/club`;
 export type ApplicationsRoute =
   | { page: 'home'; error: string | null }
   | { page: 'club'; clubId: string | null; linked: boolean }
-  | { page: 'compare'; clubId: string; trainerIds: string[] }
+  | { page: 'compare'; clubId: string; trainerIds: string[]; requirement: Requirement | null }
   | { page: 'trainer' };
 
 const CLUB_APPLICATIONS = /^\/applications\/club(?:\/(\d{1,18}))?\/?$/;
@@ -89,6 +90,7 @@ export function applicationsRoute(pathname: string, search: string): Application
       page: 'compare',
       clubId: compare[1]!,
       trainerIds: comparedTrainers(params.get('trainers')),
+      requirement: parseRequirement(params.get('need'), params.get('per')),
     };
   }
   const match = CLUB_APPLICATIONS.exec(pathname);
@@ -103,11 +105,21 @@ export function clubApplicationsPath(clubId: number | string, linked = false): s
 }
 
 /** The page where a leader compares applicants in their club, such as `…/compare?trainers=…`. */
-export function clubComparePath(clubId: number | string, trainerIds: string[] = []): string {
+export function clubComparePath(
+  clubId: number | string,
+  trainerIds: string[] = [],
+  requirement: Requirement | null = null,
+): string {
   const path = `${APPLICATIONS_PATH}/club/${clubId}/compare`;
-  return trainerIds.length === 0
-    ? path
-    : `${path}?${new URLSearchParams({ trainers: trainerIds.join(',') })}`;
+  const params = new URLSearchParams();
+  if (trainerIds.length > 0) {
+    params.set('trainers', trainerIds.join(','));
+  }
+  if (requirement) {
+    params.set('need', String(requirement.fans));
+    params.set('per', requirement.per);
+  }
+  return params.size === 0 ? path : `${path}?${params}`;
 }
 
 const FROM_KEY = 'uma-stable-match:club-from';

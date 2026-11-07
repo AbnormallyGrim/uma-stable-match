@@ -74,6 +74,7 @@ function compare(ids: string[]): ClubCompare {
 const loader = () => vi.fn<typeof fetchClubCompare>((_club, ids) => Promise.resolve(compare(ids)));
 
 afterEach(() => {
+  localStorage.clear();
   vi.unstubAllGlobals();
   history.replaceState(null, '', '/');
 });
@@ -184,6 +185,101 @@ describe('ClubComparePage', () => {
         name: t('compare.remove', { name: t('compare.unnamed', { id: ALPHA }) }),
       }),
     ).toBeDisabled();
+  });
+
+  it('draws the requirement on the chart, and keeps it in the address', async () => {
+    answer(leader());
+    const { container } = render(ClubComparePage, {
+      clubId: '7',
+      trainerIds: [ALPHA],
+      load: loader(),
+    });
+    await screen.findByRole('heading', { name: 'Page Club' });
+    expect(container.querySelector('path.requirement')).toBeNull();
+
+    const amount = screen.getByLabelText(t('compare.req.amount'));
+    await fireEvent.input(amount, { target: { value: 'lots' } });
+    await fireEvent.click(screen.getByRole('button', { name: t('compare.req.set') }));
+    expect(await screen.findByText(t('compare.req.invalid'))).toBeInTheDocument();
+
+    await fireEvent.input(amount, { target: { value: '7' } });
+    await fireEvent.change(screen.getByLabelText(t('compare.req.interval')), {
+      target: { value: 'week' },
+    });
+    await fireEvent.click(screen.getByRole('button', { name: t('compare.req.set') }));
+    await waitFor(() => expect(container.querySelector('path.requirement')).toBeInTheDocument());
+    // 7M a week is 1M a day.
+    expect(screen.getByText(t('compare.req.summary', { pace: '1.0M/day' }))).toBeInTheDocument();
+    expect(window.location.search).toContain('need=7000000');
+    expect(window.location.search).toContain('per=week');
+
+    await fireEvent.click(screen.getByRole('button', { name: t('compare.req.clear') }));
+    expect(container.querySelector('path.requirement')).toBeNull();
+    expect(window.location.search).not.toContain('need');
+  });
+
+  it('says who meets the requirement, members and trainers alike', async () => {
+    answer(leader());
+    render(ClubComparePage, {
+      clubId: '7',
+      trainerIds: [ALPHA],
+      // 6M a day: the trainer (5M) and the 4M member are short; 9M and 7M meet it.
+      requirement: { fans: 6_000_000, per: 'day' },
+      load: loader(),
+    });
+    await screen.findByRole('heading', { name: 'Page Club' });
+    expect(screen.getAllByText(t('compare.req.meets', { gap: '3.0M/day' }))).toHaveLength(1);
+    expect(screen.getAllByText(t('compare.req.short', { gap: '1.0M/day' }))).toHaveLength(1);
+    expect(screen.getAllByText(t('compare.req.short', { gap: '2.0M/day' }))).toHaveLength(1);
+    expect(screen.getAllByText(t('compare.req.meets', { gap: '1.0M/day' }))).toHaveLength(1);
+  });
+
+  it('has no badges without a requirement', async () => {
+    answer(leader());
+    render(ClubComparePage, { clubId: '7', trainerIds: [ALPHA], load: loader() });
+    await screen.findByRole('heading', { name: 'Page Club' });
+    expect(document.querySelector('.badge')).toBeNull();
+  });
+
+  it('remembers the requirement for the club in this browser', async () => {
+    answer(leader());
+    const first = render(ClubComparePage, { clubId: '7', trainerIds: [ALPHA], load: loader() });
+    await screen.findByRole('heading', { name: 'Page Club' });
+    await fireEvent.input(screen.getByLabelText(t('compare.req.amount')), {
+      target: { value: '8' },
+    });
+    await fireEvent.click(screen.getByRole('button', { name: t('compare.req.set') }));
+    first.unmount();
+    history.replaceState(null, '', '/');
+    answer(leader());
+
+    // A new visit, with nothing in the address, starts from it and puts it back there.
+    const { container } = render(ClubComparePage, {
+      clubId: '7',
+      trainerIds: [ALPHA],
+      load: loader(),
+    });
+    await screen.findByRole('heading', { name: 'Page Club' });
+    expect(container.querySelector('path.requirement')).toBeInTheDocument();
+    expect(screen.getByLabelText(t('compare.req.amount'))).toHaveValue('8');
+    expect(window.location.search).toContain('need=8000000');
+
+    // Clearing forgets it.
+    await fireEvent.click(screen.getByRole('button', { name: t('compare.req.clear') }));
+    expect(localStorage.length).toBe(0);
+  });
+
+  it('starts with the requirement from the address', async () => {
+    answer(leader());
+    const { container } = render(ClubComparePage, {
+      clubId: '7',
+      trainerIds: [ALPHA],
+      requirement: { fans: 8_000_000, per: 'day' },
+      load: loader(),
+    });
+    await screen.findByRole('heading', { name: 'Page Club' });
+    expect(container.querySelector('path.requirement')).toBeInTheDocument();
+    expect(screen.getByLabelText(t('compare.req.amount'))).toHaveValue('8');
   });
 
   it('asks for an applicant when the address has none, without loading', async () => {

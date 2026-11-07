@@ -28,9 +28,11 @@
   /* Lines for the applicants compared on a club's chart; the first is --accent. Apart from
      --highlight, --text and each other. */
   --candidate-2: light-dark(#0e7490, #67e8f9);
-  --candidate-3: light-dark(#b4235a, #f472b6);
+  --candidate-3: light-dark(#a21caf, #e879f9);
   --candidate-4: light-dark(#c2410c, #fb7c4d);
   --candidate-5: light-dark(#2e7d32, #86d68c);
+  /* A club's fan requirement, drawn dashed on the chart. */
+  --requirement: light-dark(#b91c1c, #ff8a80);
   --gold: light-dark(#946100, #ffd700);
   --silver: light-dark(#53616b, #c0c0c0);
   --bronze: light-dark(#9b521b, #cd7f32);

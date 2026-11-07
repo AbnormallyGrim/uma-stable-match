@@ -130,11 +130,41 @@ describe('PaceChart', () => {
     await fireEvent.keyDown(slider(), { key: 'End' });
     expect(slider().getAttribute('aria-valuetext')).toMatch(/^Day 5, /);
     const dot = container.querySelector('circle.end');
-    const last = container.querySelectorAll('.grid text');
+    const last = container.querySelectorAll('.grid text:not(.axis)');
     expect(dot).toBeInTheDocument();
     expect(Number(dot!.getAttribute('cx'))).toBeCloseTo(
       Number(last[last.length - 1]!.getAttribute('x')),
     );
+  });
+
+  it('labels the axes for the chosen view', async () => {
+    render(PaceChart, { details: details() });
+    expect(screen.getByText('Day of the month')).toBeInTheDocument();
+    expect(screen.getByText('Fans gained per day')).toBeInTheDocument();
+    await fireEvent.click(screen.getByLabelText('Fans this month'));
+    expect(screen.getByText('Fans gained this month')).toBeInTheDocument();
+    expect(screen.queryByText('Fans gained per day')).toBeNull();
+  });
+
+  it('draws a requirement as a flat dashed line by day, and a rising one for the month', async () => {
+    const { container } = render(PaceChart, {
+      details: details(false),
+      requirementPerDay: 5 * M,
+    });
+    const flat = container.querySelector('path.requirement')!.getAttribute('d')!;
+    const ys = [...flat.matchAll(/,([\d.]+)/g)].map((match) => match[1]);
+    expect(new Set(ys).size).toBe(1);
+    expect(screen.getByRole('list')).toHaveTextContent('Requirement');
+    await fireEvent.click(screen.getByLabelText('Fans this month'));
+    const rising = container.querySelector('path.requirement')!.getAttribute('d')!;
+    expect(
+      new Set([...rising.matchAll(/,([\d.]+)/g)].map((match) => match[1])).size,
+    ).toBeGreaterThan(1);
+  });
+
+  it('leaves the requirement out without one', () => {
+    const { container } = render(PaceChart, { details: details(false) });
+    expect(container.querySelector('path.requirement')).toBeNull();
   });
 
   it('treats data without a month as the current month', () => {
