@@ -499,6 +499,13 @@ section {
     margin-top: 0.9rem;
 }
 
+/* Space between a section's screenshot, its cards and its buttons. */
+.showcase + .grid-3,
+.showcase + .cta-group,
+.grid-3 + .cta-group {
+    margin-top: 2.5rem;
+}
+
 .grid-3 {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
