@@ -29,7 +29,7 @@ export interface Release {
 export const RELEASES: Release[] = [
   {
     build: '1.4.0',
-    date: '2026-11-07',
+    date: '2026-11-08',
     kind: 'update',
     changes: [
       {
