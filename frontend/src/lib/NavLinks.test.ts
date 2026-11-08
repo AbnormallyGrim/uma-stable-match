@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 describe('NavLinks', () => {
-  it('links to the home page, the club finder, the wishlist page and applications', () => {
+  it('links to the home page, the club finder, the wishlist page, applications and ads', () => {
     render(NavLinks);
     const nav = screen.getByRole('navigation', { name: 'Pages' });
     expect(
@@ -23,6 +23,7 @@ describe('NavLinks', () => {
       ['Club finder', '/'],
       ['Wishlist', '/wishlist'],
       ['Applications', '/applications'],
+      ['Recruitment Ads', '/applications/ads'],
     ]);
   });
 
@@ -31,6 +32,7 @@ describe('NavLinks', () => {
       ['/', 'Club finder'],
       ['/club/100000001', 'Club finder'],
       ['/wishlist', 'Wishlist'],
+      ['/applications/ads', 'Recruitment Ads'],
     ] as const) {
       window.history.pushState({}, '', path);
       const { unmount } = render(NavLinks);
@@ -54,6 +56,7 @@ describe('currentPage', () => {
     expect(currentPage('/applications')).toBe('applications');
     expect(currentPage('/applications/club/7')).toBe('applications');
     expect(currentPage('/login')).toBe('applications');
+    expect(currentPage('/applications/ads')).toBe('ads');
     expect(currentPage('/settings')).toBeNull();
   });
 });

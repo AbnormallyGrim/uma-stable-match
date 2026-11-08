@@ -14,6 +14,7 @@ use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use crate::ad_store::AdStore;
 use crate::application_store::{Application, ApplicationStore, NewApplication, Sent, Status};
 use crate::auth::{
     begin, private, send_to_discord, session_user, signed_in, Failure, Flow, Target,
@@ -108,12 +109,32 @@ impl std::fmt::Debug for ApplicantLookup {
 pub struct Applying {
     store: ApplicationStore,
     applicants: ApplicantLookup,
+    ads: Option<AdStore>,
 }
 
 impl Applying {
     /// Applications kept in `store`, with trainers' details from `applicants`.
     pub fn new(store: ApplicationStore, applicants: ApplicantLookup) -> Self {
-        Self { store, applicants }
+        Self {
+            store,
+            applicants,
+            ads: None,
+        }
+    }
+
+    /// The same, also serving the board where trainers post ads, kept in `ads`.
+    pub fn with_ads(mut self, ads: AdStore) -> Self {
+        self.ads = Some(ads);
+        self
+    }
+
+    pub(crate) fn ads(&self) -> Option<&AdStore> {
+        self.ads.as_ref()
+    }
+
+    /// A trainer's details, fresh from the lookup.
+    pub(crate) async fn applicant(&self, trainer: u64) -> Result<Option<Applicant>, LookupError> {
+        self.applicants.get(trainer).await
     }
 }
 
@@ -138,7 +159,7 @@ fn failure(label: &'static str, status: StatusCode, message: &'static str) -> Fa
     Failure::new(label, status, message)
 }
 
-fn unavailable() -> Failure {
+pub(crate) fn unavailable() -> Failure {
     failure(
         "unavailable",
         StatusCode::SERVICE_UNAVAILABLE,
@@ -147,7 +168,7 @@ fn unavailable() -> Failure {
 }
 
 /// The first trainer the user linked, which is the only one since a person can link one.
-async fn linked_trainer(discord: &Discord, user: u64) -> Result<u64, Failure> {
+pub(crate) async fn linked_trainer(discord: &Discord, user: u64) -> Result<u64, Failure> {
     let Some(links) = discord.trainer_links() else {
         return Err(failure("unavailable", StatusCode::NOT_FOUND, "not found"));
     };
@@ -165,7 +186,10 @@ async fn linked_trainer(discord: &Discord, user: u64) -> Result<u64, Failure> {
 }
 
 /// The club's link, if it takes applications.
-async fn open_club(discord: &Discord, club: u64) -> Result<crate::store::ClubRecord, Failure> {
+pub(crate) async fn open_club(
+    discord: &Discord,
+    club: u64,
+) -> Result<crate::store::ClubRecord, Failure> {
     let Some(opt_in) = discord.opt_in() else {
         return Err(failure("unavailable", StatusCode::NOT_FOUND, "not found"));
     };

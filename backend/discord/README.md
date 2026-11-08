@@ -128,18 +128,18 @@ These are only guesses. A code is an invite once Discord resolves it: `resolve_i
 
 | Key | Holds |
 |---|---|
-| `discord:club:{club_id}` | A hash: `server`, `category`, `auto_join` and `open` (`1` or absent), `leader` (the Discord ID of the leader who last opted the club in or changed its settings, who is added to its tickets; encrypted, see below) and `problem`. Clubs linked before leader roles were dropped may still hold `leader_roles`, which nothing reads |
+| `discord:club:{club_id}` | A hash: `server`, `category`, `auto_join` and `open` (`1` or absent), `leader` (the Discord ID of the leader who last opted the club in or changed its settings, who is added to its tickets; encrypted, see below), `ticket_prefix` or `ticket_name` (at most one, see [The ticket name](#the-ticket-name)) and `problem`. Clubs linked before leader roles were dropped may still hold `leader_roles`, which nothing reads |
 | `discord:guild:{guild_id}` | A set of the IDs of the clubs linked to that server |
 
 Many clubs can share a server, and a club is linked to one server at a time:
 
-- `link(club_id, server_id)` links a club. Linking it to another server moves it: it leaves the old server's set and loses its `category` and `problem`, which name things on the old one, and keeps its `auto_join` and `open` choices. It returns the `Departure` (server and clubs still linked there) if the club moved.
+- `link(club_id, server_id)` links a club. Linking it to another server moves it: it leaves the old server's set and loses its `category` and `problem`, which name things on the old one, and keeps its `auto_join`, `open` and ticket name choices. It returns the `Departure` (server and clubs still linked there) if the club moved.
 - A new link starts open and with auto-join on (`open` and `auto_join` are set only if the club has none, so a moved club keeps its choices).
-- `update(club_id, server_id, &SettingsUpdate)` changes the category, auto-join or open fields, and only while the club is still linked to `server_id`, so a club that moved meanwhile isn't changed. It returns whether it did.
+- `update(club_id, server_id, &SettingsUpdate)` changes the category, auto-join, open or ticket name fields, and only while the club is still linked to `server_id`, so a club that moved meanwhile isn't changed. It returns whether it did.
 - `takes_applications(club_ids)` says for each club whether it is linked, open and has no setup problem, in one round trip. The server adds the club's own join style and spots to decide the `applications` badge.
 - `unlink(club_id)` deletes the club's hash and takes it out of its server's set, returning the `Departure` if it was linked. A `remaining` of 0 means no club needs the bot on that server any more.
 - `club(club_id)` reads the `ClubRecord`, and `clubs_on(server_id)` lists a server's clubs, lowest ID first.
-- `with_dev_guild(server_id)` makes the store answer as if every club were open in that server, for trying applications on one's own machine. The server only allows it on a `localhost` address.
+- `with_dev_guild(server_id)` makes the store answer as if every club were open in that server, for trying applications on one's own machine. Only the ticket name is still read from Redis, so a leader's choice shows. The server only allows it on a `localhost` address.
 
 The leader's Discord ID is encrypted like an [applicant's](#applying-to-a-club), with the club's ID as associated data, so it can't be copied onto another club. `ClubStore::new` takes the key secret (`REDIS_KEY_SECRET`) for it. A leader saved as a plain number before this is still read, and is encrypted the next time the club is opted in or its settings change.
 
@@ -212,7 +212,7 @@ Everything about a linked club, from its settings to unlinking it, is for its le
    - opens the ticket and notes it on the application. If any step after saving fails, the application is taken back, so a failed try costs nothing (`join_failed`, `ticket_failed`).
 4. The player lands on `/applications/trainer`.
 
-**The ticket** is a private text channel named `app-<trainer name>`, in the club's category if it has one. Everyone else is shut out; the applicant, the leader noted on the club and the bot can see it. If Discord refuses it, the leader may have left the server, so it's tried once more without them. The bot posts an embed with the trainer's name and a link to `https://uma.moe/profile/<trainer ID>`, the applicant, their current club, pace, fans this month, total fans, average fans per day, week and month, fans rank and days tracked, and Accept and Decline buttons.
+**The ticket** is a private text channel, named as [the club chose](#the-ticket-name), in the club's category if it has one. Everyone else is shut out; the applicant, the leader noted on the club and the bot can see it. If Discord refuses it, the leader may have left the server, so it's tried once more without them. The bot posts an embed with the trainer's name and a link to `https://uma.moe/profile/<trainer ID>`, the applicant, their current club, pace, fans this month, total fans, average fans per day, week and month, fans rank and days tracked, and Accept and Decline buttons.
 
 **The buttons** go through the interactions endpoint. Only the leader noted on the club can answer, or, for a club with no leader noted, someone with Manage Server. The first answer wins and removes the buttons; the applicant can then apply to that club again.
 
@@ -231,6 +231,38 @@ Everything about a linked club, from its settings to unlinking it, is for its le
 The applicant's Discord ID is the only field kept encrypted: AES-256-GCM, with a key derived from the key secret (`REDIS_KEY_SECRET`) and the application's ID as associated data, so a copy moved onto another application doesn't open. Everything else is what uma.moe shows publicly or an ID that is useless alone. Changing the key secret makes saved applications unreadable until they expire; an application that can't be read is skipped in lists, not removed.
 
 The lists drop expired applications when read. Results are counted in `discord_applications_total` by `result`, and answers in `discord_application_answers_total`.
+
+## Ads for clubs
+
+Trainers post an ad that they're looking for a club, and leaders find them on a board and invite them to apply. Ads need an `AdStore` on `Applying`, set with `Applying::with_ads`.
+
+- `GET`, `PUT` and `DELETE /api/v1/discord/ads/me` (`MY_AD_PATH`) read, post or replace, and delete the signed-in trainer's ad. `GET` answers `null` without one. A person has one ad, for their linked trainer; without one `PUT` is 403.
+- `POST /api/v1/discord/ads/me/renew` (`MY_AD_RENEW_PATH`) keeps the ad's choices and takes fresh fan numbers.
+- `GET /api/v1/discord/ads` (`ADS_PATH`) gives one page of the ads on the board for anyone signed in: `{ "ads": [...], "page", "pages", "total" }`, `PAGE_SIZE` (20) ads a page, fastest first and those without a pace last. Query parameters describe the leader's club. Each is optional, and one left out (or `language=any`) filters nothing:
+  - `rank_min` and `rank_max`: tier codes 1 (D) to 11 (SS); swapped if both are given the wrong way round. An ad matches when its lowest rank is at or above `rank_min` and its highest at or below `rank_max`.
+  - `has_discord`: `true` or `false`. Without a Discord server (`false`), ads that require one are left out.
+  - `language`: a language code or `any`. Ads in another language are left out; ads that don't mind stay.
+  - `page`: from 1; a page past the end gives the last one.
+  - `club`: a club the signed-in person leads (403 otherwise), so each ad also says whether that club already invited the trainer.
+
+  Anything that can't be read is a 400. The server reads at most `MAX_ON_BOARD` (500) ads, the most recently renewed, then filters, sorts and pages them. Nothing identifies the trainer beyond their name and trainer ID: Discord usernames are never shown.
+- `POST /api/v1/discord/clubs/{club}/ads/{ad}/invite` (`CLUB_AD_INVITE_PATH`) invites the trainer. It needs the club's leader and a club that takes applications through Discord (409 otherwise), and answers 204, also for a repeat. A trainer with `MAX_INVITES` (10) is 409, and an ad that's off the board 404.
+- `DELETE /api/v1/discord/ads/me/invites/{club}` (`MY_AD_INVITE_PATH`) dismisses an invite.
+
+An ad holds the trainer's name, current club, pace and fans this month, taken from the same `ApplicantLookup` as applications, and what they ask for: the lowest and highest club rank (tier codes 1 for D to 11 for SS), at most three ranks apart counting both (`MAX_RANK_SPAN`: C to B covers C, C+ and B; a wider range is a 400), whether the club needs a Discord server (`required`, `preferred` or `any`) and the language it speaks: `en`, `ja`, `ko`, `zh`, `es`, `pt`, `fr`, `de`, `id`, `th`, `vi` or `any`. The languages are only filters for leaders; the app isn't translated into them. Every ad takes invites, and there is no free text.
+
+An invite is not an addition to a server. The trainer sees it on their ad page and applies through the usual [application](#applying-to-a-club), which signs them in again, adds them and opens the ticket. Nothing from the sign-in is kept for later.
+
+**What's kept.** In Redis:
+
+| Key | Holds |
+|---|---|
+| `discord:ad:{hash}` | A hash: the ad's fields, the trainer's Discord ID (encrypted as for applications), when it was posted and when it leaves the board, and one `inv:{club_id}` field per invite, holding when it was sent |
+| `discord:ads` | The hashes of the ads on the board, scored by when each leaves it |
+
+`{hash}` is the keyed hash of the trainer's Discord ID. An ad is on the board for 7 days (`VISIBLE_FOR`) after it's posted or renewed and kept for 30 (`STORED_FOR`), so a trainer can bring it back; invites live on the ad and go with it. Leaving the board changes nothing in the hash: `board` drops the ad from `discord:ads` when it reads it, and renewing adds it back. Deleting the account or unlinking the ad's trainer deletes the ad.
+
+Invites are one field each, not a list in one field, so the hash stays in Redis's compact encoding (which needs every value under `hash-max-listpack-value`, 64 bytes by default) and an ad with all 10 invites takes under 1 KB. Results are counted in `discord_ads_total` by `result` and invites in `discord_ad_invites_total`.
 
 ## Unlinking a club
 
@@ -251,11 +283,33 @@ It is a `DELETE`, which a browser doesn't send across sites with the session coo
 | `auto_join` | Whether applicants are added to the server automatically |
 | `open` | Whether the club takes applications (`false` is paused) |
 | `problem` | The club's setup problem, if any; it can't be changed here |
+| `ticket_name` | How tickets are named: `{mode, value}`, with `mode` one of `default`, `prefix` or `override` and `value` the text, `null` for `default` |
 | `categories` | The server's categories, `{id, name}`, to choose the ticket category from |
 
-`PATCH` takes a JSON object with any of `category` (an ID, or `null` to clear), `auto_join` and `open`. Fields left out stay as they are. The category must be one of the server's categories; otherwise, an unknown field, a wrong type, or no field at all gets 400 and nothing changes. It answers with the new settings, as `GET` does. A 409 means the club moved to another server or was unlinked while the change was made.
+`PATCH` takes a JSON object with any of `category` (an ID, or `null` to clear), `auto_join`, `open` and `ticket_name` (`{mode, value}` as above). Fields left out stay as they are. The category must be one of the server's categories and the ticket name must pass [its checks](#the-ticket-name); otherwise, an unknown field, a wrong type, or no field at all gets 400 and nothing changes. It answers with the new settings, as `GET` does. A 409 means the club moved to another server or was unlinked while the change was made.
 
 **Bot kicked from the server.** Discord then answers the channel list with 403 `Missing Access` (50001) or 404 `Unknown Guild` (10004). Both `GET` and `PATCH` take that as the bot being gone: every club linked to that server is unlinked (the bot is gone for all of them) and the call answers 404, as for a club that isn't linked, so the leader can opt in again. Each is counted in `discord_unlinks_total` with `result="bot_removed"`. Any other Discord failure is 502 and changes nothing.
+
+### The ticket name
+
+A leader picks how the club's tickets are named. Every name ends in a dash and a random number from `0000` to `9999`, which tells tickets apart; Discord doesn't need names to be unique.
+
+| `mode` | Channel name |
+|---|---|
+| `default` (nothing stored) | `<club>-<trainer>-<number>` |
+| `prefix` | `<prefix>-<trainer>-<number>` |
+| `override` | `<override>-<number>` |
+
+The club and trainer names come from uma.moe, so they are cleaned up rather than refused: lowercase letters and digits joined by dashes. A trainer with none of those is `applicant`, and a club with none is left out. When a name would pass 90 characters, the club or prefix is cut, then the trainer's name (at most 40), so the number always fits.
+
+A prefix or override comes from the leader, so it is refused, never repaired. Only the server's checks count; the dashboard's copy is for quick feedback:
+
+1. More than 80 bytes is refused before anything else is looked at.
+2. The text is trimmed, ASCII letters are lowercased and each space or underscore becomes a dash.
+3. What's left must be letters `a-z` and digits joined by single dashes. Anything else, such as quotes, brackets, `@`, `#`, dots, slashes, control characters, zero-width or right-to-left characters, look-alike letters and emoji, is refused.
+4. A prefix may be 32 characters and an override 80.
+
+A bad value gets 400 and nothing changes. The checked, lowercased text is what's stored, in `ticket_prefix` or `ticket_name`, one at a time: saving one empties the other, and `default` empties both. It is passed to Redis as an argument, never built into the script or a key, and to Discord as a JSON value. It is checked again when read, so a value put in Redis some other way names no channel and the default is used. Tickets already open keep the name they have.
 
 ## Linking a trainer
 

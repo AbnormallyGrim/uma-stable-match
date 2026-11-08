@@ -16,6 +16,8 @@ import {
   MAX_COMPARED,
   WISHLIST_PATH,
   isSettingsRoute,
+  ADS_PATH,
+  adsPath,
 } from './route';
 
 describe('clubRoute', () => {
@@ -230,5 +232,24 @@ describe('compare route', () => {
     expect(clubComparePath('7', ['100000000011', '100000000022'])).toBe(
       '/applications/club/7/compare?trainers=100000000011%2C100000000022',
     );
+  });
+});
+
+describe('ad routes', () => {
+  it('reads the board of ads, and whether to open the trainer’s ad', () => {
+    expect(applicationsRoute(ADS_PATH, '')).toEqual({ page: 'ads', post: false });
+    expect(applicationsRoute(`${ADS_PATH}/`, '?post=1')).toEqual({ page: 'ads', post: true });
+    expect(applicationsRoute(ADS_PATH, '?post=yes')).toEqual({ page: 'ads', post: false });
+  });
+
+  it('builds the addresses back', () => {
+    expect(adsPath()).toBe('/applications/ads');
+    expect(adsPath(true)).toBe('/applications/ads?post=1');
+    expect(applicationsRoute('/applications/ads', '?post=1')).toEqual({ page: 'ads', post: true });
+  });
+
+  it('leaves similar addresses alone', () => {
+    expect(applicationsRoute('/applications/ads/more', '')).toBeNull();
+    expect(applicationsRoute('/applications/club/12/ads', '')).toBeNull();
   });
 });

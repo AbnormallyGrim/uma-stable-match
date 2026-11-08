@@ -38,6 +38,7 @@ fn reads_a_full_record() {
             open: true,
             problem: Some("missing permission".into()),
             leader: Some(40),
+            ticket_name: TicketName::Default,
         }
     );
 }
@@ -55,6 +56,7 @@ fn a_record_needs_a_server_and_defaults_the_rest() {
             open: false,
             problem: None,
             leader: None,
+            ticket_name: TicketName::Default,
         }
     );
 }

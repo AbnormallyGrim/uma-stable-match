@@ -37,10 +37,13 @@ if (location.hostname === 'site.localhost') {
     }
 }
 
-// The language button. English is the page as written; Japanese swaps in the text below.
-(() => {
-    // Feature flag: set to true to offer the Japanese translation, once the Japanese data is in.
-    const JAPANESE_ENABLED = config.japaneseEnabled ?? false;
+// The language button. English is the page as written; Japanese swaps in the text below. The
+// button only shows when the server's ENABLE_JAPANESE is on.
+fetch('/api/v1/features')
+    .then((response) => (response.ok ? response.json() : {}))
+    .catch(() => ({}))
+    .then((features) => {
+    const JAPANESE_ENABLED = features.japanese === true;
 
     const key = 'uma-stable-match:language';
     // A cookie, so app.umastable.com shares the choice.
@@ -50,13 +53,14 @@ if (location.hostname === 'site.localhost') {
         'meta.description': 'ウマ娘のサークル検索・マッチングツール(無料)。あなたの1日のファン獲得数と、空きのある全サークルのメンバーを比べ、ぴったり合うサークルを順位付けします。',
         'nav.label': 'メインメニュー',
         'nav.how': 'しくみ',
-        'nav.apply': '応募',
         'nav.faq': 'よくある質問',
         'nav.pages': 'ページ',
         'nav.home': 'ホーム',
         'nav.finder': 'サークル検索',
         'nav.wishlist': 'ウィッシュリスト',
         'nav.applications': 'サークルマスターの方へ',
+        'nav.ads': '募集広告',
+        'nav.account': 'アカウント',
         'lang.switch': '英語に切り替え (English)',
         'theme.label': 'テーマ',
         'theme.system': 'システム',
@@ -211,4 +215,4 @@ if (location.hostname === 'site.localhost') {
         apply(lang);
         save(lang);
     });
-})();
+    });

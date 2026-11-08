@@ -17,9 +17,9 @@ use serde_json::json;
 use tower::ServiceExt;
 use uma_stable_match_discord::{
     router, ApplicationId, BotToken, ClientSecret, ClubLookup, ClubStore, ClubSummary, Discord,
-    DiscordConfig, KeySecret, LookupError, OptIn, PublicKey, PublicUrl, SigningKey, TrainerLinks,
-    TrainerLookup, TrainerStore, TrainerSummary, BOT_PERMISSIONS, CALLBACK_PATH, LOGIN_PATH,
-    MY_CLUB_PATH, OPT_IN_PATH, SETTINGS_PATH, UNLINK_PATH,
+    DiscordConfig, KeySecret, LookupError, OptIn, PublicKey, PublicUrl, SettingsUpdate, SigningKey,
+    TicketName, TrainerLinks, TrainerLookup, TrainerStore, TrainerSummary, BOT_PERMISSIONS,
+    CALLBACK_PATH, LOGIN_PATH, MY_CLUB_PATH, OPT_IN_PATH, SETTINGS_PATH, UNLINK_PATH,
 };
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -969,6 +969,7 @@ async fn the_leader_reads_the_clubs_settings_with_the_servers_categories() {
             "auto_join": true,
             "open": true,
             "problem": null,
+            "ticket_name": { "mode": "default", "value": null },
             "categories": [
                 { "id": (a + 2000).to_string(), "name": "Applications" },
                 { "id": (a + 2002).to_string(), "name": "archive" },
@@ -1170,6 +1171,135 @@ async fn settings_must_name_the_servers_own_categories() {
     assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
     let record = world.store.club(world.club(1)).await.unwrap().unwrap();
     assert!(record.open && record.auto_join && record.category.is_none());
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn the_leader_picks_how_tickets_are_named() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    world
+        .store
+        .link(world.club(1), world.server_a())
+        .await
+        .unwrap();
+    let session = world.sign_in().await;
+
+    let read = world.settings(&session, world.club(1)).await;
+    assert_eq!(
+        json_body(read).await["ticket_name"],
+        json!({ "mode": "default", "value": null })
+    );
+
+    let response = world
+        .change(
+            &session,
+            world.club(1),
+            json!({ "ticket_name": { "mode": "prefix", "value": "Apply Here" } }),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        json_body(response).await["ticket_name"],
+        json!({ "mode": "prefix", "value": "apply-here" })
+    );
+    let record = world.store.club(world.club(1)).await.unwrap().unwrap();
+    assert_eq!(record.ticket_name, TicketName::Prefix("apply-here".into()));
+
+    let response = world
+        .change(
+            &session,
+            world.club(1),
+            json!({ "ticket_name": { "mode": "override", "value": "join-us" } }),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let record = world.store.club(world.club(1)).await.unwrap().unwrap();
+    assert_eq!(record.ticket_name, TicketName::Override("join-us".into()));
+
+    let response = world
+        .change(
+            &session,
+            world.club(1),
+            json!({ "ticket_name": { "mode": "default" } }),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let record = world.store.club(world.club(1)).await.unwrap().unwrap();
+    assert_eq!(record.ticket_name, TicketName::Default);
+    world.clean_up().await;
+}
+
+#[tokio::test]
+async fn hostile_ticket_names_are_refused_and_change_nothing() {
+    let Some(world) = World::new().await else {
+        return;
+    };
+    world
+        .store
+        .link(world.club(1), world.server_a())
+        .await
+        .unwrap();
+    let session = world.sign_in().await;
+    let kept = TicketName::Prefix("kept".into());
+    let update = SettingsUpdate {
+        ticket_name: Some(kept.clone()),
+        ..SettingsUpdate::default()
+    };
+    world
+        .store
+        .update(world.club(1), world.server_a(), &update)
+        .await
+        .unwrap();
+
+    for value in [
+        "'; DROP TABLE clubs;--",
+        "\" OR \"1\"=\"1",
+        "<script>alert(1)</script>",
+        "{{7*7}}",
+        "../../etc/passwd",
+        "nul\u{0}l",
+        "two\r\nlines",
+        "\u{202e}gnp",
+        "@everyone",
+        "",
+        "   ",
+        "---",
+    ] {
+        for mode in ["prefix", "override"] {
+            let patch = json!({ "ticket_name": { "mode": mode, "value": value } });
+            let response = world.change(&session, world.club(1), patch).await;
+            assert_eq!(
+                response.status(),
+                StatusCode::BAD_REQUEST,
+                "{mode} {value:?}"
+            );
+        }
+    }
+    let huge = "a".repeat(100_000);
+    for patch in [
+        json!({ "ticket_name": { "mode": "override", "value": huge } }),
+        json!({ "ticket_name": { "mode": "default", "value": "x" } }),
+        json!({ "ticket_name": { "mode": "prefix" } }),
+        json!({ "ticket_name": { "mode": "prefix", "value": 5 } }),
+        json!({ "ticket_name": { "mode": "prefix", "value": "a", "extra": 1 } }),
+        json!({ "ticket_name": "apply" }),
+        json!({ "ticket_prefix": "apply" }),
+    ] {
+        let response = world.change(&session, world.club(1), patch.clone()).await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{patch}");
+    }
+    let record = world.store.club(world.club(1)).await.unwrap().unwrap();
+    assert_eq!(record.ticket_name, kept);
+
+    // Only the club's leader may change it.
+    let stranger = world.sign_in_with("stranger-code").await;
+    let patch = json!({ "ticket_name": { "mode": "prefix", "value": "mine" } });
+    let response = world.change(&stranger, world.club(1), patch).await;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let record = world.store.club(world.club(1)).await.unwrap().unwrap();
+    assert_eq!(record.ticket_name, kept);
     world.clean_up().await;
 }
 

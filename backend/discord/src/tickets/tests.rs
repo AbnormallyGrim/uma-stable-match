@@ -41,14 +41,6 @@ fn applicant() -> Applicant {
 }
 
 #[test]
-fn names_the_channel_after_the_trainer() {
-    assert_eq!(channel_name("Example Trainer"), "app-example-trainer");
-    assert_eq!(channel_name("  Ex--Tra!! "), "app-ex-tra");
-    assert_eq!(channel_name("トレーナー"), "app-applicant");
-    assert_eq!(channel_name(&"a".repeat(200)).len(), MAX_NAME);
-}
-
-#[test]
 fn groups_digits() {
     assert_eq!(grouped(0), "0");
     assert_eq!(grouped(999), "999");

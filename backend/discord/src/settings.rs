@@ -14,6 +14,7 @@ use crate::error::Error;
 use crate::leaders::managed_club;
 use crate::opt_in::store_unavailable;
 use crate::store::{ClubRecord, SettingsUpdate};
+use crate::ticket_name::TicketName;
 
 /// Path of a club's settings, with `{club}` the club's ID. `GET` reads them and `PATCH` changes
 /// them. Both need a session whose linked trainer leads the club, checked with uma.moe each time.
@@ -45,6 +46,7 @@ struct Settings {
     auto_join: bool,
     open: bool,
     problem: Option<String>,
+    ticket_name: TicketNameSetting,
     /// The server's categories, to pick the ticket category from.
     categories: Vec<Named>,
 }
@@ -57,6 +59,48 @@ struct Channel {
     kind: u8,
 }
 
+/// How ticket channels are named. `value` is the prefix or override, and is left out for the
+/// default.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TicketNameSetting {
+    mode: Mode,
+    #[serde(default)]
+    value: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+enum Mode {
+    Default,
+    Prefix,
+    Override,
+}
+
+impl TicketNameSetting {
+    /// The name this asks for, if its value suits its mode.
+    fn parse(&self) -> Result<TicketName, &'static str> {
+        match (self.mode, &self.value) {
+            (Mode::Default, None) => Ok(TicketName::Default),
+            (Mode::Default, Some(_)) => Err("the default ticket name takes no value"),
+            (Mode::Prefix, Some(text)) => TicketName::with_prefix(text).map_err(|e| e.message()),
+            (Mode::Override, Some(text)) => {
+                TicketName::with_override(text).map_err(|e| e.message())
+            }
+            (_, None) => Err("the ticket name needs a value"),
+        }
+    }
+
+    fn of(name: &TicketName) -> Self {
+        let (mode, value) = match name {
+            TicketName::Default => (Mode::Default, None),
+            TicketName::Prefix(prefix) => (Mode::Prefix, Some(prefix.clone())),
+            TicketName::Override(name) => (Mode::Override, Some(name.clone())),
+        };
+        Self { mode, value }
+    }
+}
+
 /// The change to make. Every field is optional; `category: null` clears the category.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -65,6 +109,7 @@ struct Patch {
     category: Option<Option<String>>,
     auto_join: Option<bool>,
     open: Option<bool>,
+    ticket_name: Option<TicketNameSetting>,
 }
 
 /// Tells a missing field from a `null` one.
@@ -151,11 +196,17 @@ fn checked(patch: &Patch, categories: &[Named]) -> Result<SettingsUpdate, &'stat
             Some(Some(id))
         }
     };
+    let ticket_name = patch
+        .ticket_name
+        .as_ref()
+        .map(TicketNameSetting::parse)
+        .transpose()?;
     let update = SettingsUpdate {
         category,
         auto_join: patch.auto_join,
         open: patch.open,
         leader: None,
+        ticket_name,
     };
     if update == SettingsUpdate::default() {
         return Err("no settings to change");
@@ -221,6 +272,7 @@ fn view(record: &ClubRecord, categories: Vec<Named>) -> Settings {
         auto_join: record.auto_join,
         open: record.open,
         problem: record.problem.clone(),
+        ticket_name: TicketNameSetting::of(&record.ticket_name),
         categories,
     }
 }

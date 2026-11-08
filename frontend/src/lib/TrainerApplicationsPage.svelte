@@ -7,6 +7,7 @@
   import { onMount } from 'svelte';
 
   import { ApiError } from './api';
+  import { fetchMyAd, type MyAd } from './ads';
   import { fetchMyApplications, loginUrl, type TrainerApplication } from './applications';
   import { applyFeatures } from './features';
   import { t } from './i18n';
@@ -16,6 +17,7 @@
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
   import { TRAINER_APPLICATIONS_PATH } from './route';
   import SiteFooter from './SiteFooter.svelte';
+  import TrainerAdsTable from './TrainerAdsTable.svelte';
   import TrainerApplicationsTable from './TrainerApplicationsTable.svelte';
 
   const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
@@ -29,6 +31,7 @@
   }
 
   let applications = $state<TrainerApplication[]>([]);
+  let ad = $state<MyAd | null>(null);
 
   $effect(() => {
     document.documentElement.lang = language.current;
@@ -47,6 +50,11 @@
         }
       },
     );
+    // The table of ads shows its empty state if the ad can't be read.
+    fetchMyAd({ signal: features.signal }).then(
+      (found) => (ad = found),
+      () => undefined,
+    );
     return () => features.abort();
   });
 </script>
@@ -61,6 +69,7 @@
   </header>
 
   <TrainerApplicationsTable {applications} />
+  <TrainerAdsTable {ad} />
 </main>
 
 <SiteFooter />

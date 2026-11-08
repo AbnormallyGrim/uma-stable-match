@@ -1,5 +1,7 @@
 #![doc = include_str!("../README.md")]
 
+mod ad_store;
+mod ads;
 mod application_store;
 mod apply;
 mod auth;
@@ -21,12 +23,20 @@ mod sealed;
 mod sessions;
 mod settings;
 mod store;
+mod ticket_name;
 mod tickets;
 mod token;
 mod trainer_store;
 mod trainers;
 mod webhook_events;
 
+pub use ad_store::{
+    Ad, AdStore, DiscordWish, Invite, Invited, Language, NewAd, MAX_INVITES, MAX_ON_BOARD,
+    MAX_RANK_SPAN, RANKS, STORED_FOR, VISIBLE_FOR,
+};
+pub use ads::{
+    ADS_PATH, CLUB_AD_INVITE_PATH, MY_AD_INVITE_PATH, MY_AD_PATH, MY_AD_RENEW_PATH, PAGE_SIZE,
+};
 pub use application_store::{
     Application, ApplicationStore, NewApplication, Sent, Status, MAX_PER_DAY,
 };
@@ -58,6 +68,7 @@ pub use rest::Rest;
 pub use sessions::SessionStore;
 pub use settings::SETTINGS_PATH;
 pub use store::{ClubRecord, ClubStore, Departure, SettingsUpdate, StoreError};
+pub use ticket_name::{NameError, TicketName};
 pub use trainer_store::{
     Action, CheckState, LinkOutcome, LinkedTrainer, Pending, PendingLink, TrainerStore,
     KEY_LIFETIME, MAX_LINKED_TRAINERS,

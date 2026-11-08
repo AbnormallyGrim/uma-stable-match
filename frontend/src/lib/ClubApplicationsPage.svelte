@@ -178,7 +178,13 @@
   {:else if settings !== null && clubId !== null}
     <div class="split">
       <aside class="stack">
-        <BotPanel {clubId} {settings} onsaved={(next) => (settings = next)} onremoved={removed} />
+        <BotPanel
+          {clubId}
+          {clubName}
+          {settings}
+          onsaved={(next) => (settings = next)}
+          onremoved={removed}
+        />
       </aside>
       <div class="stack">
         {#if linked}

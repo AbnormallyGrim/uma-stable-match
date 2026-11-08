@@ -132,6 +132,7 @@ pub(crate) fn router(discord: Discord) -> Router {
         .with_state(discord.clone())
         .merge(crate::trainers::router(discord.clone()))
         .merge(crate::apply::router(discord.clone()))
+        .merge(crate::ads::router(discord.clone()))
         .merge(crate::opt_in::router(discord))
 }
 
@@ -443,8 +444,8 @@ fn from_this_site(config: &DiscordConfig, headers: &HeaderMap) -> bool {
         .is_some_and(|origin| origin.scheme() == site.scheme() && origin.host() == site.host())
 }
 
-/// Deletes the person's trainer links and pending keys, ends all their sessions and signs them
-/// out.
+/// Deletes the person's trainer links, pending keys and ad, ends all their sessions and signs
+/// them out.
 async fn delete_account(State(discord): State<Discord>, headers: HeaderMap) -> Response {
     let user = match signed_in(&discord, &headers).await {
         Ok(user) => user,
@@ -452,6 +453,11 @@ async fn delete_account(State(discord): State<Discord>, headers: HeaderMap) -> R
     };
     if let Some(links) = discord.trainer_links() {
         if let Err(err) = links.store().forget(user).await {
+            return store_unavailable(&err);
+        }
+    }
+    if let Some(ads) = discord.applying().and_then(|applying| applying.ads()) {
+        if let Err(err) = ads.delete(user).await {
             return store_unavailable(&err);
         }
     }

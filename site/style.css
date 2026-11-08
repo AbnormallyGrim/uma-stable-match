@@ -240,6 +240,49 @@ a {
     white-space: nowrap;
 }
 
+/* The account link, a round person icon like the web app's sign-in button. */
+.account-link {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    box-sizing: border-box;
+    color: var(--text-muted);
+}
+
+.account-link:hover {
+    color: var(--text-main);
+}
+
+.account-link::after {
+    position: absolute;
+    z-index: 1;
+    top: calc(100% + 8px);
+    right: 0;
+    padding: 3px 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    color: var(--text-main);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    content: attr(data-tooltip);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s;
+}
+
+.account-link:hover::after,
+.account-link:focus-visible::after {
+    opacity: 1;
+}
+
 /* System / Light / Dark switch, as in the web app: a pill of icon buttons with tooltips. */
 .theme-switch {
     display: inline-flex;
@@ -731,30 +774,8 @@ footer strong {
     color: var(--accent-silver);
 }
 
-/* Too narrow to keep the pages pill centered with the section links beside it. */
-@media (max-width: 960px) {
-    .nav-link {
-        display: none;
-    }
-}
-
-@media (max-width: 640px) {
-    .hero {
-        padding: 4rem 0 3.5rem;
-    }
-
-    .hero h1 {
-        font-size: 2.1rem;
-    }
-
-    .hero p {
-        font-size: 1.05rem;
-    }
-
-    .brand-title {
-        font-size: 1rem;
-    }
-
+/* Too narrow for the five page names: the icons stay, each named by its tooltip. */
+@media (max-width: 1279px) {
     .pages a {
         padding: 6px 9px;
     }
@@ -771,6 +792,43 @@ footer strong {
     .pages a:hover::after,
     .pages a:focus-visible::after {
         display: block;
+    }
+}
+
+/* Too narrow to keep the pages pill centered with the section links beside it. */
+@media (max-width: 960px) {
+    .nav-link {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    /* The page icons don't fit beside the logo and switches, so they get a row of their own,
+       centered under them. */
+    .nav-container {
+        grid-template-columns: auto 1fr;
+    }
+
+    .pages {
+        grid-row: 2;
+        grid-column: 1 / -1;
+        justify-self: center;
+    }
+
+    .hero {
+        padding: 4rem 0 3.5rem;
+    }
+
+    .hero h1 {
+        font-size: 2.1rem;
+    }
+
+    .hero p {
+        font-size: 1.05rem;
+    }
+
+    .brand-title {
+        font-size: 1rem;
     }
 
     .section-title h2 {

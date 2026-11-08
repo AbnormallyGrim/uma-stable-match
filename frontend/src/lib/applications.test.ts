@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   activeApplications,
   applyUrl,
+  checkTicketName,
   checkTrainerLink,
   deleteAccount,
   discardVerificationKey,
@@ -16,6 +17,7 @@ import {
   fetchSettings,
   hasInvite,
   loginUrl,
+  previewTicketName,
   optInUrl,
   saveSettings,
   signedInUser,
@@ -36,6 +38,7 @@ const settings: Settings = {
   auto_join: true,
   open: true,
   problem: null,
+  ticket_name: { mode: 'default', value: null },
   categories: [{ id: '10', name: 'Applications' }],
 };
 
@@ -251,5 +254,55 @@ describe('applications', () => {
     const fetch = vi.fn(() => Promise.resolve(json([])));
     await expect(fetchClubApplications('7', { fetch })).resolves.toEqual([]);
     expect(fetch).toHaveBeenCalledWith('/api/v1/discord/clubs/7/applications', expect.anything());
+  });
+});
+
+describe('ticket names', () => {
+  it('cleans up what the server cleans up', () => {
+    expect(checkTicketName('apply', 'prefix')).toEqual({ value: 'apply' });
+    expect(checkTicketName('  Apply 2 Join_Us ', 'prefix')).toEqual({ value: 'apply-2-join-us' });
+    expect(checkTicketName('a'.repeat(32), 'prefix')).toEqual({ value: 'a'.repeat(32) });
+    expect(checkTicketName('a'.repeat(80), 'override')).toEqual({ value: 'a'.repeat(80) });
+  });
+
+  it('refuses what the server would refuse', () => {
+    for (const text of [
+      "'; DROP TABLE clubs;--",
+      '<script>alert(1)</script>',
+      '{{7*7}}',
+      '../../etc/passwd',
+      'two\nlines',
+      'nul\0l',
+      '\u202egnp',
+      'zero\u200bwidth',
+      '\uff41\uff42',
+      'トレーナー',
+      'apply 🎉',
+      '@everyone',
+      '-leading',
+      'trailing-',
+      'double--dash',
+      '---',
+    ]) {
+      expect(checkTicketName(text, 'prefix'), text).toEqual({ problem: 'characters' });
+    }
+    expect(checkTicketName('   ', 'prefix')).toEqual({ problem: 'empty' });
+    expect(checkTicketName('', 'override')).toEqual({ problem: 'empty' });
+    expect(checkTicketName('a'.repeat(33), 'prefix')).toEqual({ problem: 'long' });
+    expect(checkTicketName('a'.repeat(33), 'override')).toEqual({ value: 'a'.repeat(33) });
+    expect(checkTicketName('a'.repeat(81), 'override')).toEqual({ problem: 'long' });
+    expect(checkTicketName('a'.repeat(10_000), 'override')).toEqual({ problem: 'long' });
+  });
+
+  it('previews each way of naming a ticket', () => {
+    const preview = (mode: 'default' | 'prefix' | 'override', value: string | null) =>
+      previewTicketName({ mode, value }, 'Example Club');
+    expect(preview('default', null)).toBe('example-club-example-trainer-4821');
+    expect(preview('prefix', 'apply')).toBe('apply-example-trainer-4821');
+    expect(preview('override', 'join-us')).toBe('join-us-4821');
+    expect(previewTicketName({ mode: 'default', value: null }, null)).toBe('example-trainer-4821');
+    expect(previewTicketName({ mode: 'default', value: null }, 'サークル')).toBe(
+      'example-trainer-4821',
+    );
   });
 });

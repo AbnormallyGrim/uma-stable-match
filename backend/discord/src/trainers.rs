@@ -411,6 +411,18 @@ async fn unlink(
     match links.store.unlink(user, trainer).await {
         Ok(true) => {
             metrics::counter!("discord_trainer_unlinks_total").increment(1);
+            // An ad shows the trainer's numbers, so it goes with the link.
+            if let Some(ads) = discord.applying().and_then(|applying| applying.ads()) {
+                match ads.get(user).await {
+                    Ok(Some(ad)) if ad.details.trainer == trainer => {
+                        if let Err(err) = ads.delete(user).await {
+                            return store_unavailable(&err);
+                        }
+                    }
+                    Ok(_) => {}
+                    Err(err) => return store_unavailable(&err),
+                }
+            }
             StatusCode::NO_CONTENT.into_response()
         }
         Ok(false) => error(StatusCode::NOT_FOUND, "that trainer isn't linked to you"),
