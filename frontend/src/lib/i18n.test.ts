@@ -79,6 +79,10 @@ const SAMPLE = {
   gap: '+1.2M/day',
   date: 'October 24, 2026',
   max: 5,
+  min: 'C',
+  page: 2,
+  pages: 3,
+  club: 'Example',
 } as never;
 
 function text(message: unknown): string {

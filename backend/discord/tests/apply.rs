@@ -17,9 +17,9 @@ use tower::ServiceExt;
 use uma_stable_match_discord::{
     router, Applicant, ApplicantLookup, ApplicationId, ApplicationStore, Applying, BotToken,
     ClientSecret, ClubLookup, ClubStore, ClubSummary, Discord, DiscordConfig, KeySecret, OptIn,
-    PublicKey, PublicUrl, SettingsUpdate, SigningKey, TrainerLinks, TrainerLookup, TrainerStore,
-    TrainerSummary, APPLICATIONS_PATH, APPLY_PATH, CALLBACK_PATH, CLUB_APPLICATIONS_PATH,
-    INTERACTIONS_PATH, LOGIN_PATH, MAX_PER_DAY,
+    PublicKey, PublicUrl, SettingsUpdate, SigningKey, TicketName, TrainerLinks, TrainerLookup,
+    TrainerStore, TrainerSummary, APPLICATIONS_PATH, APPLY_PATH, CALLBACK_PATH,
+    CLUB_APPLICATIONS_PATH, INTERACTIONS_PATH, LOGIN_PATH, MAX_PER_DAY,
 };
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -420,6 +420,50 @@ async fn a_browser_is_sent_to_the_applications_page_to_see_what_went_wrong() {
     world.clean_up().await;
 }
 
+/// That `channel` is named `stem`, then the rest of the name, then a dash and four digits.
+fn assert_ticket_name(channel: &Value, stem: &str) {
+    let name = channel["name"].as_str().unwrap();
+    let rest = name.strip_prefix(stem).unwrap_or_else(|| panic!("{name}"));
+    let (_, number) = rest.rsplit_once('-').unwrap_or_else(|| panic!("{name}"));
+    assert!(
+        number.len() == 4 && number.bytes().all(|b| b.is_ascii_digit()),
+        "{name}"
+    );
+}
+
+#[tokio::test]
+async fn tickets_are_named_as_the_leader_chose() {
+    for (name, stem) in [
+        (
+            TicketName::with_prefix("Apply Here").unwrap(),
+            "apply-here-trainer",
+        ),
+        (TicketName::with_override("Join Us").unwrap(), "join-us"),
+    ] {
+        let Some(world) = World::new().await else {
+            return;
+        };
+        let update = SettingsUpdate {
+            ticket_name: Some(name),
+            ..SettingsUpdate::default()
+        };
+        world
+            .clubs
+            .update(world.club(), world.server(), &update)
+            .await
+            .unwrap();
+        world.mock_ticket().await;
+        let player = world.sign_in("player-code").await;
+        let started = world.start(&player, &world.club().to_string()).await;
+        world.finish(&started, "player-code").await;
+
+        let channels = world.requests("POST", "/channels").await;
+        assert_eq!(channels.len(), 1);
+        assert_ticket_name(&channels[0], stem);
+        world.clean_up().await;
+    }
+}
+
 #[tokio::test]
 async fn applying_joins_the_player_and_opens_a_ticket_for_them_and_the_leader() {
     let Some(world) = World::new().await else {
@@ -458,6 +502,8 @@ async fn applying_joins_the_player_and_opens_a_ticket_for_them_and_the_leader() 
     );
     // Everyone else is shut out of it.
     assert_eq!(overwrites[0]["deny"], (1u64 << 10).to_string());
+    // Named after the club and the trainer, and a number.
+    assert_ticket_name(&channels[0], "example-club-trainer");
 
     let messages = world.requests("POST", "/messages").await;
     assert_eq!(messages.len(), 1);

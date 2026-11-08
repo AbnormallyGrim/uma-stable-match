@@ -10,6 +10,15 @@ export interface Named {
   name: string;
 }
 
+/** How a club's ticket channels are named. */
+export type TicketNameMode = 'default' | 'prefix' | 'override';
+
+/** The ticket naming setting: `value` is the prefix or the override, and `null` for the default. */
+export interface TicketNameSetting {
+  mode: TicketNameMode;
+  value: string | null;
+}
+
 /** A club's Discord settings, with the server's categories to choose from. */
 export interface Settings {
   guild_id: string;
@@ -17,7 +26,54 @@ export interface Settings {
   auto_join: boolean;
   open: boolean;
   problem: string | null;
+  ticket_name: TicketNameSetting;
   categories: Named[];
+}
+
+/** The longest prefix and override the server takes, once cleaned up. */
+export const TICKET_NAME_MAX = { prefix: 32, override: 80 } as const;
+
+/** Why a prefix or override can't name tickets. */
+export type TicketNameProblem = 'empty' | 'long' | 'characters';
+
+/**
+ * Checks a prefix or override as the server will: spaces and underscores become dashes, capitals
+ * lowercase, and only letters, digits and single dashes may be left. This is quick feedback; the
+ * server decides.
+ */
+export function checkTicketName(
+  text: string,
+  mode: 'prefix' | 'override',
+): { value: string } | { problem: TicketNameProblem } {
+  if (new TextEncoder().encode(text).length > TICKET_NAME_MAX.override) return { problem: 'long' };
+  const value = text
+    .trim()
+    .replace(/[ _]/g, '-')
+    .replace(/[A-Z]/g, (c) => c.toLowerCase());
+  if (value === '') return { problem: 'empty' };
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)) return { problem: 'characters' };
+  if (value.length > TICKET_NAME_MAX[mode]) return { problem: 'long' };
+  return { value };
+}
+
+/** Lowercase letters and digits joined by dashes, as the bot cleans up a club's name. */
+function slug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** What a ticket would be called for an example applicant, ending in an example number. */
+export function previewTicketName(
+  setting: TicketNameSetting,
+  clubName: string | null,
+  number = '4821',
+): string {
+  const trainer = 'example-trainer';
+  if (setting.mode === 'override') return `${setting.value}-${number}`;
+  const head = setting.mode === 'prefix' ? setting.value : slug(clubName ?? '');
+  return [head, trainer, number].filter(Boolean).join('-');
 }
 
 /** Where an application stands with the club's leaders. */
@@ -109,6 +165,7 @@ export interface SettingsChange {
   category?: string | null;
   auto_join?: boolean;
   open?: boolean;
+  ticket_name?: TicketNameSetting;
 }
 
 /** The address that sends the visitor to sign in with Discord and back to `next`. */
@@ -319,7 +376,11 @@ function settingsUrl(clubId: string): string {
   return `/api/v1/discord/clubs/${encodeURIComponent(clubId)}/settings`;
 }
 
-async function send<T>(path: string, init: RequestInit, options: RequestOptions): Promise<T> {
+export async function send<T>(
+  path: string,
+  init: RequestInit,
+  options: RequestOptions,
+): Promise<T> {
   const fetchFn = options.fetch ?? globalThis.fetch;
   let response: Response;
   try {

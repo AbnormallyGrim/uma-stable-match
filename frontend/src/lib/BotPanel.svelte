@@ -6,11 +6,22 @@
 -->
 
 <script lang="ts">
-  import { saveSettings, unlinkClub, type Settings } from './applications';
+  import {
+    checkTicketName,
+    previewTicketName,
+    saveSettings,
+    TICKET_NAME_MAX,
+    unlinkClub,
+    type Settings,
+    type SettingsChange,
+    type TicketNameMode,
+  } from './applications';
   import { t } from './i18n';
 
   interface Props {
     clubId: string;
+    /** The club's name, for the ticket name example. */
+    clubName?: string | null;
     settings: Settings;
     /** Called with the new settings after a save. */
     onsaved: (settings: Settings) => void;
@@ -18,10 +29,12 @@
     onremoved: () => void;
   }
 
-  let { clubId, settings, onsaved, onremoved }: Props = $props();
+  let { clubId, clubName = null, settings, onsaved, onremoved }: Props = $props();
 
   let open = $state(true);
   let autoJoin = $state(true);
+  let nameMode = $state<TicketNameMode>('default');
+  let nameText = $state('');
   let saving = $state(false);
   let saved = $state(false);
   let saveFailed = $state(false);
@@ -32,15 +45,39 @@
   $effect(() => {
     open = settings.open;
     autoJoin = settings.auto_join;
+    nameMode = settings.ticket_name.mode;
+    nameText = settings.ticket_name.value ?? '';
   });
+
+  // What the server would store for the text so far, or what's wrong with it.
+  const nameCheck = $derived(nameMode === 'default' ? null : checkTicketName(nameText, nameMode));
+  const nameProblem = $derived(
+    nameCheck !== null && 'problem' in nameCheck ? nameCheck.problem : null,
+  );
+  const example = $derived(
+    previewTicketName(
+      {
+        mode: nameMode,
+        value: nameCheck !== null && 'value' in nameCheck ? nameCheck.value : null,
+      },
+      clubName,
+    ),
+  );
 
   async function save(event: SubmitEvent) {
     event.preventDefault();
+    if (nameProblem !== null) return;
     saving = true;
     saved = false;
     saveFailed = false;
+    const change: SettingsChange = { open, auto_join: autoJoin };
+    // Only a changed name is sent.
+    const value = nameCheck !== null && 'value' in nameCheck ? nameCheck.value : null;
+    if (nameMode !== settings.ticket_name.mode || value !== settings.ticket_name.value) {
+      change.ticket_name = { mode: nameMode, value };
+    }
     try {
-      onsaved(await saveSettings(clubId, { open, auto_join: autoJoin }));
+      onsaved(await saveSettings(clubId, change));
       saved = true;
     } catch {
       saveFailed = true;
@@ -100,8 +137,44 @@
     </span>
     <input type="checkbox" role="switch" bind:checked={autoJoin} />
   </label>
+  <fieldset class="ticket-name">
+    <legend>{t('leader.ticket.heading')}</legend>
+    <p class="hint">{t('leader.ticket.hint')}</p>
+    {#each ['default', 'prefix', 'override'] as const as mode (mode)}
+      <label class="choice">
+        <input type="radio" name="ticket-name-mode" value={mode} bind:group={nameMode} />
+        {t(`leader.ticket.${mode}`)}
+      </label>
+    {/each}
+    {#if nameMode !== 'default'}
+      <label class="text-field">
+        <span
+          >{t(
+            nameMode === 'prefix' ? 'leader.ticket.prefixLabel' : 'leader.ticket.overrideLabel',
+          )}</span
+        >
+        <input
+          type="text"
+          bind:value={nameText}
+          maxlength={TICKET_NAME_MAX[nameMode]}
+          autocomplete="off"
+          spellcheck="false"
+          aria-invalid={nameProblem !== null}
+          aria-describedby="ticket-name-help"
+        />
+      </label>
+      <p id="ticket-name-help" class="hint" class:failed={nameProblem !== null}>
+        {nameProblem === null
+          ? t('leader.ticket.valueHint')
+          : t(`leader.ticket.problem.${nameProblem}`)}
+      </p>
+    {/if}
+    <p class="example">
+      {t('leader.ticket.example')} <code>{example}</code>
+    </p>
+  </fieldset>
   <div class="actions">
-    <button class="primary" type="submit" disabled={saving}>
+    <button class="primary" type="submit" disabled={saving || nameProblem !== null}>
       {t(saving ? 'leader.settings.saving' : 'leader.settings.save')}
     </button>
     {#if saved}<p class="success" role="status">{t('leader.settings.saved')}</p>{/if}
@@ -232,6 +305,42 @@
   input[role='switch']:checked::after {
     left: 20px;
     background: #ffffff;
+  }
+
+  .ticket-name {
+    margin: 12px 0 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .ticket-name legend {
+    padding: 0;
+    font-weight: 700;
+  }
+
+  .ticket-name .hint {
+    margin: 4px 0 8px;
+  }
+
+  .choice {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 4px 0;
+    cursor: pointer;
+  }
+
+  .text-field {
+    display: grid;
+    gap: 4px;
+    margin-top: 8px;
+    font-size: 0.875rem;
+  }
+
+  .example {
+    margin: 8px 0 0;
+    overflow-wrap: anywhere;
+    font-size: 0.875rem;
   }
 
   .actions {

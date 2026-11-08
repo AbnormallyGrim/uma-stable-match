@@ -6,7 +6,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use redis::aio::ConnectionManager;
-use uma_stable_match_discord::{ClubStore, Departure, KeySecret, SettingsUpdate};
+use uma_stable_match_discord::{ClubStore, Departure, KeySecret, SettingsUpdate, TicketName};
 
 /// A store and its connection, or `None` without `REDIS_TEST_URL`.
 async fn connect() -> Option<(ClubStore, ConnectionManager)> {
@@ -278,6 +278,7 @@ async fn a_dev_server_takes_every_clubs_applications() {
     assert_eq!(record.guild_id, 555);
     assert!(record.open && record.auto_join);
     assert_eq!(record.problem, None);
+    assert_eq!(record.ticket_name, TicketName::Default);
     // The store itself still knows nothing about the club.
     assert_eq!(store.club(club).await.unwrap(), None);
     assert_eq!(
@@ -311,5 +312,137 @@ async fn keeps_the_leader_who_set_the_club_up_encrypted() {
         .await
         .unwrap();
     assert!(!saved.contains(&leader.to_string()));
+    store.unlink(club).await.unwrap();
+}
+
+async fn fields(conn: &ConnectionManager, club: u64) -> std::collections::HashMap<String, String> {
+    redis::cmd("HGETALL")
+        .arg(format!("discord:club:{club}"))
+        .query_async(&mut conn.clone())
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn ticket_names_are_stored_one_at_a_time() {
+    let Some((store, conn)) = connect().await else {
+        return;
+    };
+    let (club, _, guild, _) = ids();
+    store.link(club, guild).await.unwrap();
+    let record = store.club(club).await.unwrap().unwrap();
+    assert_eq!(record.ticket_name, TicketName::Default);
+
+    let change = |name| SettingsUpdate {
+        ticket_name: Some(name),
+        ..SettingsUpdate::default()
+    };
+    let prefix = TicketName::with_prefix("Apply Here").unwrap();
+    assert!(store
+        .update(club, guild, &change(prefix.clone()))
+        .await
+        .unwrap());
+    let record = store.club(club).await.unwrap().unwrap();
+    assert_eq!(record.ticket_name, prefix);
+    let stored = fields(&conn, club).await;
+    assert_eq!(
+        stored.get("ticket_prefix").map(String::as_str),
+        Some("apply-here")
+    );
+    assert!(!stored.contains_key("ticket_name"));
+
+    // An override replaces the prefix rather than joining it.
+    let name = TicketName::with_override("join-us").unwrap();
+    assert!(store
+        .update(club, guild, &change(name.clone()))
+        .await
+        .unwrap());
+    assert_eq!(store.club(club).await.unwrap().unwrap().ticket_name, name);
+    let stored = fields(&conn, club).await;
+    assert!(!stored.contains_key("ticket_prefix"));
+    assert_eq!(
+        stored.get("ticket_name").map(String::as_str),
+        Some("join-us")
+    );
+
+    // Other settings leave it alone; the default removes both.
+    let open = SettingsUpdate {
+        open: Some(false),
+        ..SettingsUpdate::default()
+    };
+    assert!(store.update(club, guild, &open).await.unwrap());
+    assert_eq!(store.club(club).await.unwrap().unwrap().ticket_name, name);
+    assert!(store
+        .update(club, guild, &change(TicketName::Default))
+        .await
+        .unwrap());
+    let stored = fields(&conn, club).await;
+    assert!(!stored.contains_key("ticket_prefix") && !stored.contains_key("ticket_name"));
+    store.unlink(club).await.unwrap();
+}
+
+#[tokio::test]
+async fn a_ticket_name_survives_a_move_and_a_bad_stored_one_is_ignored() {
+    let Some((store, conn)) = connect().await else {
+        return;
+    };
+    let (club, _, guild, other) = ids();
+    store.link(club, guild).await.unwrap();
+    let name = TicketName::with_override("join-us").unwrap();
+    let update = SettingsUpdate {
+        ticket_name: Some(name.clone()),
+        ..SettingsUpdate::default()
+    };
+    store.update(club, guild, &update).await.unwrap();
+    store.link(club, other).await.unwrap();
+    assert_eq!(store.club(club).await.unwrap().unwrap().ticket_name, name);
+
+    // Something that never went through our checks, such as an edit by hand.
+    for bad in ["'; DROP TABLE clubs;--", "a\r\nSET x y", "<script>", "-"] {
+        set(&conn, club, "ticket_name", bad).await;
+        let record = store.club(club).await.unwrap().unwrap();
+        assert_eq!(record.ticket_name, TicketName::Default, "{bad}");
+    }
+    store.unlink(club).await.unwrap();
+}
+
+#[tokio::test]
+async fn hostile_ticket_name_text_never_reaches_redis() {
+    let Some((store, conn)) = connect().await else {
+        return;
+    };
+    let (club, _, guild, _) = ids();
+    store.link(club, guild).await.unwrap();
+    for text in [
+        "'; DROP TABLE clubs;--",
+        "]]; redis.call('FLUSHALL') --",
+        "a\r\n*1\r\n$8\r\nFLUSHALL\r\n",
+        "x\0y",
+    ] {
+        assert!(TicketName::with_prefix(text).is_err(), "{text:?}");
+        assert!(TicketName::with_override(text).is_err(), "{text:?}");
+    }
+    let stored = fields(&conn, club).await;
+    assert!(!stored.contains_key("ticket_prefix") && !stored.contains_key("ticket_name"));
+    store.unlink(club).await.unwrap();
+}
+
+#[tokio::test]
+async fn a_dev_server_still_keeps_the_ticket_name() {
+    let Some((store, _)) = connect().await else {
+        return;
+    };
+    let (club, _, guild, _) = ids();
+    let dev = store.clone().with_dev_guild(555);
+    store.link(club, guild).await.unwrap();
+    let name = TicketName::with_prefix("apply").unwrap();
+    let update = SettingsUpdate {
+        ticket_name: Some(name.clone()),
+        ..SettingsUpdate::default()
+    };
+    assert!(store.update(club, guild, &update).await.unwrap());
+    let record = dev.club(club).await.unwrap().unwrap();
+    assert_eq!(record.guild_id, 555);
+    assert_eq!(record.ticket_name, name);
     store.unlink(club).await.unwrap();
 }

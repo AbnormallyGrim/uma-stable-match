@@ -4,6 +4,7 @@ import { mount } from 'svelte';
 import './app.css';
 import App from './App.svelte';
 import ClubPage from './lib/ClubPage.svelte';
+import AdsPage from './lib/AdsPage.svelte';
 import ApplicationsPage from './lib/ApplicationsPage.svelte';
 import ClubApplicationsPage from './lib/ClubApplicationsPage.svelte';
 import ClubComparePage from './lib/ClubComparePage.svelte';
@@ -70,6 +71,8 @@ if (!shouldRedirectToLogin) {
         requirement: applications.requirement,
       },
     });
+  } else if (applications?.page === 'ads') {
+    mount(AdsPage, { target, props: { post: applications.post } });
   } else if (applications?.page === 'trainer') {
     mount(TrainerApplicationsPage, { target });
   } else if (applications && isApplicationHome) {

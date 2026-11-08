@@ -16,6 +16,7 @@ const settings = (change: Partial<Settings> = {}): Settings => ({
   auto_join: true,
   open: true,
   problem: null,
+  ticket_name: { mode: 'default', value: null },
   categories: [{ id: '10', name: 'Applications' }],
   ...change,
 });
@@ -201,6 +202,65 @@ describe('ClubApplicationsPage', () => {
         open: true,
         auto_join: false,
       });
+    });
+
+    it('shows how tickets are named, and saves a new prefix', async () => {
+      const fetch = answer({
+        'GET /api/v1/discord/clubs/7/settings': () => json(settings()),
+        'PATCH /api/v1/discord/clubs/7/settings': () =>
+          json(settings({ ticket_name: { mode: 'prefix', value: 'apply-here' } })),
+      });
+      render(ClubApplicationsPage, { clubId: '7' });
+      expect(await screen.findByText('example-club-example-trainer-4821')).toBeInTheDocument();
+
+      await fireEvent.click(screen.getByRole('radio', { name: t('leader.ticket.prefix') }));
+      const input = screen.getByRole('textbox', { name: t('leader.ticket.prefixLabel') });
+      await fireEvent.input(input, { target: { value: 'Apply Here' } });
+      expect(screen.getByText('apply-here-example-trainer-4821')).toBeInTheDocument();
+      await fireEvent.click(screen.getByRole('button', { name: t('leader.settings.save') }));
+
+      expect(await screen.findByText(t('leader.settings.saved'))).toBeInTheDocument();
+      const patch = fetch.mock.calls.find(([, init]) => init?.method === 'PATCH');
+      expect(JSON.parse(String(patch?.[1]?.body))).toEqual({
+        open: true,
+        auto_join: true,
+        ticket_name: { mode: 'prefix', value: 'apply-here' },
+      });
+    });
+
+    it('refuses a ticket name the server would refuse, without asking it', async () => {
+      const fetch = answer({
+        'GET /api/v1/discord/clubs/7/settings': () => json(settings()),
+      });
+      render(ClubApplicationsPage, { clubId: '7' });
+      await fireEvent.click(
+        await screen.findByRole('radio', { name: t('leader.ticket.override') }),
+      );
+      const input = screen.getByRole('textbox', { name: t('leader.ticket.overrideLabel') });
+      await fireEvent.input(input, { target: { value: "'; DROP TABLE clubs;--" } });
+      expect(screen.getByText(t('leader.ticket.problem.characters'))).toBeInTheDocument();
+      const save = screen.getByRole('button', { name: t('leader.settings.save') });
+      expect(save).toBeDisabled();
+      await fireEvent.submit(save.closest('form')!);
+      expect(fetch.mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(false);
+
+      await fireEvent.input(input, { target: { value: '   ' } });
+      expect(screen.getByText(t('leader.ticket.problem.empty'))).toBeInTheDocument();
+      await fireEvent.input(input, { target: { value: 'join-us' } });
+      expect(save).toBeEnabled();
+    });
+
+    it('starts from the name the club already has', async () => {
+      answer({
+        'GET /api/v1/discord/clubs/7/settings': () =>
+          json(settings({ ticket_name: { mode: 'override', value: 'join-us' } })),
+      });
+      render(ClubApplicationsPage, { clubId: '7' });
+      expect(await screen.findByRole('radio', { name: t('leader.ticket.override') })).toBeChecked();
+      expect(screen.getByRole('textbox', { name: t('leader.ticket.overrideLabel') })).toHaveValue(
+        'join-us',
+      );
+      expect(screen.getByText('join-us-4821')).toBeInTheDocument();
     });
 
     it('removes the bot after asking, and goes back to the setup steps', async () => {

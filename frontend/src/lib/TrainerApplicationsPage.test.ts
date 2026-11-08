@@ -15,7 +15,9 @@ afterEach(() => {
 
 describe('TrainerApplicationsPage', () => {
   it('explains the page and shows the empty table', () => {
-    vi.stubGlobal('fetch', () => Promise.resolve(json([])));
+    vi.stubGlobal('fetch', (uri: string) =>
+      Promise.resolve(uri.includes('/ads/me') ? json(null) : json([])),
+    );
     render(TrainerApplicationsPage);
     expect(
       screen.getByRole('heading', { level: 1, name: t('trainer.heading') }),
@@ -27,19 +29,21 @@ describe('TrainerApplicationsPage', () => {
 
   it('lists the applications the trainer sent', async () => {
     const sent = new Date().toISOString();
-    vi.stubGlobal('fetch', () =>
+    vi.stubGlobal('fetch', (uri: string) =>
       Promise.resolve(
-        json([
-          {
-            id: 'a',
-            clubId: '7',
-            clubName: 'Example Club',
-            trainerId: '123456789',
-            status: 'pending',
-            submittedAt: sent,
-            ticketUrl: 'https://discord.com/channels/1/2',
-          },
-        ]),
+        uri.includes('/ads/me')
+          ? json(null)
+          : json([
+              {
+                id: 'a',
+                clubId: '7',
+                clubName: 'Example Club',
+                trainerId: '123456789',
+                status: 'pending',
+                submittedAt: sent,
+                ticketUrl: 'https://discord.com/channels/1/2',
+              },
+            ]),
       ),
     );
     render(TrainerApplicationsPage);

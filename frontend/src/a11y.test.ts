@@ -4,6 +4,9 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import AdPanel from './lib/AdPanel.svelte';
+import AdsPage from './lib/AdsPage.svelte';
+import TrainerAdsTable from './lib/TrainerAdsTable.svelte';
 import App from './App.svelte';
 import type { ClubDetails, Recommendations } from './lib/api';
 import ClubPage from './lib/ClubPage.svelte';
@@ -253,6 +256,7 @@ describe('accessibility', () => {
       auto_join: true,
       open: true,
       problem: 'made-up problem',
+      ticket_name: { mode: 'default', value: null },
       categories: [{ id: '10', name: 'Applications' }],
     };
 
@@ -318,6 +322,77 @@ describe('accessibility', () => {
         now: new Date('2026-11-05T00:00:00Z'),
       });
       expect(await violations(container)).toEqual([]);
+    });
+
+    it("has no violations in the ad panel and a trainer's ad table", async () => {
+      const mine = {
+        trainerName: 'Example Trainer',
+        trainerId: '100000000011',
+        currentClub: 'Example Club',
+        pace: 6_400_000,
+        fansThisMonth: 48_000_000,
+        rankMin: 3,
+        rankMax: 8,
+        discord: 'required' as const,
+        language: 'en' as const,
+        postedAt: '2026-11-01T00:00:00Z',
+        visibleUntil: '2026-11-08T00:00:00Z',
+        expiresAt: '2026-12-01T00:00:00Z',
+        onBoard: true,
+        invites: [
+          { clubId: '100000001', clubName: 'Example Club', sentAt: '2026-11-02T00:00:00Z' },
+        ],
+      };
+      for (const ad of [null, mine]) {
+        const panel = render(AdPanel, { ad });
+        expect(await violations(panel.container)).toEqual([]);
+        panel.unmount();
+        const table = render(TrainerAdsTable, { ad });
+        expect(await violations(table.container)).toEqual([]);
+        table.unmount();
+      }
+    });
+
+    it('has no violations on the board of ads, and in its dialog', async () => {
+      const board = [
+        {
+          id: 'a1',
+          trainerName: 'Trainer Alpha',
+          trainerId: '100000000011',
+          currentClub: null,
+          pace: 1_420_000,
+          fansThisMonth: 18_300_000,
+          rankMin: 1,
+          rankMax: 11,
+          discord: 'required',
+          language: 'ja',
+          postedAt: '2026-11-01T00:00:00Z',
+          visibleUntil: '2026-11-08T00:00:00Z',
+          invited: false,
+        },
+      ];
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((uri: string) => {
+          const path = uri.split('?')[0];
+          return Promise.resolve(
+            json(
+              path === '/api/v1/discord/ads'
+                ? { ads: board, page: 1, pages: 1, total: board.length }
+                : path === '/api/v1/discord/my-club'
+                  ? { trainer: '100000000011', club: { id: '100000001', name: 'X', leader: true } }
+                  : path === '/api/v1/discord/ads/me'
+                    ? null
+                    : {},
+            ),
+          );
+        }),
+      );
+      const { container } = render(AdsPage);
+      await screen.findByText('Trainer Alpha');
+      expect(await violations(container)).toEqual([]);
+      await fireEvent.click(screen.getByRole('button', { name: t('ads.post') }));
+      expect(await violations(screen.getByRole('dialog'))).toEqual([]);
     });
 
     it('has no violations in the applications table and an open application', async () => {

@@ -9,7 +9,7 @@ use redis::aio::ConnectionManager;
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 use uma_stable_match_discord::{
-    ApplicationStore, Applying, ClubStore, Discord, KeySecret as DiscordKeySecret, OptIn,
+    AdStore, ApplicationStore, Applying, ClubStore, Discord, KeySecret as DiscordKeySecret, OptIn,
     SessionStore, TrainerLinks, TrainerStore,
 };
 
@@ -230,9 +230,10 @@ pub async fn run(config: &Config, source: impl Into<Source>) -> Result<(), RunEr
             // Sign-out and account deletion end sessions early.
             let sessions = SessionStore::new(conn.clone(), secret.clone());
             let applying = Applying::new(
-                ApplicationStore::new(conn, secret),
+                ApplicationStore::new(conn.clone(), secret.clone()),
                 applicant_lookup(applicant_source, applicant_paces),
-            );
+            )
+            .with_ads(AdStore::new(conn, secret));
             let discord = Discord::new(discord.clone())
                 .map_err(RunError::Discord)?
                 .with_opt_in(OptIn::new(store.clone(), club_lookup(club_source)))

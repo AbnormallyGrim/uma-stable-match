@@ -9,6 +9,7 @@ use crate::apply::Applicant;
 use crate::bot::Discord;
 use crate::error::Error;
 use crate::store::ClubRecord;
+use crate::ticket_name::random_number;
 
 const VIEW_CHANNEL: u64 = 1 << 10;
 const SEND_MESSAGES: u64 = 1 << 11;
@@ -21,9 +22,6 @@ const PEOPLE: u64 = VIEW_CHANNEL | SEND_MESSAGES | READ_MESSAGE_HISTORY;
 
 /// What the bot needs in the ticket, which it lacks once the server's members can't see it.
 const BOT: u64 = PEOPLE | EMBED_LINKS | MANAGE_CHANNELS;
-
-/// Longest channel name Discord takes.
-const MAX_NAME: usize = 90;
 
 const BLURPLE: u32 = 0x5865f2;
 
@@ -84,7 +82,11 @@ async fn create_channel(
         overwrites.push(member(leader));
     }
     let mut body = json!({
-        "name": channel_name(&application.details.trainer_name),
+        "name": record.ticket_name.channel_name(
+            &application.details.club_name,
+            &application.details.trainer_name,
+            random_number(),
+        ),
         "type": 0,
         "topic": format!("Application to {}", application.details.club_name),
         "permission_overwrites": overwrites,
@@ -106,26 +108,6 @@ fn id(value: &str) -> Result<u64, Error> {
     value
         .parse()
         .map_err(|_| Error::Decode(serde::de::Error::custom("an ID isn't a whole number")))
-}
-
-/// `app-` and the trainer's name as a channel name: lowercase letters and digits joined by
-/// dashes.
-pub(crate) fn channel_name(trainer_name: &str) -> String {
-    let mut slug = String::new();
-    for c in trainer_name.chars() {
-        if c.is_ascii_alphanumeric() {
-            slug.push(c.to_ascii_lowercase());
-        } else if !slug.ends_with('-') && !slug.is_empty() {
-            slug.push('-');
-        }
-    }
-    let slug = slug.trim_end_matches('-');
-    let name = if slug.is_empty() {
-        "app-applicant".to_owned()
-    } else {
-        format!("app-{slug}")
-    };
-    name.chars().take(MAX_NAME).collect()
 }
 
 /// A whole number with thousands separators.

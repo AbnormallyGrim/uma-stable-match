@@ -16,6 +16,7 @@ use tokio::time::timeout;
 
 use crate::config::KeySecret;
 use crate::sealed::Sealer;
+use crate::ticket_name::TicketName;
 
 const CLUB_PREFIX: &str = "discord:club:";
 const GUILD_PREFIX: &str = "discord:guild:";
@@ -96,6 +97,8 @@ pub struct ClubRecord {
     pub problem: Option<String>,
     /// The Discord ID of the leader who last set the club up, who is added to its tickets.
     pub leader: Option<u64>,
+    /// How its ticket channels are named.
+    pub ticket_name: TicketName,
 }
 
 /// Changes to a club's settings. A field left `None` stays as it is.
@@ -109,6 +112,8 @@ pub struct SettingsUpdate {
     pub open: Option<bool>,
     /// The Discord ID of the leader setting the club up.
     pub leader: Option<u64>,
+    /// How the club's ticket channels are named.
+    pub ticket_name: Option<TicketName>,
 }
 
 impl SettingsUpdate {
@@ -130,6 +135,9 @@ impl SettingsUpdate {
         }
         if let Some(leader) = self.leader {
             pairs.push(("leader", leader.to_string()));
+        }
+        if let Some(name) = &self.ticket_name {
+            pairs.extend(name.fields());
         }
         pairs
     }
@@ -266,6 +274,17 @@ impl ClubStore {
     /// What's kept about a club, or `None` if it isn't linked.
     pub async fn club(&self, club_id: u64) -> Result<Option<ClubRecord>, StoreError> {
         if let Some(guild_id) = self.dev_guild {
+            // The ticket name is the one setting that still comes from Redis, so a leader's
+            // choice shows on the dashboard.
+            let (prefix, name): (Option<String>, Option<String>) = self
+                .run(
+                    redis::cmd("HMGET")
+                        .arg(club_key(club_id))
+                        .arg("ticket_prefix")
+                        .arg("ticket_name")
+                        .query_async(&mut self.conn.clone()),
+                )
+                .await?;
             return Ok(Some(ClubRecord {
                 guild_id,
                 category: None,
@@ -273,6 +292,7 @@ impl ClubStore {
                 open: true,
                 problem: None,
                 leader: None,
+                ticket_name: TicketName::from_stored(prefix.as_deref(), name.as_deref()),
             }));
         }
         let fields: HashMap<String, String> = self
@@ -352,6 +372,10 @@ fn parse_record(
         leader: fields
             .get("leader")
             .and_then(|value| leader(sealer, club_id, value)),
+        ticket_name: TicketName::from_stored(
+            fields.get("ticket_prefix").map(String::as_str),
+            fields.get("ticket_name").map(String::as_str),
+        ),
     })
 }
 
