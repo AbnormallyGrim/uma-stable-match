@@ -1,6 +1,7 @@
 /** The release notes: what changed for visitors, newest first, and remembering the last one seen. */
 
 import type { MessageKey } from './i18n';
+import { APPLICATIONS_PATH } from './route';
 
 /** The sort of change: something new, something that works better, or a bug that's gone. */
 export type ChangeKind = 'new' | 'improved' | 'fixed';
@@ -13,6 +14,8 @@ export interface Change {
   kind: ChangeKind;
   title: MessageKey;
   body: MessageKey;
+  /** A page to try it on, shown under the body. */
+  link?: { label: MessageKey; href: string };
 }
 
 /** One release. */
@@ -41,6 +44,7 @@ export const RELEASES: Release[] = [
         kind: 'new',
         title: 'releases.leaderApplications.title',
         body: 'releases.leaderApplications.body',
+        link: { label: 'releases.leaderApplications.link', href: APPLICATIONS_PATH },
       },
     ],
   },

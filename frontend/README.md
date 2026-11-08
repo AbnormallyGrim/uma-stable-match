@@ -568,7 +568,7 @@ The site launched as `1.0.0` on 23 October 2026. A release's date is the day it 
 
 ### Add a release
 
-1. Add the release at the **top** of `RELEASES` in `src/lib/releases.ts`, with its build, date, kind and changes. Each change has a kind (`new`, `improved` or `fixed`) and the keys of its title and body messages.
+1. Add the release at the **top** of `RELEASES` in `src/lib/releases.ts`, with its build, date, kind and changes. Each change has a kind (`new`, `improved` or `fixed`) and the keys of its title and body messages. It can also have a `link`, the key of its label and a path on this site, shown under the body to take players to the page it's about.
 2. Write both messages in `messages/en.ts` and `messages/ja.ts`, under `releases.<name>.title` and `releases.<name>.body`. The tests fail if one language is missing.
 
 Writing the notes:

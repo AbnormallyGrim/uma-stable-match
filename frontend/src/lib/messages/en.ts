@@ -34,6 +34,7 @@ export const en = {
   'releases.leaderApplications.title': 'Take applications for your club',
   'releases.leaderApplications.body':
     'Club leaders can add the bot to their Discord server, set their requirements, and accept or decline each trainer with their fan pace and history in front of them.',
+  'releases.leaderApplications.link': 'Open Applications',
   'releases.trainerLookup.title': "Fixed trainers not being found when they're between clubs",
   'releases.trainerLookup.body':
     "Searching by trainer ID now gives recommendations for trainers who aren't in a club right now, or have no fan gains yet this month.",

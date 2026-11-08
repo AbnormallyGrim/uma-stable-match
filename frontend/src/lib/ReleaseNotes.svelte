@@ -128,6 +128,9 @@
                   <div>
                     <h4>{t(change.title)}</h4>
                     <p>{t(change.body)}</p>
+                    {#if change.link}
+                      <a class="try" href={change.link.href}>{t(change.link.label)}</a>
+                    {/if}
                   </div>
                 </li>
               {/each}
@@ -372,6 +375,13 @@
     color: var(--text-2);
     font-size: 0.875rem;
     line-height: 1.55;
+  }
+
+  .try {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 0.875rem;
+    font-weight: 600;
   }
 
   @media (width <= 520px) {

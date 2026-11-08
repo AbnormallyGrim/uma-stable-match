@@ -62,6 +62,10 @@ describe('RELEASES', () => {
     for (const change of RELEASES.flatMap((release) => release.changes)) {
       expect(hasMessage(change.title), change.title).toBe(true);
       expect(hasMessage(change.body), change.body).toBe(true);
+      if (change.link) {
+        expect(hasMessage(change.link.label), change.link.label).toBe(true);
+        expect(change.link.href, change.link.label).toMatch(/^\//);
+      }
     }
   });
 });

@@ -32,6 +32,7 @@ export const ja: Catalog = {
   'releases.leaderApplications.title': 'サークルの応募を受け付けよう',
   'releases.leaderApplications.body':
     'サークルマスターは自分のDiscordサーバーにボットを追加して条件を設定し、トレーナーの1日のファン獲得数と履歴を見ながら承認または辞退できます。',
+  'releases.leaderApplications.link': 'サークル申請を開く',
   'releases.trainerLookup.title': 'サークルに所属していないトレーナーが見つからない問題を修正',
   'releases.trainerLookup.body':
     'トレーナーIDで検索すると、現在サークルに所属していないトレーナーや、今月まだファン数の増加がないトレーナーにもおすすめが表示されます。',
