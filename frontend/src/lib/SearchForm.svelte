@@ -145,6 +145,11 @@
           <span class="track" aria-hidden="true"></span>
           {t('form.hasDiscord')}
         </label>
+        <label class="switch">
+          <input type="checkbox" role="switch" bind:checked={search.quickApply} />
+          <span class="track" aria-hidden="true"></span>
+          {t('form.quickApply')}
+        </label>
 
         <span class="label" id="join-style-label">{t('form.joinStyle')}</span>
         <div class="join-styles" role="group" aria-labelledby="join-style-label">

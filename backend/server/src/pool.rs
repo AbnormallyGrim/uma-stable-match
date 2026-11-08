@@ -170,7 +170,7 @@ struct Entry {
 
 /// Which clubs a shortlist may include. The default leaves out closed and full clubs.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct ShortlistFilter {
+pub struct ShortlistFilter<'a> {
     /// Include clubs that aren't accepting members. Ignored when `join_styles` is set.
     pub include_closed: bool,
     /// Include clubs with no open spot.
@@ -183,9 +183,11 @@ pub struct ShortlistFilter {
     pub playstyles: Option<u32>,
     /// Only clubs whose description mentions Discord.
     pub discord_only: bool,
+    /// Only clubs with one of these IDs.
+    pub only: Option<&'a HashSet<u64>>,
 }
 
-impl ShortlistFilter {
+impl ShortlistFilter<'_> {
     /// Whether closed clubs can be included.
     pub fn allows_closed(&self) -> bool {
         match self.join_styles {
@@ -212,6 +214,7 @@ impl ShortlistFilter {
             && playstyle
             && (self.include_full || !club.is_full())
             && (!self.discord_only || club.discord)
+            && self.only.is_none_or(|ids| ids.contains(&club.circle_id))
     }
 }
 
@@ -392,6 +395,20 @@ impl ClubPool {
                 ..ShortlistFilter::default()
             },
         )
+    }
+
+    /// IDs of the clubs `filter` allows that aren't closed or full, whatever the filter says about
+    /// them.
+    pub fn joinable_matching(&self, filter: ShortlistFilter) -> Vec<u64> {
+        self.entries
+            .iter()
+            .filter(|e| {
+                filter.allows(&e.club)
+                    && !e.club.is_full()
+                    && e.club.join_style != Some(JoinStyle::Closed)
+            })
+            .map(|e| e.club.circle_id)
+            .collect()
     }
 
     /// How many clubs `filter` allows.

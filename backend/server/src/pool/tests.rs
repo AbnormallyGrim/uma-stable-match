@@ -524,6 +524,28 @@ fn spots_discord_links_and_mentions() {
 }
 
 #[test]
+fn only_filter_and_joinable_matching_keep_listed_open_clubs() {
+    let pool = ClubPool::new([
+        listed(1, 100.0),
+        listed(2, 200.0),
+        closed(3, 300.0),
+        ListedClub {
+            member_count: 30,
+            ..listed(4, 400.0)
+        },
+    ]);
+    let ids = HashSet::from([2, 3, 4]);
+    let filter = ShortlistFilter {
+        include_closed: true,
+        include_full: true,
+        only: Some(&ids),
+        ..ShortlistFilter::default()
+    };
+    assert_eq!(pool.shortlist_matching(150.0, 10, filter).len(), 3);
+    assert_eq!(pool.joinable_matching(filter), vec![2]);
+}
+
+#[test]
 fn discord_filter_keeps_only_clubs_that_mention_it() {
     let pool = ClubPool::new([
         ListedClub {

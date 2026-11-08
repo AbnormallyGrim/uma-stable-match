@@ -151,6 +151,7 @@ export const en = {
   'form.balanceStrength': ({ value }: { value: string }) => `Balance strength: ${value}`,
   'form.includeFull': 'Include full clubs',
   'form.hasDiscord': 'Has Discord',
+  'form.quickApply': 'Has Quick Apply',
   'form.joinStyle': 'Join style',
   'form.playstyle': 'Playstyle',
   'form.anyPlaystyle': 'Any playstyle',
@@ -195,6 +196,7 @@ export const en = {
   'error.umamoe.detail': "The server couldn't get your data from uma.moe. Try again in a moment.",
 
   'hint.discord': 'Turn off Has Discord.',
+  'hint.quickApply': 'Turn off Has Quick Apply.',
   'hint.playstyle': 'Set playstyle back to any.',
   'hint.closed': "Pick Closed under join style to see clubs that aren't recruiting right now.",
   'hint.balance': 'Lower the balance strength or turn balance scoring off.',

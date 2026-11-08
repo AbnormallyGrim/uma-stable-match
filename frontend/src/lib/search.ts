@@ -21,6 +21,8 @@ export interface SearchState {
   playstyle: number | null;
   /** Only clubs whose description mentions Discord. */
   hasDiscord: boolean;
+  /** Only clubs people can apply to through the Discord bot. */
+  quickApply: boolean;
   includeFull: boolean;
 }
 
@@ -47,6 +49,7 @@ export const DEFAULT_SEARCH: SearchState = {
   joinStyle: null,
   playstyle: null,
   hasDiscord: false,
+  quickApply: false,
   includeFull: false,
 };
 
@@ -92,6 +95,7 @@ export function validate(state: SearchState): Validation {
     joinStyle: state.joinStyle,
     playstyle: state.playstyle,
     hasDiscord: state.hasDiscord,
+    quickApply: state.quickApply,
     includeFull: state.includeFull,
   };
   if (state.mode === 'trainer') {
@@ -138,6 +142,7 @@ export function fromUrlParams(params: URLSearchParams): SearchState | null {
     joinStyle: JOIN_STYLES.find((style) => style === params.get('join_style')) ?? null,
     playstyle: playstyleFrom(params.get('playstyle')),
     hasDiscord: params.get('has_discord') === 'true',
+    quickApply: params.get('quick_apply') === 'true',
     includeFull: params.get('include_full') === 'true',
   };
   if (trainerId !== null && isTrainerId(trainerId)) {

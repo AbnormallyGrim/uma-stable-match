@@ -118,6 +118,9 @@ export function emptyHints(options: Recommendations['options']): string[] {
   if (options.has_discord) {
     hints.push(t('hint.discord'));
   }
+  if (options.quick_apply) {
+    hints.push(t('hint.quickApply'));
+  }
   if (options.playstyles !== null) {
     hints.push(t('hint.playstyle'));
   }

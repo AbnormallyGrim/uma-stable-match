@@ -79,6 +79,7 @@ const withResults: Recommendations = recommendations({
     join_styles: null,
     playstyles: null,
     has_discord: false,
+    quick_apply: false,
     limit: 100,
   },
 });

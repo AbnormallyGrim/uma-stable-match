@@ -455,6 +455,7 @@ There's no public status endpoint. The page takes the data's age from each searc
 | `join_style` | No | | Comma-separated join styles to include, from `open`, `approval` and `closed`. Without it, open and approval clubs are included, and clubs whose join style is unknown too |
 | `playstyle` | No | | Comma-separated playstyle codes to include, from 1 to 31, such as `2,12`. Without it, every playstyle is included |
 | `has_discord` | No | `false` | `true` to include only clubs whose description [mentions Discord](#discord) |
+| `quick_apply` | No | `false` | `true` to include only clubs people can [apply to through Discord](#discord-applications), the ones marked `applications`. Needs Discord applications to be set up; without them no club matches |
 | `include_full` | No | `false` | `true` to include clubs with no open spot |
 | `limit` | No | `50` | Most clubs to return |
 
@@ -514,7 +515,7 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
 ```json
 {
   "trainer": { "trainer_id": 123456789012, "pace_per_day": 7600000.0 },
-  "options": { "balance_weight": 0.5, "include_closed": false, "include_full": false, "join_styles": null, "playstyles": null, "has_discord": false, "limit": 50 },
+  "options": { "balance_weight": 0.5, "include_closed": false, "include_full": false, "join_styles": null, "playstyles": null, "has_discord": false, "quick_apply": false, "limit": 50 },
   "updated_at": "2026-03-18T09:00:00Z",
   "month": "2026-03",
   "coverage": { "considered": 4980, "shortlisted": 120, "scored": 240, "pending": 0 },
@@ -578,7 +579,7 @@ Clubs with fewer than 8 rankable members aren't returned, and with balance scori
 |---|---|
 | `trainer.trainer_id` | The trainer ID you asked about, or `null` when you gave a `pace` |
 | `trainer.pace_per_day` | The pace used: yours from uma.moe, or the `pace` you gave |
-| `options` | The settings used, after defaults: `balance_weight` is `null` when balance scoring is off. `include_closed` says whether closed clubs could be included. `join_styles` and `playstyles` list the filters, or are `null` without them, and `has_discord` says whether only Discord clubs were searched |
+| `options` | The settings used, after defaults: `balance_weight` is `null` when balance scoring is off. `include_closed` says whether closed clubs could be included. `join_styles` and `playstyles` list the filters, or are `null` without them, `has_discord` says whether only Discord clubs were searched, and `quick_apply` whether only clubs taking applications through Discord were |
 | `updated_at` | When the clubs were scanned. Before the first scan finishes, when its club list was fetched |
 | `month` | Game month of the club data, `YYYY-MM` |
 | `coverage.considered` | Clubs in the pool that your options allow. Each was compared with your pace by its estimate |
@@ -609,7 +610,7 @@ Errors come back as `{"error": "..."}`:
 
 | Status | When |
 |---|---|
-| `400` | Any of these:<br>• the query string can't be read, for example because a parameter is repeated<br>• neither or both of `trainer_id` and `pace` are given<br>• `trainer_id` isn't a trainer ID<br>• `pace` isn't a number above zero<br>• `balance_weight` isn't a number from 0 to 1<br>• `balance=false` is given with `balance_weight`<br>• `balance`, `include_closed`, `include_full` or `has_discord` isn't `true` or `false`<br>• `join_style` names something other than `open`, `approval` and `closed`<br>• `playstyle` isn't a list of codes from 1 to 31<br>• `limit` isn't a positive whole number |
+| `400` | Any of these:<br>• the query string can't be read, for example because a parameter is repeated<br>• neither or both of `trainer_id` and `pace` are given<br>• `trainer_id` isn't a trainer ID<br>• `pace` isn't a number above zero<br>• `balance_weight` isn't a number from 0 to 1<br>• `balance=false` is given with `balance_weight`<br>• `balance`, `include_closed`, `include_full`, `has_discord` or `quick_apply` isn't `true` or `false`<br>• `join_style` names something other than `open`, `approval` and `closed`<br>• `playstyle` isn't a list of codes from 1 to 31<br>• `limit` isn't a positive whole number |
 | `401` | The [human check](#human-check) is on and the token, in the `Authorization: Bearer` header or the cookie, is missing, invalid or expired |
 | `404` | uma.moe doesn't know the trainer, or they aren't in their club's data |
 | `422` | The trainer has too little fan data this month to work out a pace |

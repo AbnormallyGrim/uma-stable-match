@@ -1,6 +1,6 @@
 //! `GET /api/v1/recommendations`: scores the cached clubs for a pace or a trainer.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -69,6 +69,7 @@ pub(crate) struct Params {
     join_style: Option<String>,
     playstyle: Option<String>,
     has_discord: Option<String>,
+    quick_apply: Option<String>,
     limit: Option<String>,
 }
 
@@ -122,6 +123,7 @@ struct OptionsView {
     join_styles: Option<Vec<&'static str>>,
     playstyles: Option<Vec<u32>>,
     has_discord: bool,
+    quick_apply: bool,
     limit: u32,
 }
 
@@ -186,7 +188,7 @@ pub(crate) async fn recommendations(
     let started = Instant::now();
     let shared = state.details.shared().clone();
     let paces = state.paces.clone();
-    let mut result = search(state, visitor, params).await;
+    let mut result = search(state, visitor, applications.clone(), params).await;
     if let Ok(Json(found)) = &mut result {
         mark(&applications, found.clubs.iter_mut().map(|c| &mut c.info)).await;
     }
@@ -277,6 +279,7 @@ fn log_search(
 async fn search(
     State(state): State<AppState>,
     Extension(visitor): Extension<Visitor>,
+    applications: Option<Extension<Applications>>,
     params: Result<Query<Params>, QueryRejection>,
 ) -> Result<Json<Recommendations>, ApiError> {
     let Query(params) = params.map_err(|_| ApiError::bad_request("invalid query string"))?;
@@ -313,7 +316,8 @@ async fn search(
     let include_full = parse_bool("include_full", &params.include_full)?.unwrap_or(false);
     let join_styles = parse_join_styles(&params.join_style)?;
     let playstyles = parse_playstyles(&params.playstyle)?;
-    let filter = ShortlistFilter {
+    let quick_apply = parse_bool("quick_apply", &params.quick_apply)?.unwrap_or(false);
+    let mut filter = ShortlistFilter {
         include_closed: parse_bool("include_closed", &params.include_closed)?.unwrap_or(false),
         include_full,
         join_styles: join_styles.as_ref().map(|styles| {
@@ -325,8 +329,15 @@ async fn search(
             .as_ref()
             .map(|codes| codes.iter().fold(0, |mask, code| mask | (1 << code))),
         discord_only: parse_bool("has_discord", &params.has_discord)?.unwrap_or(false),
+        only: None,
     };
     let include_closed = filter.allows_closed();
+    let quick_apply_clubs = if quick_apply {
+        Some(quick_apply_clubs(&state, &applications, filter).await?)
+    } else {
+        None
+    };
+    filter.only = quick_apply_clubs.as_ref();
     let limit = match blank_to_none(&params.limit) {
         None => DEFAULT_LIMIT,
         Some(value) => value
@@ -410,6 +421,7 @@ async fn search(
                 .map(|styles| styles.into_iter().map(join_style_name).collect()),
             playstyles,
             has_discord: filter.discord_only,
+            quick_apply,
             limit,
         },
         updated_at: timestamp(updated_at),
@@ -424,6 +436,30 @@ async fn search(
             .collect(),
         your_club,
     }))
+}
+
+// The clubs `filter` allows that people can apply to through Discord. None take applications
+// when Discord is off.
+async fn quick_apply_clubs(
+    state: &AppState,
+    applications: &Option<Extension<Applications>>,
+    filter: ShortlistFilter<'_>,
+) -> Result<HashSet<u64>, ApiError> {
+    let Some(Extension(applications)) = applications else {
+        return Ok(HashSet::new());
+    };
+    let candidates = state
+        .details
+        .pool()
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .joinable_matching(filter);
+    applications.taking(&candidates).await.ok_or_else(|| {
+        ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "couldn't check which clubs take applications; try again shortly",
+        )
+    })
 }
 
 // The trainer's club scored as if they were joining it: without their own member row and one
@@ -485,7 +521,7 @@ async fn load_clubs(
     details: &ClubDetails,
     settings: MatchSettings,
     pace: f64,
-    filter: ShortlistFilter,
+    filter: ShortlistFilter<'_>,
 ) -> (Vec<Club>, Coverage, SearchDepth) {
     let (nearest, slowest, considered) = tracing::info_span!("shortlist").in_scope(|| {
         let pool = details.pool().read().unwrap_or_else(|e| e.into_inner());
