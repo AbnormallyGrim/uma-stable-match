@@ -341,8 +341,6 @@ export const ja: Catalog = {
   'wishlist.intro':
     '作ってみたいアイデアをいくつか並べました。実際に使いたいと思うものに投票してください。',
   'wishlist.polls': '投票',
-  'wishlist.poll.dashboard': 'リーダー向け応募ダッシュボードの投票',
-  'wishlist.poll.discord': 'Discord Botによる応募連携の投票',
   'wishlist.poll.jpTrainers': '日本版のトレーナーとサークルの投票',
   'wishlist.aboutLabel': '投票について',
   'wishlist.about':

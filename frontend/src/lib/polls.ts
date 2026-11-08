@@ -14,8 +14,6 @@ export interface Poll {
 
 /** The polls, in the order they show. */
 export const POLLS: Poll[] = [
-  { id: '7MZ0k5l2mgo', title: 'wishlist.poll.dashboard', height: 440 },
-  { id: 'poy9kMvNAgJ', title: 'wishlist.poll.discord', height: 490 },
   { id: 'NMnQNoMKMg6', title: 'wishlist.poll.jpTrainers', height: 304 },
 ];
 

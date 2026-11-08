@@ -364,8 +364,6 @@ export const en = {
   'wishlist.intro':
     "Here are some ideas I'm thinking of building. Vote on the ones you'd actually use.",
   'wishlist.polls': 'Polls',
-  'wishlist.poll.dashboard': 'Leader Focused Applications Dashboard poll',
-  'wishlist.poll.discord': 'Discord Bot Applications Integration poll',
   'wishlist.poll.jpTrainers': 'JP Trainer and Circles poll',
   'wishlist.aboutLabel': 'About these polls',
   'wishlist.about':
