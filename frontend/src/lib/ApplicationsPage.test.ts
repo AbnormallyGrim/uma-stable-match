@@ -1,6 +1,6 @@
 // ApplicationsPage component tests with a stubbed fetch. All data is made up.
 
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import ApplicationsPage from './ApplicationsPage.svelte';
@@ -20,8 +20,8 @@ function stub(routes: Record<string, () => Response | Promise<Response>>) {
   return fetchMock;
 }
 
-const signedIn = { '/api/v1/applications/me': () => json({ discord_id: '42' }) };
-const signedOut = { '/api/v1/applications/me': () => json({ error: 'not signed in' }, 401) };
+const signedIn = { '/api/v1/auth/session': () => json({ discord_id: '42' }) };
+const signedOut = { '/api/v1/auth/session': () => json({ error: 'not signed in' }, 401) };
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -29,14 +29,14 @@ afterEach(() => {
 });
 
 describe('ApplicationsPage', () => {
-  it('shows its heading and intro, with no privacy link of its own', () => {
+  it('shows its heading and intro, with no privacy link outside the footer', () => {
     stub(signedOut);
     render(ApplicationsPage);
     expect(
       screen.getByRole('heading', { level: 1, name: t('applications.heading') }),
     ).toBeInTheDocument();
     expect(screen.getByText(t('applications.intro'))).toBeInTheDocument();
-    const links = screen.queryAllByRole('link');
+    const links = within(screen.getByRole('main')).queryAllByRole('link');
     expect(links.some((link) => /\/privacy\/$/.test(link.getAttribute('href') ?? ''))).toBe(false);
   });
 
@@ -49,11 +49,10 @@ describe('ApplicationsPage', () => {
     expect(screen.queryByLabelText(/role/i)).not.toBeInTheDocument();
   });
 
-  it('says so when it cannot tell whether you are signed in', async () => {
-    stub({ '/api/v1/applications/me': () => json({ error: 'down' }, 503) });
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  it("doesn't check the session itself, since the page only opens once someone is signed in", () => {
+    const fetchMock = stub(signedIn);
     render(ApplicationsPage);
-    expect(await screen.findByRole('alert')).toHaveTextContent(t('applications.session.error'));
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/v1/auth/session', expect.anything());
   });
 
   it('has no sign-out button, signed in or not', async () => {

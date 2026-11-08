@@ -26,6 +26,13 @@ export const ja: Catalog = {
   'releases.change.improved': '改善',
   'releases.change.fixed': '修正',
 
+  'releases.quickApply.title': 'かんたん応募でサークルに応募',
+  'releases.quickApply.body':
+    'Discordでサインインすると、ボットのあるサークルにワンクリックで応募でき、応募状況は「サークル申請」ページで確認できます。',
+  'releases.leaderApplications.title': 'サークルの応募を受け付けよう',
+  'releases.leaderApplications.body':
+    'サークルマスターは自分のDiscordサーバーにボットを追加して条件を設定し、トレーナーの1日のファン獲得数と履歴を見ながら承認または辞退できます。',
+  'releases.leaderApplications.link': 'サークル申請を開く',
   'releases.trainerLookup.title': 'サークルに所属していないトレーナーが見つからない問題を修正',
   'releases.trainerLookup.body':
     'トレーナーIDで検索すると、現在サークルに所属していないトレーナーや、今月まだファン数の増加がないトレーナーにもおすすめが表示されます。',
@@ -355,13 +362,9 @@ export const ja: Catalog = {
     '<ul><li>サークルマスターはDiscord設定と運営状況をまとめて管理できます。</li><li>トレーナーは応募済みのサークルを一覧で確認し、進行状況を把握できます。</li></ul>',
   'applications.privacy': ({ href }: { href: string }) =>
     `Discordへのサインインは、サークル申請の管理のためだけに使われます。<a href="${href}">プライバシー情報</a>をご確認ください。`,
-  'applications.session.loading': 'Discordセッションを確認しています…',
-
   'applications.session.signIn': 'Discordでサインイン',
   'applications.session.signedIn': 'Discordセッションは有効です。',
 
-  'applications.session.error':
-    'Discordセッションを確認できませんでした。しばらくしてからもう一度お試しください。',
   'applications.role.heading': 'どちらに当てはまりますか？',
   'applications.role.leader.title': 'サークルマスターです',
   'applications.role.leader.description':

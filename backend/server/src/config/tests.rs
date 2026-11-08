@@ -817,17 +817,6 @@ fn reads_the_japanese_flag() {
     ]))
     .unwrap();
     assert!(config.features.japanese);
-    assert!(!config.features.applications);
-}
-
-#[test]
-fn reads_the_applications_flag() {
-    let config = Config::from_lookup(lookup(&[
-        ("UMAMOE_API_KEY", "test-key"),
-        ("ENABLE_APPLICATIONS", "true"),
-    ]))
-    .unwrap();
-    assert!(config.features.applications);
 }
 
 #[test]

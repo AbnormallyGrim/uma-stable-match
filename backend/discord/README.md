@@ -90,7 +90,7 @@ Discord sends a signed PING, and a badly signed request, when the URL is saved i
 |---|---|
 | `GET /api/v1/auth/discord/login?flow=sign_in&next=/path` | Redirects to Discord's authorize page. `next` is where the visitor lands afterwards: a path on this site, else `/` |
 | `GET /api/v1/auth/discord/callback` | Where Discord sends the visitor back. Checks the `state`, trades the code for the visitor's Discord ID, starts the session and redirects to `next`. When it fails, a browser (a request that accepts `text/html`) is redirected to `/applications?error=<result>` (`APPLICATIONS_PAGE`) instead of seeing JSON |
-| `GET /api/v1/applications/me` | `{"discord_id": "…", "name": "…"}` for a signed-in person, else 401. `name` is their Discord display name, or their username without one, and `null` if Discord couldn't be asked. Never cached |
+| `GET /api/v1/auth/session` | `{"discord_id": "…", "name": "…"}` for a signed-in person, else 401. `name` is their Discord display name, or their username without one, and `null` if Discord couldn't be asked. Never cached |
 | `POST /api/v1/auth/sign-out` | Ends the session and clears its cookie (204), so a copy of the cookie stops working too. 503 if that can't be saved (the session stays). A POST, so another site can't trigger it with a link, and refused (403) when its `Origin` isn't this site |
 | `DELETE /api/v1/auth/account` | Deletes the person's [trainer links](#club-links), pending keys and attempt counts, ends every session they have, on any device, and clears the cookie (204). Clubs they opted in stay linked. 401 without a session, 503 if the saved links can't be reached (the session stays; try again). A DELETE, so another site can't trigger it with a link or form (`ACCOUNT_PATH`) |
 
@@ -109,7 +109,7 @@ Discord sends a signed PING, and a badly signed request, when the URL is saved i
 
 **Sign-out's origin.** Browsers send `Origin` with every `POST`. Sign-out is refused when it names another site, so a form elsewhere can't sign people out. The scheme and host must match `PUBLIC_URL`; the port is ignored, so a local dev server's proxy still works. A request with no `Origin` isn't from a browser page and is allowed.
 
-**What's kept.** The access token is used for one `GET /users/@me` inside the callback request and then dropped; only the ID is kept, inside the session cookie. The name `GET /api/v1/applications/me` gives is looked up as the bot (`GET /users/{id}`) and held in memory for 10 minutes (`NAME_TTL`), never in the cookie or Redis; deleting the account drops it. Nothing from Discord is logged: a failed sign-in logs Discord's error message, not the user. Results are counted in `discord_sign_ins_total`, labelled by `result` (`success`, `invalid_state`, `denied`, `discord_error`, or for opting a club in `no_server`, `wrong_server`, `not_manager`, `not_leader`, `missing_permissions` and `unavailable`).
+**What's kept.** The access token is used for one `GET /users/@me` inside the callback request and then dropped; only the ID is kept, inside the session cookie. Beside it, the page-readable `uma_signed_in` cookie holds only the session's expiry, so the web app knows a session exists without asking; it proves nothing. Signing in sets it, signing out, deleting the account and a `401` from `GET /api/v1/auth/session` clear it, and a successful session check puts it back if it's missing. The name `GET /api/v1/auth/session` gives is looked up as the bot (`GET /users/{id}`) and held in memory for 10 minutes (`NAME_TTL`), never in the cookie or Redis; deleting the account drops it. Nothing from Discord is logged: a failed sign-in logs Discord's error message, not the user. Results are counted in `discord_sign_ins_total`, labelled by `result` (`success`, `invalid_state`, `denied`, `discord_error`, or for opting a club in `no_server`, `wrong_server`, `not_manager`, `not_leader`, `missing_permissions` and `unavailable`).
 
 ## Finding a club's server
 
@@ -210,7 +210,7 @@ Everything about a linked club, from its settings to unlinking it, is for its le
    - saves the application, unless the player has a pending one to this club (`already_applied`, 409) or sent `MAX_PER_DAY` (5) in the last day (`too_many_applications`, 429);
    - adds the player to the club's server with their access token, which lives only in that call. Players are always added, whatever the club's `auto_join` says;
    - opens the ticket and notes it on the application. If any step after saving fails, the application is taken back, so a failed try costs nothing (`join_failed`, `ticket_failed`).
-4. The player lands on `/applications/mine`.
+4. The player lands on `/applications/trainer`.
 
 **The ticket** is a private text channel named `app-<trainer name>`, in the club's category if it has one. Everyone else is shut out; the applicant, the leader noted on the club and the bot can see it. If Discord refuses it, the leader may have left the server, so it's tried once more without them. The bot posts an embed with the trainer's name and a link to `https://uma.moe/profile/<trainer ID>`, the applicant, their current club, pace, fans this month, total fans, average fans per day, week and month, fans rank and days tracked, and Accept and Decline buttons.
 

@@ -14,7 +14,12 @@ const releases: Release[] = [
     kind: 'update',
     changes: [
       { kind: 'new', title: 'releases.yourClub.title', body: 'releases.yourClub.body' },
-      { kind: 'improved', title: 'releases.earlyMonth.title', body: 'releases.earlyMonth.body' },
+      {
+        kind: 'improved',
+        title: 'releases.earlyMonth.title',
+        body: 'releases.earlyMonth.body',
+        link: { label: 'releases.leaderApplications.link', href: '/applications' },
+      },
     ],
   },
   {
@@ -73,6 +78,15 @@ describe('ReleaseNotes', () => {
     expect(within(hotfix!).getByText('Hotfix')).toBeInTheDocument();
     expect(within(hotfix!).queryByText('Latest')).not.toBeInTheDocument();
     expect(within(hotfix!).getByText('Fixed')).toBeInTheDocument();
+  });
+
+  it("links to a change's page when it has one", () => {
+    setup();
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Open Applications' })).toHaveAttribute(
+      'href',
+      '/applications',
+    );
   });
 
   it('shows the Japanese notes when Japanese is on', () => {

@@ -28,6 +28,13 @@ export const en = {
   'releases.change.improved': 'Improved',
   'releases.change.fixed': 'Fixed',
 
+  'releases.quickApply.title': 'Apply to clubs with Quick Apply',
+  'releases.quickApply.body':
+    'Sign in with Discord and apply to any club that has the bot with one click, then follow your applications under Applications.',
+  'releases.leaderApplications.title': 'Take applications for your club',
+  'releases.leaderApplications.body':
+    'Club leaders can add the bot to their Discord server, set their requirements, and accept or decline each trainer with their fan pace and history in front of them.',
+  'releases.leaderApplications.link': 'Open Applications',
   'releases.trainerLookup.title': "Fixed trainers not being found when they're between clubs",
   'releases.trainerLookup.body':
     "Searching by trainer ID now gives recommendations for trainers who aren't in a club right now, or have no fan gains yet this month.",
@@ -377,11 +384,8 @@ export const en = {
     '<ul><li>Leaders can manage the bot and their club settings when the Discord setup is live.</li><li>Trainers can track their applications and keep an eye on the clubs they want to join.</li></ul>',
   'applications.privacy': ({ href }: { href: string }) =>
     `Your Discord sign-in is only used for club application management. See our <a href="${href}">privacy information</a>.`,
-  'applications.session.loading': 'Checking your Discord session…',
   'applications.session.signIn': 'Sign in with Discord',
   'applications.session.signedIn': 'Your Discord session is active.',
-  'applications.session.error':
-    'We could not check your Discord session right now. Please try again in a moment.',
   'applications.role.heading': 'Who are you?',
   'applications.role.leader.title': 'I’m a club leader',
   'applications.role.leader.description':

@@ -1,21 +1,3 @@
-// Whether the club applications pages (/privacy/, /terms/ and /bot/) and the navbar link are shown,
-// from the server's ENABLE_APPLICATIONS. While it is off, or the server can't be asked, those pages
-// send visitors to the home page. When turning it on, also remove the noindex tag from
-// privacy/index.html, terms/index.html and bot/index.html, and add /privacy/, /terms/ and /bot/
-// back to sitemap.xml and index.md.
-fetch('/api/v1/features')
-    .then((response) => (response.ok ? response.json() : {}))
-    .catch(() => ({}))
-    .then((features) => {
-        if (features.applications === true) {
-            for (const el of document.querySelectorAll('[data-applications]')) {
-                el.hidden = false;
-            }
-        } else if (['/privacy', '/terms', '/bot'].some((path) => location.pathname.startsWith(path))) {
-            location.replace('/');
-        }
-    });
-
 // The theme switch: shows the saved choice, applies a new one and remembers it, like the web app.
 (() => {
     const key = 'uma-stable-match:theme';
@@ -68,6 +50,7 @@ if (location.hostname === 'site.localhost') {
         'meta.description': 'ウマ娘のサークル検索・マッチングツール(無料)。あなたの1日のファン獲得数と、空きのある全サークルのメンバーを比べ、ぴったり合うサークルを順位付けします。',
         'nav.label': 'メインメニュー',
         'nav.how': 'しくみ',
+        'nav.apply': '応募',
         'nav.faq': 'よくある質問',
         'nav.pages': 'ページ',
         'nav.home': 'ホーム',
@@ -97,7 +80,7 @@ if (location.hostname === 'site.localhost') {
         'how.open.body': '空きのあるサークルだけを比べます(条件を変えない限り)。現在のメンバーだけを数えるので、抜けたプレイヤーがサークルの数字を狂わせることはありません。',
         'results.title': '選ぶのに必要な情報がすべて',
         'results.body': '上位100件を検索・並べ替えして、サークルのuma.moeページを開き、サークルマスターに連絡できます。',
-        'results.alt': '上位の結果の表。各サークルのティア、順位、先月の順位、空き枠、加入方法、1日の中央値、あなたの順位、バランス、おんぶ組、上位3人の割合、スコアが並んでいます。',
+        'results.alt': '上位の結果の表。各サークルのティア、順位、先月の順位、空き枠、加入方法、1日の中央値、あなたの順位が並び、それぞれに「メンバーを見る」ボタンがあります。',
         'results.caption': '上位の結果の表(サークルは架空のものです)。',
         'field.0.name': 'あなたの順位',
         'field.0.value': '30人中8位',
@@ -117,6 +100,23 @@ if (location.hostname === 'site.localhost') {
         'field.5.name': 'おんぶ組',
         'field.5.value': '27人中0人',
         'field.5.note': '1日のファン獲得数が100万未満、またはサークルの中央値の4分の1未満のメンバー。',
+        'apply.title': 'ワンクリックでサークルに応募',
+        'apply.body': 'Discordでサインインして、結果からそのまま応募できます。Uma Stable Matchのボットがあるサークルには、あなたのファン獲得ペースと履歴が非公開チケットで届き、応募状況はまとめて確認できます。',
+        'apply.alt': '「自分の申請」ページ。4件の応募について、トレーナーID、送信日、有効期限、保留中・承認・辞退の状態が一覧になっています。',
+        'apply.caption': '自分の申請(サークルは架空のものです)。',
+        'apply.quick.title': 'かんたん応募',
+        'apply.quick.body': 'ボットのあるサークルで「かんたん応募」を選ぶだけで応募が送られます。入力フォームもスクリーンショットも不要です。',
+        'apply.ticket.title': 'あなたの数字つきチケット',
+        'apply.ticket.body': 'サークルマスターは、1日のファン獲得数、今月のファン数、現在のサークルを非公開のDiscordチケットで確認し、承認または辞退します。',
+        'apply.track.title': 'すべての応募を確認',
+        'apply.track.body': '保留中・承認・辞退の状態と、それぞれの有効期限を確認できます。',
+        'apply.cta': 'サークル申請を開く',
+        'apply.leaders': 'サークルマスターの方はボットをチェック',
+        'wish.title': '次に作るものを一緒に決めよう',
+        'wish.body': 'サークルマスター向けのダッシュボードから日本版のトレーナーとサークルまで、使いたいアイデアに投票してください。',
+        'wish.alt': 'ウィッシュリストのページ。次に作るものを決めるための見出しと、サークルマスター向け応募ダッシュボードやDiscordボット連携の投票が並んでいます。',
+        'wish.caption': 'ウィッシュリスト(投票数は架空のものです)。',
+        'wish.cta': 'ウィッシュリストを開く',
         'faq.title': 'よくある質問',
         'faq.0.q': 'ウマ娘で良いサークルはどう探せばいいですか?',
         'faq.0.a': '空きがあり、メンバーのファン獲得ペースがあなたと近く、あなたがメンバーの真ん中あたりに入れて、ほとんどのメンバーがしっかり貢献しているサークルを探しましょう。Uma Stable Matchは、対象の順位帯にあるすべてのサークルでこの比較を行い、いちばん合うサークルを順位付けします。',

@@ -25,6 +25,7 @@ import {
   unlinkTrainer,
   type Settings,
 } from './applications';
+import { ACCOUNT_KEY, saveAccount, sessionMarker, SIGNED_IN_COOKIE } from './session';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -65,6 +66,17 @@ describe('adding the bot', () => {
   it('fails on other answers, such as being signed out', async () => {
     const signedOut = vi.fn<typeof fetch>(async () => json({ error: 'sign in' }, 401));
     await expect(hasInvite('7', { fetch: signedOut })).rejects.toMatchObject({ status: 401 });
+  });
+});
+
+describe('an ended session', () => {
+  it('is forgotten on any 401, so later pages stop counting on it', async () => {
+    document.cookie = `${SIGNED_IN_COOKIE}=1794170000; Path=/`;
+    saveAccount('1794170000', { discordId: '42', name: null }, localStorage);
+    const signedOut = vi.fn<typeof fetch>(async () => json({ error: 'sign in' }, 401));
+    await expect(fetchMyClub({ fetch: signedOut })).rejects.toMatchObject({ status: 401 });
+    expect(sessionMarker()).toBeNull();
+    expect(localStorage.getItem(ACCOUNT_KEY)).toBeNull();
   });
 });
 

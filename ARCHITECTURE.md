@@ -68,7 +68,6 @@ backend/
 frontend/          Web interface (Svelte + TypeScript)
 observability/     Prometheus config and Grafana dashboards for local metrics
 site/              Project website, served by the server at umastable.com, with a Markdown copy for agents
-                   (its club applications privacy page, privacy/, is behind a flag in site.js, off for now)
 docs/images/       README screenshots and the website's original artwork
 ```
 

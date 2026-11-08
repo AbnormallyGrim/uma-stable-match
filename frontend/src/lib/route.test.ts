@@ -33,14 +33,14 @@ describe('clubRoute', () => {
   });
 
   it("reads a trainer's own applications page", () => {
-    expect(applicationsRoute('/applications/mine', '')).toEqual({ page: 'trainer' });
-    expect(applicationsRoute('/applications/mine/', '')).toEqual({ page: 'trainer' });
-    expect(TRAINER_APPLICATIONS_PATH).toBe('/applications/mine');
+    expect(applicationsRoute('/applications/trainer', '')).toEqual({ page: 'trainer' });
+    expect(applicationsRoute('/applications/trainer/', '')).toEqual({ page: 'trainer' });
+    expect(TRAINER_APPLICATIONS_PATH).toBe('/applications/trainer');
   });
 
   it('leaves other pages alone', () => {
     for (const path of [
-      '/applications/mine/7',
+      '/applications/trainer/7',
       '/',
       '/club',
       '/club/',

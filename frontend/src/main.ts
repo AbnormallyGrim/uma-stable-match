@@ -7,8 +7,6 @@ import ClubPage from './lib/ClubPage.svelte';
 import ApplicationsPage from './lib/ApplicationsPage.svelte';
 import ClubApplicationsPage from './lib/ClubApplicationsPage.svelte';
 import ClubComparePage from './lib/ClubComparePage.svelte';
-import { fetchFeatures } from './lib/api';
-import { flags } from './lib/flags.svelte';
 import LoginPage from './lib/LoginPage.svelte';
 import {
   applicationsRoute,
@@ -34,16 +32,9 @@ if (!target) {
   throw new Error('missing #app element');
 }
 
-// Only the applications pages wait for the flag; elsewhere it just adds a navbar link later.
 const isApplicationsPath = /^\/applications(?:\/|$)/.test(window.location.pathname);
-if (isApplicationsPath) {
-  flags.applications = await fetchFeatures().then(
-    (found) => found.applications,
-    () => false,
-  );
-}
 const isSettingsPath = isSettingsRoute(window.location.pathname);
-const isProtected = (isApplicationsPath && flags.applications) || isSettingsPath;
+const isProtected = isApplicationsPath || isSettingsPath;
 
 let shouldRedirectToLogin = false;
 if (isProtected) {
@@ -59,9 +50,7 @@ if (isProtected) {
 
 if (!shouldRedirectToLogin) {
   const club = clubRoute(window.location.pathname, window.location.search);
-  const applications = flags.applications
-    ? applicationsRoute(window.location.pathname, window.location.search)
-    : null;
+  const applications = applicationsRoute(window.location.pathname, window.location.search);
 
   const isApplicationHome = applications?.page === 'home';
 

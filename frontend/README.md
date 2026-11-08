@@ -65,6 +65,7 @@ src/lib/applications.ts            The applications API client: sign-in, the lea
 src/lib/SettingsPage.svelte   The settings page: link a trainer ID, sign out, delete the account
 src/lib/AccountMenu.svelte    The navbar's account menu for a person signed in with Discord
 src/lib/account.svelte.ts     Who is signed in, shared by every component
+src/lib/session.ts            Remembering who is signed in between pages: the signed-in cookie and the saved person
 src/lib/WishlistPage.svelte   The wishlist page: StrawPoll polls for ideas, in frames
 src/lib/polls.ts              The polls on the wishlist page
 src/lib/ClubPage.svelte       The club page: a club's details, its chart and member cards, with you added
@@ -95,8 +96,7 @@ src/lib/language.svelte.ts    The language shown right now, shared by every comp
 src/lib/SiteFooter.svelte     Tips, the logo, buttons to report a problem and support the project, the disclaimer, and Privacy Policy and Terms of Service links once applications are on
 src/lib/BrandLogo.svelte      The logo, in the version for the current theme
 src/lib/api.ts                Typed API client
-src/lib/features.ts           Switches on Japanese, applications and analytics from the server's features, on every page
-src/lib/flags.svelte.ts       Feature flags from the server, shared by every component
+src/lib/features.ts           Switches on Japanese and analytics from the server's features, on every page
 src/lib/human.ts              The human check: Turnstile challenge and API token
 src/lib/search.ts             Search validation, URL parameters and "remember me"
 src/lib/format.ts             Number, rank trend, label and time formatting
@@ -129,9 +129,17 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 
 ### Account menu
 
-`main.ts` asks `GET /api/v1/applications/me` who is signed in once per page (`loadAccount()` in `account.svelte.ts`), waiting for the answer only on pages that need a session. Once someone is, `AccountMenu.svelte` shows last in the navbar: a pill with their Discord name (or "Discord account" when the server couldn't look it up), cut short with an ellipsis when long. It opens a menu with **Signed in as …**, **Settings** and **Sign Out**, following the ARIA menu button pattern: arrow keys, Home and End move between the items, and Escape, Tab or a click elsewhere closes it. Signing out from a page that needs a session goes to the club finder; elsewhere the menu gives way to the sign-in button.
+`main.ts` works out who is signed in once per page (`loadAccount()` in `account.svelte.ts`), waiting for it only on pages that need a session. Pages don't ask again themselves: anything that needs the person reads `account` or calls `loadAccount()`. It asks the server as little as it can, through `session.ts`:
 
-Signed out, the same place holds a round silhouette button, **Sign in**, linking to `/login?next=<this page>`. It waits for the server's answer (`account.known`), so a signed-in person never sees it flash first, and it's left out while applications are off and on the login page itself.
+- Without the server's `uma_signed_in` cookie, nobody is signed in and the server isn't asked. The server sets that cookie beside the session, readable by the page, holding the session's expiry, and clears it on sign-out and account deletion. It expires with the session.
+- With it, the person saved in local storage (`uma-stable-match:account`) for the same session is reused. Only after signing in, or when nothing is saved, does the page ask `GET /api/v1/auth/session`, and it saves the answer.
+- Any 401 from the applications API, signing out and deleting the account drop both, so a session ended elsewhere stops counting at the next request. Signing out in one tab signs the others out through the `storage` event.
+
+The saved person only chooses what the navbar shows and whether a page sends you to sign in; every API call still checks the session. After deleting the account on one device, another may keep showing the account menu until its next request.
+
+ Once someone is, `AccountMenu.svelte` shows last in the navbar: a pill with their Discord name (or "Discord account" when the server couldn't look it up), cut short with an ellipsis when long. It opens a menu with **Signed in as …**, **Settings** and **Sign Out**, following the ARIA menu button pattern: arrow keys, Home and End move between the items, and Escape, Tab or a click elsewhere closes it. Signing out from a page that needs a session goes to the club finder; elsewhere the menu gives way to the sign-in button.
+
+Signed out, the same place holds a round silhouette button, **Sign in**, linking to `/login?next=<this page>`. It waits until the account is worked out (`account.known`), so a signed-in person never sees it flash first, and it's left out on the login page itself.
 
 The menu or the sign-in button makes the tools wider, so while either shows (`showsAccount()`) the page names in the pill show from 1440px rather than 900px, and the three-column layout starts at 1100px rather than 960px. Below that the navbar wraps, as it does on phones.
 
@@ -312,7 +320,7 @@ Card descriptions are capped at `80ch` so they stay easy to read on wide screens
 
 ### Footer
 
-`SiteFooter.svelte` is the page's `<footer>` landmark, below `<main>`. Its last line is **Privacy Policy** and **Terms of Service** links to the website's `/privacy/` and `/terms/` pages, in new tabs, shown only once `flags.applications` is on, because the website redirects that page home until then.
+`SiteFooter.svelte` is the page's `<footer>` landmark, below `<main>`. Its last line is **Privacy Policy** and **Terms of Service** links to the website's `/privacy/` and `/terms/` pages, in new tabs.
 
 | Part | Content |
 |---|---|
@@ -401,8 +409,6 @@ The navbar keeps the release notes but has no tour button here.
 
 ## Club applications pages
 
-**Feature flag.** The server's `ENABLE_APPLICATIONS` setting, off by default, switches on these pages and the website's `/privacy/` page. It is read at run time from `GET /api/v1/features`, so changing it needs no rebuild. On an `/applications` address, `main.ts` asks for it before mounting; while it is off, or the request fails, these pages aren't mounted, so `/applications`, `/applications/club/{id}` and `/applications/mine` open the club finder like any unknown address. Elsewhere, `applyFeatures()` sets `flags.applications` and `pages()` adds the **Applications** link to the navbar once it's on. The components and their tests don't depend on the flag. The website's `site.js` reads the same endpoint for its privacy page and navbar link; see the notes at the top of that file for what else to change when turning it on.
-
 **Placeholder copy.** All text on these pages is lorem ipsum for now: the `applications.*` messages (except `applications.link`, the navbar label), in both languages. The website's privacy page is real, English-only text. Tests read the text through `t()`, so replacing it needs no test changes.
 
 `/applications`, `/applications/club` and `/applications/club/{id}` are where a club leader sets up applications through Discord. `main.ts` mounts `ApplicationsPage.svelte` or `ClubApplicationsPage.svelte`; `applicationsRoute()` reads the address and `clubApplicationsPath()` builds it. A **Club applications** link joins the navbar's pages. `applications.ts` wraps the [Discord endpoints](../backend/discord/README.md); they aren't behind the human check, and they use the session cookie, so requests are same-origin.
@@ -423,7 +429,7 @@ The navbar keeps the release notes but has no tour button here.
 - **Once it's added**, `BotPanel.svelte` sits beside the applications: the bot's status as a checklist, the settings (**Take applications**, **Add applicants to the server**) and **Remove the bot**, which asks once before sending the `DELETE` and then shows the setup steps again. When applications are paused, a notice above the table has a **Resume** button.
 - **Applications.** `ApplicationsTable.svelte` lists them newest first with status filters, as cards on narrow screens, and **View** opens `ApplicationDetails.svelte`, laid out like the message the bot posted, with a link to the ticket channel. No endpoint lists a club's applications yet, so the page passes an empty list and the table shows its empty state.
 
-**A trainer's applications page** (`/applications/mine`, `TRAINER_APPLICATIONS_PATH`) is where a trainer follows the applications they've sent. The **I'm a trainer** card on `/applications` opens it. Like the club's page, it needs a session, so `main.ts` sends a signed-out visitor to `/login` first. It has no bot setup or bot panel: just `TrainerApplicationsTable.svelte`, which lists each application's club (linking to its club page), trainer ID, submitted and expiry dates, status and ticket link, newest first with the same status filters, and as cards on narrow screens.
+**A trainer's applications page** (`/applications/trainer`, `TRAINER_APPLICATIONS_PATH`) is where a trainer follows the applications they've sent. The **I'm a trainer** card on `/applications` opens it. Like the club's page, it needs a session, so `main.ts` sends a signed-out visitor to `/login` first. It has no bot setup or bot panel: just `TrainerApplicationsTable.svelte`, which lists each application's club (linking to its club page), trainer ID, submitted and expiry dates, status and ticket link, newest first with the same status filters, and as cards on narrow screens.
 
 An application expires one calendar month after it was sent, or on the last day of that month when it has no such date (31 January expires on 28 February). `expiresAt()` in `applications.ts` works this out in UTC, and `activeApplications()` drops the expired ones, so the table only ever shows active applications. No endpoint lists a trainer's applications yet, so the page passes an empty list and the table shows its empty state.
 
@@ -562,7 +568,7 @@ The site launched as `1.0.0` on 23 October 2026. A release's date is the day it 
 
 ### Add a release
 
-1. Add the release at the **top** of `RELEASES` in `src/lib/releases.ts`, with its build, date, kind and changes. Each change has a kind (`new`, `improved` or `fixed`) and the keys of its title and body messages.
+1. Add the release at the **top** of `RELEASES` in `src/lib/releases.ts`, with its build, date, kind and changes. Each change has a kind (`new`, `improved` or `fixed`) and the keys of its title and body messages. It can also have a `link`, the key of its label and a path on this site, shown under the body to take players to the page it's about.
 2. Write both messages in `messages/en.ts` and `messages/ja.ts`, under `releases.<name>.title` and `releases.<name>.body`. The tests fail if one language is missing.
 
 Writing the notes:

@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BEACON_SRC } from './analytics';
 import { applyFeatures } from './features';
-import { flags } from './flags.svelte';
 import { language } from './language.svelte';
 
 const json = (body: unknown, status = 200) =>
@@ -14,21 +13,17 @@ const beacon = () => document.head.querySelector(`script[src="${BEACON_SRC}"]`);
 
 afterEach(() => {
   language.japaneseEnabled = false;
-  flags.applications = false;
   beacon()?.remove();
 });
 
 describe('applyFeatures', () => {
   it('switches on what the server has on', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>(() =>
-      Promise.resolve(
-        json({ japanese: true, applications: true, web_analytics: 'madeuptoken123' }),
-      ),
+      Promise.resolve(json({ japanese: true, web_analytics: 'madeuptoken123' })),
     );
     await applyFeatures({ fetch });
     expect(fetch).toHaveBeenCalledWith('/api/v1/features', expect.anything());
     expect(language.japaneseEnabled).toBe(true);
-    expect(flags.applications).toBe(true);
     expect(beacon()).not.toBeNull();
   });
 
@@ -38,7 +33,6 @@ describe('applyFeatures', () => {
     );
     await expect(applyFeatures({ fetch })).resolves.toBeUndefined();
     expect(language.japaneseEnabled).toBe(false);
-    expect(flags.applications).toBe(false);
     expect(beacon()).toBeNull();
   });
 });

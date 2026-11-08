@@ -24,8 +24,8 @@ pub const LOGIN_PATH: &str = "/api/v1/auth/discord/login";
 /// Discord Developer Portal.
 pub const CALLBACK_PATH: &str = "/api/v1/auth/discord/callback";
 
-/// Path that answers with the signed-in leader.
-pub const APPLICATIONS_ME_PATH: &str = "/api/v1/applications/me";
+/// Path that answers with who is signed in.
+pub const SESSION_PATH: &str = "/api/v1/auth/session";
 
 /// Path that ends the session.
 pub const SIGN_OUT_PATH: &str = "/api/v1/auth/sign-out";
@@ -43,6 +43,9 @@ const STATE_PURPOSE: &str = "state";
 const SESSION_PURPOSE: &str = "session";
 const NONCE_COOKIE: &str = "uma_discord_nonce";
 const SESSION_COOKIE: &str = "uma_session";
+/// Cookie the frontend can read, holding the session's expiry, so pages know a session exists
+/// without asking. It holds nothing secret and proves nothing; the session cookie does.
+pub const SIGNED_IN_COOKIE: &str = "uma_signed_in";
 /// Longest `next` path kept.
 const MAX_NEXT_LEN: usize = 200;
 
@@ -123,7 +126,7 @@ pub(crate) fn router(discord: Discord) -> Router {
     Router::new()
         .route(LOGIN_PATH, get(login))
         .route(CALLBACK_PATH, get(callback))
-        .route(APPLICATIONS_ME_PATH, get(session_info))
+        .route(SESSION_PATH, get(session_info))
         .route(SIGN_OUT_PATH, post(sign_out))
         .route(ACCOUNT_PATH, delete(delete_account))
         .with_state(discord.clone())
@@ -208,6 +211,7 @@ async fn callback(
     let outcome = finish(&discord, &params, &headers).await;
     let (result, mut response) = match outcome {
         Ok((id, next)) => {
+            let expires = seconds(SystemTime::now() + MAX_SESSION_AGE);
             let session = set_cookie(
                 config,
                 SESSION_COOKIE,
@@ -215,13 +219,15 @@ async fn callback(
                     &config.signing_key,
                     SESSION_PURPOSE,
                     &id.to_string(),
-                    seconds(SystemTime::now() + MAX_SESSION_AGE),
+                    expires,
                 ),
                 "/",
                 MAX_SESSION_AGE,
             );
+            let marker = signed_in_cookie(config, &expires.to_string(), MAX_SESSION_AGE);
             let mut response = Redirect::temporary(&next).into_response();
             response.headers_mut().append(SET_COOKIE, session);
+            response.headers_mut().append(SET_COOKIE, marker);
             ("success", response)
         }
         // A browser lands on the applications page, which explains what went wrong; anything else
@@ -380,14 +386,30 @@ pub(crate) async fn signed_in(
 async fn session_info(State(discord): State<Discord>, headers: HeaderMap) -> Response {
     let id = match session_user(&discord, &headers).await {
         Ok(Some(id)) => id,
-        Ok(None) => return private(error(StatusCode::UNAUTHORIZED, "not signed in")),
+        Ok(None) => {
+            let mut response = private(error(StatusCode::UNAUTHORIZED, "not signed in"));
+            let marker = signed_in_cookie(discord.config(), "", Duration::ZERO);
+            response.headers_mut().append(SET_COOKIE, marker);
+            return response;
+        }
         Err(err) => return private(store_unavailable(&err)),
     };
     let name = discord.names().get(discord.rest(), id).await;
-    private(Json(Me {
+    let mut response = private(Json(Me {
         discord_id: id.to_string(),
         name,
-    }))
+    }));
+    // Puts the marker back if it went missing while the session still holds.
+    if let Some((_, _, expires)) = signed_session(discord.config(), &headers) {
+        let left = expires.saturating_sub(seconds(SystemTime::now()));
+        let marker = signed_in_cookie(
+            discord.config(),
+            &expires.to_string(),
+            Duration::from_secs(left),
+        );
+        response.headers_mut().append(SET_COOKIE, marker);
+    }
+    response
 }
 
 /// Ends the session, so a copy of the cookie stops working too. Refused from another site.
@@ -454,8 +476,10 @@ async fn delete_account(State(discord): State<Discord>, headers: HeaderMap) -> R
 /// A 204 that clears the session.
 fn signed_out(discord: &Discord) -> Response {
     let session = set_cookie(discord.config(), SESSION_COOKIE, "", "/", Duration::ZERO);
+    let marker = signed_in_cookie(discord.config(), "", Duration::ZERO);
     let mut response = StatusCode::NO_CONTENT.into_response();
     response.headers_mut().append(SET_COOKIE, session);
+    response.headers_mut().append(SET_COOKIE, marker);
     response
 }
 
@@ -518,13 +542,29 @@ pub(crate) fn set_cookie(
     path: &str,
     max_age: Duration,
 ) -> HeaderValue {
+    cookie(config, name, value, path, max_age, "; HttpOnly")
+}
+
+/// The [`SIGNED_IN_COOKIE`], readable by the page, set to `value` for `max_age`.
+fn signed_in_cookie(config: &DiscordConfig, value: &str, max_age: Duration) -> HeaderValue {
+    cookie(config, SIGNED_IN_COOKIE, value, "/", max_age, "")
+}
+
+fn cookie(
+    config: &DiscordConfig,
+    name: &str,
+    value: &str,
+    path: &str,
+    max_age: Duration,
+    http_only: &str,
+) -> HeaderValue {
     let secure = if config.public_url.is_https() {
         "; Secure"
     } else {
         ""
     };
     HeaderValue::from_str(&format!(
-        "{name}={value}; Path={path}; Max-Age={}; HttpOnly; SameSite=Lax{secure}",
+        "{name}={value}; Path={path}; Max-Age={}{http_only}; SameSite=Lax{secure}",
         max_age.as_secs()
     ))
     .expect("cookie values are visible ASCII")

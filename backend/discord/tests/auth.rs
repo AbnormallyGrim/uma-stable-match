@@ -9,8 +9,8 @@ use serde_json::{json, Value};
 use tower::ServiceExt;
 use uma_stable_match_discord::{
     router, ApplicationId, BotToken, ClientSecret, Discord, DiscordConfig, PublicKey, PublicUrl,
-    SigningKey, ACCOUNT_PATH, APPLICATIONS_ME_PATH, APPLICATIONS_PAGE, CALLBACK_PATH, LOGIN_PATH,
-    OPT_IN_PATH, SIGN_OUT_PATH,
+    SigningKey, ACCOUNT_PATH, APPLICATIONS_PAGE, CALLBACK_PATH, LOGIN_PATH, OPT_IN_PATH,
+    SESSION_PATH, SIGNED_IN_COOKIE, SIGN_OUT_PATH,
 };
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -179,12 +179,31 @@ async fn signing_in_starts_a_leader_session_and_returns_to_the_page() {
         .unwrap();
     assert!(cleared.contains("Max-Age=0"));
 
-    let me = get(
-        &app,
-        APPLICATIONS_ME_PATH,
-        Some(&cookie(&response, "uma_session")),
-    )
-    .await;
+    // The page can read the marker, which holds the session's expiry and nothing else.
+    let marker = cookies
+        .iter()
+        .find(|c| c.starts_with(&format!("{SIGNED_IN_COOKIE}=")))
+        .unwrap();
+    assert!(!marker.contains("HttpOnly"), "{marker}");
+    for attribute in ["Secure", "SameSite=Lax", "Max-Age=43200", "Path=/;"] {
+        assert!(marker.contains(attribute), "{marker}");
+    }
+    let expires: u64 = cookie(&response, SIGNED_IN_COOKIE)
+        .split_once('=')
+        .unwrap()
+        .1
+        .parse()
+        .unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    assert!(
+        (now + 43_190..=now + 43_210).contains(&expires),
+        "{expires}"
+    );
+
+    let me = get(&app, SESSION_PATH, Some(&cookie(&response, "uma_session"))).await;
     assert_eq!(me.status(), StatusCode::OK);
     assert_eq!(header_value(&me, CACHE_CONTROL), "no-store");
     assert_eq!(
@@ -227,7 +246,7 @@ async fn the_session_endpoint_gives_the_display_name_looked_up_once_as_the_bot()
     let app = app(&server);
     let session = signed_in(&app).await;
     for _ in 0..2 {
-        let me = get(&app, APPLICATIONS_ME_PATH, Some(&session)).await;
+        let me = get(&app, SESSION_PATH, Some(&session)).await;
         assert_eq!(
             json_body(me).await,
             json!({ "discord_id": USER_ID, "name": "Made Up" })
@@ -248,7 +267,7 @@ async fn without_a_display_name_the_username_is_given() {
         .await;
     let app = app(&server);
     let session = signed_in(&app).await;
-    let me = get(&app, APPLICATIONS_ME_PATH, Some(&session)).await;
+    let me = get(&app, SESSION_PATH, Some(&session)).await;
     assert_eq!(json_body(me).await["name"], "made-up-name");
 }
 
@@ -267,6 +286,7 @@ async fn deleting_the_account_needs_a_session_and_signs_out() {
     assert!(cleared
         .iter()
         .any(|c| c.starts_with("uma_session=;") && c.contains("Max-Age=0")));
+    assert!(clears_the_marker(&cleared));
     // A DELETE, so a link or form on another site can't trigger it.
     for method in ["GET", "POST"] {
         let response = send(&app, method, ACCOUNT_PATH, Some(&session)).await;
@@ -388,13 +408,21 @@ async fn next_outside_the_site_is_ignored() {
 async fn the_session_endpoint_needs_a_valid_session() {
     let server = MockServer::start().await;
     let app = app(&server);
-    let response = get(&app, APPLICATIONS_ME_PATH, None).await;
+    let response = get(&app, SESSION_PATH, None).await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     assert_eq!(header_value(&response, CACHE_CONTROL), "no-store");
+    assert!(clears_the_marker(&set_cookies(&response)));
     for forged in ["uma_session=abc.def", "uma_session=", "other=1"] {
-        let response = get(&app, APPLICATIONS_ME_PATH, Some(forged)).await;
+        let response = get(&app, SESSION_PATH, Some(forged)).await;
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{forged}");
     }
+}
+
+/// Whether `cookies` clears the signed-in marker, so the page stops counting on a session.
+fn clears_the_marker(cookies: &[String]) -> bool {
+    cookies
+        .iter()
+        .any(|c| c.starts_with(&format!("{SIGNED_IN_COOKIE}=;")) && c.contains("Max-Age=0"))
 }
 
 #[tokio::test]
@@ -402,12 +430,7 @@ async fn a_state_is_not_a_session() {
     let server = MockServer::start().await;
     let app = app(&server);
     let (state, _) = start(&app, "/").await;
-    let response = get(
-        &app,
-        APPLICATIONS_ME_PATH,
-        Some(&format!("uma_session={state}")),
-    )
-    .await;
+    let response = get(&app, SESSION_PATH, Some(&format!("uma_session={state}"))).await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
@@ -421,9 +444,10 @@ async fn sign_out_clears_the_session() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
-    let cleared = set_cookies(&response).remove(0);
-    assert!(cleared.starts_with("uma_session=;"));
-    assert!(cleared.contains("Max-Age=0"));
+    let cleared = set_cookies(&response);
+    assert!(cleared[0].starts_with("uma_session=;"));
+    assert!(cleared[0].contains("Max-Age=0"));
+    assert!(clears_the_marker(&cleared));
     // Signing out is a POST, so a link or image on another site can't trigger it.
     let response = get(&app, SIGN_OUT_PATH, None).await;
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);

@@ -7,7 +7,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import { signedInUser } from './applications';
   import { applyFeatures } from './features';
   import { t, hasMessage } from './i18n';
   import { language } from './language.svelte';
@@ -26,8 +25,6 @@
   const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
   let readingReleases = $state(false);
   let unseenRelease = $state(hasUnseenRelease(storage));
-  let session = $state<'loading' | 'ready' | 'error'>('loading');
-  let statusMessage = $state<string | null>(null);
 
   type RoleKey = 'leader' | 'trainer';
 
@@ -64,17 +61,6 @@
     return hasMessage(key) ? t(key) : t('applications.error.generic');
   }
 
-  async function checkSession() {
-    try {
-      await signedInUser();
-      session = 'ready';
-    } catch (reason) {
-      console.warn(reason);
-      session = 'error';
-      statusMessage = t('applications.session.error');
-    }
-  }
-
   $effect(() => {
     document.documentElement.lang = language.current;
     document.title = t('applications.title');
@@ -83,7 +69,6 @@
   onMount(() => {
     const features = new AbortController();
     applyFeatures({ signal: features.signal });
-    void checkSession();
     return () => {
       features.abort();
     };
@@ -112,14 +97,8 @@
     </div>
   </section>
 
-  {#if error !== null && statusMessage === null}
+  {#if error !== null}
     <p class="status-alert" role="alert">{appErrorMessage(error)}</p>
-  {/if}
-
-  {#if session === 'loading'}
-    <p class="card muted" role="status">{t('applications.session.loading')}</p>
-  {:else if session === 'error'}
-    <p class="status-alert" role="alert">{t('applications.session.error')}</p>
   {/if}
 </main>
 
@@ -227,15 +206,6 @@
     border-radius: 10px;
     background: var(--surface);
     color: var(--text);
-  }
-
-  .card.muted {
-    max-width: 560px;
-    margin: 20px auto 0;
-    padding: 14px 16px;
-    border-radius: 10px;
-    background: var(--surface);
-    color: var(--text-2);
   }
 
   @media (max-width: 640px) {

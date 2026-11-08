@@ -3,14 +3,12 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { flags } from './flags.svelte';
 import { websiteUrl } from './pages';
 import SiteFooter from './SiteFooter.svelte';
 
 describe('SiteFooter', () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    flags.applications = false;
   });
 
   it('is the page footer landmark with the disclaimer', () => {
@@ -60,12 +58,7 @@ describe('SiteFooter', () => {
     );
   });
 
-  it('ends with Privacy Policy and Terms of Service links once the applications flag is on', () => {
-    const { unmount } = render(SiteFooter);
-    expect(screen.queryByRole('link', { name: 'Privacy Policy' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Terms of Service' })).toBeNull();
-    unmount();
-    flags.applications = true;
+  it('ends with Privacy Policy and Terms of Service links', () => {
     render(SiteFooter);
     const link = screen.getByRole('link', { name: 'Privacy Policy' });
     expect(link).toHaveAttribute('href', `${websiteUrl(window.location)}/privacy/`);

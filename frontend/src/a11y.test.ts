@@ -257,13 +257,13 @@ describe('accessibility', () => {
     };
 
     it('has no violations when signed out', async () => {
-      answer({ 'GET /api/v1/applications/me': () => json({ error: 'no' }, 401) });
+      answer({ 'GET /api/v1/auth/session': () => json({ error: 'no' }, 401) });
       const { container } = render(ApplicationsPage, { error: 'wrong_server' });
       expect(await violations(container)).toEqual([]);
     });
 
     it('has no violations when signed in', async () => {
-      answer({ 'GET /api/v1/applications/me': () => json({ discord_id: '42' }) });
+      answer({ 'GET /api/v1/auth/session': () => json({ discord_id: '42' }) });
       const { container } = render(ApplicationsPage);
       await screen.findByText(t('applications.role.leader.title'));
       expect(await violations(container)).toEqual([]);

@@ -80,7 +80,7 @@ async fn sign_in_routes_are_served_before_the_api_not_found() {
     );
     let response = app
         .oneshot(
-            Request::get("/api/v1/applications/me")
+            Request::get("/api/v1/auth/session")
                 .body(Body::empty())
                 .unwrap(),
         )

@@ -1,6 +1,7 @@
 /** The release notes: what changed for visitors, newest first, and remembering the last one seen. */
 
 import type { MessageKey } from './i18n';
+import { APPLICATIONS_PATH } from './route';
 
 /** The sort of change: something new, something that works better, or a bug that's gone. */
 export type ChangeKind = 'new' | 'improved' | 'fixed';
@@ -13,6 +14,8 @@ export interface Change {
   kind: ChangeKind;
   title: MessageKey;
   body: MessageKey;
+  /** A page to try it on, shown under the body. */
+  link?: { label: MessageKey; href: string };
 }
 
 /** One release. */
@@ -27,6 +30,24 @@ export interface Release {
 
 /** Every published release, newest first. See the frontend README before adding one. */
 export const RELEASES: Release[] = [
+  {
+    build: '1.4.0',
+    date: '2026-11-08',
+    kind: 'update',
+    changes: [
+      {
+        kind: 'new',
+        title: 'releases.quickApply.title',
+        body: 'releases.quickApply.body',
+      },
+      {
+        kind: 'new',
+        title: 'releases.leaderApplications.title',
+        body: 'releases.leaderApplications.body',
+        link: { label: 'releases.leaderApplications.link', href: APPLICATIONS_PATH },
+      },
+    ],
+  },
   {
     build: '1.3.2',
     date: '2026-11-06',
