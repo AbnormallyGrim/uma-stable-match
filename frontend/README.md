@@ -187,6 +187,7 @@ The form searches by **trainer ID** or by **daily pace**, with an optional **bal
 | Join style | One of open, approval and closed, or none | `join_style`, only when one is picked |
 | Playstyle | One of uma.moe's playstyles, or any | `playstyle`, only when one is picked |
 | Has Discord | On or off | `has_discord=true`, only when on |
+| Has Quick Apply | On or off | `quick_apply=true`, only when on |
 | Include full clubs | On or off | `include_full=true`, only when on |
 
 Only the field for the chosen mode is checked. An invalid field gets a message linked to it with `aria-describedby`, and nothing is sent. Links with an unknown or several join styles or playstyles open with none picked, as do older links with `include_closed=true`.

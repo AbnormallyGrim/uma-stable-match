@@ -215,6 +215,48 @@ async fn only_linked_open_joinable_clubs_without_a_problem_are_marked() {
 }
 
 #[tokio::test]
+async fn quick_apply_keeps_only_the_clubs_that_take_applications() {
+    let Some(store) = store().await else {
+        return;
+    };
+    let (ok, paused, closed, unlinked) = (930_000_001, 930_000_002, 930_000_003, 930_000_004);
+    let state = scanned(vec![
+        detail(ok, 2, 10),
+        detail(paused, 2, 10),
+        detail(closed, 3, 10),
+        detail(unlinked, 2, 10),
+    ])
+    .await;
+    for club in [ok, paused, closed] {
+        store.link(club, SERVER).await.unwrap();
+    }
+    let pause = SettingsUpdate {
+        open: Some(false),
+        ..SettingsUpdate::default()
+    };
+    store.update(paused, SERVER, &pause).await.unwrap();
+
+    let base = "/api/v1/recommendations?pace=7600000&include_closed=true";
+    let all = get(&state, Some(&store), base).await;
+    assert_eq!(all["clubs"].as_array().unwrap().len(), 4);
+    assert_eq!(all["options"]["quick_apply"], false);
+
+    let body = get(&state, Some(&store), &format!("{base}&quick_apply=true")).await;
+    assert_eq!(body["options"]["quick_apply"], true);
+    assert_eq!(body["total"], 1);
+    assert_eq!(marked(&body), [ok]);
+    assert_eq!(body["clubs"].as_array().unwrap().len(), 1);
+
+    // Without Discord set up no club takes applications.
+    let plain = get(&state, None, &format!("{base}&quick_apply=true")).await;
+    assert_eq!(plain["total"], 0);
+
+    for club in [ok, paused, closed] {
+        store.unlink(club).await.unwrap();
+    }
+}
+
+#[tokio::test]
 async fn the_club_page_is_marked_the_same_way() {
     let Some(store) = store().await else {
         return;

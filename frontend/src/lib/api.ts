@@ -62,6 +62,8 @@ export interface Recommendations {
     playstyles: number[] | null;
     /** Whether only clubs that mention Discord were searched. */
     has_discord: boolean;
+    /** Whether only clubs that take applications through Discord were searched. */
+    quick_apply: boolean;
     limit: number;
   };
   updated_at: string;
@@ -158,6 +160,8 @@ export interface RecommendationQuery {
   playstyle?: number | null;
   /** Only clubs whose description mentions Discord. */
   hasDiscord?: boolean;
+  /** Only clubs people can apply to through the Discord bot. */
+  quickApply?: boolean;
   includeFull?: boolean;
   limit?: number;
 }
@@ -220,7 +224,7 @@ export function recommendationParams(query: RecommendationQuery): URLSearchParam
   return params;
 }
 
-/** Adds the join style, playstyle, Discord and full-club parameters, leaving out defaults. */
+/** Adds the join style, playstyle, Discord, quick apply and full-club parameters, leaving out defaults. */
 export function setFilterParams(params: URLSearchParams, query: RecommendationQuery): void {
   if (query.joinStyle) {
     params.set('join_style', query.joinStyle);
@@ -230,6 +234,9 @@ export function setFilterParams(params: URLSearchParams, query: RecommendationQu
   }
   if (query.hasDiscord) {
     params.set('has_discord', 'true');
+  }
+  if (query.quickApply) {
+    params.set('quick_apply', 'true');
   }
   if (query.includeFull) {
     params.set('include_full', 'true');

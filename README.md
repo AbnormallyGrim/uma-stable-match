@@ -234,6 +234,7 @@ GET /api/v1/recommendations
 | `join_style` | no | `open,approval` | Comma-separated join styles to include: `open`, `approval`, `closed` |
 | `playstyle` | no | any | Comma-separated playstyle codes to include |
 | `has_discord` | no | `false` | `true` keeps only clubs whose description mentions Discord, a best guess |
+| `quick_apply` | no | `false` | `true` keeps only clubs people can apply to through the Discord bot |
 | `include_full` | no | `false` | Include full clubs |
 | `limit` | no | `50` | Maximum number of clubs returned |
 
@@ -246,7 +247,7 @@ curl "http://localhost:8080/api/v1/recommendations?trainer_id=123456789012&balan
 ```json
 {
   "trainer": { "trainer_id": 123456789012, "pace_per_day": 7620000 },
-  "options": { "balance_weight": 0.6, "include_closed": false, "include_full": false, "join_styles": null, "playstyles": null, "has_discord": false, "limit": 1 },
+  "options": { "balance_weight": 0.6, "include_closed": false, "include_full": false, "join_styles": null, "playstyles": null, "has_discord": false, "quick_apply": false, "limit": 1 },
   "updated_at": "2026-10-19T08:00:00Z",
   "month": "2026-10",
   "coverage": { "considered": 4980, "shortlisted": 120, "scored": 240, "pending": 0 },

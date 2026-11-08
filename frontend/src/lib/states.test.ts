@@ -92,12 +92,19 @@ describe('emptyHints', () => {
     join_styles: null,
     playstyles,
     has_discord: false,
+    quick_apply: false,
     limit: 100,
   });
 
   it('suggests turning off Has Discord', () => {
     expect(emptyHints({ ...options(null, true), has_discord: true })).toEqual([
       'Turn off Has Discord.',
+    ]);
+  });
+
+  it('suggests turning off Has Quick Apply', () => {
+    expect(emptyHints({ ...options(null, true), quick_apply: true })).toEqual([
+      'Turn off Has Quick Apply.',
     ]);
   });
 
@@ -122,6 +129,7 @@ describe('filter notice', () => {
     join_styles,
     playstyles,
     has_discord: false,
+    quick_apply: false,
     limit: 100,
   });
 

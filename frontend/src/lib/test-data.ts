@@ -37,6 +37,7 @@ export function recommendations(overrides: Partial<Recommendations> = {}): Recom
       join_styles: null,
       playstyles: null,
       has_discord: false,
+      quick_apply: false,
       limit: 50,
     },
     updated_at: '2026-03-18T09:00:00Z',

@@ -1,5 +1,7 @@
 //! Marks the clubs people can apply to through Discord.
 
+use std::collections::HashSet;
+
 use axum::Extension;
 use uma_stable_match_discord::ClubStore;
 
@@ -19,6 +21,25 @@ impl Applications {
     /// Applications that read the club links in `store`.
     pub fn new(store: ClubStore) -> Self {
         Self { store }
+    }
+}
+
+impl Applications {
+    /// Which of `ids` take applications through Discord, or `None` if the links can't be read.
+    pub(crate) async fn taking(&self, ids: &[u64]) -> Option<HashSet<u64>> {
+        match self.store.takes_applications(ids).await {
+            Ok(flags) => Some(
+                ids.iter()
+                    .zip(flags)
+                    .filter_map(|(id, takes)| takes.then_some(*id))
+                    .collect(),
+            ),
+            Err(error) => {
+                metrics::counter!("discord_applications_errors_total").increment(1);
+                tracing::warn!(%error, "could not read which clubs take applications on Discord");
+                None
+            }
+        }
     }
 }
 

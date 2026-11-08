@@ -69,6 +69,7 @@ describe('validate', () => {
         joinStyle: null,
         playstyle: null,
         hasDiscord: false,
+        quickApply: false,
         includeFull: false,
       },
     });
@@ -92,6 +93,7 @@ describe('validate', () => {
         joinStyle: 'closed',
         playstyle: 12,
         hasDiscord: false,
+        quickApply: false,
         includeFull: false,
       },
     });
@@ -122,12 +124,17 @@ describe('URL state', () => {
   });
 
   it('round-trips a pace search with filters', () => {
-    const filters = { joinStyle: 'approval' as JoinStyle, playstyle: 12, hasDiscord: true };
+    const filters = {
+      joinStyle: 'approval' as JoinStyle,
+      playstyle: 12,
+      hasDiscord: true,
+      quickApply: true,
+    };
     const result = validate(pace('7.6', filters));
     if (!result.ok) throw new Error('expected a valid search');
     const params = toUrlParams(result.query);
     expect(params.toString()).toBe(
-      'pace=7600000&join_style=approval&playstyle=12&has_discord=true',
+      'pace=7600000&join_style=approval&playstyle=12&has_discord=true&quick_apply=true',
     );
     expect(fromUrlParams(params)).toEqual(pace('7.6', filters));
   });

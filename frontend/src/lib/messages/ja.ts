@@ -132,6 +132,7 @@ export const ja: Catalog = {
   'form.balanceStrength': ({ value }) => `バランスの強さ: ${value}`,
   'form.includeFull': '満員のサークルも含める',
   'form.hasDiscord': 'Discordあり',
+  'form.quickApply': 'かんたん応募あり',
   'form.joinStyle': '加入方法',
   'form.playstyle': 'サークル方針',
   'form.anyPlaystyle': '指定なし',
@@ -177,6 +178,7 @@ export const ja: Catalog = {
     'サーバーがuma.moeからデータを取得できませんでした。しばらくしてからもう一度お試しください。',
 
   'hint.discord': '「Discordあり」をオフにする。',
+  'hint.quickApply': '「かんたん応募あり」をオフにする。',
   'hint.playstyle': 'サークル方針を「指定なし」に戻す。',
   'hint.closed': '加入方法で「募集停止」を選ぶと、現在募集していないサークルも表示されます。',
   'hint.balance': 'バランスの強さを下げるか、バランス評価をオフにする。',

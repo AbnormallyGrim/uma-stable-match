@@ -31,6 +31,7 @@ describe('SearchForm', () => {
         joinStyle: null,
         playstyle: null,
         hasDiscord: false,
+        quickApply: false,
         includeFull: false,
       },
       expect.objectContaining({ trainerId: '123456789012' }),
@@ -127,6 +128,15 @@ describe('SearchForm', () => {
     );
     await submit();
     expect(onsearch.mock.lastCall?.[0]).toMatchObject({ hasDiscord: true });
+  });
+
+  it('passes Has Quick Apply', async () => {
+    const onsearch = setup({ trainerId: '123456789' });
+    const toggle = screen.getByRole('switch', { name: 'Has Quick Apply' });
+    expect(toggle).not.toBeChecked();
+    await fireEvent.click(toggle);
+    await submit();
+    expect(onsearch.mock.lastCall?.[0]).toMatchObject({ quickApply: true });
   });
 
   it('shows balance scoring and full clubs as switches', () => {
