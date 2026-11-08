@@ -37,7 +37,7 @@ pub const APPLICATIONS_PATH: &str = "/api/v1/discord/applications";
 pub const CLUB_APPLICATIONS_PATH: &str = "/api/v1/discord/clubs/{club}/applications";
 
 /// Where a player lands after applying.
-const TRAINER_PAGE: &str = "/applications/mine";
+const TRAINER_PAGE: &str = "/applications/trainer";
 
 /// Most applications a club's list shows.
 const MAX_LISTED: usize = 100;

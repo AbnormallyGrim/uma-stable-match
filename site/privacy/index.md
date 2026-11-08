@@ -2,7 +2,7 @@
 
 What Uma Stable Match collects, why, who sees it, and how to have it removed.
 
-Last updated: 6 November 2026
+Last updated: 8 November 2026
 
 ## 1. Who runs this site
 
@@ -51,10 +51,11 @@ Every cookie here is needed for the site to work. There are no analytics or adve
 |---|---|---|
 | `usm_human` | Shows you passed the human check. Holds nothing about you | 10 minutes |
 | Session | Keeps you signed in. Signed, and holds your Discord ID | 12 hours |
+| Signed in | Tells pages you're signed in, so they needn't ask the server each time. Holds only when your session ends | 12 hours |
 | Sign-in check | Protects the Discord sign-in | 10 minutes |
 | Language | Remembers your language, when the language switch is offered | 1 year |
 
-Your browser's local storage, which never leaves your device, holds your theme, your language, your trainer ID if you choose to remember it, whether you've seen the tour and release notes, when your human check expires, and where the club page should return to.
+Your browser's local storage, which never leaves your device, holds your theme, your language, your trainer ID if you choose to remember it, your Discord ID and display name while you're signed in, whether you've seen the tour and release notes, when your human check expires, and where the club page should return to.
 
 You can clear cookies and local storage in your browser's settings. Clearing the session cookie signs you out.
 
@@ -71,7 +72,7 @@ Our servers are in the United States, as is Sentry, so your data leaves your cou
 
 ## 6. Security and how long we keep it
 
-The site uses HTTPS only. Cookies are signed and hidden from page scripts. We store Discord IDs only as a keyed hash or encrypted, our database has a password and no public address, and Discord's access token is used once and thrown away.
+The site uses HTTPS only. The session cookie is signed and hidden from page scripts. We store Discord IDs only as a keyed hash or encrypted, our database has a password and no public address, and Discord's access token is used once and thrown away.
 
 | <tr><th scope="col">Data | Kept for |
 |---|---|
@@ -89,7 +90,7 @@ You can do these yourself:
 
 - [Delete your account](https://app.umastable.com/settings), which removes your linked trainer and ends all your sessions.
 - Unlink a trainer or a club on the same pages.
-- See your applications under [My applications](https://app.umastable.com/applications/mine).
+- See your applications under [My applications](https://app.umastable.com/applications/trainer).
 - Remove the app from your Discord account, which signs you out everywhere.
 
 Deleting your account doesn't remove pending applications, which expire after a month, clubs you opted in, which stay until you unlink them, or tickets already in Discord.

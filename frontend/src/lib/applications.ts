@@ -2,6 +2,7 @@
 
 import { ApiError, type RequestOptions } from './api';
 import { APPLICATIONS_PATH, clubApplicationsPath } from './route';
+import { forgetSession } from './session';
 
 /** A category on the club's Discord server. */
 export interface Named {
@@ -126,7 +127,7 @@ export interface Account {
 export async function signedInUser(options: RequestOptions = {}): Promise<Account | null> {
   try {
     const body = await send<{ discord_id: string; name?: string | null }>(
-      '/api/v1/applications/me',
+      '/api/v1/auth/session',
       {},
       options,
     );
@@ -335,6 +336,10 @@ async function send<T>(path: string, init: RequestInit, options: RequestOptions)
     throw new ApiError('network', 'Could not reach the server.');
   }
   if (!response.ok) {
+    if (response.status === 401) {
+      // The session has ended, wherever that happened, so later pages stop counting on it.
+      forgetSession();
+    }
     throw await httpError(response);
   }
   if (response.status === 204) {

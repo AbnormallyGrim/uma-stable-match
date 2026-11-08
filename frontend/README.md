@@ -65,6 +65,7 @@ src/lib/applications.ts            The applications API client: sign-in, the lea
 src/lib/SettingsPage.svelte   The settings page: link a trainer ID, sign out, delete the account
 src/lib/AccountMenu.svelte    The navbar's account menu for a person signed in with Discord
 src/lib/account.svelte.ts     Who is signed in, shared by every component
+src/lib/session.ts            Remembering who is signed in between pages: the signed-in cookie and the saved person
 src/lib/WishlistPage.svelte   The wishlist page: StrawPoll polls for ideas, in frames
 src/lib/polls.ts              The polls on the wishlist page
 src/lib/ClubPage.svelte       The club page: a club's details, its chart and member cards, with you added
@@ -128,9 +129,17 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 
 ### Account menu
 
-`main.ts` asks `GET /api/v1/applications/me` who is signed in once per page (`loadAccount()` in `account.svelte.ts`), waiting for the answer only on pages that need a session. Once someone is, `AccountMenu.svelte` shows last in the navbar: a pill with their Discord name (or "Discord account" when the server couldn't look it up), cut short with an ellipsis when long. It opens a menu with **Signed in as …**, **Settings** and **Sign Out**, following the ARIA menu button pattern: arrow keys, Home and End move between the items, and Escape, Tab or a click elsewhere closes it. Signing out from a page that needs a session goes to the club finder; elsewhere the menu gives way to the sign-in button.
+`main.ts` works out who is signed in once per page (`loadAccount()` in `account.svelte.ts`), waiting for it only on pages that need a session. Pages don't ask again themselves: anything that needs the person reads `account` or calls `loadAccount()`. It asks the server as little as it can, through `session.ts`:
 
-Signed out, the same place holds a round silhouette button, **Sign in**, linking to `/login?next=<this page>`. It waits for the server's answer (`account.known`), so a signed-in person never sees it flash first, and it's left out on the login page itself.
+- Without the server's `uma_signed_in` cookie, nobody is signed in and the server isn't asked. The server sets that cookie beside the session, readable by the page, holding the session's expiry, and clears it on sign-out and account deletion. It expires with the session.
+- With it, the person saved in local storage (`uma-stable-match:account`) for the same session is reused. Only after signing in, or when nothing is saved, does the page ask `GET /api/v1/auth/session`, and it saves the answer.
+- Any 401 from the applications API, signing out and deleting the account drop both, so a session ended elsewhere stops counting at the next request. Signing out in one tab signs the others out through the `storage` event.
+
+The saved person only chooses what the navbar shows and whether a page sends you to sign in; every API call still checks the session. After deleting the account on one device, another may keep showing the account menu until its next request.
+
+ Once someone is, `AccountMenu.svelte` shows last in the navbar: a pill with their Discord name (or "Discord account" when the server couldn't look it up), cut short with an ellipsis when long. It opens a menu with **Signed in as …**, **Settings** and **Sign Out**, following the ARIA menu button pattern: arrow keys, Home and End move between the items, and Escape, Tab or a click elsewhere closes it. Signing out from a page that needs a session goes to the club finder; elsewhere the menu gives way to the sign-in button.
+
+Signed out, the same place holds a round silhouette button, **Sign in**, linking to `/login?next=<this page>`. It waits until the account is worked out (`account.known`), so a signed-in person never sees it flash first, and it's left out on the login page itself.
 
 The menu or the sign-in button makes the tools wider, so while either shows (`showsAccount()`) the page names in the pill show from 1440px rather than 900px, and the three-column layout starts at 1100px rather than 960px. Below that the navbar wraps, as it does on phones.
 
@@ -420,7 +429,7 @@ The navbar keeps the release notes but has no tour button here.
 - **Once it's added**, `BotPanel.svelte` sits beside the applications: the bot's status as a checklist, the settings (**Take applications**, **Add applicants to the server**) and **Remove the bot**, which asks once before sending the `DELETE` and then shows the setup steps again. When applications are paused, a notice above the table has a **Resume** button.
 - **Applications.** `ApplicationsTable.svelte` lists them newest first with status filters, as cards on narrow screens, and **View** opens `ApplicationDetails.svelte`, laid out like the message the bot posted, with a link to the ticket channel. No endpoint lists a club's applications yet, so the page passes an empty list and the table shows its empty state.
 
-**A trainer's applications page** (`/applications/mine`, `TRAINER_APPLICATIONS_PATH`) is where a trainer follows the applications they've sent. The **I'm a trainer** card on `/applications` opens it. Like the club's page, it needs a session, so `main.ts` sends a signed-out visitor to `/login` first. It has no bot setup or bot panel: just `TrainerApplicationsTable.svelte`, which lists each application's club (linking to its club page), trainer ID, submitted and expiry dates, status and ticket link, newest first with the same status filters, and as cards on narrow screens.
+**A trainer's applications page** (`/applications/trainer`, `TRAINER_APPLICATIONS_PATH`) is where a trainer follows the applications they've sent. The **I'm a trainer** card on `/applications` opens it. Like the club's page, it needs a session, so `main.ts` sends a signed-out visitor to `/login` first. It has no bot setup or bot panel: just `TrainerApplicationsTable.svelte`, which lists each application's club (linking to its club page), trainer ID, submitted and expiry dates, status and ticket link, newest first with the same status filters, and as cards on narrow screens.
 
 An application expires one calendar month after it was sent, or on the last day of that month when it has no such date (31 January expires on 28 February). `expiresAt()` in `applications.ts` works this out in UTC, and `activeApplications()` drops the expired ones, so the table only ever shows active applications. No endpoint lists a trainer's applications yet, so the page passes an empty list and the table shows its empty state.
 

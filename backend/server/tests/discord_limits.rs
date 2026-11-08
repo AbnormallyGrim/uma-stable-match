@@ -7,8 +7,8 @@ use axum::Router;
 use tower::ServiceExt;
 use uma_stable_match_discord::{
     router as discord_router, ApplicationId, BotToken, ClientSecret, Discord, DiscordConfig,
-    PublicKey, PublicUrl, SigningKey, APPLICATIONS_ME_PATH, APPLY_PATH, CALLBACK_PATH,
-    INTERACTIONS_PATH, LOGIN_PATH, OPT_IN_PATH, WEBHOOK_EVENTS_PATH,
+    PublicKey, PublicUrl, SigningKey, APPLY_PATH, CALLBACK_PATH, INTERACTIONS_PATH, LOGIN_PATH,
+    OPT_IN_PATH, SESSION_PATH, WEBHOOK_EVENTS_PATH,
 };
 use uma_stable_match_server::{limit_discord, RateLimits};
 
@@ -45,7 +45,7 @@ async fn the_discord_routes_allow_a_few_requests_a_minute() {
     let app = app();
     for _ in 0..2 {
         assert_eq!(
-            status(&app, get(APPLICATIONS_ME_PATH, "192.0.2.1")).await,
+            status(&app, get(SESSION_PATH, "192.0.2.1")).await,
             StatusCode::UNAUTHORIZED
         );
     }
@@ -58,7 +58,7 @@ async fn the_discord_routes_allow_a_few_requests_a_minute() {
     assert!(response.headers().contains_key(RETRY_AFTER));
     // Another visitor has their own count.
     assert_eq!(
-        status(&app, get(APPLICATIONS_ME_PATH, "192.0.2.2")).await,
+        status(&app, get(SESSION_PATH, "192.0.2.2")).await,
         StatusCode::UNAUTHORIZED
     );
 }
@@ -81,7 +81,7 @@ async fn trips_to_discord_share_a_stricter_limit_of_their_own() {
         }
         // The per-minute routes keep their own count.
         assert_eq!(
-            status(&app, get(APPLICATIONS_ME_PATH, "192.0.2.1")).await,
+            status(&app, get(SESSION_PATH, "192.0.2.1")).await,
             StatusCode::UNAUTHORIZED,
             "{path}"
         );

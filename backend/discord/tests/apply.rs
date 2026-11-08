@@ -433,7 +433,7 @@ async fn applying_joins_the_player_and_opens_a_ticket_for_them_and_the_leader() 
 
     let response = world.finish(&started, "player-code").await;
     assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
-    assert_eq!(location(&response), "/applications/mine");
+    assert_eq!(location(&response), "/applications/trainer");
 
     let joins = world
         .requests("PUT", &format!("/members/{}", world.player()))

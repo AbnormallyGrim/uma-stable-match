@@ -77,7 +77,7 @@
 <main class="container legal-page">
     <h1>Privacy</h1>
     <p class="lead">What Uma Stable Match collects, why, who sees it, and how to have it removed.</p>
-    <p class="updated">Last updated: 6 November 2026</p>
+    <p class="updated">Last updated: 8 November 2026</p>
 
     <section id="privacy">
         <h2>1. Who runs this site</h2>
@@ -127,11 +127,12 @@
             <tbody>
                 <tr><td><code>usm_human</code></td><td>Shows you passed the human check. Holds nothing about you</td><td>10 minutes</td></tr>
                 <tr><td>Session</td><td>Keeps you signed in. Signed, and holds your Discord ID</td><td>12 hours</td></tr>
+                <tr><td>Signed in</td><td>Tells pages you're signed in, so they needn't ask the server each time. Holds only when your session ends</td><td>12 hours</td></tr>
                 <tr><td>Sign-in check</td><td>Protects the Discord sign-in</td><td>10 minutes</td></tr>
                 <tr><td>Language</td><td>Remembers your language, when the language switch is offered</td><td>1 year</td></tr>
             </tbody>
         </table>
-        <p>Your browser's local storage, which never leaves your device, holds your theme, your language, your trainer ID if you choose to remember it, whether you've seen the tour and release notes, when your human check expires, and where the club page should return to.</p>
+        <p>Your browser's local storage, which never leaves your device, holds your theme, your language, your trainer ID if you choose to remember it, your Discord ID and display name while you're signed in, whether you've seen the tour and release notes, when your human check expires, and where the club page should return to.</p>
         <p>You can clear cookies and local storage in your browser's settings. Clearing the session cookie signs you out.</p>
 
         <h2>5. Who we share it with</h2>
@@ -145,7 +146,7 @@
         <p>Our servers are in the United States, as is Sentry, so your data leaves your country.</p>
 
         <h2>6. Security and how long we keep it</h2>
-        <p>The site uses HTTPS only. Cookies are signed and hidden from page scripts. We store Discord IDs only as a keyed hash or encrypted, our database has a password and no public address, and Discord's access token is used once and thrown away.</p>
+        <p>The site uses HTTPS only. The session cookie is signed and hidden from page scripts. We store Discord IDs only as a keyed hash or encrypted, our database has a password and no public address, and Discord's access token is used once and thrown away.</p>
         <table>
             <thead>
                 <tr><th scope="col">Data</th><th scope="col">Kept for</th></tr>
@@ -166,7 +167,7 @@
         <ul>
             <li><a href="https://app.umastable.com/settings">Delete your account</a>, which removes your linked trainer and ends all your sessions.</li>
             <li>Unlink a trainer or a club on the same pages.</li>
-            <li>See your applications under <a href="https://app.umastable.com/applications/mine">My applications</a>.</li>
+            <li>See your applications under <a href="https://app.umastable.com/applications/trainer">My applications</a>.</li>
             <li>Remove the app from your Discord account, which signs you out everywhere.</li>
         </ul>
         <p>Deleting your account doesn't remove pending applications, which expire after a month, clubs you opted in, which stay until you unlink them, or tickets already in Discord.</p>

@@ -15,8 +15,8 @@ use serde_json::json;
 use tower::ServiceExt;
 use uma_stable_match_discord::{
     router, ApplicationId, BotToken, ClientSecret, Discord, DiscordConfig, KeySecret, PublicKey,
-    PublicUrl, SessionStore, SigningKey, ACCOUNT_PATH, APPLICATIONS_ME_PATH, CALLBACK_PATH,
-    LOGIN_PATH, MAX_SESSION_AGE, SIGN_OUT_PATH,
+    PublicUrl, SessionStore, SigningKey, ACCOUNT_PATH, CALLBACK_PATH, LOGIN_PATH, MAX_SESSION_AGE,
+    SESSION_PATH, SIGN_OUT_PATH,
 };
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -128,12 +128,12 @@ async fn a_signed_out_session_stops_working_even_as_a_copy() {
     let server = MockServer::start().await;
     let app = app(&server, sessions, user_id()).await;
     let session = signed_in(&app).await;
-    let me = send(&app, "GET", APPLICATIONS_ME_PATH, Some(&session)).await;
+    let me = send(&app, "GET", SESSION_PATH, Some(&session)).await;
     assert_eq!(me.status(), StatusCode::OK);
 
     let out = send(&app, "POST", SIGN_OUT_PATH, Some(&session)).await;
     assert_eq!(out.status(), StatusCode::NO_CONTENT);
-    let me = send(&app, "GET", APPLICATIONS_ME_PATH, Some(&session)).await;
+    let me = send(&app, "GET", SESSION_PATH, Some(&session)).await;
     assert_eq!(me.status(), StatusCode::UNAUTHORIZED);
 }
 
@@ -147,7 +147,7 @@ async fn deleting_the_account_ends_its_session() {
     let session = signed_in(&app).await;
     let deleted = send(&app, "DELETE", ACCOUNT_PATH, Some(&session)).await;
     assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
-    let me = send(&app, "GET", APPLICATIONS_ME_PATH, Some(&session)).await;
+    let me = send(&app, "GET", SESSION_PATH, Some(&session)).await;
     assert_eq!(me.status(), StatusCode::UNAUTHORIZED);
 }
 

@@ -361,13 +361,9 @@ export const ja: Catalog = {
     '<ul><li>サークルマスターはDiscord設定と運営状況をまとめて管理できます。</li><li>トレーナーは応募済みのサークルを一覧で確認し、進行状況を把握できます。</li></ul>',
   'applications.privacy': ({ href }: { href: string }) =>
     `Discordへのサインインは、サークル申請の管理のためだけに使われます。<a href="${href}">プライバシー情報</a>をご確認ください。`,
-  'applications.session.loading': 'Discordセッションを確認しています…',
-
   'applications.session.signIn': 'Discordでサインイン',
   'applications.session.signedIn': 'Discordセッションは有効です。',
 
-  'applications.session.error':
-    'Discordセッションを確認できませんでした。しばらくしてからもう一度お試しください。',
   'applications.role.heading': 'どちらに当てはまりますか？',
   'applications.role.leader.title': 'サークルマスターです',
   'applications.role.leader.description':

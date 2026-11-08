@@ -46,7 +46,7 @@ export function isWishlistRoute(pathname: string): boolean {
 export const APPLICATIONS_PATH = '/applications';
 
 /** The address of the page where a trainer follows the applications they've sent. */
-export const TRAINER_APPLICATIONS_PATH = `${APPLICATIONS_PATH}/mine`;
+export const TRAINER_APPLICATIONS_PATH = `${APPLICATIONS_PATH}/trainer`;
 
 /** The address of the leader's page, which finds their club from their linked trainer. */
 export const CLUB_APPLICATIONS_PATH = `${APPLICATIONS_PATH}/club`;

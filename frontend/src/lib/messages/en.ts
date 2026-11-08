@@ -383,11 +383,8 @@ export const en = {
     '<ul><li>Leaders can manage the bot and their club settings when the Discord setup is live.</li><li>Trainers can track their applications and keep an eye on the clubs they want to join.</li></ul>',
   'applications.privacy': ({ href }: { href: string }) =>
     `Your Discord sign-in is only used for club application management. See our <a href="${href}">privacy information</a>.`,
-  'applications.session.loading': 'Checking your Discord session…',
   'applications.session.signIn': 'Sign in with Discord',
   'applications.session.signedIn': 'Your Discord session is active.',
-  'applications.session.error':
-    'We could not check your Discord session right now. Please try again in a moment.',
   'applications.role.heading': 'Who are you?',
   'applications.role.leader.title': 'I’m a club leader',
   'applications.role.leader.description':
