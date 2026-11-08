@@ -3292,7 +3292,7 @@ dependencies = [
  "axum",
  "base64 0.23.1",
  "ed25519-dalek",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "hmac",
  "http-body-util",
  "metrics",
