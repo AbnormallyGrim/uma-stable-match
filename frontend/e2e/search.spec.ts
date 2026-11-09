@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test';
 test('a daily pace search shows top picks and the results table', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Skip tour' }).click();
+  // The pages announcement opens once the tour is over, and covers the page.
+  await page.getByRole('button', { name: 'Maybe later' }).click();
 
   const form = page.getByRole('form', { name: 'Find clubs' });
   await form.getByText('Daily pace', { exact: true }).click();
