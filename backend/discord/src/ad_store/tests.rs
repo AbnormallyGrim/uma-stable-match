@@ -39,6 +39,7 @@ fn reads_an_ad() {
         ("current_club", "Other Club"),
         ("pace", "6400000.5"),
         ("fans", "48000000"),
+        ("dress", "100101"),
     ])
     .unwrap();
     assert_eq!(
@@ -52,6 +53,7 @@ fn reads_an_ad() {
                 current_club: Some("Other Club".into()),
                 pace: Some(6_400_000.5),
                 fans_this_month: Some(48_000_000),
+                leader_chara_dress_id: Some(100_101),
                 rank_min: 3,
                 rank_max: 8,
                 discord: DiscordWish::Preferred,
@@ -70,6 +72,7 @@ fn optional_fields_may_be_missing() {
     assert_eq!(ad.details.current_club, None);
     assert_eq!(ad.details.pace, None);
     assert_eq!(ad.details.fans_this_month, None);
+    assert_eq!(ad.details.leader_chara_dress_id, None);
 }
 
 #[test]

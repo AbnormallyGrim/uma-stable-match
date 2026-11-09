@@ -111,6 +111,8 @@ pub struct ProfileTrainer {
     pub name: String,
     /// The trainer's profile comment, set in game.
     pub comment: Option<String>,
+    /// The outfit ID of the trainer's leader character, if the profile has one.
+    pub leader_chara_dress_id: Option<i64>,
 }
 
 /// The club a profile belongs to.

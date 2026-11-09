@@ -48,8 +48,18 @@ export const APPLICATIONS_PATH = '/applications';
 /** The address of the page where a trainer follows the applications they've sent. */
 export const TRAINER_APPLICATIONS_PATH = `${APPLICATIONS_PATH}/trainer`;
 
-/** The address of the board of ads, where trainers post and leaders look for trainers. */
-export const ADS_PATH = `${APPLICATIONS_PATH}/ads`;
+/** The address of the recruitment board, where trainers post and leaders look for trainers. */
+export const BOARD_PATH = '/recruitment-board';
+
+/** Where the board used to be: links to it are sent on to `BOARD_PATH`. */
+export const LEGACY_BOARD_PATH = `${APPLICATIONS_PATH}/ads`;
+
+/** The board's address for a visit to `pathname` and `search` at its old address, else `null`. */
+export function legacyBoardRedirect(pathname: string, search: string): string | null {
+  return pathname === LEGACY_BOARD_PATH || pathname === `${LEGACY_BOARD_PATH}/`
+    ? `${BOARD_PATH}${search}`
+    : null;
+}
 
 /** The address of the leader's page, which finds their club from their linked trainer. */
 export const CLUB_APPLICATIONS_PATH = `${APPLICATIONS_PATH}/club`;
@@ -63,7 +73,7 @@ export type ApplicationsRoute =
   | { page: 'club'; clubId: string | null; linked: boolean }
   | { page: 'compare'; clubId: string; trainerIds: string[]; requirement: Requirement | null }
   | { page: 'trainer' }
-  | { page: 'ads'; post: boolean };
+  | { page: 'board'; post: boolean };
 
 const CLUB_APPLICATIONS = /^\/applications\/club(?:\/(\d{1,18}))?\/?$/;
 const CLUB_COMPARE = /^\/applications\/club\/(\d{1,18})\/compare\/?$/;
@@ -88,8 +98,8 @@ export function applicationsRoute(pathname: string, search: string): Application
   if (pathname === TRAINER_APPLICATIONS_PATH || pathname === `${TRAINER_APPLICATIONS_PATH}/`) {
     return { page: 'trainer' };
   }
-  if (pathname === ADS_PATH || pathname === `${ADS_PATH}/`) {
-    return { page: 'ads', post: params.get('post') === '1' };
+  if (pathname === BOARD_PATH || pathname === `${BOARD_PATH}/`) {
+    return { page: 'board', post: params.get('post') === '1' };
   }
   const compare = CLUB_COMPARE.exec(pathname);
   if (compare) {
@@ -111,9 +121,9 @@ export function clubApplicationsPath(clubId: number | string, linked = false): s
   return `${APPLICATIONS_PATH}/club/${clubId}${linked ? '?linked=1' : ''}`;
 }
 
-/** The board of ads, opening the trainer's own ad when `post` is set. */
-export function adsPath(post = false): string {
-  return post ? `${ADS_PATH}?post=1` : ADS_PATH;
+/** The recruitment board, opening the trainer's own listing when `post` is set. */
+export function boardPath(post = false): string {
+  return post ? `${BOARD_PATH}?post=1` : BOARD_PATH;
 }
 
 /** The page where a leader compares applicants in their club, such as `…/compare?trainers=…`. */

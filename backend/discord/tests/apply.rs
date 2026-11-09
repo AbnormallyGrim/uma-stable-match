@@ -100,6 +100,7 @@ impl World {
                 club_name: Some("Other Club".into()),
                 pace_per_day: Some(6_400_000.0),
                 fans_this_month: Some(48_000_000),
+                leader_chara_dress_id: None,
                 alltime: None,
             }))
         });

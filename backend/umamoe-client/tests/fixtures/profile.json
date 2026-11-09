@@ -3,7 +3,8 @@
     "account_id": "100000001",
     "name": "Example Trainer",
     "comment": "Hello! uma-7KQ4XM",
-    "follower_num": 12
+    "follower_num": 12,
+    "leader_chara_dress_id": 100101
   },
   "circle": {
     "circle_id": 900001,

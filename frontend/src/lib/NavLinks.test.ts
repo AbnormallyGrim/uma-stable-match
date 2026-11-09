@@ -23,7 +23,7 @@ describe('NavLinks', () => {
       ['Club finder', '/'],
       ['Wishlist', '/wishlist'],
       ['Applications', '/applications'],
-      ['Recruitment Ads', '/applications/ads'],
+      ['Recruitment Board', '/recruitment-board'],
     ]);
   });
 
@@ -32,7 +32,7 @@ describe('NavLinks', () => {
       ['/', 'Club finder'],
       ['/club/100000001', 'Club finder'],
       ['/wishlist', 'Wishlist'],
-      ['/applications/ads', 'Recruitment Ads'],
+      ['/recruitment-board', 'Recruitment Board'],
     ] as const) {
       window.history.pushState({}, '', path);
       const { unmount } = render(NavLinks);
@@ -56,7 +56,7 @@ describe('currentPage', () => {
     expect(currentPage('/applications')).toBe('applications');
     expect(currentPage('/applications/club/7')).toBe('applications');
     expect(currentPage('/login')).toBe('applications');
-    expect(currentPage('/applications/ads')).toBe('ads');
+    expect(currentPage('/recruitment-board')).toBe('board');
     expect(currentPage('/settings')).toBeNull();
   });
 });

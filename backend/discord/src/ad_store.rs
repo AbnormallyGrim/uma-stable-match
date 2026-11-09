@@ -207,6 +207,8 @@ pub struct NewAd {
     pub pace: Option<f64>,
     /// Fans gained this month.
     pub fans_this_month: Option<i64>,
+    /// The outfit ID of their leader character.
+    pub leader_chara_dress_id: Option<i64>,
     /// The lowest club rank they'd join, as a tier code in [`RANKS`].
     pub rank_min: u8,
     /// The highest club rank they'd join, as a tier code in [`RANKS`].
@@ -293,6 +295,12 @@ impl AdStore {
             (
                 "fans",
                 ad.fans_this_month
+                    .map(|v| v.to_string())
+                    .unwrap_or_default(),
+            ),
+            (
+                "dress",
+                ad.leader_chara_dress_id
                     .map(|v| v.to_string())
                     .unwrap_or_default(),
             ),
@@ -485,6 +493,7 @@ fn parse(sealer: &Sealer, id: &str, fields: &HashMap<String, String>) -> Option<
             current_club: text("current_club"),
             pace: fields.get("pace").and_then(|v| v.parse().ok()),
             fans_this_month: fields.get("fans").and_then(|v| v.parse().ok()),
+            leader_chara_dress_id: fields.get("dress").and_then(|v| v.parse().ok()),
             rank_min,
             rank_max,
             discord: DiscordWish::parse(fields.get("discord")?)?,

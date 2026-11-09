@@ -56,6 +56,8 @@ pub struct Applicant {
     pub fans_this_month: Option<i64>,
     /// All-time fan totals and averages, if known.
     pub alltime: Option<Alltime>,
+    /// The outfit ID of the trainer's leader character, if known.
+    pub leader_chara_dress_id: Option<i64>,
 }
 
 /// A trainer's all-time fans.

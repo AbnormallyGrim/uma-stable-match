@@ -93,6 +93,7 @@ impl World {
                 club_name: Some("Other Club".into()),
                 pace_per_day: Some(6_400_000.0),
                 fans_this_month: Some(48_000_000),
+                leader_chara_dress_id: Some(100_101),
                 alltime: None,
             }))
         });
@@ -342,6 +343,7 @@ async fn a_trainer_posts_an_ad_with_their_fan_numbers() {
     assert_eq!(posted["currentClub"], "Other Club");
     assert_eq!(posted["pace"], 6_400_000.0);
     assert_eq!(posted["fansThisMonth"], 48_000_000);
+    assert_eq!(posted["leaderCharaDressId"], 100_101);
     assert_eq!(posted["rankMin"], 3);
     assert_eq!(posted["rankMax"], 5);
     assert_eq!(posted["discord"], "required");
@@ -415,7 +417,7 @@ async fn an_ad_must_make_sense() {
 }
 
 #[tokio::test]
-async fn anyone_signed_in_sees_the_board_and_only_a_leader_sees_a_clubs_invites() {
+async fn anyone_sees_the_board_and_only_a_leader_sees_a_clubs_invites() {
     let Some(world) = World::new().await else {
         return;
     };
@@ -433,8 +435,9 @@ async fn anyone_signed_in_sees_the_board_and_only_a_leader_sees_a_clubs_invites(
     assert!(board.iter().any(
         |ad| ad["trainerId"] == (world.base + 51).to_string().as_str() && ad["invited"] == false
     ));
+    // Nor does a visitor who hasn't signed in.
     let response = world.send("GET", ADS_PATH, "", None).await;
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(response.status(), StatusCode::OK);
 
     let board = world
         .whole_board(&leader, &format!("club={}", world.club()))
@@ -682,6 +685,7 @@ async fn the_board_takes_filters_and_pages() {
                 current_club: None,
                 pace: Some(9_000_000.0 - n as f64),
                 fans_this_month: None,
+                leader_chara_dress_id: None,
                 rank_min: 11,
                 rank_max: 11,
                 discord: DiscordWish::Required,

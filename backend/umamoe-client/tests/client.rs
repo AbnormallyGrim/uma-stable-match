@@ -703,6 +703,7 @@ async fn fetches_a_profile() {
         response.trainer.comment.as_deref(),
         Some("Hello! uma-7KQ4XM")
     );
+    assert_eq!(response.trainer.leader_chara_dress_id, Some(100_101));
     assert_eq!(response.circle.unwrap().circle_id, 900001);
 }
 

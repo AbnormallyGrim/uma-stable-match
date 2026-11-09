@@ -1,9 +1,9 @@
 // AdsPage tests. All data is made up.
 
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { BoardAd, MyAd } from './ads';
+import { adDay, BOARD_VIEW_KEY, type BoardAd, type MyAd } from './ads';
 import AdsPage from './AdsPage.svelte';
 import { t } from './i18n';
 
@@ -18,6 +18,7 @@ function ad(id: string, over: Partial<BoardAd> = {}): BoardAd {
     currentClub: 'Other Club',
     pace: 1_000_000,
     fansThisMonth: 10_000_000,
+    leaderCharaDressId: 100101,
     rankMin: 1,
     rankMax: 11,
     discord: 'any',
@@ -56,6 +57,8 @@ const mine: MyAd = {
 interface Setup {
   /** The signed-in trainer's own ad. */
   mine?: MyAd | null;
+  /** Whether nobody is signed in: the signed-in routes answer 401. */
+  signedOut?: boolean;
   /** The club they lead, or `null` for none. */
   leads?: string | null;
   /** The ads on the server's board; it pages them 20 at a time, fastest first, unfiltered. */
@@ -67,6 +70,12 @@ interface Setup {
 function stub(setup: Setup = {}) {
   const fetch = vi.fn((uri: string, init?: RequestInit) => {
     const [path, search] = uri.split('?') as [string, string | undefined];
+    if (
+      setup.signedOut &&
+      (path === '/api/v1/discord/ads/me' || path === '/api/v1/discord/my-club')
+    ) {
+      return Promise.resolve(json({ error: 'sign in' }, 401));
+    }
     if (path === '/api/v1/discord/ads/me') {
       return Promise.resolve(json(setup.mine ?? null));
     }
@@ -120,8 +129,14 @@ function names(): string[] {
     .map((row) => within(row).getAllByRole('link')[0]!.textContent?.trim() ?? '');
 }
 
+// Most tests read the table; the ones about the grid and the switch say so.
+beforeEach(() => {
+  localStorage.setItem(BOARD_VIEW_KEY, 'table');
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  localStorage.clear();
 });
 
 describe('AdsPage', () => {
@@ -232,10 +247,13 @@ describe('AdsPage', () => {
       await screen.findByRole('button', { name: t('ads.viewAd', { name: 'Trainer 1' }) }),
     );
     let dialog = screen.getByRole('dialog', { name: 'Trainer 1' });
-    expect(within(dialog).getByText('100000001')).toBeInTheDocument();
+    // The trainer ID and the board expiry aren't listed; the name links to the profile.
+    expect(within(dialog).queryByText('100000001')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(adDay('2026-11-10T00:00:00Z'))).not.toBeInTheDocument();
+    expect(dialog.querySelector('.icon img')?.getAttribute('src')).toMatch(/100101/);
     expect(within(dialog).getByText('B to A+')).toBeInTheDocument();
     expect(within(dialog).getByText(t('ad.language.en'))).toBeInTheDocument();
-    expect(within(dialog).getByRole('link', { name: t('ads.details.profile') })).toHaveAttribute(
+    expect(within(dialog).getByRole('link', { name: 'Trainer 1' })).toHaveAttribute(
       'href',
       'https://uma.moe/profile/100000001',
     );
@@ -398,6 +416,66 @@ describe('AdsPage', () => {
     stub();
     render(AdsPage, { post: true });
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('shows the board to a visitor who hasn’t signed in, who signs in to post', async () => {
+    const fetch = stub({ signedOut: true });
+    render(AdsPage);
+    expect(await screen.findByRole('link', { name: t('ads.signInToPost') })).toHaveAttribute(
+      'href',
+      '/api/v1/auth/discord/login?next=%2Frecruitment-board%3Fpost%3D1',
+    );
+    expect(names()).toEqual(['Trainer 2', 'Trainer 1', 'Trainer 4', 'Trainer 3']);
+    expect(screen.queryByRole('button', { name: t('ads.post') })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Invite/ })).not.toBeInTheDocument();
+    expect(lastBoardQuery(fetch).has('club')).toBe(false);
+  });
+
+  it('sends a visitor who hasn’t signed in to sign in when a link opens the dialog', async () => {
+    stub({ signedOut: true });
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign });
+    render(AdsPage, { post: true });
+    await vi.waitFor(() =>
+      expect(assign).toHaveBeenCalledWith(
+        '/api/v1/auth/discord/login?next=%2Frecruitment-board%3Fpost%3D1',
+      ),
+    );
+  });
+
+  it('shows a card’s leader icon when we have its image, and the initial when we don’t', async () => {
+    stub({
+      board: [
+        ad('1', { leaderCharaDressId: 100102 }),
+        ad('2', { leaderCharaDressId: 1 }),
+        ad('3', { leaderCharaDressId: null }),
+      ],
+    });
+    localStorage.removeItem(BOARD_VIEW_KEY);
+    const { container } = render(AdsPage);
+    await screen.findByText('Trainer 1');
+    expect(container.querySelectorAll('.icon img')).toHaveLength(1);
+    expect(container.querySelector('.icon img')?.getAttribute('src')).toMatch(/100102/);
+  });
+
+  it('shows the grid unless the visitor chose the table, and remembers the choice', async () => {
+    localStorage.removeItem(BOARD_VIEW_KEY);
+    stub();
+    const { container } = render(AdsPage);
+    await screen.findByText('Trainer 1');
+    expect(container.querySelector('ul.grid')).not.toBeNull();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    const grid = screen.getByRole('radio', { name: t('ads.layout.grid') });
+    expect(grid).toBeChecked();
+
+    await fireEvent.click(screen.getByRole('radio', { name: t('ads.layout.table') }));
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(container.querySelector('ul.grid')).toBeNull();
+    expect(localStorage.getItem(BOARD_VIEW_KEY)).toBe('table');
+
+    await fireEvent.click(screen.getByRole('radio', { name: t('ads.layout.grid') }));
+    expect(container.querySelector('ul.grid')).not.toBeNull();
+    expect(localStorage.getItem(BOARD_VIEW_KEY)).toBe('grid');
   });
 
   it('shows an empty board', async () => {

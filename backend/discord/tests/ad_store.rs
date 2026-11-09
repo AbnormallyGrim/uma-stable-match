@@ -42,6 +42,7 @@ fn new_ad(user: u64) -> NewAd {
         current_club: Some("Other Club".into()),
         pace: Some(6_400_000.0),
         fans_this_month: Some(48_000_000),
+        leader_chara_dress_id: Some(100_101),
         rank_min: 3,
         rank_max: 8,
         discord: DiscordWish::Preferred,

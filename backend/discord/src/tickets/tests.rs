@@ -29,6 +29,7 @@ fn applicant() -> Applicant {
         club_name: Some("Other Club".into()),
         pace_per_day: Some(6_400_000.0),
         fans_this_month: Some(48_123_456),
+        leader_chara_dress_id: Some(100_101),
         alltime: Some(Alltime {
             total_fans: 1_500_000_000,
             active_days: 300,
@@ -85,6 +86,7 @@ fn leaves_out_what_isnt_known() {
         club_name: None,
         pace_per_day: None,
         fans_this_month: None,
+        leader_chara_dress_id: None,
         alltime: None,
     };
     let body = message(&application(), &unknown, None);

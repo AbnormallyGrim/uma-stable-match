@@ -13,12 +13,14 @@
     /** ID prefix for the dialog's title, so the page can have more than one. */
     id: string;
     title: string;
+    /** What the heading shows in place of the plain `title`, such as a link. */
+    heading?: Snippet;
     /** Called when the dialog is closed. */
     onclose: () => void;
     children: Snippet;
   }
 
-  let { id, title, onclose, children }: Props = $props();
+  let { id, title, heading, onclose, children }: Props = $props();
 
   let panel: HTMLDivElement | undefined = $state();
   let closeButton: HTMLButtonElement | undefined = $state();
@@ -81,7 +83,9 @@
 >
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="{id}-title" bind:this={panel}>
     <header>
-      <h2 id="{id}-title">{title}</h2>
+      <h2 id="{id}-title">
+        {#if heading}{@render heading()}{:else}{title}{/if}
+      </h2>
       <button
         type="button"
         class="close"

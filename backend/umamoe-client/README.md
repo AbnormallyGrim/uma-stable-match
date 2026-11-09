@@ -65,7 +65,7 @@ assert_eq!(me.gain_7d, Some(14_000_000));
 
 `RankingsMonthlyRequest` works the same way for one month: `for_viewer` searches for a trainer ID, `for_month` picks the month (the current one by default), and `MonthlyRankingsResponse::viewer` picks the exact trainer. Its `circle_id` is the club the trainer was in that month. A month outside 1 to 12 is rejected before any request is sent.
 
-`Client::profile` takes a trainer ID of 9 to 12 digits and rejects anything else before sending a request. A trainer uma.moe doesn't know is an `Error::Status` with a 404. The `ProfileResponse` type holds only the trainer's `account_id`, `name` and `comment` and the current `circle`; the rest of the profile is ignored. Metrics and traces label the call `/api/v4/user/profile/{account_id}`, never the ID.
+`Client::profile` takes a trainer ID of 9 to 12 digits and rejects anything else before sending a request. A trainer uma.moe doesn't know is an `Error::Status` with a 404. The `ProfileResponse` type holds only the trainer's `account_id`, `name`, `comment` and `leader_chara_dress_id` and the current `circle`; the rest of the profile is ignored. Metrics and traces label the call `/api/v4/user/profile/{account_id}`, never the ID.
 
 ## Response types
 

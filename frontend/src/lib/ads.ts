@@ -81,6 +81,49 @@ export interface MyAd extends AdChoices {
   invites: Invite[];
 }
 
+/** How the board lists its ads: as a grid of cards or a table. */
+export type BoardView = 'grid' | 'table';
+
+/** Local storage key for the view the visitor picked. */
+export const BOARD_VIEW_KEY = 'uma-stable-match:board-view';
+
+/** The saved view, or the grid if there's none or storage is blocked. */
+export function loadBoardView(storage: Storage | undefined): BoardView {
+  try {
+    return storage?.getItem(BOARD_VIEW_KEY) === 'table' ? 'table' : 'grid';
+  } catch {
+    return 'grid';
+  }
+}
+
+/** Saves the view. Storage errors are ignored. */
+export function saveBoardView(storage: Storage | undefined, view: BoardView) {
+  try {
+    storage?.setItem(BOARD_VIEW_KEY, view);
+  } catch {
+    return;
+  }
+}
+
+/** The icons we have, by outfit ID, from the file names (`chara_stand_1013_101301.webp`). */
+const DRESS_ICONS = new Map<number, string>(
+  Object.entries(
+    import.meta.glob<string>('../assets/thumbnails/*.webp', {
+      eager: true,
+      query: '?url',
+      import: 'default',
+    }),
+  ).flatMap(([path, url]) => {
+    const id = /_(\d+)\.webp$/.exec(path)?.[1];
+    return id === undefined ? [] : [[Number(id), url] as const];
+  }),
+);
+
+/** The icon for a leader character outfit, or `null` when we don't have that outfit's image. */
+export function dressIconUrl(dressId: number): string | null {
+  return DRESS_ICONS.get(dressId) ?? null;
+}
+
 /** An ad on the board, as a leader sees it. */
 export interface BoardAd {
   id: string;
@@ -89,6 +132,8 @@ export interface BoardAd {
   currentClub: string | null;
   pace: number | null;
   fansThisMonth: number | null;
+  /** The outfit ID of the trainer's leader character, which picks their icon. */
+  leaderCharaDressId: number | null;
   rankMin: number;
   rankMax: number;
   discord: DiscordWish;
