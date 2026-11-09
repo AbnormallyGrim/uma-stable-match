@@ -15,6 +15,7 @@ import {
   isLoginRoute,
   isSettingsRoute,
   isWishlistRoute,
+  legacyBoardRedirect,
 } from './lib/route';
 import SettingsPage from './lib/SettingsPage.svelte';
 import TrainerApplicationsPage from './lib/TrainerApplicationsPage.svelte';
@@ -31,6 +32,12 @@ Sentry.init({
 const target = document.getElementById('app');
 if (!target) {
   throw new Error('missing #app element');
+}
+
+// The board used to live under /applications, which asks for a sign-in; it moves before that check.
+const movedBoard = legacyBoardRedirect(window.location.pathname, window.location.search);
+if (movedBoard !== null) {
+  window.history.replaceState(null, '', movedBoard);
 }
 
 const isApplicationsPath = /^\/applications(?:\/|$)/.test(window.location.pathname);
@@ -71,7 +78,7 @@ if (!shouldRedirectToLogin) {
         requirement: applications.requirement,
       },
     });
-  } else if (applications?.page === 'ads') {
+  } else if (applications?.page === 'board') {
     mount(AdsPage, { target, props: { post: applications.post } });
   } else if (applications?.page === 'trainer') {
     mount(TrainerApplicationsPage, { target });

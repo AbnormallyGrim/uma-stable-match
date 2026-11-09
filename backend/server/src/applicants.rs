@@ -45,6 +45,7 @@ pub fn applicant_lookup(source: Source, paces: PaceLookup) -> ApplicantLookup {
                 pace_per_day: pace,
                 fans_this_month: fans,
                 alltime: alltime(profile.fan_history),
+                leader_chara_dress_id: profile.trainer.leader_chara_dress_id,
             }))
         }
     })

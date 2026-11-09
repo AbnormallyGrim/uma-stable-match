@@ -59,7 +59,7 @@ fetch('/api/v1/features')
         'nav.finder': 'サークル検索',
         'nav.wishlist': 'ウィッシュリスト',
         'nav.applications': 'サークルマスターの方へ',
-        'nav.ads': '募集広告',
+        'nav.board': '募集掲示板',
         'nav.account': 'アカウント',
         'lang.switch': '英語に切り替え (English)',
         'theme.label': 'テーマ',

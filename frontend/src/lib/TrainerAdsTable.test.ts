@@ -33,7 +33,7 @@ describe('TrainerAdsTable', () => {
     expect(screen.getByText(t('trainer.ads.empty'))).toBeInTheDocument();
     expect(screen.getByRole('link', { name: t('ads.post') })).toHaveAttribute(
       'href',
-      '/applications/ads?post=1',
+      '/recruitment-board?post=1',
     );
   });
 
@@ -46,7 +46,7 @@ describe('TrainerAdsTable', () => {
     expect(screen.getByRole('cell', { name: '2' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: t('trainer.ads.manage') })).toHaveAttribute(
       'href',
-      '/applications/ads?post=1',
+      '/recruitment-board?post=1',
     );
   });
 

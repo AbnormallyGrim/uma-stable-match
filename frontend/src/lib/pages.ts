@@ -2,7 +2,7 @@
 
 import type { MessageKey } from './i18n';
 import {
-  ADS_PATH,
+  BOARD_PATH,
   APPLICATIONS_PATH,
   applicationsRoute,
   isLoginRoute,
@@ -13,7 +13,7 @@ import {
 
 /** One page in the navbar. */
 export interface Page {
-  id: 'home' | 'finder' | 'wishlist' | 'applications' | 'ads';
+  id: 'home' | 'finder' | 'wishlist' | 'applications' | 'board';
   href: string;
   label: MessageKey;
   /** The icon's drawing: SVG elements for a 16 by 16 grid, drawn as outlines. */
@@ -35,7 +35,7 @@ export function websiteUrl({ protocol, hostname, port }: Origin): string {
 
 /**
  * The pages the navbar links to: the website's home page, the club finder, wishlist, applications
- * and the board of recruitment ads.
+ * and the recruitment board.
  */
 export const PAGES: Page[] = [
   {
@@ -63,24 +63,24 @@ export const PAGES: Page[] = [
     icon: '<circle cx="8" cy="5.25" r="2.5" /><path d="M3 13.5c.5-2.75 2.5-4 5-4s4.5 1.25 5 4" />',
   },
   {
-    id: 'ads',
-    href: ADS_PATH,
-    label: 'nav.ads',
+    id: 'board',
+    href: BOARD_PATH,
+    label: 'nav.board',
     icon: '<path d="M2.5 6.25v3.5h2.25L10 13V3L4.75 6.25H2.5Z" /><path d="M12.5 5.75a3 3 0 0 1 0 4.5" />',
   },
 ];
 
 /**
  * The page `pathname` belongs to, or `null` for the settings page, which isn't in the navbar. The
- * club page is part of the finder, sign-in of applications, and the board of ads is its own page.
+ * club page is part of the finder, sign-in of applications, and the recruitment board is its own page.
  */
 export function currentPage(pathname: string): Page['id'] | null {
   if (isSettingsRoute(pathname)) {
     return null;
   }
   const applications = applicationsRoute(pathname, '');
-  if (applications?.page === 'ads') {
-    return 'ads';
+  if (applications?.page === 'board') {
+    return 'board';
   }
   if (applications || isLoginRoute(pathname)) {
     return 'applications';

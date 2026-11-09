@@ -238,7 +238,7 @@ Trainers post an ad that they're looking for a club, and leaders find them on a 
 
 - `GET`, `PUT` and `DELETE /api/v1/discord/ads/me` (`MY_AD_PATH`) read, post or replace, and delete the signed-in trainer's ad. `GET` answers `null` without one. A person has one ad, for their linked trainer; without one `PUT` is 403.
 - `POST /api/v1/discord/ads/me/renew` (`MY_AD_RENEW_PATH`) keeps the ad's choices and takes fresh fan numbers.
-- `GET /api/v1/discord/ads` (`ADS_PATH`) gives one page of the ads on the board for anyone signed in: `{ "ads": [...], "page", "pages", "total" }`, `PAGE_SIZE` (20) ads a page, fastest first and those without a pace last. Query parameters describe the leader's club. Each is optional, and one left out (or `language=any`) filters nothing:
+- `GET /api/v1/discord/ads` (`ADS_PATH`) gives one page of the ads on the board for anyone, signed in or not: `{ "ads": [...], "page", "pages", "total" }`, `PAGE_SIZE` (20) ads a page, fastest first and those without a pace last. Query parameters describe the leader's club. Each is optional, and one left out (or `language=any`) filters nothing:
   - `rank_min` and `rank_max`: tier codes 1 (D) to 11 (SS); swapped if both are given the wrong way round. An ad matches when its lowest rank is at or above `rank_min` and its highest at or below `rank_max`.
   - `has_discord`: `true` or `false`. Without a Discord server (`false`), ads that require one are left out.
   - `language`: a language code or `any`. Ads in another language are left out; ads that don't mind stay.
@@ -249,7 +249,7 @@ Trainers post an ad that they're looking for a club, and leaders find them on a 
 - `POST /api/v1/discord/clubs/{club}/ads/{ad}/invite` (`CLUB_AD_INVITE_PATH`) invites the trainer. It needs the club's leader and a club that takes applications through Discord (409 otherwise), and answers 204, also for a repeat. A trainer with `MAX_INVITES` (10) is 409, and an ad that's off the board 404.
 - `DELETE /api/v1/discord/ads/me/invites/{club}` (`MY_AD_INVITE_PATH`) dismisses an invite.
 
-An ad holds the trainer's name, current club, pace and fans this month, taken from the same `ApplicantLookup` as applications, and what they ask for: the lowest and highest club rank (tier codes 1 for D to 11 for SS), at most three ranks apart counting both (`MAX_RANK_SPAN`: C to B covers C, C+ and B; a wider range is a 400), whether the club needs a Discord server (`required`, `preferred` or `any`) and the language it speaks: `en`, `ja`, `ko`, `zh`, `es`, `pt`, `fr`, `de`, `id`, `th`, `vi` or `any`. The languages are only filters for leaders; the app isn't translated into them. Every ad takes invites, and there is no free text.
+An ad holds the trainer's name, current club, pace, fans this month and leader character outfit (`leader_chara_dress_id` from their profile, for their icon; `null` for ads posted before it was stored until they're renewed), taken from the same `ApplicantLookup` as applications, and what they ask for: the lowest and highest club rank (tier codes 1 for D to 11 for SS), at most three ranks apart counting both (`MAX_RANK_SPAN`: C to B covers C, C+ and B; a wider range is a 400), whether the club needs a Discord server (`required`, `preferred` or `any`) and the language it speaks: `en`, `ja`, `ko`, `zh`, `es`, `pt`, `fr`, `de`, `id`, `th`, `vi` or `any`. The languages are only filters for leaders; the app isn't translated into them. Every ad takes invites, and there is no free text.
 
 An invite is not an addition to a server. The trainer sees it on their ad page and applies through the usual [application](#applying-to-a-club), which signs them in again, adds them and opens the ticket. Nothing from the sign-in is kept for later.
 
@@ -257,7 +257,7 @@ An invite is not an addition to a server. The trainer sees it on their ad page a
 
 | Key | Holds |
 |---|---|
-| `discord:ad:{hash}` | A hash: the ad's fields, the trainer's Discord ID (encrypted as for applications), when it was posted and when it leaves the board, and one `inv:{club_id}` field per invite, holding when it was sent |
+| `discord:ad:{hash}` | A hash: the ad's fields (including `dress`, the leader character outfit), the trainer's Discord ID (encrypted as for applications), when it was posted and when it leaves the board, and one `inv:{club_id}` field per invite, holding when it was sent |
 | `discord:ads` | The hashes of the ads on the board, scored by when each leaves it |
 
 `{hash}` is the keyed hash of the trainer's Discord ID. An ad is on the board for 7 days (`VISIBLE_FOR`) after it's posted or renewed and kept for 30 (`STORED_FOR`), so a trainer can bring it back; invites live on the ad and go with it. Leaving the board changes nothing in the hash: `board` drops the ad from `discord:ads` when it reads it, and renewing adds it back. Deleting the account or unlinking the ad's trainer deletes the ad.

@@ -58,6 +58,7 @@ impl ClubSource for Fixed {
                         account_id: account_id.to_string(),
                         name: "Example Trainer".into(),
                         comment: Some("made-up comment".into()),
+                        leader_chara_dress_id: None,
                     },
                     circle: None,
                     ..Default::default()

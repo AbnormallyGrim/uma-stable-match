@@ -8,7 +8,7 @@
 <script lang="ts">
   import { adDay, rankRange, type MyAd } from './ads';
   import { t } from './i18n';
-  import { adsPath } from './route';
+  import { boardPath } from './route';
 
   interface Props {
     /** The trainer's ad, or `null` without one. */
@@ -24,7 +24,7 @@
     <div class="empty">
       <strong>{t('trainer.ads.empty')}</strong>
       <span>{t('trainer.ads.emptyHint')}</span>
-      <a href={adsPath(true)}>{t('ads.post')}</a>
+      <a href={boardPath(true)}>{t('ads.post')}</a>
     </div>
   {:else}
     <table>
@@ -60,7 +60,7 @@
           </td>
           <td class="num" data-label={t('trainer.ads.invites')}>{ad.invites.length}</td>
           <td class="act">
-            <a class="button-link" href={adsPath(true)}>{t('trainer.ads.manage')}</a>
+            <a class="button-link" href={boardPath(true)}>{t('trainer.ads.manage')}</a>
           </td>
         </tr>
       </tbody>

@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  dressIconUrl,
   deleteAd,
   dismissInvite,
   fetchBoard,
@@ -28,6 +29,7 @@ function ad(id: string, over: Partial<BoardAd> = {}): BoardAd {
     currentClub: null,
     pace: 1_000_000,
     fansThisMonth: 10_000_000,
+    leaderCharaDressId: null,
     rankMin: 1,
     rankMax: 11,
     discord: 'any',
@@ -38,6 +40,16 @@ function ad(id: string, over: Partial<BoardAd> = {}): BoardAd {
     ...over,
   };
 }
+
+describe('dressIconUrl', () => {
+  it('finds the icon for an outfit we have an image of', () => {
+    expect(dressIconUrl(100102)).toMatch(/chara_stand_1001_100102.*\.webp$/);
+  });
+
+  it('is null for an outfit we don’t have', () => {
+    expect(dressIconUrl(1)).toBeNull();
+  });
+});
 
 describe('rankLabel', () => {
   it('names the tiers from D to SS', () => {

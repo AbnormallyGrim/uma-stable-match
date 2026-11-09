@@ -2,7 +2,7 @@
 
 What Uma Stable Match collects, why, who sees it, and how to have it removed.
 
-Last updated: 8 November 2026
+Last updated: 9 November 2026
 
 ## 1. Who runs this site
 
@@ -63,7 +63,7 @@ You can clear cookies and local storage in your browser's settings. Clearing the
 
 - **uma.moe** receives the trainer IDs you look up, to fetch public game data.
 - **Discord** handles sign-in and, when you apply, adds you to the club's server. Our bot posts your application in a private ticket channel that you, the club's leader and the bot can see. It shows your trainer name, a uma.moe profile link and your stats. Once it is in Discord, the ticket is under Discord's policy and the club server's control, and we can't delete it.
-- **Club leaders** see your applications to their club, and can compare up to five applicants with their current members using public data.
+- **Club leaders** see your applications to their club, and can compare up to five applicants with their current members using public data. Anyone who visits the recruitment board can see your listing while it is on the board, without signing in, and a club's leader can invite you to apply.
 - **Service providers:** Fly.io (hosting and our database), Sentry (errors, logs and performance reports), Cloudflare (Web Analytics and the human check), Google Fonts (the website's fonts, which sees your IP address) and StrawPoll (the wishlist polls, under StrawPoll's own policy).
 
 We don't sell or rent personal data, and we don't share it for advertising across sites.

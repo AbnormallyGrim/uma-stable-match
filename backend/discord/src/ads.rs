@@ -90,6 +90,7 @@ fn summary(ad: &Ad) -> Value {
         "currentClub": details.current_club,
         "pace": details.pace,
         "fansThisMonth": details.fans_this_month,
+        "leaderCharaDressId": details.leader_chara_dress_id,
         "rankMin": details.rank_min,
         "rankMax": details.rank_max,
         "discord": details.discord.as_str(),
@@ -223,6 +224,7 @@ async fn save(discord: &Discord, user: u64, wanted: Wanted, result: &'static str
         current_club: details.club_name,
         pace: details.pace_per_day,
         fans_this_month: details.fans_this_month,
+        leader_chara_dress_id: details.leader_chara_dress_id,
         rank_min: wanted.rank_min,
         rank_max: wanted.rank_max,
         discord: wanted.discord,
@@ -426,16 +428,13 @@ async fn board(
         Ok(found) => found,
         Err(message) => return bad(message),
     };
-    // The ads are for anyone signed in; only a club's leader can ask what the club invited.
+    // The ads are public; only a club's leader can ask what the club invited.
     let club = match params.club {
         Some(club) => match led_club(&discord, &headers, &club).await {
             Ok((_, club_id, _)) => Some(club_id),
             Err(response) => return *response,
         },
-        None => match signed_in(&discord, &headers).await {
-            Ok(_) => None,
-            Err(response) => return *response,
-        },
+        None => None,
     };
     let listed = match ads.board().await {
         Ok(listed) => listed,

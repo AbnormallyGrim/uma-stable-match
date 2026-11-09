@@ -6,20 +6,23 @@
 -->
 
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
 
   import {
     adDay,
     fetchBoard,
     fetchMyAd,
     inviteTrainer,
+    loadBoardView,
     LANGUAGE_CODES,
     NO_FILTERS,
     profileUrl,
     RANK_CODES,
     rankLabel,
     rankRange,
+    saveBoardView,
     type BoardAd,
+    type BoardView,
     type BoardFilters,
     type BoardPage,
     type MyAd,
@@ -27,7 +30,9 @@
   import AdPanel from './AdPanel.svelte';
   import { ApiError } from './api';
   import { fetchMyClub, loginUrl } from './applications';
+  import BoardViewToggle from './BoardViewToggle.svelte';
   import Dropdown from './Dropdown.svelte';
+  import LeaderIcon from './LeaderIcon.svelte';
   import { applyFeatures } from './features';
   import { formatMillions, formatPerDay } from './format';
   import { t } from './i18n';
@@ -36,7 +41,7 @@
   import NavBar from './NavBar.svelte';
   import ReleaseNotes from './ReleaseNotes.svelte';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
-  import { adsPath } from './route';
+  import { boardPath } from './route';
   import SiteFooter from './SiteFooter.svelte';
 
   interface Props {
@@ -66,6 +71,8 @@
   let version = $state(0);
   /** Whether reading a later page or filter failed, with the earlier ads still shown. */
   let pageFailed = $state(false);
+  /** Whether the visitor is signed in; the board itself is public. */
+  let signedIn = $state(false);
   /** The signed-in trainer's own ad. */
   let mine = $state<MyAd | null>(null);
   /** The club the signed-in person leads, who can invite from the board. */
@@ -81,6 +88,13 @@
   /** The ad being invited from, and why the last invite failed, by ad ID. */
   let inviting = $state<string | null>(null);
   let failures = $state<Record<string, string>>({});
+
+  /** Whether the listings are a grid of cards or a table; the grid unless the visitor chose. */
+  let view = $state<BoardView>(untrack(() => loadBoardView(storage)));
+
+  $effect(() => {
+    saveBoardView(storage, view);
+  });
 
   const filtered = $derived(
     filters.rankMin !== NO_FILTERS.rankMin ||
@@ -157,7 +171,7 @@
 
   function signedOut(reason: unknown): boolean {
     if (reason instanceof ApiError && reason.status === 401) {
-      window.location.assign(loginUrl(adsPath()));
+      window.location.assign(loginUrl(boardPath()));
       return true;
     }
     return false;
@@ -188,18 +202,26 @@
     const { signal } = features;
     void (async () => {
       try {
-        const [own, club] = await Promise.all([
-          fetchMyAd({ signal }),
-          // Anyone can look at the board; only a leader's club can invite.
-          fetchMyClub({ signal }).catch((reason) => {
-            if (signedOut(reason)) {
-              throw reason;
-            }
-            return null;
-          }),
-        ]);
-        mine = own;
-        ledClub = club?.club?.leader ? club.club.id : null;
+        // Anyone can look at the board; posting and inviting need a sign-in, and only a leader's
+        // club can invite.
+        const own = await fetchMyAd({ signal }).catch((reason) => {
+          if (reason instanceof ApiError && reason.status === 401) {
+            return undefined;
+          }
+          throw reason;
+        });
+        if (own === undefined) {
+          // A link that opens the dialog goes through the sign-in first.
+          if (post) {
+            window.location.assign(loginUrl(boardPath(true)));
+            return;
+          }
+        } else {
+          signedIn = true;
+          mine = own;
+          const club = await fetchMyClub({ signal }).catch(() => null);
+          ledClub = club?.club?.leader ? club.club.id : null;
+        }
         started = true;
       } catch (reason) {
         if (!signal.aborted && !signedOut(reason)) {
@@ -258,9 +280,13 @@
 
   {#if load === 'ready'}
     <div class="post">
-      <button type="button" class="primary" onclick={() => (posting = true)}>
-        {mine === null ? t('ads.post') : t('ads.myAd')}
-      </button>
+      {#if signedIn}
+        <button type="button" class="primary" onclick={() => (posting = true)}>
+          {mine === null ? t('ads.post') : t('ads.myAd')}
+        </button>
+      {:else}
+        <a class="button-link" href={loginUrl(boardPath(true))}>{t('ads.signInToPost')}</a>
+      {/if}
     </div>
   {/if}
 
@@ -315,7 +341,10 @@
         </div>
       </form>
 
-      <p class="count" role="status">{t('ads.count', { n: board.total })}</p>
+      <div class="bar">
+        <p class="count" role="status">{t('ads.count', { n: board.total })}</p>
+        <BoardViewToggle bind:view />
+      </div>
 
       {#if pageFailed}
         <p class="problem" role="alert">{t('ads.loadError')}</p>
@@ -329,53 +358,55 @@
       {:else if board.total === 0}
         <div class="empty"><strong>{t('ads.noMatch')}</strong></div>
       {:else}
-        <table style:--sticky-top="{navHeight}px">
-          <thead>
-            <tr>
-              <th scope="col">{t('ads.table.trainer')}</th>
-              <th scope="col">{t('ads.table.pace')}</th>
-              <th scope="col">{t('ads.table.fans')}</th>
-              <th scope="col">{t('ads.table.wants')}</th>
-              <th scope="col">{t('ads.table.posted')}</th>
-              <th scope="col"><span class="visually-hidden">{t('ads.table.actions')}</span></th>
-            </tr>
-          </thead>
-          <tbody>
+        {#if view === 'grid'}
+          <ul class="grid">
             {#each board.ads as ad (ad.id)}
-              <!-- The View button is the keyboard way in; a click anywhere on the row is a pointer shortcut. -->
-              <tr class="ad" onclick={(event) => openFromRow(event, ad)}>
-                <td class="trainer" data-label={t('ads.table.trainer')}>
-                  <a
-                    class="name"
-                    href={profileUrl(ad.trainerId)}
-                    target="_blank"
-                    rel="noopener noreferrer">{ad.trainerName}</a
-                  >
-                  <span class="muted">{ad.trainerId}</span>
-                  <span class="muted">{ad.currentClub ?? t('ads.table.noClub')}</span>
-                </td>
-                <td class="num" data-label={t('ads.table.pace')}>
-                  {ad.pace === null ? t('ads.table.unknown') : formatPerDay(ad.pace)}
-                </td>
-                <td class="num" data-label={t('ads.table.fans')}>
-                  {ad.fansThisMonth === null
-                    ? t('ads.table.unknown')
-                    : formatMillions(ad.fansThisMonth)}
-                </td>
-                <td class="wants" data-label={t('ads.table.wants')}>
-                  <div class="chips">
-                    <span>{rankRange(ad.rankMin, ad.rankMax)}</span>
-                    {#if ad.discord !== 'any'}
-                      <span class="tag">{t(`ads.table.discord.${ad.discord}`)}</span>
-                    {/if}
-                    {#if ad.language !== 'any'}
-                      <span class="tag">{t(`ad.language.${ad.language}`)}</span>
-                    {/if}
+              <li class="tile">
+                <div class="head">
+                  <LeaderIcon name={ad.trainerName} dressId={ad.leaderCharaDressId} />
+                  <div class="who">
+                    <a
+                      class="name"
+                      href={profileUrl(ad.trainerId)}
+                      target="_blank"
+                      rel="noopener noreferrer">{ad.trainerName}</a
+                    >
+                    <span class="muted">{ad.currentClub ?? t('ads.table.noClub')}</span>
                   </div>
-                </td>
-                <td data-label={t('ads.table.posted')}>{adDay(ad.postedAt)}</td>
-                <td class="act">
+                </div>
+                <dl class="stats">
+                  <div>
+                    <dt>{t('ads.table.pace')}</dt>
+                    <dd>{ad.pace === null ? t('ads.table.unknown') : formatPerDay(ad.pace)}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('ads.table.fans')}</dt>
+                    <dd>
+                      {ad.fansThisMonth === null
+                        ? t('ads.table.unknown')
+                        : formatMillions(ad.fansThisMonth)}
+                    </dd>
+                  </div>
+                </dl>
+                <div class="chips">
+                  <span class="tag">{rankRange(ad.rankMin, ad.rankMax)}</span>
+                  {#if ad.discord !== 'any'}
+                    <span class="tag">{t(`ads.table.discord.${ad.discord}`)}</span>
+                  {/if}
+                  {#if ad.language !== 'any'}
+                    <span class="tag">{t(`ad.language.${ad.language}`)}</span>
+                  {/if}
+                </div>
+                {#if failures[ad.id]}
+                  <span class="problem" role="alert">{failures[ad.id]}</span>
+                {/if}
+                <!-- View stays last, so it sits in the bottom right corner whatever else is shown. -->
+                <div class="foot">
+                  <span class="muted">{adDay(ad.postedAt)}</span>
                   <div class="buttons">
+                    {#if ledClub !== null}
+                      {@render inviteButton(ad)}
+                    {/if}
                     <button
                       type="button"
                       onclick={() => (viewing = ad)}
@@ -383,18 +414,79 @@
                     >
                       {t('ads.view')}
                     </button>
-                    {#if ledClub !== null}
-                      {@render inviteButton(ad)}
-                    {/if}
                   </div>
-                  {#if failures[ad.id]}
-                    <span class="problem" role="alert">{failures[ad.id]}</span>
-                  {/if}
-                </td>
-              </tr>
+                </div>
+              </li>
             {/each}
-          </tbody>
-        </table>
+          </ul>
+        {:else}
+          <table style:--sticky-top="{navHeight}px">
+            <thead>
+              <tr>
+                <th scope="col">{t('ads.table.trainer')}</th>
+                <th scope="col">{t('ads.table.pace')}</th>
+                <th scope="col">{t('ads.table.fans')}</th>
+                <th scope="col">{t('ads.table.wants')}</th>
+                <th scope="col">{t('ads.table.posted')}</th>
+                <th scope="col"><span class="visually-hidden">{t('ads.table.actions')}</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each board.ads as ad (ad.id)}
+                <!-- The View button is the keyboard way in; a click anywhere on the row is a pointer shortcut. -->
+                <tr class="ad" onclick={(event) => openFromRow(event, ad)}>
+                  <td class="trainer" data-label={t('ads.table.trainer')}>
+                    <a
+                      class="name"
+                      href={profileUrl(ad.trainerId)}
+                      target="_blank"
+                      rel="noopener noreferrer">{ad.trainerName}</a
+                    >
+                    <span class="muted">{ad.trainerId}</span>
+                    <span class="muted">{ad.currentClub ?? t('ads.table.noClub')}</span>
+                  </td>
+                  <td class="num" data-label={t('ads.table.pace')}>
+                    {ad.pace === null ? t('ads.table.unknown') : formatPerDay(ad.pace)}
+                  </td>
+                  <td class="num" data-label={t('ads.table.fans')}>
+                    {ad.fansThisMonth === null
+                      ? t('ads.table.unknown')
+                      : formatMillions(ad.fansThisMonth)}
+                  </td>
+                  <td class="wants" data-label={t('ads.table.wants')}>
+                    <div class="chips">
+                      <span>{rankRange(ad.rankMin, ad.rankMax)}</span>
+                      {#if ad.discord !== 'any'}
+                        <span class="tag">{t(`ads.table.discord.${ad.discord}`)}</span>
+                      {/if}
+                      {#if ad.language !== 'any'}
+                        <span class="tag">{t(`ad.language.${ad.language}`)}</span>
+                      {/if}
+                    </div>
+                  </td>
+                  <td data-label={t('ads.table.posted')}>{adDay(ad.postedAt)}</td>
+                  <td class="act">
+                    <div class="buttons">
+                      <button
+                        type="button"
+                        onclick={() => (viewing = ad)}
+                        aria-label={t('ads.viewAd', { name: ad.trainerName })}
+                      >
+                        {t('ads.view')}
+                      </button>
+                      {#if ledClub !== null}
+                        {@render inviteButton(ad)}
+                      {/if}
+                    </div>
+                    {#if failures[ad.id]}
+                      <span class="problem" role="alert">{failures[ad.id]}</span>
+                    {/if}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
 
         {#if board.pages > 1}
           <nav class="pages" aria-label={t('ads.page.label')}>
@@ -443,15 +535,16 @@
 {#if viewing}
   {@const ad = viewing}
   <Modal id="board-ad" title={ad.trainerName} onclose={() => (viewing = null)}>
-    <div class="details">
-      <p>
+    {#snippet heading()}
+      <span class="dialog-title">
+        <LeaderIcon name={ad.trainerName} dressId={ad.leaderCharaDressId} size={40} />
         <a href={profileUrl(ad.trainerId)} target="_blank" rel="noopener noreferrer">
-          {t('ads.details.profile')}
+          {ad.trainerName}
         </a>
-      </p>
+      </span>
+    {/snippet}
+    <div class="details">
       <dl>
-        <dt>{t('ads.details.trainerId')}</dt>
-        <dd>{ad.trainerId}</dd>
         <dt>{t('ads.table.club')}</dt>
         <dd>{ad.currentClub ?? t('ads.table.noClub')}</dd>
         <dt>{t('ads.table.pace')}</dt>
@@ -468,8 +561,6 @@
         <dd>{t(`ad.language.${ad.language}`)}</dd>
         <dt>{t('ads.table.posted')}</dt>
         <dd>{adDay(ad.postedAt)}</dd>
-        <dt>{t('ads.details.until')}</dt>
-        <dd>{adDay(ad.visibleUntil)}</dd>
       </dl>
       {#if ledClub !== null}
         <div class="buttons">{@render inviteButton(ad)}</div>
@@ -511,6 +602,21 @@
   .post {
     display: flex;
     justify-content: flex-end;
+  }
+
+  /* A link that looks like a primary button. */
+  .button-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    color: var(--on-accent);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
   }
 
   h1 {
@@ -566,8 +672,16 @@
     white-space: nowrap;
   }
 
-  .count {
+  .bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
     margin: 16px 0 6px;
+  }
+
+  .count {
+    margin: 0;
     color: var(--muted);
     font-size: 0.85rem;
   }
@@ -582,6 +696,68 @@
     .filters {
       grid-template-columns: minmax(0, 1fr);
     }
+  }
+
+  /* Experiment: a card for each listing, as many columns as fit. */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tile {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .head {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .who {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .stats dt {
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .stats dd {
+    margin: 2px 0 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .foot {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    font-size: 0.85rem;
   }
 
   table {
@@ -676,8 +852,10 @@
     gap: 14px;
   }
 
-  .details p {
-    margin: 0;
+  .dialog-title {
+    display: inline-flex;
+    gap: 12px;
+    align-items: center;
   }
 
   .details dl {

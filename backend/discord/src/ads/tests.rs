@@ -16,6 +16,7 @@ fn ad(
             current_club: None,
             pace,
             fans_this_month: None,
+            leader_chara_dress_id: None,
             rank_min: ranks.0,
             rank_max: ranks.1,
             discord,
