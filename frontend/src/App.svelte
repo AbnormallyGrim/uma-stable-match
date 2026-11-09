@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
+  import Announcement from './lib/Announcement.svelte';
+  import { hasSeenAnnouncement } from './lib/announcement';
   import { fetchRecommendations, type RecommendationQuery } from './lib/api';
   import { applyFeatures } from './lib/features';
   import { HumanCheck } from './lib/human';
@@ -27,6 +29,13 @@
     validate,
     type SearchState,
   } from './lib/search';
+
+  interface Props {
+    /** Whether this visit gets the pages announcement, once the tour, if any, is over. */
+    announce?: boolean;
+  }
+
+  let { announce = false }: Props = $props();
 
   const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
   const fromUrl = fromUrlParams(new URLSearchParams(window.location.search));
@@ -134,4 +143,6 @@
 
 {#if touring}
   <Tour steps={tourSteps()} onclose={endTour} />
+{:else if announce && !hasSeenAnnouncement(storage)}
+  <Announcement />
 {/if}

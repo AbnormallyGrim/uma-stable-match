@@ -86,13 +86,15 @@ src/lib/HowToUse.svelte       Step-by-step instructions under the search form
 src/lib/SearchStatus.svelte   Loading, waiting and error messages
 src/lib/RunnerProgress.svelte The running figure that moves along a track while a search or club loads
 src/lib/progress.ts           The progress curve: how far along the track the runner is
+src/lib/Announcement.svelte   Dialog that points visitors to the Applications and Recruitment Board pages, shown once
+src/lib/announcement.ts       Who gets that dialog, and remembering that it was shown
 src/lib/NavBar.svelte         Top bar: the brand, linking to the website, the pages pill, the release notes and tour buttons, the theme switch and the account menu
 src/lib/NavLinks.svelte       The pages as a pill of icon links in the navbar, icons only on narrow screens
 src/lib/pages.ts              The pages the navbar links to, and which one is showing
 src/lib/ReleaseNotes.svelte   The release notes modal: a timeline of builds, newest first
 src/lib/releases.ts           The releases themselves, and remembering the newest one seen
 src/lib/Tour.svelte           The product tour's overlay, highlight and instruction card
-src/lib/tour.ts               The tour's steps, and remembering that it was seen
+src/lib/tour.ts               The tours' steps, and remembering that they were seen
 src/lib/ThemeToggle.svelte    System / Light / Dark switch, as icons with tooltips
 src/lib/theme.ts              Saving and applying the theme choice
 src/lib/LanguageToggle.svelte  Translate button, shown only when Japanese is enabled
@@ -168,6 +170,36 @@ The menu or the sign-in button makes the tools wider, so while either shows (`sh
 - **Controls.** **Next** and **Back** move between steps, **Skip tour** ends it, and the last step has **Done**. A row of dots shows progress.
 - **Keyboard and screen readers.** The card is a modal dialog labelled by the step's title and described by its text. Focus moves to **Next** on each step and stays inside the card; Escape skips the tour, the left and right arrow keys step through it, and focus goes back to where it was afterwards.
 - **Keeping it current.** The steps quote the page's labels, so update `tour.ts` when they change, and add a `data-tour` attribute for any new step's target.
+
+### Board tour
+
+The recruitment board reuses the same overlay with steps from `boardTourSteps()`, written to get a visitor to post: "Get found by clubs" (centred), "See who's on the board" (the listings, `data-tour="board"`), "Filter the board" (`data-tour="board-filters"`), "Post your listing" (`data-tour="board-post"`, the **Post a listing** button, or **Sign in to post a listing** for a signed-out visitor) and, for a signed-in trainer without a listing, "Fill in the form" (`data-tour="ad-form"`).
+
+- **Opening the form.** `Tour` takes an optional `onstep` callback, called as each step is shown. The board uses it to open the listing dialog behind the tour on the form step and close it on every other step, so **Next** from the post button opens the form and **Back** closes it. Finishing or skipping on the form step leaves it open to fill in.
+- **When it shows.** On a visitor's first visit, once the board has loaded. Finishing or skipping sets `uma-stable-match:board-tour-seen`, apart from the search tour's key, so each shows once. A link that opens the posting dialog (`?post=1`) skips it and leaves it for a later visit. Blocked storage means it never starts on its own. The **?** button in the board's navbar brings it back.
+
+### Pages announcement
+
+`Announcement.svelte` is a dialog that points to the **Recruitment Board** and **Applications** pages, one link card for each, with **Maybe later** to dismiss it. `main.ts` mounts it, so no page needs its own copy, except the club finder (`App.svelte`), which mounts it itself so that it can wait for the tour. Two flags in local storage decide what a visitor sees:
+
+- `uma-stable-match:pages-announcement-seen`: set as soon as the announcement opens, so it shows once per device.
+- `uma-stable-match:board-tour-seen`: the [board tour](#board-tour)'s flag.
+
+The flow is announcement, then tour:
+
+- **Other pages.** A visitor who hasn't seen the announcement gets it on the club finder, the club page, the wishlist and the settings. Its links lead to the new pages, where the board tour starts on their first visit.
+- **The club finder.** A first visit gets the search tour first, and the announcement the moment it's finished or skipped. A visitor who has seen the tour gets it at once.
+- **The new pages.** A visitor who arrives on `/applications` or `/recruitment-board` (or the old `/applications/ads` address) doesn't get the announcement, and it's marked as seen, since they're already there. On the board the tour starts as usual. Applications has no tour, so landing there leaves the board tour for the board. A sign-in redirect marks nothing.
+- **Sign-in.** The sign-in page never shows it.
+- **Blocked storage.** It counts as seen, so the dialog never repeats on every visit.
+
+The website's home page ([`site/`](../site)) has its own copy, a native `<dialog>` in `index.html` opened by `site.js`, with the same wording and flag name. Local storage isn't shared between `umastable.com` and `app.umastable.com`, so a visitor can see it once on each.
+
+### New badges
+
+The pages pill in the navbar (`NavLinks.svelte`) marks the **Applications** and **Recruitment Board** links as new until the visitor has been to them: a small dot over the icon on narrow screens, and a "New" label beside the name when the names show. The pages are listed in `NEW_PAGES` in `pages.ts`. Being on one of them sets `uma-stable-match:page-seen:{id}` (`applications` or `board`), which clears its badge for good; the sign-in page, though it counts as part of applications in the navbar, doesn't. Dismissing the announcement leaves the badges, so they keep pointing to pages the visitor hasn't opened. With blocked storage no badge shows. The website's pill has the same badges, cleared by following their links, since it can't see which pages were visited in the app. To retire the badges, empty `NEW_PAGES` and remove the badge markup from `site/index.html`.
+
+To announce something else later, change the copy and storage key in `announcement.ts`.
 
 ## Search form
 

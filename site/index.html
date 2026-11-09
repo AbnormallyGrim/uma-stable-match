@@ -155,10 +155,12 @@
             <a href="https://app.umastable.com/applications" data-tooltip="Applications" data-i18n-attr="data-tooltip:nav.applications">
                 <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="5.25" r="2.5" /><path d="M3 13.5c.5-2.75 2.5-4 5-4s4.5 1.25 5 4" /></svg>
                 <span class="label" data-i18n="nav.applications">Applications</span>
+                <span class="new-badge" data-new-page="applications" hidden><span class="new-badge-text" data-i18n="nav.new">New</span></span>
             </a>
             <a href="https://app.umastable.com/recruitment-board" data-tooltip="Recruitment Board" data-i18n-attr="data-tooltip:nav.board">
                 <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.25v3.5h2.25L10 13V3L4.75 6.25H2.5Z" /><path d="M12.5 5.75a3 3 0 0 1 0 4.5" /></svg>
                 <span class="label" data-i18n="nav.board">Recruitment Board</span>
+                <span class="new-badge" data-new-page="board" hidden><span class="new-badge-text" data-i18n="nav.new">New</span></span>
             </a>
         </nav>
         <div class="nav-links">
@@ -419,6 +421,23 @@
         <p class="policy"><a href="/privacy/" data-i18n="footer.privacy">Privacy Policy</a> <span aria-hidden="true">·</span> <a href="/terms/" data-i18n="footer.terms">Terms of Service</a></p>
     </div>
 </footer>
+
+<dialog class="announcement" id="announcement" aria-labelledby="announcement-title" hidden>
+    <div class="announcement-header">
+        <h2 id="announcement-title" data-i18n="announce.title">What’s new</h2>
+        <button type="button" class="announcement-close" data-announcement-close aria-label="Close" data-i18n-attr="aria-label:announce.close">
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" /></svg>
+        </button>
+    </div>
+    <p class="announcement-lede" data-i18n="announce.lede">Applications and the Recruitment Board are live. Take a look.</p>
+    <ul class="announcement-pages">
+        <li><a href="https://app.umastable.com/recruitment-board"><span class="tile"><svg viewBox="0 0 16 16" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.25v3.5h2.25L10 13V3L4.75 6.25H2.5Z" /><path d="M12.5 5.75a3 3 0 0 1 0 4.5" /></svg></span><span class="text"><strong data-i18n="nav.board">Recruitment Board</strong><span class="description" data-i18n="announce.board">Post a listing so club leaders can invite you to apply.</span></span><span class="arrow"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5" /></svg></span></a></li>
+        <li><a href="https://app.umastable.com/applications"><span class="tile"><svg viewBox="0 0 16 16" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="5.25" r="2.5" /><path d="M3 13.5c.5-2.75 2.5-4 5-4s4.5 1.25 5 4" /></svg></span><span class="text"><strong data-i18n="nav.applications">Applications</strong><span class="description" data-i18n="announce.applications">Apply to clubs and follow your applications, or set up your club as a leader.</span></span><span class="arrow"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5" /></svg></span></a></li>
+    </ul>
+    <div class="announcement-actions">
+        <button type="button" class="announcement-later" data-announcement-close data-i18n="announce.dismiss">Maybe later</button>
+    </div>
+</dialog>
 
 <script src="/site.js" defer></script>
 

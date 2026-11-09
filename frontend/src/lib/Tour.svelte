@@ -15,9 +15,11 @@
     steps: TourStep[];
     /** Called when the tour is finished or skipped. */
     onclose: () => void;
+    /** Called when a later or earlier step is shown, before it's highlighted, so the page can get its target ready. */
+    onstep?: (step: TourStep) => void;
   }
 
-  let { steps, onclose }: Props = $props();
+  let { steps, onclose, onstep }: Props = $props();
 
   const GAP = 12;
   const MARGIN = 16;
@@ -84,6 +86,7 @@
 
   function go(to: number) {
     index = Math.min(steps.length - 1, Math.max(0, to));
+    onstep?.(step);
     show();
   }
 

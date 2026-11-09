@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adDay, BOARD_VIEW_KEY, type BoardAd, type MyAd } from './ads';
 import AdsPage from './AdsPage.svelte';
 import { t } from './i18n';
+import { BOARD_TOUR_KEY } from './tour';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -132,6 +133,8 @@ function names(): string[] {
 // Most tests read the table; the ones about the grid and the switch say so.
 beforeEach(() => {
   localStorage.setItem(BOARD_VIEW_KEY, 'table');
+  // Returning visitors by default, so the tour doesn't cover the page.
+  localStorage.setItem(BOARD_TOUR_KEY, '1');
 });
 
 afterEach(() => {
@@ -489,5 +492,84 @@ describe('AdsPage', () => {
     render(AdsPage);
     expect(await screen.findByText(t('ads.loadError'))).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: t('ads.post') })).not.toBeInTheDocument();
+  });
+});
+
+describe('AdsPage tour', () => {
+  beforeEach(() => {
+    localStorage.removeItem(BOARD_TOUR_KEY);
+  });
+
+  it('starts on a first visit, once the board is there, and not again once skipped', async () => {
+    stub();
+    const { unmount } = render(AdsPage);
+    const dialog = await screen.findByRole('dialog', { name: 'Get found by clubs' });
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
+    expect(screen.getByRole('dialog', { name: 'See who’s on the board' })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByRole('dialog', { name: 'Filter the board' })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByRole('dialog', { name: 'Post your listing' })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: 'Skip tour' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(localStorage.getItem(BOARD_TOUR_KEY)).toBe('1');
+    unmount();
+
+    stub();
+    render(AdsPage);
+    await screen.findByRole('button', { name: t('ads.post') });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('opens the listing form on its last step, and closes it again on Back', async () => {
+    stub();
+    render(AdsPage);
+    await screen.findByRole('dialog', { name: 'Get found by clubs' });
+    for (let i = 0; i < 4; i += 1) {
+      await fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    }
+    expect(screen.getByRole('dialog', { name: 'Fill in the form' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: t('ad.heading') })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.queryByRole('dialog', { name: t('ad.heading') })).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    // The form stays open for the trainer to fill in.
+    expect(screen.getByRole('dialog', { name: t('ad.heading') })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Fill in the form' })).not.toBeInTheDocument();
+  });
+
+  it('has no form step for a trainer who already has a listing, or a visitor', async () => {
+    stub({ mine });
+    render(AdsPage);
+    await screen.findByRole('dialog', { name: 'Get found by clubs' });
+    expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
+  });
+
+  it('points at the post button, or the sign-in link for a visitor', async () => {
+    stub({ signedOut: true });
+    render(AdsPage);
+    await screen.findByRole('dialog', { name: 'Get found by clubs' });
+    expect(screen.getByRole('link', { name: t('ads.signInToPost') })).toHaveAttribute(
+      'data-tour',
+      'board-post',
+    );
+  });
+
+  it('waits when a link opens the posting dialog', async () => {
+    stub();
+    render(AdsPage, { post: true });
+    await screen.findByRole('dialog', { name: t('ad.heading') });
+    expect(screen.queryByRole('dialog', { name: 'Get found by clubs' })).not.toBeInTheDocument();
+    expect(localStorage.getItem(BOARD_TOUR_KEY)).toBeNull();
+  });
+
+  it('comes back from the help button', async () => {
+    localStorage.setItem(BOARD_TOUR_KEY, '1');
+    stub();
+    render(AdsPage);
+    await screen.findByRole('button', { name: t('ads.post') });
+    await fireEvent.click(screen.getByRole('button', { name: 'Take the tour' }));
+    expect(screen.getByRole('dialog', { name: 'Get found by clubs' })).toBeInTheDocument();
   });
 });

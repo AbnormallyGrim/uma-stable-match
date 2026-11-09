@@ -4,14 +4,17 @@ import { render, screen, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import NavLinks from './NavLinks.svelte';
-import { currentPage, websiteUrl } from './pages';
+import { currentPage, hasSeenPage, markPageSeen, websiteUrl } from './pages';
 
 afterEach(() => {
   window.history.pushState({}, '', '/');
+  localStorage.clear();
 });
 
 describe('NavLinks', () => {
   it('links to the home page, the club finder, the wishlist page, applications and ads', () => {
+    markPageSeen(localStorage, 'applications');
+    markPageSeen(localStorage, 'board');
     render(NavLinks);
     const nav = screen.getByRole('navigation', { name: 'Pages' });
     expect(
@@ -79,5 +82,38 @@ describe('websiteUrl', () => {
     expect(websiteUrl({ protocol: 'http:', hostname: 'site.localhost', port: '8080' })).toBe(
       'http://site.localhost:8080',
     );
+  });
+});
+
+describe('New badges', () => {
+  const badges = () =>
+    screen
+      .queryAllByText('New')
+      .map((badge) => badge.closest('a')?.textContent?.replace(/\s+/g, ' ').trim());
+
+  it('mark the applications and recruitment board links until they have been visited', () => {
+    render(NavLinks);
+    expect(badges()).toEqual(['Applications New', 'Recruitment Board New']);
+  });
+
+  it('clear on a visit, and stay cleared', () => {
+    window.history.pushState({}, '', '/recruitment-board');
+    const { unmount } = render(NavLinks);
+    expect(hasSeenPage(localStorage, 'board')).toBe(true);
+    expect(badges()).toEqual(['Applications New']);
+    unmount();
+    window.history.pushState({}, '', '/wishlist');
+    render(NavLinks);
+    expect(badges()).toEqual(['Applications New']);
+  });
+
+  it('don’t clear from the sign-in page, which belongs to applications', () => {
+    window.history.pushState({}, '', '/login');
+    render(NavLinks);
+    expect(hasSeenPage(localStorage, 'applications')).toBe(false);
+  });
+
+  it('never show when storage is blocked', () => {
+    expect(hasSeenPage(undefined, 'board')).toBe(true);
   });
 });

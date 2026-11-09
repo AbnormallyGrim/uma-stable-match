@@ -23,7 +23,7 @@ import { club, recommendations } from './lib/test-data';
 import ThemeToggle from './lib/ThemeToggle.svelte';
 import TrainerApplicationsPage from './lib/TrainerApplicationsPage.svelte';
 import TrainerApplicationsTable from './lib/TrainerApplicationsTable.svelte';
-import { TOUR_KEY } from './lib/tour';
+import { BOARD_TOUR_KEY, TOUR_KEY } from './lib/tour';
 
 // axe's colour-contrast rule needs real rendering, so contrast.test.ts covers it instead.
 // The landmark (region) rule only applies to whole-page checks.
@@ -86,6 +86,7 @@ const withResults: Recommendations = recommendations({
 
 beforeEach(() => {
   localStorage.setItem(TOUR_KEY, '1');
+  localStorage.setItem(BOARD_TOUR_KEY, '1');
 });
 
 afterEach(() => {
@@ -354,7 +355,7 @@ describe('accessibility', () => {
       }
     });
 
-    it('has no violations on the board of ads, and in its dialog', async () => {
+    function stubBoard() {
       const board = [
         {
           id: 'a1',
@@ -389,11 +390,23 @@ describe('accessibility', () => {
           );
         }),
       );
+    }
+
+    it('has no violations on the board of ads, and in its dialog', async () => {
+      stubBoard();
       const { container } = render(AdsPage);
       await screen.findByText('Trainer Alpha');
       expect(await violations(container)).toEqual([]);
       await fireEvent.click(screen.getByRole('button', { name: t('ads.post') }));
       expect(await violations(screen.getByRole('dialog'))).toEqual([]);
+    });
+
+    it('has no violations on the board with its tour open', async () => {
+      localStorage.removeItem(BOARD_TOUR_KEY);
+      stubBoard();
+      render(AdsPage);
+      await screen.findByRole('dialog', { name: 'Get found by clubs' });
+      expect(await violations(document.body, true)).toEqual([]);
     });
 
     it('has no violations in the applications table and an open application', async () => {

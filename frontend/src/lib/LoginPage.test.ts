@@ -29,7 +29,7 @@ describe('LoginPage', () => {
     );
     render(LoginPage);
     const nav = screen.getByRole('navigation', { name: 'Pages' });
-    expect(within(nav).getByRole('link', { name: 'Applications' })).toHaveAttribute(
+    expect(within(nav).getByRole('link', { name: /^Applications/ })).toHaveAttribute(
       'href',
       '/applications',
     );

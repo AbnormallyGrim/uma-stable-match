@@ -70,6 +70,29 @@ export const PAGES: Page[] = [
   },
 ];
 
+/** The pages that carry a "New" badge until the visitor has been to them. */
+export const NEW_PAGES: Page['id'][] = ['applications', 'board'];
+
+const seenKey = (id: Page['id']) => `uma-stable-match:page-seen:${id}`;
+
+/** Whether the visitor has been to the page on this device. Blocked storage counts as seen. */
+export function hasSeenPage(storage: Storage | undefined, id: Page['id']): boolean {
+  try {
+    return storage === undefined || storage.getItem(seenKey(id)) !== null;
+  } catch {
+    return true;
+  }
+}
+
+/** Remembers that the visitor has been to the page. Storage errors are ignored. */
+export function markPageSeen(storage: Storage | undefined, id: Page['id']) {
+  try {
+    storage?.setItem(seenKey(id), '1');
+  } catch {
+    return;
+  }
+}
+
 /**
  * The page `pathname` belongs to, or `null` for the settings page, which isn't in the navbar. The
  * club page is part of the finder, sign-in of applications, and the recruitment board is its own page.

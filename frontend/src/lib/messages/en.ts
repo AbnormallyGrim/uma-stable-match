@@ -343,6 +343,27 @@ export const en = {
   'tour.theme.body': 'Follow your device, or pick the light or dark theme.',
   'tour.help.title': 'Take the tour again',
   'tour.help.body': 'Select the question mark to bring this tour back any time.',
+  'announce.title': 'What’s new',
+  'announce.lede': 'Applications and the Recruitment Board are live. Take a look.',
+  'announce.board': 'Post a listing so club leaders can invite you to apply.',
+  'announce.applications':
+    'Apply to clubs and follow your applications, or set up your club as a leader.',
+  'announce.dismiss': 'Maybe later',
+  'tour.board.welcome.title': 'Get found by clubs',
+  'tour.board.welcome.body':
+    'Clubs are looking for trainers like you. Here’s the board, and how to get on it in a minute.',
+  'tour.board.list.title': 'See who’s on the board',
+  'tour.board.list.body':
+    'Each listing is a trainer looking for a club, with their fan pace from uma.moe. Yours would sit right here.',
+  'tour.board.filters.title': 'Filter the board',
+  'tour.board.filters.body':
+    'Narrow the listings by the club rank, Discord and language trainers are after, to see what’s in demand before you post yours.',
+  'tour.board.post.title': 'Post your listing',
+  'tour.board.post.body':
+    'Say what kind of club you want, and leaders can invite you to apply. It stays up for a week, and you can edit or delete it any time.',
+  'tour.board.form.title': 'Fill in the form',
+  'tour.board.form.body':
+    'Pick the club ranks, Discord and language you want, then select Post listing. Your fan numbers come from uma.moe, so that’s all there is to it.',
 
   'howTo.summary': 'How to use',
   'howTo.step1':
@@ -362,6 +383,7 @@ export const en = {
   'nav.home': 'Home',
   'nav.finder': 'Club finder',
   'nav.board': 'Recruitment Board',
+  'nav.new': 'New',
   'wishlist.title': 'Wishlist · Uma Stable Match',
   'wishlist.link': 'Wishlist',
   'wishlist.heading': 'Help decide what gets built next',
