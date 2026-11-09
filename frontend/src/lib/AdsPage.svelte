@@ -2,7 +2,7 @@
   @component
   The board of ads: trainers who are looking for a club, in a table that can be filtered and paged.
   A button opens a dialog where a trainer posts or manages their own ad, and a club's leader gets
-  an Invite button on each row.
+  an Invite button on each row. A short tour on a first visit points to the button.
 -->
 
 <script lang="ts">
@@ -43,6 +43,8 @@
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './releases';
   import { boardPath } from './route';
   import SiteFooter from './SiteFooter.svelte';
+  import { boardTourSteps, BOARD_TOUR_KEY, hasSeenTour, markTourSeen, type TourStep } from './tour';
+  import Tour from './Tour.svelte';
 
   interface Props {
     /** Whether the dialog for the trainer's own ad starts open. */
@@ -59,6 +61,26 @@
     readingReleases = true;
     unseenRelease = false;
     markReleaseSeen(storage);
+  }
+
+  let touring = $state(false);
+  let tourChecked = false;
+  let tourSteps = $state<TourStep[]>([]);
+
+  /** Starts the tour. A trainer without a listing also gets a step that opens the form. */
+  function startTour() {
+    tourSteps = boardTourSteps(signedIn && mine === null);
+    touring = true;
+  }
+
+  // The form step opens the listing form behind the tour, and the other steps close it again.
+  function onTourStep(step: TourStep) {
+    posting = step.target === 'ad-form';
+  }
+
+  function endTour() {
+    touring = false;
+    markTourSeen(storage, BOARD_TOUR_KEY);
   }
 
   type Load = 'loading' | 'ready' | 'error';
@@ -162,6 +184,17 @@
       },
     );
     return () => reading.abort();
+  });
+
+  // The tour starts once, on a first visit, when the board is there to point at. A link that opens
+  // the posting dialog skips it.
+  $effect(() => {
+    if (load === 'ready' && !tourChecked) {
+      tourChecked = true;
+      if (!post && !hasSeenTour(storage, BOARD_TOUR_KEY)) {
+        startTour();
+      }
+    }
   });
 
   $effect(() => {
@@ -269,7 +302,7 @@
   }
 </script>
 
-<NavBar onreleases={openReleases} unseen={unseenRelease} />
+<NavBar onhelp={startTour} onreleases={openReleases} unseen={unseenRelease} />
 
 <main>
   <header class="intro">
@@ -281,11 +314,18 @@
   {#if load === 'ready'}
     <div class="post">
       {#if signedIn}
-        <button type="button" class="primary" onclick={() => (posting = true)}>
+        <button
+          type="button"
+          class="primary"
+          data-tour="board-post"
+          onclick={() => (posting = true)}
+        >
           {mine === null ? t('ads.post') : t('ads.myAd')}
         </button>
       {:else}
-        <a class="button-link" href={loginUrl(boardPath(true))}>{t('ads.signInToPost')}</a>
+        <a class="button-link" data-tour="board-post" href={loginUrl(boardPath(true))}
+          >{t('ads.signInToPost')}</a
+        >
       {/if}
     </div>
   {/if}
@@ -295,9 +335,14 @@
   {:else if load === 'error'}
     <p class="card" role="alert">{t('ads.loadError')}</p>
   {:else}
-    <section class="card" aria-labelledby="board-heading">
+    <section class="card" aria-labelledby="board-heading" data-tour="board">
       <h2 id="board-heading" class="visually-hidden">{t('ads.heading')}</h2>
-      <form class="filters" role="search" aria-label={t('ads.filter.label')}>
+      <form
+        class="filters"
+        role="search"
+        aria-label={t('ads.filter.label')}
+        data-tour="board-filters"
+      >
         <div class="field">
           <span class="label" id="ads-rank-min-label">{t('ads.filter.rankMin')}</span>
           <Dropdown
@@ -580,6 +625,10 @@
 
 {#if readingReleases}
   <ReleaseNotes releases={RELEASES} onclose={() => (readingReleases = false)} />
+{/if}
+
+{#if touring}
+  <Tour steps={tourSteps} onclose={endTour} onstep={onTourStep} />
 {/if}
 
 <style>

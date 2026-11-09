@@ -64,7 +64,7 @@
   }
 </script>
 
-<form onsubmit={submit} novalidate>
+<form onsubmit={submit} novalidate data-tour="ad-form">
   <h2>{t('ad.form.heading')}</h2>
 
   <div class="row">

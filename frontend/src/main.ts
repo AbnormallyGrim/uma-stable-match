@@ -3,6 +3,8 @@ import { mount } from 'svelte';
 
 import './app.css';
 import App from './App.svelte';
+import Announcement from './lib/Announcement.svelte';
+import { isAnnouncedPage, markAnnouncementSeen, shouldAnnounce } from './lib/announcement';
 import ClubPage from './lib/ClubPage.svelte';
 import AdsPage from './lib/AdsPage.svelte';
 import ApplicationsPage from './lib/ApplicationsPage.svelte';
@@ -61,6 +63,10 @@ if (!shouldRedirectToLogin) {
   const applications = applicationsRoute(window.location.pathname, window.location.search);
 
   const isApplicationHome = applications?.page === 'home';
+  const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
+  const announce = shouldAnnounce(window.location.pathname, storage);
+  // The search page shows it itself, after its tour.
+  let appMounted = false;
 
   if (club) {
     mount(ClubPage, { target, props: { route: club } });
@@ -91,6 +97,14 @@ if (!shouldRedirectToLogin) {
   } else if (isLoginRoute(window.location.pathname)) {
     mount(LoginPage, { target });
   } else {
-    mount(App, { target });
+    mount(App, { target, props: { announce } });
+    appMounted = true;
+  }
+
+  // Visitors on the new pages are already there, so only other pages point to them.
+  if (isAnnouncedPage(window.location.pathname)) {
+    markAnnouncementSeen(storage);
+  } else if (announce && !appMounted) {
+    mount(Announcement, { target: document.body });
   }
 }

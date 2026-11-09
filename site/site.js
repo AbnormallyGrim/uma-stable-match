@@ -60,6 +60,13 @@ fetch('/api/v1/features')
         'nav.wishlist': 'ウィッシュリスト',
         'nav.applications': 'サークルマスターの方へ',
         'nav.board': '募集掲示板',
+        'nav.new': '新着',
+        'announce.title': '更新情報',
+        'announce.close': '閉じる',
+        'announce.lede': '「申請」と「募集掲示板」が登場しました。ぜひご覧ください。',
+        'announce.board': '募集を投稿すると、サークルのリーダーから申請に招待されます。',
+        'announce.applications': 'サークルに申請して進捗を確認したり、リーダーとしてサークルを設定したりできます。',
+        'announce.dismiss': 'あとで',
         'nav.account': 'アカウント',
         'lang.switch': '英語に切り替え (English)',
         'theme.label': 'テーマ',
@@ -216,3 +223,52 @@ fetch('/api/v1/features')
         save(lang);
     });
     });
+
+// The announcement of the Applications and Recruitment Board pages, shown once per device, and a
+// "New" badge on each of their links until it's been followed. Blocked storage counts as seen.
+(() => {
+    const announced = 'uma-stable-match:pages-announcement-seen';
+    const visited = (page) => `uma-stable-match:page-seen:${page}`;
+
+    function seen(key) {
+        try {
+            return localStorage.getItem(key) !== null;
+        } catch {
+            return true;
+        }
+    }
+
+    function remember(key) {
+        try {
+            localStorage.setItem(key, '1');
+        } catch {
+            return;
+        }
+    }
+
+    for (const badge of document.querySelectorAll('.new-badge[data-new-page]')) {
+        const page = badge.dataset.newPage;
+        badge.hidden = seen(visited(page));
+        badge.closest('a').addEventListener('click', () => remember(visited(page)));
+    }
+
+    const dialog = document.getElementById('announcement');
+    if (!dialog || typeof dialog.showModal !== 'function' || seen(announced)) {
+        return;
+    }
+    remember(announced);
+    dialog.hidden = false;
+    dialog.showModal();
+    for (const button of dialog.querySelectorAll('[data-announcement-close]')) {
+        button.addEventListener('click', () => dialog.close());
+    }
+    // A click on the backdrop lands on the dialog itself, not on anything inside it.
+    dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) {
+            dialog.close();
+        }
+    });
+    for (const link of dialog.querySelectorAll('.announcement-pages a')) {
+        link.addEventListener('click', () => remember(visited(link.href.includes('board') ? 'board' : 'applications')));
+    }
+})();

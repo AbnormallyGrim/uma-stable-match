@@ -774,8 +774,42 @@ footer strong {
     color: var(--accent-silver);
 }
 
+/* A dot at the icon's corner; with room for the page names, a small "New" beside the name. */
+.new-badge {
+    background: var(--accent-gold);
+    border-radius: 999px;
+    color: var(--on-accent);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 1px 6px;
+    text-transform: uppercase;
+}
+
+.new-badge[hidden] {
+    display: none;
+}
+
 /* Too narrow for the five page names: the icons stay, each named by its tooltip. */
 @media (max-width: 1279px) {
+    .new-badge {
+        position: absolute;
+        top: 3px;
+        right: 5px;
+        width: 8px;
+        height: 8px;
+        padding: 0;
+    }
+
+    .new-badge-text {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
     .pages a {
         padding: 6px 9px;
     }
@@ -976,5 +1010,142 @@ footer strong {
         opacity: 1;
         transform: none;
         transition: none;
+    }
+}
+
+/* The announcement of the new pages: a native dialog, once per device. */
+.announcement {
+    /* The page's reset zeroes the margin that centres a dialog. */
+    margin: auto;
+    width: min(460px, calc(100vw - 32px));
+    padding: 26px 22px 20px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px var(--shadow);
+    color: var(--text-main);
+}
+
+.announcement[hidden] {
+    display: none;
+}
+
+.announcement::backdrop {
+    background: rgb(0 0 0 / 55%);
+    backdrop-filter: blur(3px);
+}
+
+.announcement-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.announcement-header h2 {
+    margin: 0;
+    font-size: 1.4rem;
+}
+
+.announcement-close {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.announcement-close:hover {
+    border-color: var(--border-color);
+    color: var(--text-main);
+}
+
+.announcement-lede {
+    margin: 10px 0 16px;
+    color: var(--text-muted);
+}
+
+.announcement-pages {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.announcement-pages a {
+    display: grid;
+    grid-template-columns: 44px 1fr 16px;
+    gap: 14px;
+    align-items: center;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    color: var(--text-main);
+    text-decoration: none;
+    transition: border-color 0.15s, transform 0.15s;
+}
+
+.announcement-pages a:hover {
+    border-color: var(--accent-gold);
+    transform: translateY(-1px);
+}
+
+.announcement-pages .tile {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    color: var(--accent-gold);
+}
+
+.announcement-pages .text {
+    display: grid;
+}
+
+.announcement-pages .description {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+
+.announcement-pages .arrow {
+    color: var(--text-muted);
+}
+
+.announcement-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 16px;
+}
+
+.announcement-later {
+    padding: 6px 10px;
+    background: none;
+    border: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    font: inherit;
+}
+
+.announcement-later:hover {
+    color: var(--text-main);
+    text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .announcement-pages a {
+        transition: none;
+    }
+
+    .announcement-pages a:hover {
+        transform: none;
     }
 }

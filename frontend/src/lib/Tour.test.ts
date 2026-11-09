@@ -3,7 +3,14 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 
-import { hasSeenTour, markTourSeen, TOUR_KEY, tourSteps } from './tour';
+import {
+  BOARD_TOUR_KEY,
+  boardTourSteps,
+  hasSeenTour,
+  markTourSeen,
+  TOUR_KEY,
+  tourSteps,
+} from './tour';
 import Tour from './Tour.svelte';
 
 const steps = [
@@ -73,6 +80,14 @@ describe('tour storage', () => {
     localStorage.clear();
   });
 
+  it('remembers the board tour apart from the search tour', () => {
+    localStorage.clear();
+    markTourSeen(localStorage, BOARD_TOUR_KEY);
+    expect(hasSeenTour(localStorage, BOARD_TOUR_KEY)).toBe(true);
+    expect(hasSeenTour(localStorage)).toBe(false);
+    localStorage.clear();
+  });
+
   it('counts blocked storage as seen, so the tour never repeats on every visit', () => {
     const blocked = {
       getItem: () => {
@@ -104,5 +119,21 @@ describe('tour storage', () => {
       'theme',
       'help',
     ]);
+  });
+});
+
+describe('board tour steps', () => {
+  it('welcomes, shows the board and filters, and points at the post button', () => {
+    const steps = boardTourSteps(false);
+    expect(steps[0]!.target).toBeUndefined();
+    expect(steps.flatMap((step) => (step.target ? [step.target] : []))).toEqual([
+      'board',
+      'board-filters',
+      'board-post',
+    ]);
+  });
+
+  it('ends on the listing form when it can be opened', () => {
+    expect(boardTourSteps(true).at(-1)!.target).toBe('ad-form');
   });
 });

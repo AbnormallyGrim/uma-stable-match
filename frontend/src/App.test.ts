@@ -4,6 +4,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App.svelte';
+import { ANNOUNCEMENT_KEY } from './lib/announcement';
 import { BEACON_SRC } from './lib/analytics';
 import type { Recommendations } from './lib/api';
 import { language } from './lib/language.svelte';
@@ -274,6 +275,26 @@ describe('App states', () => {
 
     render(App);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('announces the new pages after the tour, once', async () => {
+    localStorage.removeItem(TOUR_KEY);
+    stubApi(() => json(recommendations(0)));
+    const { unmount } = render(App, { announce: true });
+    expect(screen.queryByRole('dialog', { name: 'What’s new' })).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: 'Skip tour' }));
+    expect(screen.getByRole('dialog', { name: 'What’s new' })).toBeInTheDocument();
+    expect(localStorage.getItem(ANNOUNCEMENT_KEY)).toBe('1');
+    unmount();
+
+    render(App, { announce: true });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('announces the new pages at once to a visitor who has seen the tour', () => {
+    stubApi(() => json(recommendations(0)));
+    render(App, { announce: true });
+    expect(screen.getByRole('dialog', { name: 'What’s new' })).toBeInTheDocument();
   });
 
   it('waits with the tour when a visitor arrives with a search', () => {

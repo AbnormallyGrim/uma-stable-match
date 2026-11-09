@@ -1,4 +1,4 @@
-/** The product tour's steps, and remembering whether a visitor has seen it. */
+/** The product tours' steps, and remembering whether a visitor has seen them. */
 
 import { t } from './i18n';
 
@@ -10,8 +10,11 @@ export interface TourStep {
   body: string;
 }
 
-/** Local storage key, set once the tour is finished or skipped. */
+/** Local storage key, set once the search tour is finished or skipped. */
 export const TOUR_KEY = 'uma-stable-match:tour-seen';
+
+/** Local storage key, set once the board tour is finished or skipped. */
+export const BOARD_TOUR_KEY = 'uma-stable-match:board-tour-seen';
 
 /** The steps, in page order. Keep the labels they quote in step with the page. */
 export function tourSteps(): TourStep[] {
@@ -67,19 +70,56 @@ export function tourSteps(): TourStep[] {
   ];
 }
 
-/** Whether the tour was finished or skipped on this device. Blocked storage counts as seen. */
-export function hasSeenTour(storage: Storage | undefined): boolean {
+/**
+ * The board's steps: why to post, what the board shows, the filters and the button that posts.
+ * With `form`, a last step opens the listing form, which the page opens on seeing its target.
+ */
+export function boardTourSteps(form: boolean): TourStep[] {
+  return [
+    {
+      title: t('tour.board.welcome.title'),
+      body: t('tour.board.welcome.body'),
+    },
+    {
+      target: 'board',
+      title: t('tour.board.list.title'),
+      body: t('tour.board.list.body'),
+    },
+    {
+      target: 'board-filters',
+      title: t('tour.board.filters.title'),
+      body: t('tour.board.filters.body'),
+    },
+    {
+      target: 'board-post',
+      title: t('tour.board.post.title'),
+      body: t('tour.board.post.body'),
+    },
+    ...(form
+      ? [
+          {
+            target: 'ad-form',
+            title: t('tour.board.form.title'),
+            body: t('tour.board.form.body'),
+          },
+        ]
+      : []),
+  ];
+}
+
+/** Whether a tour was finished or skipped on this device. Blocked storage counts as seen. */
+export function hasSeenTour(storage: Storage | undefined, key = TOUR_KEY): boolean {
   try {
-    return storage === undefined || storage.getItem(TOUR_KEY) !== null;
+    return storage === undefined || storage.getItem(key) !== null;
   } catch {
     return true;
   }
 }
 
-/** Remembers that the tour was finished or skipped. Storage errors are ignored. */
-export function markTourSeen(storage: Storage | undefined) {
+/** Remembers that a tour was finished or skipped. Storage errors are ignored. */
+export function markTourSeen(storage: Storage | undefined, key = TOUR_KEY) {
   try {
-    storage?.setItem(TOUR_KEY, '1');
+    storage?.setItem(key, '1');
   } catch {
     return;
   }

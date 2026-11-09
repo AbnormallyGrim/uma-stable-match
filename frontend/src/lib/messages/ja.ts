@@ -320,6 +320,27 @@ export const ja: Catalog = {
   'tour.theme.body': '端末の設定に合わせるか、ライトまたはダークを選べます。',
   'tour.help.title': 'もう一度ツアーを見る',
   'tour.help.body': '疑問符のボタンを押すと、いつでもこのツアーをもう一度見られます。',
+  'announce.title': '更新情報',
+  'announce.lede': '「申請」と「募集掲示板」が登場しました。ぜひご覧ください。',
+  'announce.board': '募集を投稿すると、サークルのリーダーから申請に招待されます。',
+  'announce.applications':
+    'サークルに申請して進捗を確認したり、リーダーとしてサークルを設定したりできます。',
+  'announce.dismiss': 'あとで',
+  'tour.board.welcome.title': 'サークルに見つけてもらおう',
+  'tour.board.welcome.body':
+    'あなたのようなトレーナーを探しているサークルがあります。掲示板の見方と、1分で載る方法をご案内します。',
+  'tour.board.list.title': '掲示板を見てみよう',
+  'tour.board.list.body':
+    '各募集は、サークルを探すトレーナーとuma.moeのファンペースです。あなたの募集もここに並びます。',
+  'tour.board.filters.title': '掲示板を絞り込もう',
+  'tour.board.filters.body':
+    'トレーナーが希望するサークルのランク、Discord、言語で募集を絞り込めます。投稿する前に、どんな希望が多いか確認できます。',
+  'tour.board.form.title': 'フォームに入力しよう',
+  'tour.board.form.body':
+    '希望するサークルのランク、Discord、言語を選んで、「募集を投稿」を押すだけです。ファン数はuma.moeから取得されます。',
+  'tour.board.post.title': '募集を投稿しよう',
+  'tour.board.post.body':
+    '希望するサークルを書けば、リーダーから申請に招待されます。募集は1週間掲載され、いつでも編集・削除できます。',
 
   'howTo.summary': '使い方',
   'howTo.step1':
@@ -339,6 +360,7 @@ export const ja: Catalog = {
   'nav.home': 'ホーム',
   'nav.finder': 'サークル検索',
   'nav.board': '募集掲示板',
+  'nav.new': '新着',
   'wishlist.title': 'ウィッシュリスト · Uma Stable Match',
   'wishlist.link': 'ウィッシュリスト',
   'wishlist.heading': '次に作るものを決める手伝いをしてください',

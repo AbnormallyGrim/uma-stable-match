@@ -9,9 +9,21 @@
 <script lang="ts">
   import { showsAccount } from './account.svelte';
   import { t } from './i18n';
-  import { currentPage, PAGES } from './pages';
+  import { isAnnouncedPage } from './announcement';
+  import { currentPage, hasSeenPage, markPageSeen, NEW_PAGES, PAGES, type Page } from './pages';
 
+  const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
   const current = currentPage(window.location.pathname);
+
+  // Being on a new page counts as seeing it; the sign-in page, which belongs to applications, doesn't.
+  if (current && isAnnouncedPage(window.location.pathname)) {
+    markPageSeen(storage, current);
+  }
+
+  /** Whether the page's "New" badge shows: a new page the visitor hasn't been to. */
+  function fresh(id: Page['id']): boolean {
+    return NEW_PAGES.includes(id) && !hasSeenPage(storage, id);
+  }
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- first-party icon drawings from pages.ts -->
@@ -35,6 +47,9 @@
         aria-hidden="true">{@html page.icon}</svg
       >
       <span class="label">{t(page.label)}</span>
+      {#if fresh(page.id)}
+        <span class="new-badge"><span class="new-badge-text">{t('nav.new')}</span></span>
+      {/if}
     </a>
   {/each}
 </nav>
@@ -50,6 +65,7 @@
   }
 
   a {
+    position: relative;
     display: inline-flex;
     gap: 7px;
     align-items: center;
@@ -71,6 +87,26 @@
     box-shadow: 0 0 0 1px var(--border);
     color: var(--accent);
     font-weight: 700;
+  }
+
+  /* A dot at the icon's corner; with room for the names, a small "New" beside the name. */
+  .new-badge {
+    position: absolute;
+    top: 3px;
+    right: 5px;
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+
+  .new-badge-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   /* Without room for the names, they stay for screen readers and show as tooltips. */
@@ -99,6 +135,27 @@
     .pages:not(.with-account) a::after {
       display: none;
     }
+
+    .pages:not(.with-account) .new-badge {
+      position: static;
+      width: auto;
+      height: auto;
+      padding: 1px 6px;
+      color: var(--on-accent, #fff);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      border-radius: 999px;
+    }
+
+    .pages:not(.with-account) .new-badge-text {
+      position: static;
+      width: auto;
+      height: auto;
+      overflow: visible;
+      clip: auto;
+    }
   }
 
   @media (width >= 1440px) {
@@ -116,6 +173,27 @@
 
     a::after {
       display: none;
+    }
+
+    .new-badge {
+      position: static;
+      width: auto;
+      height: auto;
+      padding: 1px 6px;
+      color: var(--on-accent, #fff);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      border-radius: 999px;
+    }
+
+    .new-badge-text {
+      position: static;
+      width: auto;
+      height: auto;
+      overflow: visible;
+      clip: auto;
     }
   }
 </style>
