@@ -403,3 +403,85 @@
         grid-template-columns: 1fr 1fr;
     }
 }
+
+/* Step 1: a club card as it looks in the club finder */
+.club {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+}
+
+.club-head {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.club-head .tier {
+    flex: none;
+    margin: 0;
+}
+
+.club-info {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.club-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    align-items: center;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.club-tags .tag {
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+}
+
+.club-tags .open {
+    background: color-mix(in srgb, #0b6a62 15%, transparent);
+    color: light-dark(#0b6a62, #81c784);
+}
+
+.club-tags .applies {
+    background: color-mix(in srgb, #4752c4 14%, transparent);
+    color: light-dark(#4752c4, #a5b0ff);
+    font-weight: 700;
+}
+
+.club-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.club-btn {
+    display: inline-flex;
+    flex: 1 1 auto;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.club-btn.qa {
+    background: #5865f2;
+    border-color: #5865f2;
+    color: #fff;
+}
