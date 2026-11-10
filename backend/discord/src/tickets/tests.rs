@@ -2,6 +2,8 @@ use super::*;
 use crate::application_store::{NewApplication, Status};
 use crate::apply::Alltime;
 
+const SITE: &str = "https://example.com";
+
 fn application() -> Application {
     Application {
         id: "abc_123".into(),
@@ -52,7 +54,7 @@ fn groups_digits() {
 
 #[test]
 fn the_message_shows_the_applicant_and_links_the_profile() {
-    let body = message(&application(), &applicant(), Some(30));
+    let body = message(&application(), &applicant(), Some(30), SITE);
     let embed = &body["embeds"][0];
     assert_eq!(embed["url"], "https://uma.moe/profile/100000001");
     let fields = embed["fields"].to_string();
@@ -72,11 +74,22 @@ fn the_message_shows_the_applicant_and_links_the_profile() {
 
 #[test]
 fn the_message_has_accept_and_decline_buttons() {
-    let body = message(&application(), &applicant(), None);
+    let body = message(&application(), &applicant(), None, SITE);
     let buttons = &body["components"][0]["components"];
     assert_eq!(buttons[0]["custom_id"], "apply:accept:abc_123");
     assert_eq!(buttons[1]["custom_id"], "apply:decline:abc_123");
     assert_eq!(body["allowed_mentions"]["users"], json!(["20"]));
+}
+
+#[test]
+fn the_message_links_to_comparing_the_trainer_in_the_club() {
+    let body = message(&application(), &applicant(), None, SITE);
+    let button = &body["components"][0]["components"][2];
+    assert_eq!(button["style"], 5);
+    assert_eq!(
+        button["url"],
+        "https://example.com/applications/club/7/compare?trainers=100000001"
+    );
 }
 
 #[test]
@@ -89,7 +102,7 @@ fn leaves_out_what_isnt_known() {
         leader_chara_dress_id: None,
         alltime: None,
     };
-    let body = message(&application(), &unknown, None);
+    let body = message(&application(), &unknown, None, SITE);
     let fields = body["embeds"][0]["fields"].to_string();
     assert!(!fields.contains("Pace"));
     assert!(!fields.contains("Fans this month"));

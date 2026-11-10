@@ -53,7 +53,12 @@ pub(crate) async fn open(
         .rest()
         .post(
             &format!("/channels/{channel_id}/messages"),
-            &message(application, applicant, record.leader),
+            &message(
+                application,
+                applicant,
+                record.leader,
+                discord.config().public_url.as_str(),
+            ),
         )
         .await?;
     tracing::info!(guild, club = details.club, "opened an application ticket");
@@ -127,9 +132,19 @@ fn grouped(number: i64) -> String {
     }
 }
 
-fn message(application: &Application, applicant: &Applicant, leader: Option<u64>) -> Value {
+/// The ticket's opening message. `site` is the site's address, for the compare link.
+fn message(
+    application: &Application,
+    applicant: &Applicant,
+    leader: Option<u64>,
+    site: &str,
+) -> Value {
     let details = &application.details;
     let profile = format!("https://uma.moe/profile/{}", details.trainer);
+    let compare = format!(
+        "{site}/applications/club/{}/compare?trainers={}",
+        details.club, details.trainer
+    );
     let mut fields = vec![
         json!({
             "name": "Trainer",
@@ -219,6 +234,7 @@ fn message(application: &Application, applicant: &Applicant, leader: Option<u64>
                     "label": "Decline",
                     "custom_id": format!("apply:decline:{}", application.id),
                 },
+                { "type": 2, "style": 5, "label": "Compare", "url": compare },
             ],
         }],
     })
