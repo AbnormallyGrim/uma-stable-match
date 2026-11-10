@@ -7,6 +7,12 @@
     --border-color: light-dark(rgb(20 33 61 / 12%), #27303f);
     --border-strong: light-dark(rgb(20 33 61 / 22%), rgb(255 255 255 / 18%));
     --surface: light-dark(#e6eaf0, rgb(255 255 255 / 6%));
+    /* Frosted glass for the navbar's controls, as in the web app. */
+    --glass: light-dark(rgb(255 255 255 / 45%), rgb(255 255 255 / 7%));
+    --glass-strong: light-dark(rgb(255 255 255 / 85%), rgb(255 255 255 / 14%));
+    --glass-edge: light-dark(rgb(255 255 255 / 75%), rgb(255 255 255 / 14%));
+    --glass-shine: light-dark(rgb(255 255 255 / 90%), rgb(255 255 255 / 12%));
+    --glass-shadow: light-dark(rgb(20 33 61 / 10%), rgb(0 0 0 / 35%));
     --text-main: light-dark(#14213d, #f0f4f8);
     --text-muted: light-dark(#526077, #94a3b8);
     --accent-gold: light-dark(#806210, #d4af37);
@@ -104,10 +110,13 @@ a {
     border-radius: 4px;
 }
 
+/* See-through at the top of the page; site.js sets --p, the scroll progress from 0 to 1, and the
+   background, its blur and the line fade in with it. */
 .navbar {
-    border-bottom: 1px solid var(--border-color);
-    background-color: color-mix(in srgb, var(--bg-color) 85%, transparent);
-    backdrop-filter: blur(12px);
+    --p: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--border-color) calc(var(--p) * 100%), transparent);
+    background-color: color-mix(in srgb, var(--bg-color) calc(var(--p) * 85%), transparent);
+    backdrop-filter: blur(calc(var(--p) * 12px));
     position: sticky;
     top: 0;
     z-index: 100;
@@ -139,6 +148,10 @@ a {
     width: 40px;
     border-radius: 6px;
     border: 1px solid var(--border-color);
+    /* Above the name, with a solid fill, so the name slides behind it. */
+    position: relative;
+    z-index: 1;
+    background: var(--bg-color);
 }
 
 .brand-title {
@@ -146,10 +159,33 @@ a {
     font-weight: 700;
     font-size: 1.15rem;
     letter-spacing: -0.02em;
+    opacity: calc(1 - var(--p) * var(--p));
+    translate: calc(var(--p) * (-100% - 12px)) 0;
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .brand-title {
+        translate: none;
+    }
+}
+
+/* Clips the name once it has slid past the logo. */
 .brand {
     justify-self: start;
+    overflow: hidden;
+}
+
+/* Frosted glass for the pages pill, the theme switch and the round buttons. */
+.pages,
+.theme-switch,
+.account-link,
+.lang-switch {
+    background: var(--glass);
+    border: 1px solid var(--glass-edge);
+    box-shadow:
+        inset 0 1px 0 var(--glass-shine),
+        0 8px 24px var(--glass-shadow);
+    backdrop-filter: blur(20px) saturate(180%);
 }
 
 .nav-links {
@@ -176,9 +212,7 @@ a {
 .pages {
     display: inline-flex;
     gap: 2px;
-    padding: 2px;
-    background: var(--surface);
-    border: 1px solid var(--border-color);
+    padding: 3px;
     border-radius: 999px;
 }
 
@@ -201,8 +235,10 @@ a {
 }
 
 .pages a[aria-current='page'] {
-    background: var(--card-bg);
-    box-shadow: 0 0 0 1px var(--border-color);
+    background: var(--glass-strong);
+    box-shadow:
+        inset 0 1px 0 var(--glass-shine),
+        0 1px 4px var(--glass-shadow);
     color: var(--accent-gold);
     font-weight: 700;
 }
@@ -249,8 +285,6 @@ a {
     justify-content: center;
     width: 34px;
     height: 34px;
-    background: var(--surface);
-    border: 1px solid var(--border-color);
     border-radius: 999px;
     box-sizing: border-box;
     color: var(--text-muted);
@@ -288,8 +322,6 @@ a {
     display: inline-flex;
     gap: 2px;
     padding: 2px;
-    background: var(--surface);
-    border: 1px solid var(--border-color);
     border-radius: 999px;
 }
 
@@ -303,9 +335,11 @@ a {
 }
 
 .theme-switch label:has(input:checked) {
-    background: var(--card-bg);
+    background: var(--glass-strong);
     color: var(--text-main);
-    box-shadow: 0 0 0 1px var(--border-color);
+    box-shadow:
+        inset 0 1px 0 var(--glass-shine),
+        0 1px 4px var(--glass-shadow);
 }
 
 .theme-switch input {
@@ -353,8 +387,6 @@ a {
     width: 34px;
     height: 34px;
     padding: 0;
-    background: var(--surface);
-    border: 1px solid var(--border-color);
     border-radius: 999px;
     color: var(--text-muted);
     cursor: pointer;
@@ -365,7 +397,7 @@ a {
 }
 
 .lang-switch:hover {
-    background: var(--card-bg);
+    background: var(--glass-strong);
     color: var(--text-main);
 }
 

@@ -79,6 +79,9 @@ const pairs: [string, string, number][] = [
   ['control-border', 'card', UI],
   ['control-border', 'bg', UI],
   ['accent', 'surface', UI],
+  ['text-2', 'glass', TEXT],
+  ['text', 'glass-strong', TEXT],
+  ['accent', 'glass-strong', TEXT],
   ['highlight', 'card', UI],
 ];
 

@@ -27,7 +27,7 @@
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- first-party icon drawings from pages.ts -->
-<nav class="pages" class:with-account={showsAccount()} aria-label={t('nav.pages')}>
+<nav class="pages glass" class:with-account={showsAccount()} aria-label={t('nav.pages')}>
   {#each PAGES as page (page.id)}
     <a
       class="tooltip"
@@ -58,9 +58,7 @@
   .pages {
     display: inline-flex;
     gap: 2px;
-    padding: 2px;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    padding: 3px;
     border-radius: 999px;
   }
 
@@ -83,8 +81,10 @@
   }
 
   a[aria-current='page'] {
-    background: var(--card);
-    box-shadow: 0 0 0 1px var(--border);
+    background: var(--glass-strong);
+    box-shadow:
+      inset 0 1px 0 var(--glass-shine),
+      0 1px 4px var(--glass-shadow);
     color: var(--accent);
     font-weight: 700;
   }

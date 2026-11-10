@@ -121,7 +121,7 @@
     <button
       bind:this={button}
       type="button"
-      class="trigger"
+      class="trigger glass"
       id="account-button"
       aria-haspopup="menu"
       aria-expanded={open}
@@ -186,7 +186,7 @@
   </div>
 {:else if account.known && !onLoginPage}
   <a
-    class="sign-in tooltip"
+    class="sign-in glass tooltip"
     href={signInHref}
     data-tooltip={t('account.signIn')}
     aria-label={t('account.signIn')}
@@ -222,8 +222,6 @@
     height: 34px;
     max-width: 12rem;
     padding: 0 10px 0 9px;
-    background: var(--surface);
-    border-color: var(--border);
     border-radius: 999px;
     color: var(--text-2);
   }
@@ -236,21 +234,19 @@
     justify-content: center;
     width: 34px;
     height: 34px;
-    background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: 999px;
     box-sizing: border-box;
     color: var(--text-2);
   }
 
   .sign-in:hover {
-    background: var(--card);
+    background: var(--glass-strong);
     color: var(--text);
   }
 
   .trigger:hover:not(:disabled),
   .trigger[aria-expanded='true'] {
-    background: var(--card);
+    background: var(--glass-strong);
     color: var(--text);
   }
 

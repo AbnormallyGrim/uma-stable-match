@@ -15,7 +15,7 @@
 {#if language.japaneseEnabled}
   <button
     type="button"
-    class="language tooltip"
+    class="language glass tooltip"
     data-tooltip={t('language.switch')}
     data-tour="language"
     aria-label={t('language.switch')}
@@ -41,14 +41,12 @@
     width: 34px;
     height: 34px;
     padding: 0;
-    background: var(--surface);
-    border-color: var(--border);
     border-radius: 999px;
     color: var(--text-2);
   }
 
   .language:hover:not(:disabled) {
-    background: var(--card);
+    background: var(--glass-strong);
     color: var(--text);
   }
 </style>

@@ -27,7 +27,7 @@
   });
 </script>
 
-<fieldset class="segmented theme" data-tour="theme">
+<fieldset class="segmented theme glass" data-tour="theme">
   <legend class="visually-hidden">{t('theme.label')}</legend>
   {#each options as option (option)}
     <label class="tooltip" data-tooltip={t(`theme.${option}`)}>

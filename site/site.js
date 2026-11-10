@@ -1,3 +1,17 @@
+// The navbar fills in over the first scroll and the name slides behind the logo; style.css reads
+// the progress, 0 at the top to 1 once scrolled COLLAPSE_PX, as --p.
+(() => {
+    const COLLAPSE_PX = 120;
+    const navbar = document.querySelector('.navbar');
+    if (!navbar) return;
+    const update = () => {
+        const progress = Math.min(1, Math.max(0, window.scrollY / COLLAPSE_PX));
+        navbar.style.setProperty('--p', String(progress));
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+})();
+
 // The theme switch: shows the saved choice, applies a new one and remembers it, like the web app.
 (() => {
     const key = 'uma-stable-match:theme';
