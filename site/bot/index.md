@@ -9,8 +9,10 @@ Trainers apply with one click from your club's page. The bot opens a private tic
 ## How it works
 
 1. **Quick Apply.** Trainers sign in with Discord and allow it to add them to your server.
-2. **A private ticket opens.** An `app-` channel that only the applicant, the club's leader and the bot can see, in your club's category if it has one.
-3. **Decide with real numbers.** Pace, fans this month, all-time totals, averages and rank, then Accept or Decline.
+2. **A private ticket opens.** The applicant joins your server, and the bot opens a channel that only the applicant, the club's leader and the bot can see, in your club's category if it has one.
+3. **Decide with real numbers.** Pace, fans this month, all-time totals, averages and rank, right in the ticket.
+4. **See how they'd fit.** Compare in club places the applicant among your current members, with their gap to the median and whether they keep up with your fan requirement.
+5. **Answer in one click.** Only the club's leader can accept or decline. The buttons go away, and the trainer sees the answer on their applications page.
 
 ## Good to know
 
