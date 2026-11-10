@@ -3,7 +3,8 @@
   The top bar: the brand, linking back to the website, the pages, a button that opens the release
   notes, a help button that starts the product tour if there is one, the theme switch and, at the
   far right for a person signed in with Discord, the account menu. It matches the website's navbar
-  and stays at the top while scrolling.
+  and stays at the top while scrolling: see-through at the top of the page, filling in over the
+  first scroll, as the name slides away behind the logo.
 -->
 
 <script lang="ts">
@@ -28,9 +29,18 @@
   let { onhelp, onreleases, unseen }: Props = $props();
 
   const WEBSITE = websiteUrl(window.location);
+
+  /** How far to scroll before the bar is filled in and the name is hidden. */
+  const COLLAPSE_PX = 120;
+
+  let scrollY = $state(0);
+  // 0 at the top of the page, 1 once scrolled COLLAPSE_PX.
+  const progress = $derived(Math.min(1, Math.max(0, scrollY / COLLAPSE_PX)));
 </script>
 
-<nav class="navbar" aria-label={t('nav.label')}>
+<svelte:window bind:scrollY />
+
+<nav class="navbar" aria-label={t('nav.label')} style:--p={progress}>
   <div class="inner" class:with-account={showsAccount()}>
     <a class="brand" href={WEBSITE}>
       <BrandLogo size={40} />
@@ -40,7 +50,7 @@
     <div class="tools">
       <button
         type="button"
-        class="round tooltip"
+        class="round glass tooltip"
         data-tooltip={t('nav.releases')}
         aria-label={t('nav.releases')}
         onclick={onreleases}
@@ -66,7 +76,7 @@
       {#if onhelp}
         <button
           type="button"
-          class="round tooltip"
+          class="round glass tooltip"
           data-tooltip={t('nav.tour')}
           data-tour="help"
           aria-label={t('nav.tour')}
@@ -97,13 +107,14 @@
 </nav>
 
 <style>
+  /* --p is the scroll progress, 0 to 1: the background, its blur and the line fade in with it. */
   .navbar {
     position: sticky;
     z-index: 100;
     top: 0;
-    background: color-mix(in srgb, var(--bg) 85%, transparent);
-    border-bottom: 1px solid var(--border);
-    backdrop-filter: blur(12px);
+    background: color-mix(in srgb, var(--bg) calc(var(--p) * 85%), transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) calc(var(--p) * 100%), transparent);
+    backdrop-filter: blur(calc(var(--p) * 12px));
   }
 
   .inner {
@@ -134,14 +145,24 @@
     }
   }
 
+  /* Clips the name once it has slid past the logo. */
   .brand {
     justify-self: start;
     display: flex;
     gap: 12px;
     align-items: center;
     min-width: 0;
+    overflow: hidden;
     color: var(--text);
     text-decoration: none;
+  }
+
+  /* Above the name, with a solid fill, so the name passes behind it. */
+  .brand :global(.logo) {
+    position: relative;
+    z-index: 1;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
   }
 
   .tools {
@@ -160,14 +181,12 @@
     width: 34px;
     height: 34px;
     padding: 0;
-    background: var(--surface);
-    border-color: var(--border);
     border-radius: 999px;
     color: var(--text-2);
   }
 
   .round:hover:not(:disabled) {
-    background: var(--card);
+    background: var(--glass-strong);
     color: var(--text);
   }
 
@@ -192,6 +211,14 @@
     letter-spacing: -0.02em;
     text-overflow: ellipsis;
     white-space: nowrap;
+    opacity: calc(1 - var(--p) * var(--p));
+    translate: calc(var(--p) * (-100% - 12px)) 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .title {
+      translate: none;
+    }
   }
 
   /* On phones the pages' Home link takes the brand's place, so the pages and the buttons fit. */
