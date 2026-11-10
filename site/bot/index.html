@@ -100,7 +100,7 @@
         <div class="mock reveal d4">
             <div class="dc-channel"># your-club-speedytrainer-4821</div>
             <div class="dc-message">
-                <div class="dc-avatar"><img src="/images/logo.webp" alt="" width="42" height="42" /></div>
+                <div class="dc-avatar"><img src="/images/bot-avatar.webp" alt="" width="42" height="42" /></div>
                 <div class="dc-body">
                     <div class="dc-name">Uma Stable Match<small>BOT</small></div>
                     <div class="dc-embed">
@@ -128,67 +128,295 @@
             <div class="section-title reveal">
                 <h2>From “how do I join?” to accepted in a minute</h2>
                 <p>No forms to copy, no screenshots of profile pages.</p>
+                <button type="button" class="tour-again" data-tour-start>
+                    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5 3l8 5-8 5z" fill="currentColor" /></svg>
+                    Take the walkthrough
+                </button>
             </div>
 
-            <div class="row">
+            <svg class="visually-hidden" aria-hidden="true"><symbol id="dc-logo" viewBox="0 0 24 24"><path fill="currentColor" d="M20.32 4.37A19.8 19.8 0 0 0 15.43 2.85c-.21.38-.46.9-.63 1.3a18.27 18.27 0 0 0-5.49 0c-.17-.4-.42-.92-.64-1.3A19.74 19.74 0 0 0 3.78 4.38C.69 8.96-.15 13.31.27 17.61a19.94 19.94 0 0 0 6.04 3.05c.49-.66.92-1.36 1.28-2.08-.7-.26-1.37-.59-2-.96.17-.12.33-.25.49-.38a14.25 14.25 0 0 0 11.84 0c.16.13.32.26.49.38-.63.37-1.3.7-2 .96.36.72.79 1.42 1.28 2.08a19.9 19.9 0 0 0 6.04-3.05c.5-5-.84-9.31-3.41-13.24ZM8.02 14.96c-1.18 0-2.15-1.08-2.15-2.41s.95-2.41 2.15-2.41 2.17 1.09 2.15 2.41c0 1.33-.95 2.41-2.15 2.41Zm7.96 0c-1.18 0-2.15-1.08-2.15-2.41s.95-2.41 2.15-2.41 2.17 1.09 2.15 2.41c0 1.33-.95 2.41-2.15 2.41Z"/></symbol></svg>
+
+            <!-- Step 1: the trainer's browser -->
+            <div class="row" id="step-apply">
                 <div class="txt reveal">
                     <div class="eyebrow">Step 1</div>
                     <h3>Trainers hit Quick Apply</h3>
                     <p>Every club that has added the bot gets a Quick Apply button. Trainers sign in with Discord and allow it to add them to your server, all in one step.</p>
                 </div>
-                <div class="vis reveal d1" aria-hidden="true">
-                    <div class="inner">
-                        <div class="club">
-                            <div class="club-head">
+                <div class="vis reveal d1" aria-hidden="true" data-scene="apply">
+                    <span class="replay" data-replay>↺ Replay</span>
+                    <div class="win app">
+                        <div class="chrome">
+                            <i></i><i></i><i></i>
+                            <span class="url"><span class="lock">🔒</span>app.umastable.com<span data-url></span></span>
+                            <span class="win-tag">Trainer</span>
+                            <span class="loading" data-loading></span>
+                        </div>
+                        <div class="page on" data-page="finder">
+                            <div class="page-head"><b>Results</b><span>Clubs that fit SpeedyTrainer’s pace</span></div>
+                            <div class="club p1">
+                                <span class="pick">1</span>
                                 <span class="tier">S</span>
                                 <div class="club-info">
                                     <b>Starlight Stable</b>
-                                    <span class="club-tags">
-                                        <span>Rank 12</span>
-                                        <span>3 open spots</span>
-                                        <span class="tag open">Open</span>
-                                        <span class="tag applies">Quick apply</span>
-                                    </span>
+                                    <span class="club-tags"><span>Rank 12</span><span>3 open spots</span><span class="tag open">Open</span><span class="tag applies">Quick apply</span></span>
+                                </div>
+                                <div class="club-actions">
+                                    <span class="club-btn">See how you fit</span>
+                                    <span class="club-btn qa" data-target><svg width="14" height="14"><use href="#dc-logo" /></svg>Quick Apply</span>
                                 </div>
                             </div>
-                            <div class="club-actions">
-                                <span class="club-btn">See how you fit</span>
-                                <span class="club-btn qa"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20.32 4.37A19.8 19.8 0 0 0 15.43 2.85c-.21.38-.46.9-.63 1.3a18.27 18.27 0 0 0-5.49 0c-.17-.4-.42-.92-.64-1.3A19.74 19.74 0 0 0 3.78 4.38C.69 8.96-.15 13.31.27 17.61a19.94 19.94 0 0 0 6.04 3.05c.49-.66.92-1.36 1.28-2.08-.7-.26-1.37-.59-2-.96.17-.12.33-.25.49-.38a14.25 14.25 0 0 0 11.84 0c.16.13.32.26.49.38-.63.37-1.3.7-2 .96.36.72.79 1.42 1.28 2.08a19.9 19.9 0 0 0 6.04-3.05c.5-5-.84-9.31-3.41-13.24ZM8.02 14.96c-1.18 0-2.15-1.08-2.15-2.41s.95-2.41 2.15-2.41 2.17 1.09 2.15 2.41c0 1.33-.95 2.41-2.15 2.41Zm7.96 0c-1.18 0-2.15-1.08-2.15-2.41s.95-2.41 2.15-2.41 2.17 1.09 2.15 2.41c0 1.33-.95 2.41-2.15 2.41Z"/></svg>Quick Apply</span>
+                            <div class="club">
+                                <span class="pick">2</span>
+                                <span class="tier">A+</span>
+                                <div class="club-info">
+                                    <b>Moonlit Gate</b>
+                                    <span class="club-tags"><span>Rank 31</span><span>1 open spot</span><span class="tag approval">Approval</span></span>
+                                </div>
+                                <div class="club-actions">
+                                    <span class="club-btn">See how you fit</span>
+                                    <span class="club-btn qa off"><svg width="14" height="14"><use href="#dc-logo" /></svg>Quick Apply</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="page" data-page="mine">
+                            <div class="page-head"><b>My applications</b><span>The clubs you’ve applied to and where each application stands.</span></div>
+                            <div class="apps">
+                                <div class="apps-row head"><span>Club</span><span>Submitted</span><span>Status</span><span></span></div>
+                                <div class="apps-row new" data-row>
+                                    <span class="apps-club">Starlight Stable</span>
+                                    <span>Today</span>
+                                    <span><span class="status pending">Pending</span></span>
+                                    <span class="apps-ticket"><svg width="12" height="12"><use href="#dc-logo" /></svg>Open in Discord</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="row">
+            <!-- Step 2: the club's server, where the ticket appears -->
+            <div class="row flip" id="step-ticket">
                 <div class="txt reveal">
                     <div class="eyebrow">Step 2</div>
                     <h3>A private ticket opens</h3>
-                    <p>The bot creates a channel named after your club and the applicant, or however you choose, that only the applicant, the club's leader and the bot can see, in your club's category if it has one.</p>
+                    <p>The applicant joins your server, and the bot creates a channel named after your club and the applicant, or however you choose, that only the applicant, the club's leader and the bot can see, in your club's category if it has one.</p>
                 </div>
-                <div class="vis reveal d1" aria-hidden="true">
-                    <div class="inner">
-                        <div class="chip"><span># general</span><em>🔒 hidden</em></div>
-                        <div class="chip highlight"><span># your-club-speedytrainer-4821</span><em>applicant + leader</em></div>
-                        <div class="chip"><span># your-club-luckystride-0937</span><em>applicant + leader</em></div>
+                <div class="vis reveal d1" aria-hidden="true" data-scene="ticket">
+                    <span class="replay" data-replay>↺ Replay</span>
+                    <div class="win dc">
+                        <span class="win-tag">Club leader</span>
+                        <div class="dc-side">
+                            <div class="dc-guild">Starlight Stable</div>
+                            <div class="dc-cat">Text channels</div>
+                            <div class="dc-ch">welcome</div>
+                            <div class="dc-ch sel" data-general>general</div>
+                            <div class="dc-cat">Applications</div>
+                            <div class="dc-ch locked">starlight-stable-luckystride-0937</div>
+                            <div class="dc-ch locked fresh" data-target><span>starlight-stable-speedytrainer-4821</span><em class="dc-badge">1</em></div>
+                        </div>
+                        <div class="dc-main">
+                            <div class="dc-top">
+                                <span class="dc-top-general"><b># general</b></span>
+                                <span class="dc-top-ticket"><b><span class="lock">🔒</span> starlight-stable-speedytrainer-4821</b></span>
+                            </div>
+                            <div class="dc-view">
+                                <div class="dc-feed general">
+                                    <div class="dc-msg" data-chat><span class="dc-ava"><img class="face" src="/images/chara_stand_1013_101301.webp" alt="" width="36" height="36" /></span><div><div class="dc-who mcqueen">Mejiro McQueen <small>Today at 20:41</small></div>You are aware of what day it is, Gold Ship? Today is my birthday—</div></div>
+                                    <div class="dc-msg" data-chat><span class="dc-ava"><img class="face" src="/images/chara_stand_1007_100701.webp" alt="" width="36" height="36" /></span><div><div class="dc-who goldship">Gold Ship <small>Today at 20:42</small></div>Which means it’s the Domino Tournament, right?! I’m all fired up—because you and I are gonna break the world record together!</div></div>
+                                    <div class="dc-msg dc-join" data-chat data-join><span class="dc-arrow">→</span><div>Welcome, <b>SpeedyTrainer</b>. Say hi! <small>Today at 20:43</small></div></div>
+                                    <div class="dc-msg" data-chat><span class="dc-ava"><img class="face" src="/images/chara_stand_1013_101301.webp" alt="" width="36" height="36" /></span><div><div class="dc-who mcqueen">Mejiro McQueen <small>Today at 20:43</small></div>No, it does not! You promised you would attend my birthday party at the Mejiro estate. Now, hurry up and get ready in your dress.</div></div>
+                                    <div class="dc-msg" data-chat><span class="dc-ava"><img class="face" src="/images/chara_stand_1007_100701.webp" alt="" width="36" height="36" /></span><div><div class="dc-who goldship">Gold Ship <small>Today at 20:44</small></div>Ehhh, no way, that sounds like a total pain! Forget the dress—let’s all bake a cake instead! A 250-tier one with crazy decorations!</div></div>
+                                    <div class="dc-typing" data-typing><i></i><i></i><i></i><span data-typing-name></span> is typing…</div>
+                                </div>
+                                <div class="dc-feed ticket">
+                                    <div class="dc-start">
+                                        <span class="dc-start-icon">#</span>
+                                        <b>Welcome to #starlight-stable-speedytrainer-4821!</b>
+                                        <span>This is the start of the channel.</span>
+                                    </div>
+                                    <div class="dc-msg mention">
+                                        <span class="dc-ava"><img src="/images/bot-avatar.webp" alt="" width="36" height="36" /></span>
+                                        <div class="dc-msg-body">
+                                            <div class="dc-who">Uma Stable Match <span class="dc-tagbot">BOT</span> <small>Today at 20:43</small></div>
+                                            <span class="dc-at">@ClubLeader</span> New application to <b>Starlight Stable</b>.
+                                            <div class="dc-card"><b class="dc-card-title">Application from SpeedyTrainer</b></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="row">
+            <!-- Step 3: the ticket -->
+            <div class="row" id="step-stats">
                 <div class="txt reveal">
                     <div class="eyebrow">Step 3</div>
                     <h3>Decide with real numbers</h3>
-                    <p>Pace, fans this month, all-time totals, averages and rank are filled in from uma.moe. One click to accept or decline.</p>
+                    <p>Pace, fans this month, all-time totals, averages and rank are filled in from uma.moe, right in the ticket.</p>
                 </div>
-                <div class="vis reveal d1" aria-hidden="true">
-                    <div class="inner">
-                        <div class="chip"><span>Average per day</span><b>3,000,000</b></div>
-                        <div class="chip"><span>Average per week</span><b>21,000,000</b></div>
-                        <div class="chip"><span>Fans rank</span><b>#1,234</b></div>
+                <div class="vis reveal d1" aria-hidden="true" data-scene="stats">
+                    <span class="replay" data-replay>↺ Replay</span>
+                    <div class="win dc solo in-ticket">
+                        <span class="win-tag">Club leader</span>
+                        <div class="dc-main">
+                            <div class="dc-top"><span class="dc-top-ticket"><b><span class="lock">🔒</span> starlight-stable-speedytrainer-4821</b><small>Application to Starlight Stable</small></span></div>
+                            <div class="dc-view">
+                                <div class="dc-feed ticket">
+                                    <div class="dc-msg mention" data-msg>
+                                        <span class="dc-ava"><img src="/images/bot-avatar.webp" alt="" width="36" height="36" /></span>
+                                        <div class="dc-msg-body">
+                                            <div class="dc-who">Uma Stable Match <span class="dc-tagbot">BOT</span> <small>Today at 20:43</small></div>
+                                            <div><span class="c-new"><span class="dc-at">@ClubLeader</span> New application to <b>Starlight Stable</b>.</span><span class="c-done">✅ Accepted by <span class="dc-at">@ClubLeader</span></span></div>
+                                            <div class="dc-card">
+                                                <b class="dc-card-title">Application from SpeedyTrainer</b>
+                                                <div class="dc-grid">
+                                                    <div><span>Trainer</span><a>SpeedyTrainer</a></div>
+                                                    <div><span>Applicant</span><em class="dc-at">@SpeedyTrainer</em></div>
+                                                    <div><span>Current club</span>Moonlit Gate</div>
+                                                    <div data-field><span>Pace</span>3,100,000/day</div>
+                                                    <div data-field><span>Fans this month</span>58,200,000</div>
+                                                    <div><span>Total fans</span>1,204,000,000</div>
+                                                    <div><span>Average per day</span>3,000,000</div>
+                                                    <div><span>Average per week</span>21,000,000</div>
+                                                    <div><span>Average per month</span>90,000,000</div>
+                                                    <div data-field><span>Fans rank</span>#4,321</div>
+                                                    <div><span>Days tracked</span>212</div>
+                                                </div>
+                                            </div>
+                                            <div class="dc-actions" data-actions>
+                                                <span class="dc-btn ok">Accept</span>
+                                                <span class="dc-btn no">Decline</span>
+                                                <span class="dc-btn link" data-target>Compare in club <svg viewBox="0 0 16 16" width="12" height="12"><path d="M9 2h5v5M14 2 7.5 8.5M12 9.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Step 4: the applicant comparison in the web app -->
+            <div class="row flip" id="step-compare">
+                <div class="txt reveal">
+                    <div class="eyebrow">Step 4</div>
+                    <h3>See how they'd fit</h3>
+                    <p>Compare in club places the applicant among your current members, on your club's chart, with their gap to the median and whether they keep up with your fan requirement.</p>
+                </div>
+                <div class="vis reveal d1" aria-hidden="true" data-scene="compare">
+                    <span class="replay" data-replay>↺ Replay</span>
+                    <div class="win app">
+                        <div class="tabs">
+                            <span class="tab" data-target><svg width="12" height="12"><use href="#dc-logo" /></svg><span>#starlight-stable-speedytrainer-4821 | Discord</span></span>
+                            <span class="tab on"><span>Compare applicants · Starlight Stable</span></span>
+                        </div>
+                        <div class="chrome">
+                            <i></i><i></i><i></i>
+                            <span class="url"><span class="lock">🔒</span>app.umastable.com/applications/club/123456/compare</span>
+                            <span class="win-tag">Club leader</span>
+                        </div>
+                        <div class="page on cmp">
+                            <span class="cmp-back">← Back to applications</span>
+                            <div class="cmp-club">
+                                <span class="tier">S</span>
+                                <div class="club-info"><b>Starlight Stable</b><span class="club-tags"><span>Rank 12</span><span>3 open spots</span><span class="tag open">Open</span></span></div>
+                                <div class="cmp-median"><span>Median/day</span><b>1.9M/day</b></div>
+                            </div>
+                            <svg class="cmp-chart" viewBox="0 0 300 110" preserveAspectRatio="none">
+                                <path class="grid" d="M0 27.5H300M0 55H300M0 82.5H300" />
+                                <path class="member" d="M0 108L30 98L60 86L90 75L120 64L150 53L180 42L210 31L240 22L270 13L300 4" />
+                                <path class="member" d="M0 108L30 99L60 89L90 79L120 69L150 59L180 50L210 40L240 30L270 21L300 12" />
+                                <path class="member" d="M0 108L30 100L60 92L90 84L120 76L150 68L180 60L210 52L240 44L270 36L300 28" />
+                                <path class="member" d="M0 108L30 101L60 95L90 88L120 82L150 75L180 69L210 62L240 56L270 49L300 43" />
+                                <path class="member" d="M0 108L30 103L60 98L90 93L120 88L150 83L180 78L210 73L240 68L270 63L300 58" />
+                                <path class="need" d="M0 108L300 30" />
+                                <path class="cand" d="M0 108L30 99.5L60 91L90 82L120 73L150 64.5L180 56L210 47L240 38L270 29.5L300 21" />
+                            </svg>
+                            <div class="cmp-legend"><span class="sw cand"></span>SpeedyTrainer<span class="sw need"></span>Fan requirement: 18M a week</div>
+                            <ol class="roster">
+                                <li><span class="place">1</span><span class="who-m">Mejiro McQueen<small>3.6M/day</small></span><span class="ok">✓ Meets it</span></li>
+                                <li><span class="place">2</span><span class="who-m">Gold Ship<small>3.3M/day</small></span><span class="ok">✓ Meets it</span></li>
+                                <li class="cand" data-cand><span class="place">3</span><span class="who-m"><span><span class="sw cand"></span>SpeedyTrainer</span><small>3.1M/day · Vs club median +1.2M/day</small></span><span class="ok">✓ Meets it, 0.53M/day ahead</span></li>
+                                <li><span class="place">4</span><span class="who-m">LuckyStride<small>2.4M/day</small></span><span class="short">✗ Short by 0.17M/day</span></li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 5: back in the ticket -->
+            <div class="row" id="step-answer">
+                <div class="txt reveal">
+                    <div class="eyebrow">Step 5</div>
+                    <h3>Answer in one click</h3>
+                    <p>Only the club's leader can accept or decline. The buttons go away so nobody answers twice, and the trainer sees your answer on their applications page.</p>
+                </div>
+                <div class="vis reveal d1" aria-hidden="true" data-scene="answer">
+                    <span class="replay" data-replay>↺ Replay</span>
+                    <div class="win dc solo in-ticket">
+                        <span class="win-tag">Club leader</span>
+                        <div class="dc-main">
+                            <div class="dc-top"><span class="dc-top-ticket"><b><span class="lock">🔒</span> starlight-stable-speedytrainer-4821</b><small>Application to Starlight Stable</small></span></div>
+                            <div class="dc-view">
+                                <div class="dc-feed ticket">
+                                    <div class="dc-msg mention" data-msg>
+                                        <span class="dc-ava"><img src="/images/bot-avatar.webp" alt="" width="36" height="36" /></span>
+                                        <div class="dc-msg-body">
+                                            <div class="dc-who">Uma Stable Match <span class="dc-tagbot">BOT</span> <small>Today at 20:43</small></div>
+                                            <div><span class="c-new"><span class="dc-at">@ClubLeader</span> New application to <b>Starlight Stable</b>.</span><span class="c-done">✅ Accepted by <span class="dc-at">@ClubLeader</span></span></div>
+                                            <div class="dc-card">
+                                                <b class="dc-card-title">Application from SpeedyTrainer</b>
+                                                <div class="dc-grid">
+                                                    <div><span>Trainer</span><a>SpeedyTrainer</a></div>
+                                                    <div><span>Applicant</span><em class="dc-at">@SpeedyTrainer</em></div>
+                                                    <div><span>Current club</span>Moonlit Gate</div>
+                                                    <div data-field><span>Pace</span>3,100,000/day</div>
+                                                    <div data-field><span>Fans this month</span>58,200,000</div>
+                                                    <div><span>Total fans</span>1,204,000,000</div>
+                                                    <div><span>Average per day</span>3,000,000</div>
+                                                    <div><span>Average per week</span>21,000,000</div>
+                                                    <div><span>Average per month</span>90,000,000</div>
+                                                    <div data-field><span>Fans rank</span>#4,321</div>
+                                                    <div><span>Days tracked</span>212</div>
+                                                </div>
+                                            </div>
+                                            <div class="dc-actions" data-actions>
+                                                <span class="dc-btn ok" data-target>Accept</span>
+                                                <span class="dc-btn no">Decline</span>
+                                                <span class="dc-btn link">Compare in club <svg viewBox="0 0 16 16" width="12" height="12"><path d="M9 2h5v5M14 2 7.5 8.5M12 9.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="win app mini" data-mini>
+                        <div class="chrome">
+                            <i></i><i></i><i></i>
+                            <span class="url"><span class="lock">🔒</span>app.umastable.com/applications/trainer</span>
+                            <span class="win-tag">Trainer</span>
+                            <span class="loading" data-loading></span>
+                        </div>
+                        <div class="page on">
+                            <div class="apps">
+                                <div class="apps-row">
+                                    <span class="apps-club">Starlight Stable</span>
+                                    <span>Today</span>
+                                    <span><span class="status pending" data-status>Pending</span></span>
+                                    <span class="apps-ticket"><svg width="12" height="12"><use href="#dc-logo" /></svg>Open in Discord</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="mock-note how-note reveal">Example walkthrough with made-up clubs and trainers.</p>
         </div>
     </section>
 </main>
@@ -249,7 +477,41 @@
     </div>
 </footer>
 
+<!-- The walkthrough's offer, highlight and instructions. -->
+<div class="tour-ask" id="tour-ask" role="dialog" aria-labelledby="tour-ask-title" hidden>
+    <img src="/images/bot-avatar.webp" alt="" width="48" height="48" />
+    <div>
+        <h2 id="tour-ask-title">Want a quick walkthrough?</h2>
+        <p>See an application go from Quick Apply to accepted, one click at a time. It takes about a minute.</p>
+        <div class="tour-actions">
+            <button type="button" class="btn-tour primary" data-tour-yes>Show me</button>
+            <button type="button" class="btn-tour" data-tour-no>I'll look around</button>
+        </div>
+    </div>
+</div>
+<div class="tour" id="tour" hidden>
+    <div class="tour-block" data-block></div>
+    <div class="tour-block" data-block></div>
+    <div class="tour-block" data-block></div>
+    <div class="tour-block" data-block></div>
+    <div class="tour-spot" data-spot></div>
+    <div class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-body" data-card>
+        <p class="tour-count" data-count></p>
+        <h2 id="tour-title" data-title></h2>
+        <p id="tour-body" data-body></p>
+        <div class="tour-dots" data-dots></div>
+        <div class="tour-actions">
+            <button type="button" class="btn-tour skip" data-skip>Skip</button>
+            <span class="tour-spacer"></span>
+            <button type="button" class="btn-tour" data-back>Back</button>
+            <button type="button" class="btn-tour primary" data-next>Next</button>
+            <a class="btn-tour primary" href="https://app.umastable.com/applications" data-setup hidden>Set up your club</a>
+        </div>
+    </div>
+</div>
+
 <script src="/site.js" defer></script>
+<script src="/bot/walkthrough.js" defer></script>
 
 </body>
 </html>
