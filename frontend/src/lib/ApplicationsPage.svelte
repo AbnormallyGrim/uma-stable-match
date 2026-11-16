@@ -77,7 +77,7 @@
 
 <NavBar onreleases={openReleases} unseen={unseenRelease} />
 
-<main class="page">
+<main class="page applications-home">
   <header class="intro">
     <h1>{t('applications.heading')}</h1>
     <p class="lede">{t('applications.intro')}</p>
@@ -111,6 +111,17 @@
 <style>
   .page {
     padding-top: 24px;
+  }
+
+  :global(#app:has(> .applications-home)) {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+
+  .applications-home {
+    flex: 1 0 auto;
+    width: 100%;
   }
 
   .intro {
