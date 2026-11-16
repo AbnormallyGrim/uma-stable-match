@@ -99,7 +99,7 @@ describe('accessibility', () => {
   it('has no violations on the empty page', async () => {
     stubApi(() => json(withResults));
     render(App);
-    await screen.findByRole('heading', { name: 'Uma Stable Match club finder' });
+    await screen.findByRole('heading', { name: 'Find your club' });
     expect(await violations(document.body, true)).toEqual([]);
   });
 

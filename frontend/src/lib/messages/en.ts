@@ -9,7 +9,8 @@ const plural = (n: number, one: string, other: string) => (n === 1 ? one : other
 
 export const en = {
   'app.name': 'Uma Stable Match',
-  'app.heading': 'Uma Stable Match club finder',
+  'app.heading': 'Find your club',
+  'app.intro': "Enter your trainer ID and we'll rank clubs that fit your pace.",
   'app.found': ({ n }: { n: number }) => `Found ${n} ${plural(n, 'club', 'clubs')}.`,
 
   'nav.label': 'Main',
