@@ -113,8 +113,6 @@
     padding-top: 24px;
   }
 
-  /* The page has little content, so it fills the window to keep the footer at the bottom.
-     Scoped with :has() so other pages are unaffected. */
   :global(#app:has(> .applications-home)) {
     display: flex;
     flex-direction: column;
