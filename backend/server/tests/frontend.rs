@@ -185,7 +185,7 @@ async fn csp_allows_only_same_origin_data_images_turnstile_and_strawpoll_frames(
             .count(),
         2
     );
-    assert!(CONTENT_SECURITY.contains("img-src 'self' data:"));
+    assert!(CONTENT_SECURITY.contains("img-src 'self' data: https://cdn.discordapp.com;"));
     assert!(CONTENT_SECURITY.contains("frame-ancestors 'none'"));
 }
 

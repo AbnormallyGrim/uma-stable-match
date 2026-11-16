@@ -13,8 +13,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function signIn(name: string | null = 'Made Up') {
-  account.current = { discordId: '100000000000000001', name };
+function signIn(name: string | null = 'Made Up', avatar: string | null = null) {
+  account.current = { discordId: '100000000000000001', name, avatar };
   account.known = true;
 }
 
@@ -54,6 +54,34 @@ describe('AccountMenu', () => {
       '/settings',
     );
     expect(within(menu).getByRole('menuitem', { name: 'Sign Out' })).toBeInTheDocument();
+  });
+
+  it("shows the Discord avatar, and the silhouette while it can't load", async () => {
+    document.cookie = 'uma_signed_in=1794170000; Path=/';
+    const fetch = vi.fn(async () =>
+      Response.json({ discord_id: '100000000000000001', name: 'Made Up', avatar: null }),
+    );
+    vi.stubGlobal('fetch', fetch);
+    signIn('Made Up', '0123456789abcdef0123456789abcdef');
+    const { container } = render(AccountMenu);
+    const img = container.querySelector('img');
+    expect(img).toHaveAttribute(
+      'src',
+      'https://cdn.discordapp.com/avatars/100000000000000001/0123456789abcdef0123456789abcdef.png?size=64',
+    );
+    await fireEvent.error(img!);
+    // The server is asked once for a newer avatar; here there's none, so the default shows.
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() =>
+      expect(container.querySelector('img')).toHaveAttribute(
+        'src',
+        'https://cdn.discordapp.com/embed/avatars/0.png',
+      ),
+    );
+    await fireEvent.error(container.querySelector('img')!);
+    expect(container.querySelector('img')).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    document.cookie = 'uma_signed_in=; Path=/; Max-Age=0';
   });
 
   it('falls back to a generic name without one', () => {

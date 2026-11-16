@@ -178,17 +178,35 @@ export interface Account {
   discordId: string;
   /** Their Discord display name, or `null` when the server couldn't look it up. */
   name: string | null;
+  /** Their Discord avatar hash, or `null` for the default avatar. */
+  avatar: string | null;
+}
+
+const AVATAR_HASH = /^(a_)?[0-9a-f]{32}$/;
+
+/** The URL of `account`'s Discord avatar at 64 pixels, or of Discord's default one without it. */
+export function avatarUrl(account: Account): string {
+  if (account.avatar !== null && AVATAR_HASH.test(account.avatar)) {
+    return `https://cdn.discordapp.com/avatars/${account.discordId}/${account.avatar}.png?size=64`;
+  }
+  let index = 0;
+  try {
+    index = Number((BigInt(account.discordId) >> 22n) % 6n);
+  } catch {
+    // Not a number: the first default avatar.
+  }
+  return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
 }
 
 /** The signed-in person, or `null` when nobody is signed in. */
 export async function signedInUser(options: RequestOptions = {}): Promise<Account | null> {
   try {
-    const body = await send<{ discord_id: string; name?: string | null }>(
+    const body = await send<{ discord_id: string; name?: string | null; avatar?: string | null }>(
       '/api/v1/auth/session',
       {},
       options,
     );
-    return { discordId: body.discord_id, name: body.name ?? null };
+    return { discordId: body.discord_id, name: body.name ?? null, avatar: body.avatar ?? null };
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       return null;

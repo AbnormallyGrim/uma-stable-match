@@ -39,6 +39,17 @@ async function find(): Promise<Account | null> {
   if (saved !== null) {
     return settle(saved);
   }
+  return ask(marker, storage);
+}
+
+/** Asks the server who is signed in, past any saved person, as when a saved avatar stops loading. */
+export function refreshAccount(): Promise<Account | null> {
+  const marker = sessionMarker();
+  loading = marker === null ? find() : ask(marker, localStorageOrNone());
+  return loading;
+}
+
+async function ask(marker: string, storage: Storage | undefined): Promise<Account | null> {
   let found: Account | null;
   try {
     found = await signedInUser();

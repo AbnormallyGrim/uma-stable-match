@@ -11,7 +11,11 @@ import {
   SIGNED_IN_COOKIE,
 } from './session';
 
-const account = { discordId: '100000000000000001', name: 'Made Up' };
+const account = {
+  discordId: '100000000000000001',
+  name: 'Made Up',
+  avatar: '0123456789abcdef0123456789abcdef',
+};
 
 afterEach(() => {
   localStorage.clear();

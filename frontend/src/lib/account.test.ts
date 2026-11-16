@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACCOUNT_KEY, saveAccount, sessionMarker, SIGNED_IN_COOKIE } from './session';
 
 const marker = '1794170000';
-const person = { discordId: '100000000000000001', name: 'Made Up' };
+const person = { discordId: '100000000000000001', name: 'Made Up', avatar: null };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 let fetch: ReturnType<typeof vi.fn<typeof globalThis.fetch>>;

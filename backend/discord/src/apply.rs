@@ -481,7 +481,7 @@ async fn for_club(
             .names()
             .get(discord.rest(), details.applicant)
             .await
-            .unwrap_or_else(|| details.applicant.to_string());
+            .map_or_else(|| details.applicant.to_string(), |profile| profile.name);
         listed.push(json!({
             "id": application.id,
             "trainerName": details.trainer_name,

@@ -12,6 +12,7 @@ interface Saved {
   session: string;
   discordId: string;
   name: string | null;
+  avatar?: string | null;
 }
 
 /** The signed-in marker's value, or `null` when there's no session to count on. */
@@ -30,7 +31,7 @@ export function savedAccount(marker: string, storage: Storage | undefined): Acco
   try {
     const saved = JSON.parse(storage?.getItem(ACCOUNT_KEY) ?? 'null') as Saved | null;
     if (saved?.session === marker && typeof saved.discordId === 'string') {
-      return { discordId: saved.discordId, name: saved.name ?? null };
+      return { discordId: saved.discordId, name: saved.name ?? null, avatar: saved.avatar ?? null };
     }
   } catch {
     // Unreadable: ask the server again.
@@ -40,7 +41,12 @@ export function savedAccount(marker: string, storage: Storage | undefined): Acco
 
 /** Keeps `account` for the session `marker` names. */
 export function saveAccount(marker: string, account: Account, storage: Storage | undefined): void {
-  const saved: Saved = { session: marker, discordId: account.discordId, name: account.name };
+  const saved: Saved = {
+    session: marker,
+    discordId: account.discordId,
+    name: account.name,
+    avatar: account.avatar,
+  };
   try {
     storage?.setItem(ACCOUNT_KEY, JSON.stringify(saved));
   } catch {

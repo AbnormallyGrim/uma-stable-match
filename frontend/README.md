@@ -145,6 +145,10 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 - With it, the person saved in local storage (`uma-stable-match:account`) for the same session is reused. Only after signing in, or when nothing is saved, does the page ask `GET /api/v1/auth/session`, and it saves the answer.
 - Any 401 from the applications API, signing out and deleting the account drop both, so a session ended elsewhere stops counting at the next request. Signing out in one tab signs the others out through the `storage` event.
 
+The button shows the person's Discord name with a chevron from 1100 pixels wide, where the navbar fits on one row. Narrower, it's a round icon button like the ones beside it, and the name is left for screen readers.
+
+The button shows the person's Discord avatar, loaded from `https://cdn.discordapp.com` (which the server's content security policy allows), or Discord's default avatar for their ID when they have none. The avatar hash is saved with the person. If the image fails to load, as when they've since changed their avatar, the silhouette shows and the server is asked once for a newer one (`refreshAccount()`).
+
 The saved person only chooses what the navbar shows and whether a page sends you to sign in; every API call still checks the session. After deleting the account on one device, another may keep showing the account menu until its next request.
 
  Once someone is, `AccountMenu.svelte` shows last in the navbar: a pill with their Discord name (or "Discord account" when the server couldn't look it up), cut short with an ellipsis when long. It opens a menu with **Signed in as …**, **Settings** and **Sign Out**, following the ARIA menu button pattern: arrow keys, Home and End move between the items, and Escape, Tab or a click elsewhere closes it. Signing out from a page that needs a session goes to the club finder; elsewhere the menu gives way to the sign-in button.

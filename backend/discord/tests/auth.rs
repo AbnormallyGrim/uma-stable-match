@@ -208,7 +208,7 @@ async fn signing_in_starts_a_leader_session_and_returns_to_the_page() {
     assert_eq!(header_value(&me, CACHE_CONTROL), "no-store");
     assert_eq!(
         json_body(me).await,
-        json!({ "discord_id": USER_ID, "name": null })
+        json!({ "discord_id": USER_ID, "name": null, "avatar": null })
     );
 }
 
@@ -249,7 +249,7 @@ async fn the_session_endpoint_gives_the_display_name_looked_up_once_as_the_bot()
         let me = get(&app, SESSION_PATH, Some(&session)).await;
         assert_eq!(
             json_body(me).await,
-            json!({ "discord_id": USER_ID, "name": "Made Up" })
+            json!({ "discord_id": USER_ID, "name": "Made Up", "avatar": null })
         );
     }
 }
@@ -269,6 +269,31 @@ async fn without_a_display_name_the_username_is_given() {
     let session = signed_in(&app).await;
     let me = get(&app, SESSION_PATH, Some(&session)).await;
     assert_eq!(json_body(me).await["name"], "made-up-name");
+}
+
+#[tokio::test]
+async fn the_session_endpoint_gives_a_well_formed_avatar_hash() {
+    for (avatar, given) in [
+        (
+            json!("a_0123456789abcdef0123456789abcdef"),
+            json!("a_0123456789abcdef0123456789abcdef"),
+        ),
+        (json!("not/a/hash"), json!(null)),
+    ] {
+        let server = MockServer::start().await;
+        mock_discord(&server).await;
+        Mock::given(method("GET"))
+            .and(path(format!("/users/{USER_ID}")))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                json!({ "id": USER_ID, "username": "made-up-name", "avatar": avatar }),
+            ))
+            .mount(&server)
+            .await;
+        let app = app(&server);
+        let session = signed_in(&app).await;
+        let me = get(&app, SESSION_PATH, Some(&session)).await;
+        assert_eq!(json_body(me).await["avatar"], given);
+    }
 }
 
 #[tokio::test]
