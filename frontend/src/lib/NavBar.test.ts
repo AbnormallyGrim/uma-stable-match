@@ -1,9 +1,10 @@
 // NavBar component tests.
 
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import NavBar from './NavBar.svelte';
+import { navTools } from './navTools.svelte';
 import { PAGES } from './pages';
 
 const props = { onhelp: () => {}, onreleases: () => {}, unseen: false };
@@ -59,5 +60,56 @@ describe('NavBar', () => {
     unmount();
     render(NavBar, { ...props, unseen: false });
     expect(screen.queryByTestId('unseen-release')).not.toBeInTheDocument();
+  });
+});
+
+describe('NavBar on narrow screens', () => {
+  afterEach(() => {
+    navTools.open = false;
+    vi.unstubAllGlobals();
+  });
+
+  function narrow() {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(width < 768px)' }));
+  }
+
+  it('opens the folded tools, shrinking the pages pill, and swaps back from it', async () => {
+    narrow();
+    render(NavBar, { ...props });
+    const fold = screen.getByRole('button', { name: 'More options' });
+    const pages = screen.getByRole('navigation', { name: 'Pages' });
+    expect(fold).toHaveAttribute('aria-expanded', 'false');
+    expect(pages).not.toHaveClass('collapsed');
+
+    await fireEvent.click(fold);
+    expect(fold).toHaveAttribute('aria-expanded', 'true');
+    expect(pages).toHaveClass('collapsed');
+    expect(screen.getByRole('button', { name: "What's new" })).toHaveFocus();
+
+    // jsdom is at /, the club finder, so the pill keeps that page.
+    const kept = within(pages).getByRole('link', { name: 'Club finder' });
+    expect(kept).toHaveClass('kept');
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    kept.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(fold).toHaveFocus());
+    expect(fold).toHaveAttribute('aria-expanded', 'false');
+    expect(pages).not.toHaveClass('collapsed');
+  });
+
+  it('closes the folded tools with Escape', async () => {
+    narrow();
+    render(NavBar, { ...props });
+    const fold = screen.getByRole('button', { name: 'More options' });
+    await fireEvent.click(fold);
+    await fireEvent.keyDown(screen.getByRole('button', { name: "What's new" }), { key: 'Escape' });
+    await vi.waitFor(() => expect(fold).toHaveFocus());
+    expect(fold).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('marks the fold button while there are unseen release notes', () => {
+    render(NavBar, { ...props, unseen: true });
+    const fold = screen.getByRole('button', { name: 'More options' });
+    expect(fold.querySelector('.dot')).not.toBeNull();
   });
 });

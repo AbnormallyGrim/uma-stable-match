@@ -10,6 +10,7 @@
   import { t } from './lib/i18n';
   import { language } from './lib/language.svelte';
   import NavBar from './lib/NavBar.svelte';
+  import { navTools } from './lib/navTools.svelte';
   import ReleaseNotes from './lib/ReleaseNotes.svelte';
   import { hasUnseenRelease, markReleaseSeen, RELEASES } from './lib/releases';
   import Results from './lib/Results.svelte';
@@ -53,6 +54,7 @@
 
   function endTour() {
     touring = false;
+    navTools.open = false;
     markTourSeen(storage);
   }
 
@@ -145,7 +147,11 @@
 {/if}
 
 {#if touring}
-  <Tour steps={tourSteps()} onclose={endTour} />
+  <Tour
+    steps={tourSteps()}
+    onclose={endTour}
+    onstep={(step) => (navTools.open = step.target === 'theme' || step.target === 'help')}
+  />
 {:else if announce && !hasSeenAnnouncement(storage)}
   <Announcement />
 {/if}
