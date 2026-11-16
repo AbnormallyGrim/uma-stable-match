@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  avatarUrl,
   activeApplications,
   applyUrl,
   checkTicketName,
@@ -75,7 +76,7 @@ describe('adding the bot', () => {
 describe('an ended session', () => {
   it('is forgotten on any 401, so later pages stop counting on it', async () => {
     document.cookie = `${SIGNED_IN_COOKIE}=1794170000; Path=/`;
-    saveAccount('1794170000', { discordId: '42', name: null }, localStorage);
+    saveAccount('1794170000', { discordId: '42', name: null, avatar: null }, localStorage);
     const signedOut = vi.fn<typeof fetch>(async () => json({ error: 'sign in' }, 401));
     await expect(fetchMyClub({ fetch: signedOut })).rejects.toMatchObject({ status: 401 });
     expect(sessionMarker()).toBeNull();
@@ -94,12 +95,48 @@ describe('fetchMyClub', () => {
   });
 });
 
+describe('avatarUrl', () => {
+  it('points at the Discord avatar', () => {
+    expect(
+      avatarUrl({
+        discordId: '100000000000000001',
+        name: null,
+        avatar: '0123456789abcdef0123456789abcdef',
+      }),
+    ).toBe(
+      'https://cdn.discordapp.com/avatars/100000000000000001/0123456789abcdef0123456789abcdef.png?size=64',
+    );
+  });
+
+  it("falls back to Discord's default avatar, picked from the ID", () => {
+    // (100000000008388609 >> 22) % 6 is 2.
+    expect(avatarUrl({ discordId: '100000000008388609', name: null, avatar: null })).toBe(
+      'https://cdn.discordapp.com/embed/avatars/2.png',
+    );
+    expect(avatarUrl({ discordId: '42', name: null, avatar: '../not-a-hash' })).toBe(
+      'https://cdn.discordapp.com/embed/avatars/0.png',
+    );
+  });
+});
+
 describe('signedInUser', () => {
   it('gives the Discord ID and name, or null when signed out', async () => {
-    const ok = vi.fn(() => Promise.resolve(json({ discord_id: '42', name: 'Made Up' })));
-    expect(await signedInUser({ fetch: ok })).toEqual({ discordId: '42', name: 'Made Up' });
+    const ok = vi.fn(() =>
+      Promise.resolve(
+        json({ discord_id: '42', name: 'Made Up', avatar: '0123456789abcdef0123456789abcdef' }),
+      ),
+    );
+    expect(await signedInUser({ fetch: ok })).toEqual({
+      discordId: '42',
+      name: 'Made Up',
+      avatar: '0123456789abcdef0123456789abcdef',
+    });
     const unnamed = vi.fn(() => Promise.resolve(json({ discord_id: '42', name: null })));
-    expect(await signedInUser({ fetch: unnamed })).toEqual({ discordId: '42', name: null });
+    expect(await signedInUser({ fetch: unnamed })).toEqual({
+      discordId: '42',
+      name: null,
+      avatar: null,
+    });
     const out = vi.fn(() => Promise.resolve(json({ error: 'not signed in' }, 401)));
     expect(await signedInUser({ fetch: out })).toBeNull();
   });

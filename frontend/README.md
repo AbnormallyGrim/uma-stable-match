@@ -90,6 +90,7 @@ src/lib/Announcement.svelte   Dialog that points visitors to the Applications an
 src/lib/announcement.ts       Who gets that dialog, and remembering that it was shown
 src/lib/NavBar.svelte         Top bar: the brand, linking to the website, the pages pill, the release notes and tour buttons, the theme switch and the account menu
 src/lib/NavLinks.svelte       The pages as a pill of icon links in the navbar, icons only on narrow screens
+src/lib/navTools.svelte.ts    Whether the navbar's folded tools are open on narrow screens, shared with the tour
 src/lib/pages.ts              The pages the navbar links to, and which one is showing
 src/lib/ReleaseNotes.svelte   The release notes modal: a timeline of builds, newest first
 src/lib/releases.ts           The releases themselves, and remembering the newest one seen
@@ -135,7 +136,9 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 
 ## Navbar
 
-`NavBar.svelte` is a bar across the top of the page, matching the website's at [umastable.com](https://umastable.com): the logo and "Uma Stable Match" on the left, linking back to the website (`site.localhost` on the same port when the app runs on `localhost` or a name under it, as when the [server serves both](../backend/server/README.md#serving-the-website)), and on the right a round **?** button that starts the [product tour](#product-tour) (left out on the club page), then the theme switch and, for a person signed in with Discord, the [account menu](#account-menu) at the far right. It stays at the top while scrolling. At the very top of the page it's see-through, with no line under it. Over the first 120px of scrolling (`COLLAPSE_PX`) its translucent, blurred background and bottom line fade in, and the name slides left behind the logo and fades out; with reduced motion it only fades. The pages pill, the theme switch and the round buttons are frosted glass (the `.glass` class and the `--glass` tokens in `app.css`). The website's navbar does the same, driven by `site.js`. The page's own heading, "Uma Stable Match club finder", is hidden visually and read by screen readers. On narrow screens a long title is cut short with an ellipsis rather than pushing the switch off the screen.
+`NavBar.svelte` is a bar across the top of the page, matching the website's at [umastable.com](https://umastable.com): the logo and "Uma Stable Match" on the left, linking back to the website (`site.localhost` on the same port when the app runs on `localhost` or a name under it, as when the [server serves both](../backend/server/README.md#serving-the-website)), and on the right a round **?** button that starts the [product tour](#product-tour) (left out on the club page), then the theme switch and, for a person signed in with Discord, the [account menu](#account-menu) at the far right. It stays at the top while scrolling. At the very top of the page it's see-through, with no line under it. Over the first 120px of scrolling (`COLLAPSE_PX`) its translucent, blurred background and bottom line fade in, and the name slides left behind the logo and fades out; with reduced motion it only fades. The pages pill, the theme switch and the round buttons are frosted glass (the `.glass` class and the `--glass` tokens in `app.css`). The website's navbar does the same, driven by `site.js`. On narrow screens a long title is cut short with an ellipsis rather than pushing the switch off the screen.
+
+Below 768 pixels (`NARROW_NAV` in `navTools.svelte.ts`) the release notes, help, language and theme buttons fold behind one round **More options** button, which carries the release notes dot when there's something new, so the bar stays on one row down to 360 pixels. Opening it shows those buttons and shrinks the pages pill to the current page (the first page on pages that aren't listed), and focus moves to the first button. Tapping that page, or Escape, swaps back, and focus returns to **More options**. The open state is shared through `navTools`, so the product tour opens it for its theme and help steps and closes it when it ends.
 
 ### Account menu
 
@@ -144,6 +147,10 @@ vite.config.ts                Vite, the /api proxy and Vitest settings
 - Without the server's `uma_signed_in` cookie, nobody is signed in and the server isn't asked. The server sets that cookie beside the session, readable by the page, holding the session's expiry, and clears it on sign-out and account deletion. It expires with the session.
 - With it, the person saved in local storage (`uma-stable-match:account`) for the same session is reused. Only after signing in, or when nothing is saved, does the page ask `GET /api/v1/auth/session`, and it saves the answer.
 - Any 401 from the applications API, signing out and deleting the account drop both, so a session ended elsewhere stops counting at the next request. Signing out in one tab signs the others out through the `storage` event.
+
+The button shows the person's Discord name with a chevron from 1100 pixels wide, where the navbar fits on one row. Narrower, it's a round icon button like the ones beside it, and the name is left for screen readers.
+
+The button shows the person's Discord avatar, loaded from `https://cdn.discordapp.com` (which the server's content security policy allows), or Discord's default avatar for their ID when they have none. The avatar hash is saved with the person. If the image fails to load, as when they've since changed their avatar, the silhouette shows and the server is asked once for a newer one (`refreshAccount()`).
 
 The saved person only chooses what the navbar shows and whether a page sends you to sign in; every API call still checks the session. After deleting the account on one device, another may keep showing the account menu until its next request.
 

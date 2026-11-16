@@ -1,6 +1,6 @@
 <!--
   @component
-  The navbar's account menu for a person signed in with Discord: a button with their name that
+  The navbar's account menu for a person signed in with Discord: a button with their avatar and name that
   opens who they're signed in as, a link to the settings page, and signing out. It follows the
   ARIA menu button pattern. Signed out, it's a round silhouette linking to sign-in, shown once the
   server has answered.
@@ -9,8 +9,8 @@
 <script lang="ts">
   import { tick } from 'svelte';
 
-  import { account, clearAccount } from './account.svelte';
-  import { signOut } from './applications';
+  import { account, clearAccount, refreshAccount } from './account.svelte';
+  import { avatarUrl, signOut } from './applications';
   import { t } from './i18n';
   import {
     APPLICATIONS_PATH,
@@ -27,6 +27,18 @@
   let menu: HTMLUListElement | undefined = $state();
 
   const name = $derived(account.current?.name ?? t('account.unnamed'));
+  const avatar = $derived(account.current ? avatarUrl(account.current) : null);
+  // An avatar that didn't load shows the silhouette; the server is asked once for a newer one.
+  let brokenAvatar = $state<string | null>(null);
+  let refreshed = false;
+
+  function onAvatarError() {
+    brokenAvatar = avatar;
+    if (!refreshed) {
+      refreshed = true;
+      void refreshAccount();
+    }
+  }
   const here = `${window.location.pathname}${window.location.search}`;
   const signInHref = `${LOGIN_PATH}?next=${encodeURIComponent(here)}`;
   const onLoginPage = isLoginRoute(window.location.pathname);
@@ -129,20 +141,32 @@
       onclick={() => (open ? hide() : show())}
       onkeydown={onButtonKey}
     >
-      <svg
-        viewBox="0 0 16 16"
-        width="16"
-        height="16"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <circle cx="8" cy="5.25" r="2.5" />
-        <path d="M3 13.5c.5-2.75 2.5-4 5-4s4.5 1.25 5 4" />
-      </svg>
+      {#if avatar && avatar !== brokenAvatar}
+        <img
+          class="avatar"
+          src={avatar}
+          alt=""
+          width="22"
+          height="22"
+          referrerpolicy="no-referrer"
+          onerror={onAvatarError}
+        />
+      {:else}
+        <svg
+          viewBox="0 0 16 16"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="8" cy="5.25" r="2.5" />
+          <path d="M3 13.5c.5-2.75 2.5-4 5-4s4.5 1.25 5 4" />
+        </svg>
+      {/if}
       <span class="name">{name}</span>
       <svg
         class="chevron"
@@ -254,10 +278,38 @@
     flex: none;
   }
 
+  .avatar {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
   .name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Until the navbar fits on one row, just the round icon; the name stays for screen readers. */
+  @media (width < 1100px) {
+    .trigger {
+      justify-content: center;
+      width: 34px;
+      padding: 0;
+    }
+
+    .name {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      clip: rect(0 0 0 0);
+    }
+
+    .chevron {
+      display: none;
+    }
   }
 
   .chevron {

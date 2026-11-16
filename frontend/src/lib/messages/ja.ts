@@ -15,6 +15,7 @@ export const ja: Catalog = {
   'nav.tour': 'ツアーを見る',
 
   'nav.releases': '更新情報',
+  'nav.more': 'その他のオプション',
   'modal.close': '閉じる',
 
   'releases.title': '更新情報',

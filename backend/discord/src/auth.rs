@@ -335,6 +335,8 @@ struct Me {
     discord_id: String,
     /// `None` when Discord couldn't be asked.
     name: Option<String>,
+    /// Avatar hash; `None` for the default avatar or when Discord couldn't be asked.
+    avatar: Option<String>,
 }
 
 /// The request's signed, unexpired session: its token, Discord ID and expiry (Unix seconds).
@@ -395,10 +397,12 @@ async fn session_info(State(discord): State<Discord>, headers: HeaderMap) -> Res
         }
         Err(err) => return private(store_unavailable(&err)),
     };
-    let name = discord.names().get(discord.rest(), id).await;
+    let profile = discord.names().get(discord.rest(), id).await;
+    let (name, avatar) = profile.map_or((None, None), |p| (Some(p.name), p.avatar));
     let mut response = private(Json(Me {
         discord_id: id.to_string(),
         name,
+        avatar,
     }));
     // Puts the marker back if it went missing while the session still holds.
     if let Some((_, _, expires)) = signed_session(discord.config(), &headers) {

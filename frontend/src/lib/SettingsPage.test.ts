@@ -24,7 +24,7 @@ function answer(routes: Record<string, () => Response>) {
 const assign = vi.fn();
 
 beforeEach(() => {
-  account.current = { discordId: '100000000000000001', name: 'Made Up' };
+  account.current = { discordId: '100000000000000001', name: 'Made Up', avatar: null };
   vi.stubGlobal('location', { ...window.location, assign, pathname: '/settings' });
 });
 

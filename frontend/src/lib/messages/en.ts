@@ -17,6 +17,7 @@ export const en = {
   'nav.tour': 'Take the tour',
 
   'nav.releases': "What's new",
+  'nav.more': 'More options',
   'modal.close': 'Close',
 
   'releases.title': "What's new",

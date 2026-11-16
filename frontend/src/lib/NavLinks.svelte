@@ -3,17 +3,37 @@
   The pages as a pill of links in the navbar, like the theme switch: the website's home page, the
   club finder, the wishlist page, club applications and recruitment ads, each with an icon, and the page being shown raised. On narrow
   screens only the icons show, and a tooltip names each page. With the account menu or sign-in
-  button there, the names wait for a wider screen.
+  button there, the names wait for a wider screen. `collapsed` shrinks it to the current page on
+  narrow screens, where tapping that page calls `onexpand` instead of reloading it.
 -->
 
 <script lang="ts">
   import { showsAccount } from './account.svelte';
   import { t } from './i18n';
   import { isAnnouncedPage } from './announcement';
+  import { isNarrowNav } from './navTools.svelte';
   import { currentPage, hasSeenPage, markPageSeen, NEW_PAGES, PAGES, type Page } from './pages';
+
+  interface Props {
+    /** Shows only the current page on narrow screens, while the navbar's tools are open. */
+    collapsed?: boolean;
+    /** Called when the collapsed pill is tapped. */
+    onexpand?: () => void;
+  }
+
+  let { collapsed = false, onexpand }: Props = $props();
 
   const storage = typeof localStorage === 'undefined' ? undefined : localStorage;
   const current = currentPage(window.location.pathname);
+  // Collapsed, the pill keeps the current page, or the first one on pages that aren't listed.
+  const kept = current ?? PAGES[0]!.id;
+
+  function onclick(event: MouseEvent, id: Page['id']) {
+    if (collapsed && id === kept && isNarrowNav()) {
+      event.preventDefault();
+      onexpand?.();
+    }
+  }
 
   // Being on a new page counts as seeing it; the sign-in page, which belongs to applications, doesn't.
   if (current && isAnnouncedPage(window.location.pathname)) {
@@ -27,13 +47,20 @@
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- first-party icon drawings from pages.ts -->
-<nav class="pages glass" class:with-account={showsAccount()} aria-label={t('nav.pages')}>
+<nav
+  class="pages glass"
+  class:with-account={showsAccount()}
+  class:collapsed
+  aria-label={t('nav.pages')}
+>
   {#each PAGES as page (page.id)}
     <a
       class="tooltip"
       href={page.href}
       data-tooltip={t(page.label)}
       aria-current={page.id === current ? 'page' : undefined}
+      class:kept={page.id === kept}
+      onclick={(event) => onclick(event, page.id)}
     >
       <svg
         viewBox="0 0 16 16"
@@ -117,6 +144,12 @@
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
+  }
+
+  @media (width < 768px) {
+    .collapsed a:not(.kept) {
+      display: none;
+    }
   }
 
   @media (width >= 900px) {

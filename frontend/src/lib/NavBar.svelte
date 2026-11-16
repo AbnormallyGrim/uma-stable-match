@@ -4,16 +4,21 @@
   notes, a help button that starts the product tour if there is one, the theme switch and, at the
   far right for a person signed in with Discord, the account menu. It matches the website's navbar
   and stays at the top while scrolling: see-through at the top of the page, filling in over the
-  first scroll, as the name slides away behind the logo.
+  first scroll, as the name slides away behind the logo. On narrow screens the release notes, help,
+  language and theme buttons fold behind one button; opening it shrinks the pages pill to the current
+  page, and tapping that page swaps back.
 -->
 
 <script lang="ts">
+  import { tick } from 'svelte';
+
   import { showsAccount } from './account.svelte';
   import AccountMenu from './AccountMenu.svelte';
   import BrandLogo from './BrandLogo.svelte';
   import { t } from './i18n';
   import LanguageToggle from './LanguageToggle.svelte';
   import NavLinks from './NavLinks.svelte';
+  import { isNarrowNav, navTools } from './navTools.svelte';
   import { websiteUrl } from './pages';
   import ThemeToggle from './ThemeToggle.svelte';
 
@@ -36,24 +41,49 @@
   let scrollY = $state(0);
   // 0 at the top of the page, 1 once scrolled COLLAPSE_PX.
   const progress = $derived(Math.min(1, Math.max(0, scrollY / COLLAPSE_PX)));
+
+  let fold: HTMLButtonElement | undefined = $state();
+  let extra: HTMLDivElement | undefined = $state();
+
+  async function openTools() {
+    navTools.open = true;
+    await tick();
+    extra?.querySelector<HTMLElement>('button, input')?.focus();
+  }
+
+  async function closeTools() {
+    navTools.open = false;
+    await tick();
+    fold?.focus();
+  }
+
+  function onToolsKey(event: KeyboardEvent) {
+    if (event.key === 'Escape' && navTools.open && isNarrowNav()) {
+      closeTools();
+    }
+  }
 </script>
 
 <svelte:window bind:scrollY />
 
 <nav class="navbar" aria-label={t('nav.label')} style:--p={progress}>
-  <div class="inner" class:with-account={showsAccount()}>
+  <div class="inner" class:with-account={showsAccount()} class:tools-open={navTools.open}>
     <a class="brand" href={WEBSITE}>
       <BrandLogo size={40} />
       <span class="title">{t('app.name')}</span>
     </a>
-    <NavLinks />
-    <div class="tools">
+    <NavLinks collapsed={navTools.open} onexpand={closeTools} />
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="tools" onkeydown={onToolsKey}>
       <button
+        bind:this={fold}
         type="button"
-        class="round glass tooltip"
-        data-tooltip={t('nav.releases')}
-        aria-label={t('nav.releases')}
-        onclick={onreleases}
+        class="round glass tooltip fold"
+        data-tooltip={t('nav.more')}
+        aria-label={t('nav.more')}
+        aria-expanded={navTools.open}
+        aria-controls="nav-extra"
+        onclick={openTools}
       >
         <svg
           viewBox="0 0 16 16"
@@ -66,21 +96,21 @@
           stroke-linejoin="round"
           aria-hidden="true"
         >
-          <path d="M6.5 2.5 7.8 6.2l3.7 1.3-3.7 1.3-1.3 3.7-1.3-3.7-3.7-1.3 3.7-1.3z" />
-          <path d="M12.5 1.5v3M11 3h3" />
+          <path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7" />
+          <circle cx="10.5" cy="4.5" r="1.5" />
+          <circle cx="5.5" cy="11.5" r="1.5" />
         </svg>
         {#if unseen}
-          <span class="dot" data-testid="unseen-release" aria-hidden="true"></span>
+          <span class="dot" aria-hidden="true"></span>
         {/if}
       </button>
-      {#if onhelp}
+      <div class="extra" id="nav-extra" bind:this={extra}>
         <button
           type="button"
           class="round glass tooltip"
-          data-tooltip={t('nav.tour')}
-          data-tour="help"
-          aria-label={t('nav.tour')}
-          onclick={onhelp}
+          data-tooltip={t('nav.releases')}
+          aria-label={t('nav.releases')}
+          onclick={onreleases}
         >
           <svg
             viewBox="0 0 16 16"
@@ -93,14 +123,42 @@
             stroke-linejoin="round"
             aria-hidden="true"
           >
-            <circle cx="8" cy="8" r="6.25" />
-            <path d="M6.25 6.25a1.75 1.75 0 1 1 2.5 1.6c-.5.25-.75.65-.75 1.15v.25" />
-            <circle cx="8" cy="11.5" r=".5" fill="currentColor" stroke="none" />
+            <path d="M6.5 2.5 7.8 6.2l3.7 1.3-3.7 1.3-1.3 3.7-1.3-3.7-3.7-1.3 3.7-1.3z" />
+            <path d="M12.5 1.5v3M11 3h3" />
           </svg>
+          {#if unseen}
+            <span class="dot" data-testid="unseen-release" aria-hidden="true"></span>
+          {/if}
         </button>
-      {/if}
-      <LanguageToggle />
-      <ThemeToggle />
+        {#if onhelp}
+          <button
+            type="button"
+            class="round glass tooltip"
+            data-tooltip={t('nav.tour')}
+            data-tour="help"
+            aria-label={t('nav.tour')}
+            onclick={onhelp}
+          >
+            <svg
+              viewBox="0 0 16 16"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="8" cy="8" r="6.25" />
+              <path d="M6.25 6.25a1.75 1.75 0 1 1 2.5 1.6c-.5.25-.75.65-.75 1.15v.25" />
+              <circle cx="8" cy="11.5" r=".5" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+        {/if}
+        <LanguageToggle />
+        <ThemeToggle />
+      </div>
       <AccountMenu />
     </div>
   </div>
@@ -171,6 +229,33 @@
     flex: none;
     gap: 8px;
     align-items: center;
+  }
+
+  /* The fold button and its tools: on wide screens the tools sit in the row and the button hides. */
+  .round.fold {
+    display: none;
+  }
+
+  .extra {
+    display: contents;
+  }
+
+  @media (width < 768px) {
+    .inner {
+      gap: 8px 12px;
+    }
+
+    .tools {
+      gap: 6px;
+    }
+
+    .inner:not(.tools-open) .extra {
+      display: none;
+    }
+
+    .inner:not(.tools-open) .round.fold {
+      display: inline-flex;
+    }
   }
 
   /* Round, the height of the theme switch beside it. */
