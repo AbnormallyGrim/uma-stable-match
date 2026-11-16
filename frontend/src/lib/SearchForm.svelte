@@ -216,9 +216,6 @@
 </form>
 
 <style>
-  /* Two columns (field, options) on wide screens; one column below 720px. Translucent, so the
-     background artwork shows through. */
-  /* Raised above the cards after it, so the playstyle list can open over them. */
   .search {
     position: relative;
     z-index: 2;
@@ -237,7 +234,7 @@
 
   .row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
     gap: 16px 32px;
   }
 
