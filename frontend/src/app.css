@@ -72,23 +72,12 @@
   color-scheme: dark;
 }
 
-/* Theme-specific images: the background artwork and its strength, and .only-light and .only-dark
-   for elements that should show in one theme only. */
-:root {
-  --hero: url('./assets/brand/hero-light.webp');
-  --hero-opacity: 0.6;
-}
-
+/* .only-light and .only-dark, for elements that should show in one theme only. */
 .only-dark {
   display: none;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --hero: url('./assets/brand/hero-dark.webp');
-    --hero-opacity: 0.55;
-  }
-
   :root:not([data-theme='light']) .only-dark {
     display: revert;
   }
@@ -98,46 +87,12 @@
   }
 }
 
-:root[data-theme='dark'] {
-  --hero: url('./assets/brand/hero-dark.webp');
-  --hero-opacity: 0.55;
-}
-
 :root[data-theme='dark'] .only-dark {
   display: revert;
 }
 
 :root[data-theme='dark'] .only-light {
   display: none;
-}
-
-/* The top of the page, with the background artwork behind it, faded out towards its edges. */
-.hero {
-  position: relative;
-  isolation: isolate;
-}
-
-.hero::before {
-  position: absolute;
-  top: -24px;
-  left: 50%;
-  z-index: -1;
-  height: min(100% + 64px, 520px);
-  aspect-ratio: 1456 / 720;
-  content: '';
-  background: var(--hero) center / cover no-repeat;
-  opacity: var(--hero-opacity);
-  transform: translateX(-50%);
-  mask-image: radial-gradient(closest-side, #000 45%, transparent 100%);
-  pointer-events: none;
-}
-
-@media (width <= 720px) {
-  .hero::before {
-    top: auto;
-    bottom: -24px;
-    height: min(100%, 120vw);
-  }
 }
 
 *,

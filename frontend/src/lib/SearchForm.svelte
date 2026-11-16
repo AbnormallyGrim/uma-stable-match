@@ -72,49 +72,51 @@
     </label>
   </fieldset>
 
-  <div class="row">
-    {#if search.mode === 'trainer'}
-      <div class="field" data-tour="search-field">
-        <label class="label" for="trainer-id">{t('form.trainerId')}</label>
-        <input
-          id="trainer-id"
-          name="trainer_id"
-          inputmode="numeric"
-          autocomplete="off"
-          placeholder="123456789012"
-          bind:value={search.trainerId}
-          aria-invalid={errors.trainerId ? 'true' : undefined}
-          aria-describedby={errors.trainerId ? 'trainer-id-error' : undefined}
-        />
-        {#if errors.trainerId}
-          <p id="trainer-id-error" class="error">{errors.trainerId}</p>
-        {/if}
-        <label class="switch">
-          <input type="checkbox" role="switch" bind:checked={remember} />
-          <span class="track" aria-hidden="true"></span>
-          {t('form.remember')}
-        </label>
-      </div>
-    {:else}
-      <div class="field" data-tour="search-field">
-        <label class="label" for="pace">{t('form.paceLabel')}</label>
-        <input
-          id="pace"
-          name="pace"
-          inputmode="decimal"
-          autocomplete="off"
-          placeholder="7.6"
-          bind:value={search.paceMillions}
-          aria-invalid={errors.pace ? 'true' : undefined}
-          aria-describedby={errors.pace ? 'pace-error' : undefined}
-        />
-        {#if errors.pace}
-          <p id="pace-error" class="error">{errors.pace}</p>
-        {/if}
-      </div>
-    {/if}
+  {#if search.mode === 'trainer'}
+    <div class="field" data-tour="search-field">
+      <label class="label" for="trainer-id">{t('form.trainerId')}</label>
+      <input
+        id="trainer-id"
+        name="trainer_id"
+        inputmode="numeric"
+        autocomplete="off"
+        placeholder="123456789012"
+        bind:value={search.trainerId}
+        aria-invalid={errors.trainerId ? 'true' : undefined}
+        aria-describedby={errors.trainerId ? 'trainer-id-error' : undefined}
+      />
+      {#if errors.trainerId}
+        <p id="trainer-id-error" class="error">{errors.trainerId}</p>
+      {/if}
+      <label class="switch">
+        <input type="checkbox" role="switch" bind:checked={remember} />
+        <span class="track" aria-hidden="true"></span>
+        {t('form.remember')}
+      </label>
+    </div>
+  {:else}
+    <div class="field" data-tour="search-field">
+      <label class="label" for="pace">{t('form.paceLabel')}</label>
+      <input
+        id="pace"
+        name="pace"
+        inputmode="decimal"
+        autocomplete="off"
+        placeholder="7.6"
+        bind:value={search.paceMillions}
+        aria-invalid={errors.pace ? 'true' : undefined}
+        aria-describedby={errors.pace ? 'pace-error' : undefined}
+      />
+      {#if errors.pace}
+        <p id="pace-error" class="error">{errors.pace}</p>
+      {/if}
+    </div>
+  {/if}
 
-    <div class="field options">
+  <hr />
+
+  <div class="options" data-tour="filters">
+    <div class="column">
       <div class="group" data-tour="balance">
         <label class="switch">
           <input type="checkbox" role="switch" bind:checked={search.balance} />
@@ -134,7 +136,7 @@
           disabled={!search.balance}
         />
       </div>
-      <div class="group" data-tour="filters">
+      <div class="group">
         <label class="switch">
           <input type="checkbox" role="switch" bind:checked={search.includeFull} />
           <span class="track" aria-hidden="true"></span>
@@ -150,7 +152,14 @@
           <span class="track" aria-hidden="true"></span>
           {t('form.quickApply')}
         </label>
+        {#if search.hasDiscord}
+          <p class="warning" data-testid="discord-warning">{discordNote()}</p>
+        {/if}
+      </div>
+    </div>
 
+    <div class="column">
+      <div class="group">
         <span class="label" id="join-style-label">{t('form.joinStyle')}</span>
         <div class="join-styles" role="group" aria-labelledby="join-style-label">
           {#each JOIN_STYLES as style (style)}
@@ -187,7 +196,8 @@
             </button>
           {/each}
         </div>
-
+      </div>
+      <div class="group">
         <span class="label" id="playstyle-label">{t('form.playstyle')}</span>
         <Dropdown
           id="playstyle"
@@ -195,15 +205,11 @@
           options={playstyleOptions}
           bind:value={search.playstyle}
         />
-
-        {#if narrowed}
-          <p class="warning" data-testid="filter-warning">
-            {t('form.filterWarning')}
-          </p>
-        {/if}
       </div>
-      {#if search.hasDiscord}
-        <p class="warning" data-testid="discord-warning">{discordNote()}</p>
+      {#if narrowed}
+        <p class="warning" data-testid="filter-warning">
+          {t('form.filterWarning')}
+        </p>
       {/if}
     </div>
   </div>
@@ -216,26 +222,21 @@
 </form>
 
 <style>
+  /* The search, then the options in two columns (one below 720px). Raised above the cards after
+     it, so the playstyle list can open over them. */
   .search {
     position: relative;
     z-index: 2;
     display: grid;
     gap: 16px;
-    padding: 16px;
-    background: color-mix(in srgb, var(--card) 55%, transparent);
+    padding: 24px;
+    background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    backdrop-filter: blur(2px);
   }
 
-  .search > .segmented {
+  .segmented {
     justify-self: start;
-  }
-
-  .row {
-    display: grid;
-    grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
-    gap: 16px 32px;
   }
 
   .field {
@@ -253,7 +254,6 @@
 
   .field input:not([type]) {
     width: 100%;
-    max-width: 320px;
     font-variant-numeric: tabular-nums;
   }
 
@@ -265,27 +265,37 @@
 
   input[type='range'] {
     width: 100%;
-    max-width: 320px;
     margin: 0;
   }
 
-  /* Groups the tour highlights, laid out like the rest of the options column. */
-  .options .group {
+  hr {
+    width: 100%;
+    margin: 4px 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .options {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px 32px;
+  }
+
+  .column {
+    display: grid;
+    gap: 16px;
+    align-content: start;
+    min-width: 0;
+  }
+
+  .group {
     display: grid;
     gap: 6px;
     align-content: start;
   }
 
-  .options .switch + .slider-label {
+  .switch + .slider-label {
     margin-top: 2px;
-  }
-
-  .options .group + .group {
-    margin-top: 6px;
-  }
-
-  .options .label {
-    margin-top: 6px;
   }
 
   .join-styles {
@@ -354,13 +364,12 @@
   }
 
   @media (max-width: 720px) {
-    .row {
-      grid-template-columns: minmax(0, 1fr);
+    .search {
+      padding: 16px;
     }
 
-    .field input:not([type]),
-    input[type='range'] {
-      max-width: none;
+    .options {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .actions button {

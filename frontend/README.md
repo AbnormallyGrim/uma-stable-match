@@ -203,7 +203,9 @@ To announce something else later, change the copy and storage key in `announceme
 
 ## Search form
 
-The form sits in a card. The "Search by" switch is at the top, then the field on the left and the options on the right, with **Find clubs** at the bottom right. Below 720 pixels it becomes a single column, and the inputs and button use the full width.
+The search page opens with a "Find your club" heading and a one-line intro, then the form and "How to use" in a centred column up to 760 pixels wide. Results below use the full page width.
+
+The form sits in a card. The "Search by" switch is at the top, then the field across the card's full width, with the remember switch under it in trainer ID mode. Under a divider the options sit in two columns: balance scoring and the on/off filters on the left, join style and playstyle on the right, with **Find clubs** at the bottom right. Below 720 pixels the options become a single column and the button uses the full width. The tour's "Narrow your search" step highlights both columns, since its filters are on both sides.
 
 The form searches by **trainer ID** or by **daily pace**, with an optional **balance scoring** switch and strength slider (0 to 1, in steps of 0.05), an **include full clubs** switch, **join style** buttons and a **playstyle** dropdown.
 
@@ -326,12 +328,9 @@ The palette follows the project's logo and website: navy with a gold accent in t
 
 ### Brand artwork
 
-The logo and the background artwork each have a light and a dark version in `src/assets/brand/`, made from the originals in [`docs/images/`](../docs/images/): `logo.jpeg`, `hero.jpeg` and their `-light` versions.
+The logo has a light and a dark version in `src/assets/brand/`, made from the originals in [`docs/images/`](../docs/images/): `logo.jpeg` and `logo-light.jpeg`. The app has no background artwork; the website still uses `hero.jpeg`.
 
 - **Logo.** `BrandLogo.svelte` shows the logo in the navbar and the footer. It renders both versions, and the `.only-light` and `.only-dark` classes in `app.css` show the one for the current theme, whether it comes from the system or the theme switch.
-- **Background.** The search form and "How to use" sit in a `.hero` section. Its `::before` shows the wide artwork (`--hero`), dimmed by `--hero-opacity` and faded to transparent towards its edges with a radial mask, so no box shows whatever the image's background colour. It's anchored to the top of the section, and up to 720 pixels wide to the bottom, so on phones it sits behind the form rather than the title. It stays inside the section, so it never shows behind results or the footer.
-- **Search form.** The form's card is translucent with a slight blur, so the artwork shows through it.
-- **Alignment.** The light and dark artwork are aligned so their outlines lie on top of each other. Keep them aligned when replacing either: measure the drawing in both, and scale and centre the light version to match.
 - **Icons.** The language button's icon is "translate" from [Bootstrap Icons](https://icons.getbootstrap.com/) (MIT licence). `public/favicon-32.png` and `public/apple-touch-icon.png` are the dark logo at 32 and 180 pixels.
 
 ### Page width

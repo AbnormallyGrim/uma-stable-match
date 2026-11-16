@@ -7,7 +7,8 @@ import type { Catalog } from './en';
 
 export const ja: Catalog = {
   'app.name': 'Uma Stable Match',
-  'app.heading': 'Uma Stable Match サークル検索',
+  'app.heading': 'サークルを探そう',
+  'app.intro': 'トレーナーIDを入力すると、あなたのペースに合うサークルを順位付けします。',
   'app.found': ({ n }) => `${n}件のサークルが見つかりました。`,
 
   'nav.label': 'メインメニュー',

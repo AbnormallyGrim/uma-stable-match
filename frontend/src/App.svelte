@@ -120,8 +120,11 @@
 <NavBar onhelp={() => (touring = true)} onreleases={openReleases} unseen={unseenRelease} />
 
 <main>
-  <div class="hero">
-    <h1 class="visually-hidden">{t('app.heading')}</h1>
+  <div class="finder">
+    <header class="intro">
+      <h1>{t('app.heading')}</h1>
+      <p>{t('app.intro')}</p>
+    </header>
     <SearchForm {initial} remember={remembered !== null} {busy} {onsearch} />
     <HowToUse />
   </div>
@@ -146,3 +149,27 @@
 {:else if announce && !hasSeenAnnouncement(storage)}
   <Announcement />
 {/if}
+
+<style>
+  /* The search, centred above the full-width results. */
+  .finder {
+    max-width: 760px;
+    margin: 8px auto 0;
+  }
+
+  .intro {
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .intro h1 {
+    margin: 0 0 8px;
+    font-size: clamp(1.6rem, 4vw, 2rem);
+    line-height: 1.2;
+  }
+
+  .intro p {
+    margin: 0;
+    color: var(--text-2);
+  }
+</style>
