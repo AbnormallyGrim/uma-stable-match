@@ -31,13 +31,15 @@
 
     <nav aria-label={t('footer.links')}>
       <button type="button" onclick={() => open(`${REPO}/issues`)}>{t('footer.report')}</button>
-      <button type="button" class="kofi" onclick={() => open(KOFI)}
-        ><span aria-hidden="true">🥕</span> {t('footer.kofi')}</button
-      >
+      <button type="button" class="kofi" onclick={() => open(KOFI)}>
+        <span aria-hidden="true">🥕</span>
+        {t('footer.kofi')}
+      </button>
       {#if aprilFools}
-        <button type="button" class="carats" onclick={() => open(FREE_CARATS)}
-          ><img src={carats} alt="" width="20" height="20" /> {t('footer.carats')}</button
-        >
+        <button type="button" class="carats" onclick={() => open(FREE_CARATS)}>
+          <img src={carats} alt="" width="20" height="20" />
+          {t('footer.carats')}
+        </button>
       {/if}
     </nav>
     <p class="support">{t('footer.support')}</p>
@@ -49,13 +51,13 @@
     </div>
 
     <p class="policy">
-      <a href={`${websiteUrl(window.location)}/privacy/`} target="_blank" rel="noopener noreferrer"
-        >{t('footer.privacy')}</a
-      >
+      <a href={`${websiteUrl(window.location)}/privacy/`} target="_blank" rel="noopener noreferrer">
+        {t('footer.privacy')}
+      </a>
       <span aria-hidden="true">·</span>
-      <a href={`${websiteUrl(window.location)}/terms/`} target="_blank" rel="noopener noreferrer"
-        >{t('footer.terms')}</a
-      >
+      <a href={`${websiteUrl(window.location)}/terms/`} target="_blank" rel="noopener noreferrer">
+        {t('footer.terms')}
+      </a>
     </p>
   </div>
 </footer>

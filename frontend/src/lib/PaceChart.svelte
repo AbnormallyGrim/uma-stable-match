@@ -264,22 +264,25 @@
         <g class="grid">
           {#each yTicks as tick (tick)}
             <line x1={PAD.left} x2={PAD.left + plotWidth} y1={y(tick)} y2={y(tick)} />
-            <text x={PAD.left - 8} y={y(tick)} dy="0.32em" text-anchor="end">{tickLabel(tick)}</text
-            >
+            <text x={PAD.left - 8} y={y(tick)} dy="0.32em" text-anchor="end">
+              {tickLabel(tick)}
+            </text>
           {/each}
           {#each xTicks as day (day)}
             <text x={x(day)} y={HEIGHT - 28} text-anchor="middle">{day + 1}</text>
           {/each}
-          <text class="axis" x={PAD.left + plotWidth / 2} y={HEIGHT - 6} text-anchor="middle"
-            >{t('chart.axisDay')}</text
-          >
+          <text class="axis" x={PAD.left + plotWidth / 2} y={HEIGHT - 6} text-anchor="middle">
+            {t('chart.axisDay')}
+          </text>
           <text
             class="axis"
             transform="rotate(-90)"
             x={-(PAD.top + plotHeight / 2)}
             y="14"
-            text-anchor="middle">{t(mode === 'daily' ? 'chart.axisDaily' : 'chart.axisMonth')}</text
+            text-anchor="middle"
           >
+            {t(mode === 'daily' ? 'chart.axisDaily' : 'chart.axisMonth')}
+          </text>
         </g>
         {#each members as series, i (i)}
           <path class="member" d={path(series)} />
@@ -331,9 +334,9 @@
           {#each yours as line, i (line.label)}
             {#if readout.yours[i] !== null && readout.yours[i] !== undefined}
               <p>
-                <span class="key yours" style:border-color={line.colour}></span><b
-                  >{format(readout.yours[i])}</b
-                >
+                <span class="key yours" style:border-color={line.colour}></span><b>
+                  {format(readout.yours[i])}
+                </b>
                 {line.label}
               </p>
             {/if}
@@ -352,9 +355,9 @@
           {/if}
           {#if readout.low !== null && readout.high !== null}
             <p>
-              <span class="key members"></span><b
-                >{t('chart.range', { low: format(readout.low), high: format(readout.high) })}</b
-              >
+              <span class="key members"></span><b>
+                {t('chart.range', { low: format(readout.low), high: format(readout.high) })}
+              </b>
               {t('chart.members')}
             </p>
           {/if}

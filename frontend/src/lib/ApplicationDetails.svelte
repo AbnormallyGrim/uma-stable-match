@@ -63,9 +63,9 @@
       <h2 id="application-title">
         {t('leader.details.heading', { name: application.trainerName })}
       </h2>
-      <button type="button" bind:this={closeButton} onclick={close}
-        >{t('leader.details.close')}</button
-      >
+      <button type="button" bind:this={closeButton} onclick={close}>
+        {t('leader.details.close')}
+      </button>
     </header>
     <p class="muted">{t('leader.details.intro')}</p>
     <div class="embed">

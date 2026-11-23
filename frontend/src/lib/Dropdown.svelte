@@ -167,8 +167,10 @@
       stroke-width="1.5"
       stroke-linecap="round"
       stroke-linejoin="round"
-      aria-hidden="true"><path d="m3 4.5 3 3 3-3" /></svg
+      aria-hidden="true"
     >
+      <path d="m3 4.5 3 3 3-3" />
+    </svg>
   </button>
   {#if open}
     <ul id="{id}-list" class="list" role="listbox" aria-labelledby={labelledby} bind:this={list}>
@@ -195,8 +197,10 @@
               stroke-width="1.75"
               stroke-linecap="round"
               stroke-linejoin="round"
-              aria-hidden="true"><path d="m2.5 6.5 2.5 2.5 4.5-5" /></svg
+              aria-hidden="true"
             >
+              <path d="m2.5 6.5 2.5 2.5 4.5-5" />
+            </svg>
           {/if}
         </li>
       {/each}

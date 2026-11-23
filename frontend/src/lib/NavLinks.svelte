@@ -71,8 +71,10 @@
         stroke-width="1.5"
         stroke-linecap="round"
         stroke-linejoin="round"
-        aria-hidden="true">{@html page.icon}</svg
+        aria-hidden="true"
       >
+        {@html page.icon}
+      </svg>
       <span class="label">{t(page.label)}</span>
       {#if fresh(page.id)}
         <span class="new-badge"><span class="new-badge-text">{t('nav.new')}</span></span>

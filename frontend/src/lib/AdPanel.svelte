@@ -189,8 +189,10 @@
                 <a
                   class="button-link"
                   href={applyUrl(invite.clubId)}
-                  aria-label={t('ad.invites.applyTo', { club })}>{t('ad.invites.apply')}</a
+                  aria-label={t('ad.invites.applyTo', { club })}
                 >
+                  {t('ad.invites.apply')}
+                </a>
                 <button
                   type="button"
                   onclick={() => dismiss(invite.clubId)}

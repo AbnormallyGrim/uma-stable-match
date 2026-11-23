@@ -498,8 +498,9 @@
                     aria-label={t('compare.remove', { name: labels[row.candidate] ?? '' })}
                     disabled={ids.length === 1}
                     onclick={() => setIds(ids.filter((id) => id !== String(trainer.trainer_id)))}
-                    >×</button
                   >
+                    ×
+                  </button>
                 </div>
               {:else}
                 {@const member = page.details.members[row.member!]!}

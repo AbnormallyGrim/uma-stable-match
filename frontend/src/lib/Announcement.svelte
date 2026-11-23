@@ -34,8 +34,10 @@
         stroke-width="1.5"
         stroke-linecap="round"
         stroke-linejoin="round"
-        aria-hidden="true">{@html page.icon}</svg
+        aria-hidden="true"
       >
+        {@html page.icon}
+      </svg>
     </span>
     <span class="text">
       <strong>{t(page.label)}</strong>
@@ -51,8 +53,10 @@
       stroke-width="1.5"
       stroke-linecap="round"
       stroke-linejoin="round"
-      aria-hidden="true"><path d="m6 3 5 5-5 5" /></svg
+      aria-hidden="true"
     >
+      <path d="m6 3 5 5-5 5" />
+    </svg>
   </a>
 {/snippet}
 
@@ -64,9 +68,9 @@
       <li>{@render card(applications, 'announce.applications')}</li>
     </ul>
     <div class="actions">
-      <button type="button" class="later" onclick={() => (open = false)}
-        >{t('announce.dismiss')}</button
-      >
+      <button type="button" class="later" onclick={() => (open = false)}>
+        {t('announce.dismiss')}
+      </button>
     </div>
   </Modal>
 {/if}

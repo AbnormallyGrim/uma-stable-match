@@ -40,9 +40,9 @@
     {:else}
       <p>{t('status.rateLimitedDone')}</p>
     {/if}
-    <button type="button" onclick={onretry} disabled={status.retryIn > 0}
-      >{t('status.tryAgain')}</button
-    >
+    <button type="button" onclick={onretry} disabled={status.retryIn > 0}>
+      {t('status.tryAgain')}
+    </button>
   </div>
 {:else if status.phase === 'error'}
   <div class="status error" role="alert">

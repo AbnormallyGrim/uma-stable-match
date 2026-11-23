@@ -33,8 +33,9 @@
   href={clubPath(circleId, trainerId)}
   aria-label={spoken}
   onclick={() => rememberSearch(storage, window.location.href)}
-  >{label} <span aria-hidden="true">→</span></a
 >
+  {label} <span aria-hidden="true">→</span>
+</a>
 
 <style>
   .members {
