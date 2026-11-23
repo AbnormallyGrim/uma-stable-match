@@ -123,17 +123,16 @@
 <form class="card" aria-labelledby="settings-heading" onsubmit={save}>
   <h2 id="settings-heading">{t('leader.settings.heading')}</h2>
   <label class="switch-row">
-    <span
-      ><strong>{t('leader.settings.open')}</strong><small>{t('leader.settings.openHint')}</small
-      ></span
-    >
+    <span>
+      <strong>{t('leader.settings.open')}</strong><small>{t('leader.settings.openHint')}</small>
+    </span>
     <input type="checkbox" role="switch" bind:checked={open} />
   </label>
   <label class="switch-row">
     <span>
-      <strong>{t('leader.settings.autoJoin')}</strong><small
-        >{t('leader.settings.autoJoinHint')}</small
-      >
+      <strong>{t('leader.settings.autoJoin')}</strong><small>
+        {t('leader.settings.autoJoinHint')}
+      </small>
     </span>
     <input type="checkbox" role="switch" bind:checked={autoJoin} />
   </label>
@@ -148,11 +147,9 @@
     {/each}
     {#if nameMode !== 'default'}
       <label class="text-field">
-        <span
-          >{t(
-            nameMode === 'prefix' ? 'leader.ticket.prefixLabel' : 'leader.ticket.overrideLabel',
-          )}</span
-        >
+        <span>
+          {t(nameMode === 'prefix' ? 'leader.ticket.prefixLabel' : 'leader.ticket.overrideLabel')}
+        </span>
         <input
           type="text"
           bind:value={nameText}
@@ -189,8 +186,9 @@
     <p role="alert">{t('leader.remove.confirm')}</p>
     <div class="actions">
       <button class="danger" type="button" onclick={remove}>{t('leader.remove.yes')}</button>
-      <button type="button" onclick={() => (confirming = false)}>{t('leader.remove.cancel')}</button
-      >
+      <button type="button" onclick={() => (confirming = false)}>
+        {t('leader.remove.cancel')}
+      </button>
     </div>
   {:else}
     <button class="danger" type="button" onclick={() => (confirming = true)}>

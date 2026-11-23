@@ -323,9 +323,9 @@
           {mine === null ? t('ads.post') : t('ads.myAd')}
         </button>
       {:else}
-        <a class="button-link" data-tour="board-post" href={loginUrl(boardPath(true))}
-          >{t('ads.signInToPost')}</a
-        >
+        <a class="button-link" data-tour="board-post" href={loginUrl(boardPath(true))}>
+          {t('ads.signInToPost')}
+        </a>
       {/if}
     </div>
   {/if}
@@ -414,8 +414,10 @@
                       class="name"
                       href={profileUrl(ad.trainerId)}
                       target="_blank"
-                      rel="noopener noreferrer">{ad.trainerName}</a
+                      rel="noopener noreferrer"
                     >
+                      {ad.trainerName}
+                    </a>
                     <span class="muted">{ad.currentClub ?? t('ads.table.noClub')}</span>
                   </div>
                 </div>
@@ -485,8 +487,10 @@
                       class="name"
                       href={profileUrl(ad.trainerId)}
                       target="_blank"
-                      rel="noopener noreferrer">{ad.trainerName}</a
+                      rel="noopener noreferrer"
                     >
+                      {ad.trainerName}
+                    </a>
                     <span class="muted">{ad.trainerId}</span>
                     <span class="muted">{ad.currentClub ?? t('ads.table.noClub')}</span>
                   </td>
@@ -542,9 +546,9 @@
             >
               {t('ads.page.prev')}
             </button>
-            <span role="status"
-              >{t('ads.page.status', { page: board.page, pages: board.pages })}</span
-            >
+            <span role="status">
+              {t('ads.page.status', { page: board.page, pages: board.pages })}
+            </span>
             <button
               type="button"
               onclick={() => (page = board.page + 1)}

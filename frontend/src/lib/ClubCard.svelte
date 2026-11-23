@@ -38,8 +38,10 @@
         class="name"
         href={club.url}
         target="_blank"
-        rel="noopener noreferrer">{club.name}</a
+        rel="noopener noreferrer"
       >
+        {club.name}
+      </a>
       <ClubTags {club} />
     </div>
   </div>

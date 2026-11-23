@@ -39,9 +39,9 @@
 </dl>
 <p class="data-age" data-testid="data-age">
   {t('summary.updated')}
-  <time datetime={result.updated_at} title={result.updated_at}
-    >{formatUpdated(result.updated_at)}</time
-  >.
+  <time datetime={result.updated_at} title={result.updated_at}>
+    {formatUpdated(result.updated_at)}
+  </time>.
 </p>
 
 <style>

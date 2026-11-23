@@ -192,9 +192,9 @@
           >
             <button type="button" onclick={() => sortBy(column)}>
               {t(column.label)}
-              <span class="arrow" aria-hidden="true"
-                >{sortKey === column.key ? (direction === 'ascending' ? '▲' : '▼') : ''}</span
-              >
+              <span class="arrow" aria-hidden="true">
+                {sortKey === column.key ? (direction === 'ascending' ? '▲' : '▼') : ''}
+              </span>
             </button>
           </th>
         {/each}

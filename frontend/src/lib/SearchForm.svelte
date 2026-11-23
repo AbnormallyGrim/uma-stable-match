@@ -123,9 +123,9 @@
           <span class="track" aria-hidden="true"></span>
           {t('form.balanceScoring')}
         </label>
-        <label class="slider-label" for="balance-weight"
-          >{t('form.balanceStrength', { value: search.balanceWeight.toFixed(2) })}</label
-        >
+        <label class="slider-label" for="balance-weight">
+          {t('form.balanceStrength', { value: search.balanceWeight.toFixed(2) })}
+        </label>
         <input
           id="balance-weight"
           type="range"
@@ -215,9 +215,9 @@
   </div>
 
   <div class="actions">
-    <button class="primary" data-tour="find" type="submit" disabled={busy}
-      >{busy ? t('form.searching') : t('form.find')}</button
-    >
+    <button class="primary" data-tour="find" type="submit" disabled={busy}>
+      {busy ? t('form.searching') : t('form.find')}
+    </button>
   </div>
 </form>
 

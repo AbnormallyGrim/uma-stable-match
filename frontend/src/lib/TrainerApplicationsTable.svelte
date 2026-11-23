@@ -85,9 +85,9 @@
             <td data-label={t('leader.table.submitted')}>
               {day(new Date(application.submittedAt))}
             </td>
-            <td data-label={t('trainer.table.expires')}
-              >{day(expiresAt(application.submittedAt))}</td
-            >
+            <td data-label={t('trainer.table.expires')}>
+              {day(expiresAt(application.submittedAt))}
+            </td>
             <td data-label={t('leader.table.status')}>
               <span class="tag {application.status}">
                 {t(`leader.applicationStatus.${application.status}`)}

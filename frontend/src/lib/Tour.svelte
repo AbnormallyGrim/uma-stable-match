@@ -185,9 +185,9 @@
       {#if index > 0}
         <button type="button" onclick={() => go(index - 1)}>{t('tour.back')}</button>
       {/if}
-      <button type="button" class="primary" onclick={() => (last ? close() : go(index + 1))}
-        >{last ? t('tour.done') : t('tour.next')}</button
-      >
+      <button type="button" class="primary" onclick={() => (last ? close() : go(index + 1))}>
+        {last ? t('tour.done') : t('tour.next')}
+      </button>
     </div>
   </div>
 </div>

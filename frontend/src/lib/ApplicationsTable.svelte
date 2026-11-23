@@ -92,8 +92,10 @@
               <button
                 type="button"
                 aria-label={t('leader.table.viewFor', { name: application.trainerName })}
-                onclick={() => (showing = application)}>{t('leader.table.view')}</button
+                onclick={() => (showing = application)}
               >
+                {t('leader.table.view')}
+              </button>
             </td>
           </tr>
         {/each}
