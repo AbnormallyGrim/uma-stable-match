@@ -118,7 +118,7 @@ To keep your email address out of commits, turn on **Keep my email addresses pri
 
 ### Website
 
-The project's page lives in `site/`: one `index.html` with its styles inline, `index.md`, `robots.txt`, `sitemap.xml` and `images/`. There's no build step.
+The project's page lives in `site/`: one `index.html` with its styles inline, `index.md`, `robots.txt`, `sitemap.xml`, `favicon.ico` (a copy of the web app's) and `images/`. There's no build step.
 
 - **Publishing.** The server serves `site/` at <https://umastable.com/> from the same Fly.io machine as the app at <https://app.umastable.com>, and `www.umastable.com` redirects there. A push to `main` that changes `site/` deploys it with the server, through the Deploy workflow. See [Serving the website](backend/server/README.md#serving-the-website).
 - **Inline code.** The page's security policy allows its inline `<script>` and `<style>` elements by hash, which the server works out at startup. Inline event handlers (`onclick=`) and `style=` attributes are blocked, so don't add any.

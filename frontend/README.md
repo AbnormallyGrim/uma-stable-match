@@ -50,7 +50,7 @@ CI runs `check`, `lint`, `test` and `build` on Node 22 for every push to `main` 
 ```
 index.html                    Page shell
 public/theme-init.js          Applies the saved theme before the page renders
-public/favicon-32.png         Browser icon, with apple-touch-icon.png for home screens
+public/favicon-32.png         Browser icon, with apple-touch-icon.png for home screens and favicon.ico for clients that ask for it
 src/main.ts                   Mounts the search, the club page for a /club/ address, a club applications page or the settings page
 src/App.svelte                Root component: runs searches and keeps them in the URL
 src/lib/route.ts              Which page an address shows, and club, wishlist, club applications and settings page addresses
@@ -338,7 +338,7 @@ The palette follows the project's logo and website: navy with a gold accent in t
 The logo has a light and a dark version in `src/assets/brand/`, made from the originals in [`docs/images/`](../docs/images/): `logo.jpeg` and `logo-light.jpeg`. The app has no background artwork; the website still uses `hero.jpeg`.
 
 - **Logo.** `BrandLogo.svelte` shows the logo in the navbar and the footer. It renders both versions, and the `.only-light` and `.only-dark` classes in `app.css` show the one for the current theme, whether it comes from the system or the theme switch.
-- **Icons.** The language button's icon is "translate" from [Bootstrap Icons](https://icons.getbootstrap.com/) (MIT licence). `public/favicon-32.png` and `public/apple-touch-icon.png` are the dark logo at 32 and 180 pixels.
+- **Icons.** The language button's icon is "translate" from [Bootstrap Icons](https://icons.getbootstrap.com/) (MIT licence). `public/favicon-32.png` and `public/apple-touch-icon.png` are the dark logo at 32 and 180 pixels. `public/favicon.ico` holds it at 16, 32 and 48 pixels, made from the 180-pixel one, for browsers and bots that request `/favicon.ico` without reading the page. `site/favicon.ico` is a copy.
 
 ### Page width
 
