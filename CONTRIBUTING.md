@@ -77,9 +77,9 @@ npm test
 
 Run `npm run format` to fix formatting. See the [frontend README](frontend/README.md) for every script.
 
-### End-to-end test
+### End-to-end tests
 
-A Playwright test loads the built page served by the real server, with made-up clubs and Cloudflare's always-pass Turnstile test keys, and runs a search by daily pace. It runs after every merge to `main`, and the deploy waits for it to pass. A failure comments on the merged pull request and opens or updates an issue labelled `e2e-failure`. Pull requests don't run it. To run it locally, which needs both Rust and Node:
+Playwright tests load the built page served by the real server, with made-up clubs, a mock Discord, a throwaway Redis and Cloudflare's always-pass Turnstile test keys. They cover searching, the club page, signing in, linking a trainer, adding the bot, applying and the recruitment board. They run on pull requests that change the frontend or backend, and after every merge to `main`. A failure on `main` comments on the merged pull request and opens or updates an issue labelled `e2e-failure`. To run them locally, which needs Rust, Node and `redis-server`:
 
 ```bash
 cd frontend
@@ -87,7 +87,7 @@ npx playwright install chromium
 npm run e2e
 ```
 
-You only need to install the browser once. The frontend README's [End-to-end test](frontend/README.md#end-to-end-test) section explains how it works.
+You only need to install the browser once. The frontend README's [End-to-end tests](frontend/README.md#end-to-end-tests) section explains how they work.
 
 ## Keep personal information out
 

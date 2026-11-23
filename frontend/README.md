@@ -41,7 +41,7 @@ $env:API_TARGET="http://127.0.0.1:3000"; npm run dev
 | `npm run lint` | Runs ESLint, then checks formatting with Prettier |
 | `npm run format` | Formats the code with Prettier |
 | `npm test` | Runs the component tests once with Vitest |
-| `npm run e2e` | Runs the [end-to-end test](#end-to-end-test) with Playwright |
+| `npm run e2e` | Runs the [end-to-end tests](#end-to-end-tests) with Playwright |
 
 CI runs `check`, `lint`, `test` and `build` on Node 22 for every push to `main` and every pull request that changes `frontend/`.
 
@@ -579,15 +579,28 @@ try {
 - **Prettier** uses single quotes and 100-character lines. Markdown files are left alone.
 - **Tests** use Vitest with jsdom and [Testing Library](https://testing-library.com/docs/svelte-testing-library/intro). Stub `fetch` with `vi.stubGlobal` rather than calling a real server.
 
-## End-to-end test
+## End-to-end tests
 
-`e2e/` holds a [Playwright](https://playwright.dev) test that drives the built page in Chromium against the real server: it searches by daily pace and checks for top picks and the results table. It catches broken wiring between the page, the human check and the server that the component tests, with their stubbed `fetch`, can't.
+`e2e/` holds [Playwright](https://playwright.dev) tests that drive the built page in Chromium against the real server. They catch broken wiring between the page, the human check, the server, Redis and Discord that the component tests, with their stubbed `fetch`, can't.
 
-- **Server.** `playwright.config.ts` builds the page, then starts the server's [`fixture_server` example](../backend/server/README.md#fixture-clubs) on port 8181, serving `dist/` with made-up clubs instead of uma.moe. A cold build of the server takes a few minutes.
+| File | Covers |
+| --- | --- |
+| `search.spec.ts` | Searching by pace and by trainer ID, refused and unknown IDs, the join style filter and the link to a club page |
+| `pages.spec.ts` | The club page, the wishlist, the public board, the old board address, sign-in redirects and the navbar |
+| `account.spec.ts` | Signing in, out and cancelling, deleting the account, a forged callback, and linking a trainer |
+| `applications.spec.ts` | A leader adding the bot, pausing and removing it, and a trainer applying with Quick Apply while the leader sees the application |
+| `board.spec.ts` | Posting a listing, seeing it signed out and deleting it |
+| `a11y.spec.ts` | axe on each page, signed in and out, in both themes |
+| `mobile.spec.ts` | The folded navbar and a search on a phone-sized screen (the `mobile` project) |
+
+- **Servers.** `playwright.config.ts` starts a throwaway Redis on port 6391, builds the page, then starts the server's [`fixture_server` example](../backend/server/README.md#fixture-clubs) on port 8181 with made-up clubs instead of uma.moe and a mock Discord on port 8182. Every setting is a made-up value. A cold build of the server takes a few minutes.
+- **Signing in.** Tests sign in through the real Discord sign-in, with the mock's page standing in for Discord's. `e2e/fixtures.ts` has the helpers: `signIn`, `linkTrainer` (sets the trainer's profile comment through the mock, then checks it), and `setUpClub` (links a club's leader and adds the bot). Each test signs in as a new Discord ID from `newDiscordId`, and tests that set up a club each use their own.
+- **Data.** Each run starts by deleting Redis's `discord:` keys, so no sessions, links, clubs or listings carry over. Loaded clubs stay.
 - **Human check.** The server uses Cloudflare's always-pass Turnstile test keys, so the check runs for real without anything to solve. Turnstile's script and token check still call Cloudflare.
-- **Running it.** It needs Rust as well as Node. Install the browser once with `npx playwright install chromium`, then run `npm run e2e`. Locally, a server already running on port 8181 is reused.
+- **Running them.** They need Rust, Node and `redis-server`. Install the browser once with `npx playwright install chromium`, then run `npm run e2e`. Locally, Redis and a server already running on their ports are reused. Run one file with `npx playwright test e2e/search.spec.ts`, or watch with `--headed` or `--ui`.
+- **Known bug.** The test for a cancelled sign-in is marked `test.fail()`: a failed sign-in sends the visitor to the login page, which doesn't show the error. Playwright reports it once that's fixed, and the mark can go.
 - **Failures.** A failed test keeps a trace in `test-results/`; open it with `npx playwright show-trace <path to trace.zip>`.
-- **In CI.** After CI passes on `main`, the Deploy workflow runs the test, and deploys only if it passes. Pull requests don't run it. A failed run uploads the HTML report and traces as the `e2e-report` artifact. It also comments on the merged pull request and opens an issue labelled `e2e-failure`, or comments on the one already open. Close that issue once the test passes again.
+- **In CI.** The End-to-end test workflow runs them on pull requests that change the frontend, the backend or the workflow, and again after CI passes on `main`. A failed run uploads the HTML report and traces as the `e2e-report` artifact. A failure on `main` also comments on the merged pull request and opens an issue labelled `e2e-failure`, or comments on the one already open. Close that issue once the tests pass again.
 
 ## Analytics
 
