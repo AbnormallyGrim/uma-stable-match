@@ -1,12 +1,25 @@
 name: End-to-end test
 
-# Runs the end-to-end test after CI passes for a push to main. Deploys run by hand from the Deploy
-# workflow.
+# Runs the end-to-end tests on pull requests that change the page, the backend or this workflow,
+# and after CI passes for a push to main. Deploys run by hand from the Deploy workflow.
 on:
+  pull_request:
+    paths:
+      - frontend/**
+      - backend/**
+      - Cargo.lock
+      - Cargo.toml
+      - rust-toolchain.toml
+      - .github/workflows/e2e.yml
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
+
+# A new push to a pull request cancels its earlier run.
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 # No permissions by default; each job asks only for what it needs.
 permissions: {}
@@ -14,12 +27,14 @@ permissions: {}
 jobs:
   e2e:
     name: End-to-end test
-    # Matches CI runs for pushes to this repository's main. The event and repository checks exclude
-    # pull requests from a fork's main branch.
+    # Pull requests, and CI runs for pushes to this repository's main. The event and repository
+    # checks exclude pull requests from a fork's main branch.
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+      github.event_name == 'pull_request' || (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,6 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # The tested commit on main; empty for a pull request, which checks out its own.
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
 
@@ -52,8 +68,13 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      # Builds the page and the fixture server, then runs the test. See the frontend README.
-      - name: End-to-end test
+      # Playwright starts its own throwaway Redis with this.
+      - name: Install Redis
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends redis-server
+
+      # Starts Redis, builds the page and the fixture server, then runs the tests. See the frontend
+      # README.
+      - name: End-to-end tests
         run: npm run e2e
 
       - name: Upload report
@@ -66,12 +87,12 @@ jobs:
             frontend/test-results/
           retention-days: 14
 
-  # Comments on the merged pull request, and opens the e2e-failure issue or comments on the open
-  # one, so repeated failures share one issue.
+  # For a failure on main: comments on the merged pull request, and opens the e2e-failure issue or
+  # comments on the open one, so repeated failures share one issue.
   report:
     name: Report end-to-end failure
     needs: e2e
-    if: failure()
+    if: failure() && github.event_name == 'workflow_run'
     runs-on: ubuntu-latest
     permissions:
       issues: write # Create the label, and open or comment on the issue.
