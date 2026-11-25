@@ -141,7 +141,7 @@ Every dashboard links to the other three at the top, keeping the time range. The
 | Overview | Searches | Searches in the dashboard's time range, the total since launch, the same by status code, and searches per hour |
 | | Health | Redis up or down, time since the last successful scan, and uma.moe calls without a 2xx answer in the last hour |
 | | Web traffic | Requests per second by route and status code, error responses, response times, rate-limited visitors and a count of each status code in the dashboard's time range |
-| | Errors | Warnings and errors logged per hour, and a table of them by the file and line that logged them. Each file links to [Sentry Logs](#links-to-sentry) |
+| | Errors | Warnings and errors logged per hour, and a table of them by app and the file and line that logged them. Each file links to [Sentry Logs](#links-to-sentry) |
 | Search quality | Search depth | How deep into the rankings searches go (worst shortlisted and top-pick rank, median and 90th percentile), the share of searches that reached the slowest clubs in the pool, and searches by deepest shortlisted rank |
 | | Club pool | Clubs in the pool, clubs with an exact median, and the calibration factor and samples |
 | Data pipeline | Scan and refresh | Phase, refresh counts for joinable clubs (loaded, scheduled and due), clubs listed, time since the last successful scan, scans finished, scan duration, club details loaded as a percentage of the scheduled clubs (in Redis with Redis), what the instance did when a scan was due, how long the longest-waiting due club has waited, and the same counts and percentage loaded for full clubs and for the lower range |
@@ -151,11 +151,15 @@ Every dashboard links to the other three at the top, keeping the time range. The
 
 The Data pipeline dashboard also works when a separate app runs the scans and refreshes and the site is [serve-only](../backend/server/README.md#serve-only-instances). The phase and clubs listed come from whichever instance is scanning, and the last scan and refresh counts are the same on every instance, so these show once, as the highest any instance reports. The rest are per app, split by Fly's `app` label; a local Prometheus has no such label, so there the legends show no app name.
 
+The Overview's **App** picker at the top limits every panel to the chosen Fly apps, all of them by default, so a separate app such as a sync worker shows up there too. A local Prometheus has no apps, so the picker stays empty and the panels show everything.
+
 Per-hour bars line up with whole hours, so they fill in once there's an hour of data. Some panels stay empty until something happens: Redis panels need `REDIS_URL`, error panels need errors, and rates need about a minute of data.
 
 ### Links to Sentry
 
-With the server sending logs to Sentry (`SENTRY_DSN`), the Overview links straight to them. Each file in the Errors table, and **Warnings and errors in Sentry** at the top, open Sentry Logs filtered to warnings and errors over the dashboard's time range. The links point at the `uma-stable-match` organization and the `uma-stable-match-server` project; edit them in the dashboard if yours differ.
+With the server sending logs to Sentry (`SENTRY_DSN`), the Overview links straight to them. Each file in the Errors table opens Sentry Logs filtered to that row's app, file and line. **Warnings and errors in Sentry** at the top opens every warning and error from the apps chosen in the picker. Both cover the dashboard's time range.
+
+The links find an app's logs by their `fly.app` attribute, which the server adds on Fly.io, so every app needs a build that adds it and its own `SENTRY_DSN`. Logs sent before that, and logs from a local server, have no `fly.app`, so the links don't find them. The links point at the `uma-stable-match` organization and the `uma-stable-match-server` project; edit them in the dashboard if yours differ.
 
 ## Traces
 
