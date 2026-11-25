@@ -794,7 +794,7 @@ A log search service can then filter by those fields. The server also sends its 
 
 ### Sentry
 
-Set `SENTRY_DSN` to send errors (as issues), info, warning and error log lines (as Sentry Logs) and traces to [Sentry](https://sentry.io). `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE` tag them, and `SENTRY_TRACES_SAMPLE_RATE` (default `0.1`) sets the share of requests traced. Unset, nothing is sent. No personal data is attached; keep `RUST_LOG` at `info` as above.
+Set `SENTRY_DSN` to send errors (as issues), info, warning and error log lines (as Sentry Logs) and traces to [Sentry](https://sentry.io). `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE` tag them, as does `FLY_APP_NAME` (as `fly.app`), which Fly.io sets, and `SENTRY_TRACES_SAMPLE_RATE` (default `0.1`) sets the share of requests traced. Unset, nothing is sent. No personal data is attached; keep `RUST_LOG` at `info` as above.
 
 At `info`, logs hold no trainer IDs or IP addresses. Keep `RUST_LOG` at `info` when logs leave the server.
 

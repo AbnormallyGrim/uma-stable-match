@@ -53,10 +53,10 @@
     {
       "title": "Warnings and errors in Sentry",
       "type": "link",
-      "url": "https://uma-stable-match.sentry.io/explore/logs/?project=uma-stable-match-server&logsQuery=severity%3A%5Bwarn%2Cerror%5D&start=${__from:date:iso}&end=${__to:date:iso}",
+      "url": "https://uma-stable-match.sentry.io/explore/logs/?project=uma-stable-match-server&logsQuery=severity%3A%5Bwarn%2Cerror%5D%20fly.app%3A%5B${app:csv}%5D&start=${__from:date:iso}&end=${__to:date:iso}",
       "targetBlank": true,
       "icon": "external link",
-      "tooltip": "Opens every warning and error for the dashboard's time range"
+      "tooltip": "Opens every warning and error from the chosen apps for the dashboard's time range"
     }
   ],
   "liveNow": false,
@@ -95,7 +95,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(increase(http_requests_total{route=\"/api/v1/recommendations\"}[$__range]))",
+          "expr": "sum(increase(http_requests_total{route=\"/api/v1/recommendations\", app=~\"$app\"}[$__range]))",
           "legendFormat": "searches",
           "instant": true,
           "range": false
@@ -156,7 +156,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "max(searches_total)",
+          "expr": "max(searches_total{app=~\"$app\"})",
           "legendFormat": "total",
           "instant": true,
           "range": false
@@ -216,7 +216,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (status) (increase(http_requests_total{route=\"/api/v1/recommendations\"}[$__range]))",
+          "expr": "sum by (status) (increase(http_requests_total{route=\"/api/v1/recommendations\", app=~\"$app\"}[$__range]))",
           "legendFormat": "{{status}}",
           "instant": true,
           "range": false
@@ -276,7 +276,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (status) (increase(http_requests_total{route=\"/api/v1/recommendations\"}[5m]))",
+          "expr": "sum by (status) (increase(http_requests_total{route=\"/api/v1/recommendations\", app=~\"$app\"}[5m]))",
           "legendFormat": "{{status}}",
           "interval": "5m",
           "range": true
@@ -388,7 +388,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "redis_up",
+          "expr": "redis_up{app=~\"$app\"}",
           "legendFormat": "",
           "instant": true,
           "range": false
@@ -467,7 +467,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "time() - scan_last_success_timestamp_seconds",
+          "expr": "time() - scan_last_success_timestamp_seconds{app=~\"$app\"}",
           "legendFormat": "",
           "instant": true,
           "range": false
@@ -531,7 +531,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(increase(umamoe_requests_total{status!~\"2..\"}[1h]))",
+          "expr": "sum(increase(umamoe_requests_total{status!~\"2..\", app=~\"$app\"}[1h]))",
           "legendFormat": "",
           "instant": true,
           "range": false
@@ -609,7 +609,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (route, status) (rate(http_requests_total[1m]))",
+          "expr": "sum by (route, status) (rate(http_requests_total{app=~\"$app\"}[1m]))",
           "legendFormat": "{{route}} {{status}}"
         }
       ],
@@ -707,7 +707,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (status, route) (rate(http_requests_total{status=~\"4..|5..\"}[5m])) * 60",
+          "expr": "sum by (status, route) (rate(http_requests_total{status=~\"4..|5..\", app=~\"$app\"}[5m])) * 60",
           "legendFormat": "{{status}} {{route}}"
         }
       ],
@@ -804,7 +804,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket{app=~\"$app\"}[5m])))",
           "legendFormat": "{{route}}"
         }
       ],
@@ -902,7 +902,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (limit) (rate(rate_limited_total[5m])) * 60",
+          "expr": "sum by (limit) (rate(rate_limited_total{app=~\"$app\"}[5m])) * 60",
           "legendFormat": "{{limit}}"
         }
       ],
@@ -999,7 +999,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (status) (increase(http_requests_total[$__range]))",
+          "expr": "sum by (status) (increase(http_requests_total{app=~\"$app\"}[$__range]))",
           "legendFormat": "{{status}}",
           "instant": true,
           "range": false
@@ -1075,7 +1075,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (level) (increase(log_events_total[1h]))",
+          "expr": "sum by (level) (increase(log_events_total{app=~\"$app\"}[1h]))",
           "legendFormat": "{{level}}",
           "interval": "1h"
         }
@@ -1191,7 +1191,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Each row is one log line in the code. Select a row's file to open the warnings and errors in Sentry Logs, for the dashboard's time range. Rows with no file are warnings from libraries the server uses.",
+      "description": "Each row is one log line in the code, for each app. Select a row's file to open that line's warnings and errors from that app in Sentry Logs, for the dashboard's time range. Rows with no file are warnings from libraries the server uses.",
       "gridPos": {
         "h": 9,
         "w": 24,
@@ -1205,7 +1205,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sort_desc(sum by (level, file, line) (increase(log_events_total[$__range])) > 0)",
+          "expr": "sort_desc(sum by (app, level, file, line) (increase(log_events_total{app=~\"$app\"}[$__range])) > 0)",
           "legendFormat": "",
           "instant": true,
           "range": false,
@@ -1220,12 +1220,14 @@
               "Time": true
             },
             "indexByName": {
-              "level": 0,
-              "file": 1,
-              "line": 2,
-              "Value": 3
+              "app": 0,
+              "level": 1,
+              "file": 2,
+              "line": 3,
+              "Value": 4
             },
             "renameByName": {
+              "app": "App",
               "level": "Level",
               "file": "File",
               "line": "Line",
@@ -1274,7 +1276,7 @@
                 "value": [
                   {
                     "title": "Open in Sentry Logs",
-                    "url": "https://uma-stable-match.sentry.io/explore/logs/?project=uma-stable-match-server&logsQuery=severity%3A%5Bwarn%2Cerror%5D&start=${__from:date:iso}&end=${__to:date:iso}",
+                    "url": "https://uma-stable-match.sentry.io/explore/logs/?project=uma-stable-match-server&logsQuery=severity%3A%5Bwarn%2Cerror%5D%20fly.app%3A${__data.fields.app:percentencode}%20code.file.path%3A%22${__data.fields.file:percentencode}%22%20code.line.number%3A${__data.fields.line}&start=${__from:date:iso}&end=${__to:date:iso}",
                     "targetBlank": true
                   }
                 ]
@@ -1323,7 +1325,36 @@
     "uma-stable-match"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "app",
+        "label": "App",
+        "type": "query",
+        "description": "The Fly apps to show. A local Prometheus has no apps, so this stays empty there.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values({__name__=~\"http_requests_total|log_events_total|umamoe_requests_total\"}, app)",
+        "query": "label_values({__name__=~\"http_requests_total|log_events_total|umamoe_requests_total\"}, app)",
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "hide": 0
+      }
+    ]
   },
   "time": {
     "from": "now-1h",
