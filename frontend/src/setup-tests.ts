@@ -1,4 +1,10 @@
 import '@testing-library/jest-dom/vitest';
+import { afterEach } from 'vitest';
+
+// Features are saved per session; start each test without them.
+afterEach(() => {
+  globalThis.sessionStorage?.clear();
+});
 
 // jsdom has no ResizeObserver, which `bind:clientWidth` uses. Sizes stay 0 in tests.
 globalThis.ResizeObserver ??= class {
