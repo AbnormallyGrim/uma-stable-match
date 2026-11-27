@@ -10,11 +10,13 @@ use axum::http::header::{
     X_CONTENT_TYPE_OPTIONS, X_FRAME_OPTIONS,
 };
 use axum::http::{HeaderValue, StatusCode};
-use axum::middleware::{from_fn, Next};
+use axum::middleware::{from_fn, from_fn_with_state, Next};
 use axum::response::{IntoResponse, Response};
 use axum::Router;
 use tower::ServiceExt;
 use tower_http::services::{ServeDir, ServeFile};
+
+use crate::preload::{self, Preloads};
 
 /// Builds a `Content-Security-Policy`, adding extra script and connect sources.
 macro_rules! content_security {
@@ -45,10 +47,12 @@ const REVALIDATE: &str = "no-cache";
 
 pub(crate) fn service(dir: &Path) -> Router {
     let index = Arc::new(dir.join("index.html"));
+    let preloads = Arc::new(Preloads::single(&index));
     let fallback = axum::routing::any(spa_fallback).with_state(index);
     Router::new()
         .fallback_service(ServeDir::new(dir).fallback(fallback))
         .layer(from_fn(cache_headers))
+        .layer(from_fn_with_state(preloads, preload::link_headers))
 }
 
 async fn spa_fallback(State(index): State<Arc<PathBuf>>, request: Request) -> Response {
