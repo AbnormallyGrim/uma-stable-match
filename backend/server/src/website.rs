@@ -17,6 +17,7 @@ use tower::ServiceExt;
 use tower_http::services::ServeDir;
 
 use crate::frontend;
+use crate::preload::{self, Preloads};
 
 const IMAGES: &str = "public, max-age=86400";
 const REVALIDATE: &str = "no-cache";
@@ -78,6 +79,10 @@ fn service(dir: &Path, policy: HeaderValue) -> Router {
     Router::new()
         .fallback_service(ServeDir::new(dir))
         .layer(from_fn(cache_headers))
+        .layer(from_fn_with_state(
+            Arc::new(Preloads::site(dir)),
+            preload::link_headers,
+        ))
         .layer(from_fn_with_state(policy, frontend::security_headers))
 }
 

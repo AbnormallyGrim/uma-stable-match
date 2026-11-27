@@ -404,6 +404,10 @@ Every response, from the API and the frontend alike, carries these headers:
 
 The policy allows no inline scripts or styles, so the frontend must not add any. That's why the theme script lives in its own file.
 
+### Preload links
+
+HTML responses carry a `Link` header listing the page's same-origin stylesheets and scripts as `rel=preload`, and its `<link rel="preconnect">` origins, read from `index.html` at startup. Cloudflare's [Early Hints](https://developers.cloudflare.com/cache/advanced-configuration/early-hints/) remembers it and sends it as a `103` response at the edge, so the browser fetches those files while the page is still on its way from the server. A `crossorigin` attribute on the tag carries over, so the preload matches the real request. Vite's hashed file names change with each build, which is why the header is read from the built file rather than written by hand.
+
 ## Serving the website
 
 With `SITE_HOST` and `SITE_DIR` set, the server also serves a static website, such as the project's `site/`, by the request's host name:
@@ -420,7 +424,7 @@ Then open <http://site.localhost:8080> for the website and <http://localhost:808
 | For `www.` plus `SITE_HOST` | `308` to `https://` plus `SITE_HOST`, keeping the path and query |
 | For any other host, or without one | The API and frontend, as above |
 
-On the website, files under `/images/` are cached for a day and everything else gets `Cache-Control: no-cache`. Responses carry the same [security headers](#security-headers) as the app, with a different `Content-Security-Policy`:
+On the website, files under `/images/` are cached for a day and everything else gets `Cache-Control: no-cache`. Each HTML page gets its own [preload links](#preload-links), read from that file at startup. Responses carry the same [security headers](#security-headers) as the app, with a different `Content-Security-Policy`:
 
 - styles also from `https://fonts.googleapis.com`, and fonts only from `https://fonts.gstatic.com`
 - the inline `<script>` and `<style>` elements in `index.html`, allowed by their SHA-256 hashes, which the server works out at startup, so editing them needs no other change
